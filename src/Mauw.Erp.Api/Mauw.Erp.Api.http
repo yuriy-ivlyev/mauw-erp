@@ -1,0 +1,6 @@
+@Mauw.Erp.Api_HostAddress = http://localhost:5178
+
+GET {{Mauw.Erp.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

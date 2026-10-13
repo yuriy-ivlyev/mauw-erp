@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Mauw.Erp.Api/Mauw.Erp.Api.csproj" />
+    <Project Path="src/Mauw.Erp.Application/Mauw.Erp.Application.csproj" />
+    <Project Path="src/Mauw.Erp.Contracts/Mauw.Erp.Contracts.csproj" />
+    <Project Path="src/Mauw.Erp.Domain/Mauw.Erp.Domain.csproj" />
+    <Project Path="src/Mauw.Erp.Infrastructure/Mauw.Erp.Infrastructure.csproj" />
+    <Project Path="src/Mauw.Erp.Web/Mauw.Erp.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Mauw.Erp.UnitTests/Mauw.Erp.UnitTests.csproj" />
+  </Folder>
+</Solution>
