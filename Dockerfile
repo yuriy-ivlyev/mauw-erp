@@ -18,8 +18,8 @@ WORKDIR /app
 
 COPY --from=publish /app/publish .
 
-EXPOSE 8080 8081
-ENV ASPNETCORE_URLS=http://+:8080;https://+:8081
+EXPOSE 8080
+ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Development
 
 ENTRYPOINT ["dotnet", "Mauw.Erp.Api.dll"]
