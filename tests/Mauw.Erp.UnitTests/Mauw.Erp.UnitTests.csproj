@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Mauw.Erp.Application\Mauw.Erp.Application.csproj" />
     <ProjectReference Include="..\..\src\Mauw.Erp.Domain\Mauw.Erp.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Mauw.Erp.Web\Mauw.Erp.Web.csproj" />
   </ItemGroup>
 
 </Project>

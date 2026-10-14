@@ -1,0 +1,198 @@
+@page "/orders/create"
+@page "/orders/create-order"
+@using Mauw.Erp.Web.Components
+@using Mauw.Erp.Web.Helpers
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Nuovo ordine</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-6">
+    <MudStack Spacing="3">
+        <MudText Typo="Typo.h4">Nuovo ordine</MudText>
+
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudAutocomplete T="CustomerOption"
+                                 Label="Cliente"
+                                 Variant="Variant.Outlined"
+                                 Dense="true"
+                                 SearchFunc="SearchCustomers"
+                                 ToStringFunc="@(customer => customer?.DisplayName ?? string.Empty)"
+                                 Value="SelectedCustomer"
+                                 ValueChanged="OnCustomerSelected" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect T="string"
+                           Label="Articolo padre"
+                           Variant="Variant.Outlined"
+                           Dense="true"
+                           @bind-Value="SelectedArticle">
+                    @foreach (var article in Articles)
+                    {
+                        <MudSelectItem Value="@article" />
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudTextField Label="Codice articolo" Value="@(SelectedArticle ?? "")" ReadOnly="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+        </MudGrid>
+
+        <MudPaper Class="pa-4" Elevation="1">
+            <MudStack Row="false" Spacing="1">
+                <MudText Typo="Typo.h6">Quantità per taglia e colore</MudText>
+                <SizeColorMatrixGrid AvailableSizes="AvailableSizes"
+                                    AvailableColors="AvailableColors"
+                                    OnQuantitiesChanged="OnMatrixQuantitiesChanged" />
+            </MudStack>
+        </MudPaper>
+
+        <MudPaper Class="pa-4" Elevation="1">
+            <MudStack Row="false" Spacing="1">
+                <MudText Typo="Typo.h6">Riepilogo backend</MudText>
+                <MudText>Totale pezzi: <strong>@Summary.TotalUnits</strong></MudText>
+                <MudText>Subtotale: <strong>@Summary.Subtotal.ToString("C")</strong></MudText>
+                <MudText>IVA: <strong>@Summary.Vat.ToString("C")</strong></MudText>
+                <MudText>Totale documento: <strong>@Summary.Total.ToString("C")</strong></MudText>
+            </MudStack>
+        </MudPaper>
+
+        <MudStack Row="true" Justify="Justify.FlexEnd">
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Secondary"
+                       OnClick="ClearSelection"
+                       Disabled="@string.IsNullOrWhiteSpace(SelectedArticle)">
+                Reset
+            </MudButton>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="ConfirmAndIssueAsync"
+                       Disabled="@(!CanSubmit)">
+                Conferma ed Emetti
+            </MudButton>
+        </MudStack>
+
+        @if (!string.IsNullOrWhiteSpace(PdfViewerUrl))
+        {
+            <MudPaper Class="pa-4" Elevation="1">
+                <MudText Typo="Typo.h6">Anteprima fattura / DDT</MudText>
+                <iframe src="@PdfViewerUrl" style="width: 100%; height: 720px; border: 0; border-radius: 8px;" title="Anteprima PDF"></iframe>
+            </MudPaper>
+        }
+    </MudStack>
+</MudContainer>
+
+@code {
+    private readonly List<string> AvailableSizes = new() { "XS", "S", "M", "L", "XL" };
+    private readonly List<string> AvailableColors = new() { "BCO", "NRO", "BLU" };
+    private readonly List<string> Articles = new() { "ART-1001", "ART-2002", "ART-3003" };
+
+    private CustomerOption? SelectedCustomer { get; set; }
+    private string? SelectedArticle { get; set; }
+    private Dictionary<(string Size, string Color), int> Quantities { get; set; } = new();
+    private string PdfViewerUrl { get; set; } = string.Empty;
+
+    private OrderSummary Summary { get; set; } = new();
+
+    private bool CanSubmit => SelectedCustomer is not null && !string.IsNullOrWhiteSpace(SelectedArticle) && Quantities.Count > 0;
+
+    private int TotalUnits => Summary.TotalUnits;
+
+    private Task<IEnumerable<CustomerOption>> SearchCustomers(string value, CancellationToken cancellationToken)
+    {
+        var query = string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+
+        var customers = new[]
+        {
+            new CustomerOption(1, "Mario Rossi S.r.l."),
+            new CustomerOption(2, "Luigi Bianchi & Co."),
+            new CustomerOption(3, "Azienda Verde s.p.a."),
+            new CustomerOption(4, "Francesca Neri"),
+            new CustomerOption(5, "Giacomo Verdi"),
+        };
+
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return Task.FromResult<IEnumerable<CustomerOption>>(customers);
+        }
+
+        return Task.FromResult<IEnumerable<CustomerOption>>(
+            customers.Where(item => item.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private void OnCustomerSelected(CustomerOption? customer)
+    {
+        SelectedCustomer = customer;
+        if (customer is not null && string.IsNullOrWhiteSpace(SelectedArticle))
+        {
+            SelectedArticle = Articles.First();
+        }
+    }
+
+    private void OnMatrixQuantitiesChanged(Dictionary<(string Size, string Color), int> updatedQuantities)
+    {
+        Quantities = updatedQuantities;
+        Summary = BuildDemoSummary(updatedQuantities);
+    }
+
+    private static OrderSummary BuildDemoSummary(Dictionary<(string Size, string Color), int> quantities)
+    {
+        var totalUnits = OrderMatrixCalculator.GetTotalQuantity(quantities);
+
+        return new OrderSummary
+        {
+            TotalUnits = totalUnits,
+            Subtotal = totalUnits * 18m,
+            Vat = totalUnits * 3m,
+            Total = totalUnits * 21m,
+        };
+    }
+
+    private void ClearSelection()
+    {
+        SelectedCustomer = null;
+        SelectedArticle = null;
+        Quantities.Clear();
+        PdfViewerUrl = string.Empty;
+        Summary = new OrderSummary();
+    }
+
+    private async Task ConfirmAndIssueAsync()
+    {
+        if (!CanSubmit)
+        {
+            Snackbar.Add("Seleziona cliente, articolo e almeno una quantità.", Severity.Warning);
+            return;
+        }
+
+        var payload = new
+        {
+            CustomerId = SelectedCustomer?.Id,
+            ArticleCode = SelectedArticle,
+            Quantities = Quantities,
+        };
+
+        try
+        {
+            await Http.PostAsJsonAsync("api/orders", payload);
+            Snackbar.Add("Ordine inviato correttamente.", Severity.Success);
+            PdfViewerUrl = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Endpoint backend non disponibile; anteprima PDF caricata in modalità demo.", Severity.Info);
+            PdfViewerUrl = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
+        }
+    }
+
+    private sealed record CustomerOption(int Id, string DisplayName);
+
+    private sealed class OrderSummary
+    {
+        public int TotalUnits { get; set; }
+        public decimal Subtotal { get; set; }
+        public decimal Vat { get; set; }
+        public decimal Total { get; set; }
+    }
+}

@@ -1,0 +1,74 @@
+@if (AvailableSizes is { Count: > 0 } && AvailableColors is { Count: > 0 })
+{
+    <div class="mud-width-full">
+        <table class="mud-table mud-table-dense size-color-matrix-table">
+            <thead>
+                <tr>
+                    <th class="size-color-matrix-header">Colore</th>
+                    @foreach (var size in AvailableSizes)
+                    {
+                        <th class="size-color-matrix-header">@size</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var color in AvailableColors)
+                {
+                    <tr>
+                        <th class="size-color-matrix-row-label">@color</th>
+                        @foreach (var size in AvailableSizes)
+                        {
+                            var currentValue = GetQuantityFor(size, color);
+
+                            <td class="size-color-matrix-cell">
+                                <MudNumericField T="int"
+                                                 Value="@currentValue"
+                                                 ValueChanged="@(value => UpdateQuantity(size, color, value))"
+                                                 Variant="Variant.Outlined"
+                                                 Margin="Margin.Dense"
+                                                 Min="0"
+                                                 Immediate="true"
+                                                 Class="size-color-matrix-input"
+                                                 Placeholder="0"
+                                                 aria-label="@($"Quantità per {size} e {color}")" />
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public List<string> AvailableSizes { get; set; } = new();
+
+    [Parameter]
+    public List<string> AvailableColors { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<Dictionary<(string Size, string Color), int>> OnQuantitiesChanged { get; set; }
+
+    private readonly Dictionary<(string Size, string Color), int> _quantities = new();
+
+    private int GetQuantityFor(string size, string color)
+    {
+        return _quantities.TryGetValue((size, color), out var value) ? value : 0;
+    }
+
+    private async Task UpdateQuantity(string size, string color, int value)
+    {
+        if (value <= 0)
+        {
+            _quantities.Remove((size, color));
+        }
+        else
+        {
+            _quantities[(size, color)] = value;
+        }
+
+        var snapshot = new Dictionary<(string Size, string Color), int>(_quantities);
+        await OnQuantitiesChanged.InvokeAsync(snapshot);
+    }
+}
