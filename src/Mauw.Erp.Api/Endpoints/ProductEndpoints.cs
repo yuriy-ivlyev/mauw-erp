@@ -24,6 +24,10 @@ public static class ProductEndpoints
             .WithName("GetProducts")
             .WithSummary("Get paginated product list");
 
+        group.MapGet("/barcode/{barcode}", GetVariantByBarcode)
+            .WithName("GetVariantByBarcode")
+            .WithSummary("Get variant by barcode for fast lookups");
+
         group.MapGet("/{id}", GetProduct)
             .WithName("GetProduct")
             .WithSummary("Get product details by ID");
@@ -35,10 +39,6 @@ public static class ProductEndpoints
         group.MapDelete("/{id}", DeleteProduct)
             .WithName("DeleteProduct")
             .WithSummary("Delete a product and its variants");
-
-        group.MapGet("/barcode/{barcode}", GetVariantByBarcode)
-            .WithName("GetVariantByBarcode")
-            .WithSummary("Get variant by barcode for fast lookups");
     }
 
     private static async Task<Results<Created<ProductDto>, BadRequest<string>>> CreateProduct(

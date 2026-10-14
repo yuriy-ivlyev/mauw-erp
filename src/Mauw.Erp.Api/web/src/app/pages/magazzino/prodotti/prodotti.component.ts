@@ -420,7 +420,14 @@ export class ProdottiComponent implements OnInit {
         this.loadProducts();
       },
       error: (err) => {
-        this.error = this.editingProductId ? 'Errore nella modifica del prodotto' : 'Errore nella creazione del prodotto';
+        // Extract error message from HTTP response if available
+        if (err.error && typeof err.error === 'string') {
+          this.error = err.error;
+        } else if (err.message) {
+          this.error = err.message;
+        } else {
+          this.error = this.editingProductId ? 'Errore nella modifica del prodotto' : 'Errore nella creazione del prodotto';
+        }
         this.savingProduct = false;
         console.error(err);
       }
