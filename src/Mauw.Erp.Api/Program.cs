@@ -11,7 +11,6 @@ inventoryRepository.Seed(new ProductVariant(Guid.NewGuid(), "SKU-1000", "Sample 
 builder.Services.AddOpenApi();
 builder.Services.AddValidatorsFromAssemblyContaining<ScanStockMovementCommandValidator>();
 builder.Services.AddSingleton<IInventoryRepository>(inventoryRepository);
-builder.Services.AddSingleton(inventoryRepository);
 builder.Services.AddScoped<ScanStockMovementCommandHandler>();
 
 var app = builder.Build();
