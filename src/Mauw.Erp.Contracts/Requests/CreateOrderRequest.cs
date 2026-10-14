@@ -1,0 +1,10 @@
+﻿namespace Mauw.Erp.Contracts.Requests;
+
+/// <summary>
+/// Request for creating an order.
+/// </summary>
+public class CreateOrderRequest
+{
+    public Guid ContactId { get; set; }
+    public decimal? DiscountRate { get; set; }
+}

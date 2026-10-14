@@ -76,15 +76,12 @@ public static class InvoiceEndpoints
         IInvoiceService invoiceService)
     {
         var result = await invoiceService.RecordPaymentAsync(id, request);
-        
-        if (!result.Success)
-        {
-            if (result.Error.Contains("not found"))
-                return TypedResults.NotFound();
-            return TypedResults.BadRequest(result.Error);
-        }
 
-        return TypedResults.Ok((object)new { PaymentRecorded = true });
+        if (result.Success) return TypedResults.Ok((object)new { PaymentRecorded = true });
+        if (result.Error != null && result.Error.Contains("not found"))
+            return TypedResults.NotFound();
+        return TypedResults.BadRequest(result.Error);
+
     }
 
     private static async Task<Results<FileContentHttpResult, BadRequest<string>, NotFound>> GetInvoicePdf(

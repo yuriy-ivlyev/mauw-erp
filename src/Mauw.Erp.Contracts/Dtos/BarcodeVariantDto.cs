@@ -1,0 +1,17 @@
+﻿namespace Mauw.Erp.Contracts.Dtos;
+
+/// <summary>
+/// DTO for barcode lookup response.
+/// </summary>
+public record BarcodeVariantDto(
+    string Barcode,
+    Guid VariantId,
+    Guid ProductId,
+    string ProductName,
+    string Size,
+    string Color,
+    int StockQuantity,
+    decimal UnitNetPrice,
+    decimal UnitGrossPrice,
+    decimal VatRate
+);

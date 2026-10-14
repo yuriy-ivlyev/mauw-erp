@@ -6,15 +6,6 @@ using Mauw.Erp.Contracts.Dtos;
 namespace Mauw.Erp.Infrastructure.Reporting;
 
 /// <summary>
-/// Interface for PDF report generation.
-/// </summary>
-public interface IPdfGenerator
-{
-    byte[] GenerateInvoicePdf(InvoiceReportDto dto);
-    byte[] GenerateDdtPdf(DdtReportDto dto);
-}
-
-/// <summary>
 /// QuestPDF implementation of PDF generator for Italian invoices and DDT documents.
 /// </summary>
 public class QuestPdfGenerator : IPdfGenerator
@@ -80,14 +71,14 @@ public class QuestPdfGenerator : IPdfGenerator
 
             column.Item().Row(row =>
             {
-                row.RelativeColumn().Column(col =>
+                row.RelativeItem().Column(col =>
                 {
                     col.Item().Text("CLIENTE").FontSize(12).Bold();
                     col.Item().Text(dto.Customer.BusinessName).FontSize(11);
                     col.Item().Text($"P.IVA: {dto.Customer.VatNumber}").FontSize(10);
                 });
 
-                row.RelativeColumn().Column(col =>
+                row.RelativeItem().Column(col =>
                 {
                     col.Item().Text("SOCIETÀ").FontSize(12).Bold();
                     if (dto.Company != null)
@@ -137,14 +128,14 @@ public class QuestPdfGenerator : IPdfGenerator
 
             column.Item().Row(row =>
             {
-                row.RelativeColumn().Column(col =>
+                row.RelativeItem().Column(col =>
                 {
                     col.Item().Text("CLIENTE").FontSize(12).Bold();
                     col.Item().Text(dto.Customer.BusinessName).FontSize(11);
                     col.Item().Text($"P.IVA: {dto.Customer.VatNumber}").FontSize(10);
                 });
 
-                row.RelativeColumn().Column(col =>
+                row.RelativeItem().Column(col =>
                 {
                     col.Item().Text("SOCIETÀ").FontSize(12).Bold();
                     if (dto.Company != null)

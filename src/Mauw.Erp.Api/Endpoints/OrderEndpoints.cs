@@ -79,7 +79,7 @@ public static class OrderEndpoints
         
         if (!result.Success)
         {
-            if (result.Error.Contains("not found"))
+            if (result.Error != null && result.Error.Contains("not found"))
                 return TypedResults.NotFound();
             return TypedResults.BadRequest(result.Error);
         }
@@ -98,14 +98,11 @@ public static class OrderEndpoints
         IOrderService orderService)
     {
         var result = await orderService.ConfirmOrderAsync(id);
-        
-        if (!result.Success)
-        {
-            if (result.Error.Contains("not found"))
-                return TypedResults.NotFound();
-            return TypedResults.BadRequest(result.Error);
-        }
 
-        return TypedResults.Ok(result.Data!);
+        if (result.Success) return TypedResults.Ok(result.Data!);
+        if (result.Error != null && result.Error.Contains("not found"))
+            return TypedResults.NotFound();
+        return TypedResults.BadRequest(result.Error);
+
     }
 }

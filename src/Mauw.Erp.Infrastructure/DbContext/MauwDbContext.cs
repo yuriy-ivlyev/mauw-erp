@@ -7,7 +7,7 @@ namespace Mauw.Erp.Infrastructure.DbContext;
 /// Entity Framework Core DbContext for Mauw ERP system.
 /// Configured with Npgsql for PostgreSQL/Aurora with snake_case naming conventions.
 /// </summary>
-public class MauwDbContext : Microsoft.EntityFrameworkCore.DbContext
+public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.EntityFrameworkCore.DbContext(options)
 {
     public DbSet<Contact> Contacts { get; set; }
     public DbSet<Product> Products { get; set; }
@@ -21,10 +21,6 @@ public class MauwDbContext : Microsoft.EntityFrameworkCore.DbContext
     public DbSet<InvoiceItem> InvoiceItems { get; set; }
     public DbSet<Payment> Payments { get; set; }
     public DbSet<AgentCommission> AgentCommissions { get; set; }
-
-    public MauwDbContext(DbContextOptions<MauwDbContext> options) : base(options)
-    {
-    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

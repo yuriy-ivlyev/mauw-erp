@@ -1,4 +1,3 @@
-using Xunit;
 using Mauw.Erp.Domain.Services;
 
 namespace Mauw.Erp.UnitTests.Domain;

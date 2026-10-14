@@ -1,0 +1,12 @@
+﻿using Mauw.Erp.Domain.Entities;
+
+namespace Mauw.Erp.Domain.Repositories;
+
+/// <summary>
+/// Invoice-specific repository operations.
+/// </summary>
+public interface IInvoiceRepository : IRepository<Invoice>
+{
+    Task<Invoice?> GetByNumberAsync(string invoiceNumber);
+    Task<IEnumerable<Invoice>> GetByContactIdAsync(Guid contactId);
+}

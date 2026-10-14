@@ -14,36 +14,3 @@ public record ProductDto(
     string? ImageUrl,
     List<ProductVariantDto> Variants
 );
-
-/// <summary>
-/// DTO for ProductVariant information including pricing (response).
-/// </summary>
-public record ProductVariantDto(
-    Guid Id,
-    Guid ProductId,
-    string Size,
-    string Color,
-    string Barcode,
-    decimal PurchaseCost,
-    int StockQuantity,
-    decimal ListPrice,
-    decimal FinalNetPrice,
-    decimal VatAmount,
-    decimal FinalGrossPrice
-);
-
-/// <summary>
-/// DTO for barcode lookup response.
-/// </summary>
-public record BarcodeVariantDto(
-    string Barcode,
-    Guid VariantId,
-    Guid ProductId,
-    string ProductName,
-    string Size,
-    string Color,
-    int StockQuantity,
-    decimal UnitNetPrice,
-    decimal UnitGrossPrice,
-    decimal VatRate
-);

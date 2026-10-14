@@ -38,6 +38,4 @@ public class Contact : Entity
         AgentId = agentId;
         DefaultCommissionRate = defaultCommissionRate;
     }
-
-    private Contact() { } // For EF Core
 }

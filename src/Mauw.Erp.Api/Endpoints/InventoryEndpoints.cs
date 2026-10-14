@@ -33,7 +33,7 @@ public static class InventoryEndpoints
         
         if (!result.Success)
         {
-            if (result.Error.Contains("not found"))
+            if (result.Error != null && result.Error.Contains("not found"))
                 return TypedResults.NotFound();
             return TypedResults.BadRequest(result.Error);
         }
