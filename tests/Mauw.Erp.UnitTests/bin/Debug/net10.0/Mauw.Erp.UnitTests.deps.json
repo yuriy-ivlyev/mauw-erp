@@ -8,7 +8,7 @@
     ".NETCoreApp,Version=v10.0": {
       "Mauw.Erp.UnitTests/1.0.0": {
         "dependencies": {
-          "FluentValidation": "11.11.0",
+          "FluentValidation": "12.2.0",
           "Mauw.Erp.Api": "1.0.0",
           "Mauw.Erp.Application": "1.0.0",
           "Mauw.Erp.Contracts": "1.0.0",
@@ -32,17 +32,17 @@
           }
         }
       },
-      "FluentValidation/11.11.0": {
+      "FluentValidation/12.2.0": {
         "runtime": {
           "lib/net8.0/FluentValidation.dll": {
-            "assemblyVersion": "11.0.0.0",
-            "fileVersion": "11.11.0.0"
+            "assemblyVersion": "12.0.0.0",
+            "fileVersion": "12.2.0.0"
           }
         }
       },
       "FluentValidation.AspNetCore/11.3.1": {
         "dependencies": {
-          "FluentValidation": "11.11.0",
+          "FluentValidation": "12.2.0",
           "FluentValidation.DependencyInjectionExtensions": "11.11.0"
         },
         "runtime": {
@@ -54,7 +54,7 @@
       },
       "FluentValidation.DependencyInjectionExtensions/11.11.0": {
         "dependencies": {
-          "FluentValidation": "11.11.0"
+          "FluentValidation": "12.2.0"
         },
         "runtime": {
           "lib/netstandard2.1/FluentValidation.DependencyInjectionExtensions.dll": {
@@ -465,6 +465,7 @@
       },
       "Mauw.Erp.Application/1.0.0": {
         "dependencies": {
+          "FluentValidation": "12.2.0",
           "Mauw.Erp.Contracts": "1.0.0",
           "Mauw.Erp.Domain": "1.0.0"
         },
@@ -494,6 +495,7 @@
       "Mauw.Erp.Infrastructure/1.0.0": {
         "dependencies": {
           "EFCore.NamingConventions": "10.0.1",
+          "Mauw.Erp.Application": "1.0.0",
           "Mauw.Erp.Domain": "1.0.0",
           "Microsoft.EntityFrameworkCore": "10.0.4",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "10.0.3"
@@ -520,12 +522,12 @@
       "path": "efcore.namingconventions/10.0.1",
       "hashPath": "efcore.namingconventions.10.0.1.nupkg.sha512"
     },
-    "FluentValidation/11.11.0": {
+    "FluentValidation/12.2.0": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-cyIVdQBwSipxWG8MA3Rqox7iNbUNUTK5bfJi9tIdm4CAfH71Oo5ABLP4/QyrUwuakqpUEPGtE43BDddvEehuYw==",
-      "path": "fluentvalidation/11.11.0",
-      "hashPath": "fluentvalidation.11.11.0.nupkg.sha512"
+      "sha512": "sha512-DR3lFbdnKucaaj1/8zMNOACMz/64igzox1yVZSFVsLxYB5mxAB+wFP1WZ8fjwrZnbU1KA1DoMzHKYKxUfuZ4wQ==",
+      "path": "fluentvalidation/12.2.0",
+      "hashPath": "fluentvalidation.12.2.0.nupkg.sha512"
     },
     "FluentValidation.AspNetCore/11.3.1": {
       "type": "package",

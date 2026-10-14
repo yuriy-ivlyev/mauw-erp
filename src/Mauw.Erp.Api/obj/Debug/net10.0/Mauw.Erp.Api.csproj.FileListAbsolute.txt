@@ -130,3 +130,5 @@
 /home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Api/obj/Debug/net10.0/Mauw.Erp.Api.pdb
 /home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Api/obj/Debug/net10.0/Mauw.Erp.Api.genruntimeconfig.cache
 /home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Api/obj/Debug/net10.0/ref/Mauw.Erp.Api.dll
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Api/bin/Debug/net10.0/Mauw.Erp.Application.dll
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Api/bin/Debug/net10.0/Mauw.Erp.Application.pdb
