@@ -2,7 +2,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS builder
 WORKDIR /src
 
-COPY ["Mauw.Erp.slnx", "."]
+COPY ["Mauw.Erp.sln", "."]
 COPY ["src/", "src/"]
 
 RUN dotnet restore "src/Mauw.Erp.Api/Mauw.Erp.Api.csproj"
