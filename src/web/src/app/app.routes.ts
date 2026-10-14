@@ -1,9 +1,23 @@
 import { Routes } from '@angular/router';
-import { HomeComponent } from './components/home/home.component';
+import { AdminLayoutComponent } from './shared/layout/admin-layout.component';
+import { DashboardComponent } from './pages/dashboard/dashboard.component';
 
 export const routes: Routes = [
   {
     path: '',
-    component: HomeComponent
+    component: AdminLayoutComponent,
+    children: [
+      {
+        path: '',
+        component: DashboardComponent,
+        pathMatch: 'full',
+        title: 'Dashboard | Mauw ERP'
+      },
+      {
+        path: 'dashboard',
+        component: DashboardComponent,
+        title: 'Dashboard | Mauw ERP'
+      }
+    ]
   }
 ];
