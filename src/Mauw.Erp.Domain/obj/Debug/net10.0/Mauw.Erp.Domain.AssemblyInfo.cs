@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Mauw.Erp.Domain")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+adbc884525146696f385e067f8bb3301bd166f0d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f0dfe2f17b79c43e09d22b54ae2cc6261df1bbf0")]
 [assembly: System.Reflection.AssemblyProductAttribute("Mauw.Erp.Domain")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Mauw.Erp.Domain")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

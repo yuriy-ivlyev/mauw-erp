@@ -104,8 +104,7 @@ public static class ProductsEndpoint
 
             var variant = await db.ProductVariants
                 .AsNoTracking()
-                .Include(v => v.Product)
-                .FirstOrDefaultAsync(v => v.Barcode.ToLower() == barcode.Trim().ToLower());
+                .FirstOrDefaultAsync(v => v.Barcode == barcode.Trim());
 
             if (variant is null)
             {
