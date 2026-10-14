@@ -5,10 +5,21 @@
 *.suo
 *.user
 _ReSharper.*
-bin
-obj
 github.com
 **/*.log
+
+## .NET specific
+bin/
+obj/
+debug/
+Debug/
+release/
+Release/
+*.dll
+*.pdb
+*.nupkg
+*.snupkg
+appsettings.*.json
 
 ## Build generated
 target/
@@ -19,7 +30,6 @@ mvnw
 packages
 **/__pycache__/
 **/dist/
-Debug/
 **_example
 
 # IDE generated files and directories
