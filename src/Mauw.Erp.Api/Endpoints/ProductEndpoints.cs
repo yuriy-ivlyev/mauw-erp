@@ -32,6 +32,14 @@ public static class ProductEndpoints
             .WithName("GetProduct")
             .WithSummary("Get product details by ID");
 
+        group.MapPut("/{id}", UpdateProduct)
+            .WithName("UpdateProduct")
+            .WithSummary("Update product details");
+
+        group.MapDelete("/{id}", DeleteProduct)
+            .WithName("DeleteProduct")
+            .WithSummary("Delete a product and its variants");
+
         group.MapGet("/barcode/{barcode}", GetVariantByBarcode)
             .WithName("GetVariantByBarcode")
             .WithSummary("Get variant by barcode for fast lookups");
@@ -193,6 +201,103 @@ public static class ProductEndpoints
         );
 
         return TypedResults.Ok(dto);
+    }
+
+    private static async Task<Results<Ok<ProductDto>, NotFound>> UpdateProduct(
+        Guid id,
+        CreateProductRequest request,
+        MauwDbContext dbContext,
+        IValidator<CreateProductRequest> validator)
+    {
+        var product = await dbContext.Products
+            .Include(p => p.Variants)
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (product == null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        var validationResult = await validator.ValidateAsync(request);
+        if (!validationResult.IsValid)
+        {
+            throw new ValidationException(validationResult.Errors);
+        }
+
+        product.Update(
+            supplierId: request.SupplierId,
+            supplierCode: request.SupplierCode,
+            internalCode: request.InternalCode,
+            name: request.Name,
+            defaultMarkupRate: request.DefaultMarkupRate,
+            vatRate: request.VatRate,
+            imageUrl: request.ImageUrl
+        );
+
+        // Remove old variants from tracking
+        var oldVariants = product.Variants.ToList();
+        foreach (var oldVariant in oldVariants)
+        {
+            dbContext.ProductVariants.Remove(oldVariant);
+        }
+
+        // Add new variants
+        foreach (var variantRequest in request.Variants)
+        {
+            var variant = new ProductVariant(
+                productId: product.Id,
+                size: variantRequest.Size,
+                color: variantRequest.Color,
+                barcode: variantRequest.Barcode,
+                purchaseCost: variantRequest.PurchaseCost,
+                stockQuantity: variantRequest.StockQuantity
+            );
+            dbContext.ProductVariants.Add(variant);
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        // Reload product with new variants
+        var updatedProduct = await dbContext.Products
+            .Include(p => p.Variants)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (updatedProduct == null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        var dto = new ProductDto(
+            Id: updatedProduct.Id,
+            SupplierId: updatedProduct.SupplierId,
+            SupplierCode: updatedProduct.SupplierCode,
+            InternalCode: updatedProduct.InternalCode,
+            Name: updatedProduct.Name,
+            DefaultMarkupRate: updatedProduct.DefaultMarkupRate,
+            VatRate: updatedProduct.VatRate,
+            ImageUrl: updatedProduct.ImageUrl,
+            Variants: updatedProduct.Variants.Select(v => MapVariant(v, updatedProduct.DefaultMarkupRate)).ToList()
+        );
+
+        return TypedResults.Ok(dto);
+    }
+
+    private static async Task<Results<NoContent, NotFound>> DeleteProduct(
+        Guid id,
+        MauwDbContext dbContext)
+    {
+        var product = await dbContext.Products.FindAsync(id);
+
+        if (product == null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        dbContext.Products.Remove(product);
+        await dbContext.SaveChangesAsync();
+
+        return TypedResults.NoContent();
     }
 
     private static ProductVariantDto MapVariant(ProductVariant variant, decimal defaultMarkupRate)

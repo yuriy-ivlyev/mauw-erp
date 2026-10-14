@@ -35,6 +35,25 @@ public class Product : Entity
         ImageUrl = imageUrl;
     }
 
+    public void Update(
+        Guid supplierId,
+        string supplierCode,
+        string internalCode,
+        string name,
+        decimal defaultMarkupRate,
+        decimal vatRate,
+        string? imageUrl = null)
+    {
+        SupplierId = supplierId;
+        SupplierCode = supplierCode;
+        InternalCode = internalCode;
+        Name = name;
+        DefaultMarkupRate = defaultMarkupRate;
+        VatRate = vatRate;
+        ImageUrl = imageUrl;
+        UpdateTimestamp();
+    }
+
     private Product() { } // For EF Core
 }
 

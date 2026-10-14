@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Domain.Enums;
 
 namespace Mauw.Erp.Infrastructure.DbContext;
 
@@ -168,7 +169,7 @@ public class AgentCommissionConfiguration : IEntityTypeConfiguration<AgentCommis
 
         builder.Property(ac => ac.Status)
             .IsRequired()
-            .HasDefaultValue("Pending");
+            .HasDefaultValue(CommissionStatus.Pending);
 
         builder.Property(ac => ac.CreatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
