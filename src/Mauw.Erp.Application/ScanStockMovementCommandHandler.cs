@@ -13,18 +13,24 @@ public class ScanStockMovementCommandHandler
 
     public async Task<ProductVariant> HandleAsync(ScanStockMovementCommand command, CancellationToken cancellationToken = default)
     {
-        var variant = await _inventoryRepository.GetByBarcodeAsync(command.Barcode, cancellationToken)
-            ?? throw new InvalidOperationException($"Variant with barcode '{command.Barcode}' was not found.");
+        ProductVariant? variant;
+        lock (InMemoryInventoryRepository.SyncRoot)
+        {
+            variant = _inventoryRepository.GetByBarcodeAsync(command.Barcode, cancellationToken).Result
+                ?? throw new InvalidOperationException($"Variant with barcode '{command.Barcode}' was not found.");
 
-        variant.ApplyStockMovement(command.Quantity);
+            variant.ApplyStockMovement(command.Quantity);
 
-        var stockMovement = new StockMovement(
-            variant.Id,
-            command.Type,
-            command.Quantity,
-            variant.UnitCost,
-            command.ReferenceDoc);
+            var stockMovement = new StockMovement(
+                variant.Id,
+                command.Type,
+                command.Quantity,
+                variant.UnitCost,
+                command.ReferenceDoc);
 
-        return await _inventoryRepository.SaveAsync(variant, stockMovement, cancellationToken);
+            _inventoryRepository.SaveAsync(variant, stockMovement, cancellationToken).GetAwaiter().GetResult();
+        }
+
+        return variant;
     }
 }
