@@ -23,7 +23,7 @@ public sealed class QuestPdfInvoiceGenerator : IPdfGenerator
             {
                 page.Size(PageSizes.A4);
                 page.Margin(1.5f, Unit.Centimetre);
-                page.DefaultTextStyle(x => x.FontSize(8).FontFamily("Helvetica"));
+                page.DefaultTextStyle(x => x.FontSize(8).FontFamily("Lato"));
 
                 page.Content().Column(column =>
                 {
@@ -92,7 +92,7 @@ public sealed class QuestPdfInvoiceGenerator : IPdfGenerator
             {
                 page.Size(PageSizes.A4);
                 page.Margin(1.5f, Unit.Centimetre);
-                page.DefaultTextStyle(x => x.FontSize(8).FontFamily("Helvetica"));
+                page.DefaultTextStyle(x => x.FontSize(8).FontFamily("Lato"));
 
                 page.Content().Column(column =>
                 {
