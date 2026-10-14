@@ -3,6 +3,7 @@ using Mauw.Erp.Application.Validation;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Domain.Exceptions;
 using Mauw.Erp.Domain.Repositories;
 
 namespace Mauw.Erp.Application.Services;
@@ -115,7 +116,14 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         }
 
         await unitOfWork.Products.UpdateAsync(product);
-        await unitOfWork.SaveChangesAsync();
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+        catch (ConcurrencyException ex)
+        {
+            return OperationResult<ProductDto>.Fail(ex.Message);
+        }
 
         var updated = await unitOfWork.Products.GetByIdAsync(id);
         return OperationResult<ProductDto>.Ok(ProductMapper.MapToDto(updated!));
@@ -128,7 +136,14 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             return OperationResult<bool>.Fail("Product not found");
 
         await unitOfWork.Products.DeleteAsync(product);
-        await unitOfWork.SaveChangesAsync();
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+        catch (ConcurrencyException ex)
+        {
+            return OperationResult<bool>.Fail(ex.Message);
+        }
 
         return OperationResult<bool>.Ok(true);
     }

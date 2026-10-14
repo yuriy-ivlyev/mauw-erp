@@ -4,6 +4,7 @@ using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Domain.Entities;
 using Mauw.Erp.Domain.Enums;
+using Mauw.Erp.Domain.Exceptions;
 using Mauw.Erp.Domain.Repositories;
 
 namespace Mauw.Erp.Application.Services;
@@ -76,7 +77,6 @@ public class ContactService(
         if (contact == null)
             return OperationResult<ContactDto>.Fail("Contact not found");
 
-        // Update only provided fields
         if (!string.IsNullOrWhiteSpace(request.BusinessName))
             contact.BusinessName = request.BusinessName;
 
@@ -96,7 +96,14 @@ public class ContactService(
             contact.AgentId = request.AgentId.Value;
 
         await unitOfWork.Contacts.UpdateAsync(contact);
-        await unitOfWork.SaveChangesAsync();
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+        catch (ConcurrencyException ex)
+        {
+            return OperationResult<ContactDto>.Fail(ex.Message);
+        }
 
         return OperationResult<ContactDto>.Ok(ContactMapper.MapToDto(contact));
     }
@@ -108,7 +115,14 @@ public class ContactService(
             return OperationResult<bool>.Fail("Contact not found");
 
         await unitOfWork.Contacts.DeleteAsync(contact);
-        await unitOfWork.SaveChangesAsync();
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+        catch (ConcurrencyException ex)
+        {
+            return OperationResult<bool>.Fail(ex.Message);
+        }
 
         return OperationResult<bool>.Ok(true);
     }

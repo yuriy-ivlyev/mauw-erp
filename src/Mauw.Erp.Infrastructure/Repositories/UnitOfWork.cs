@@ -1,5 +1,7 @@
-﻿using Mauw.Erp.Domain.Repositories;
+using Mauw.Erp.Domain.Repositories;
+using Mauw.Erp.Domain.Exceptions;
 using Mauw.Erp.Infrastructure.DbContext;
+using Microsoft.EntityFrameworkCore;
 
 namespace Mauw.Erp.Infrastructure.Repositories;
 
@@ -26,7 +28,15 @@ public class UnitOfWork(MauwDbContext dbContext) : IUnitOfWork
 
     public async Task SaveChangesAsync()
     {
-        await dbContext.SaveChangesAsync();
+        try
+        {
+            await dbContext.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            dbContext.ChangeTracker.Clear();
+            throw new ConcurrencyException(ex.Message);
+        }
     }
 
     public async Task BeginTransactionAsync()

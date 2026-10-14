@@ -3,6 +3,7 @@ using Mauw.Erp.Application.Validation;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Domain.Exceptions;
 using Mauw.Erp.Domain.Repositories;
 using Mauw.Erp.Domain.Services;
 
@@ -82,12 +83,19 @@ public class InvoiceService(
             variantId: request.VariantId,
             quantity: request.Quantity,
             unitNetPrice: request.UnitNetPrice,
-            vatRate: (decimal)request.UnitVatAmount / request.UnitNetPrice * 100 // Reverse-calculate VAT rate
+            vatRate: (decimal)request.UnitVatAmount / request.UnitNetPrice * 100
         );
 
         invoice.AddItem(item);
         await unitOfWork.Invoices.UpdateAsync(invoice);
-        await unitOfWork.SaveChangesAsync();
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+        catch (ConcurrencyException ex)
+        {
+            return OperationResult<InvoiceDto>.Fail(ex.Message);
+        }
 
         var updated = await unitOfWork.Invoices.GetByIdAsync(invoiceId);
         return OperationResult<InvoiceDto>.Ok(InvoiceMapper.MapToDto(updated!));
@@ -107,7 +115,14 @@ public class InvoiceService(
 
         invoice.RecordPayment(request.Amount);
         await unitOfWork.Invoices.UpdateAsync(invoice);
-        await unitOfWork.SaveChangesAsync();
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+        catch (ConcurrencyException ex)
+        {
+            return OperationResult<InvoiceDto>.Fail(ex.Message);
+        }
 
         var updated = await unitOfWork.Invoices.GetByIdAsync(invoiceId);
         return OperationResult<InvoiceDto>.Ok(InvoiceMapper.MapToDto(updated!));
@@ -120,7 +135,14 @@ public class InvoiceService(
             return OperationResult<bool>.Fail("Invoice not found");
 
         await unitOfWork.Invoices.DeleteAsync(invoice);
-        await unitOfWork.SaveChangesAsync();
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+        catch (ConcurrencyException ex)
+        {
+            return OperationResult<bool>.Fail(ex.Message);
+        }
 
         return OperationResult<bool>.Ok(true);
     }
