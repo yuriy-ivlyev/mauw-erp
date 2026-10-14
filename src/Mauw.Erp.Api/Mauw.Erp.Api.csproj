@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Mauw.Erp.Application\Mauw.Erp.Application.csproj" />
     <ProjectReference Include="..\Mauw.Erp.Infrastructure\Mauw.Erp.Infrastructure.csproj" />
   </ItemGroup>
 

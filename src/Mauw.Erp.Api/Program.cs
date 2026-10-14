@@ -1,12 +1,16 @@
+using Mauw.Erp.Application;
+using Mauw.Erp.Infrastructure.Reporting;
+using QuestPDF.Infrastructure;
+
+QuestPDF.Settings.License = LicenseType.Community;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddSingleton<IPdfGenerator, QuestPdfInvoiceGenerator>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -14,28 +18,30 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
+app.MapGet("/api/v1/invoices/{id}/pdf", (string id, IPdfGenerator pdfGenerator) =>
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    var invoice = new InvoiceReportDto
+    {
+        DocumentNumber = $"FA-{id}",
+        IssueDate = DateTime.Today,
+        CustomerName = "Cliente demo",
+        CustomerAddress = "Via Roma 1, Milano",
+        CustomerVatNumber = "IT01234567890",
+        TaxableAmount = 150m,
+        TotalTax = 33m,
+        TotalDue = 183m,
+        VatSummary =
+        [
+            new VatSummaryDto { RateLabel = "22%", TaxableAmount = 150m, TaxAmount = 33m, Total = 183m },
+        ],
+        Lines =
+        [
+            new InvoiceLineDto { Code = "ITEM-001", Description = "Prodotto demo", SizeColor = "M / Nero", Quantity = 3, UnitPrice = 50m, Total = 150m },
+        ],
+    };
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    var pdfBytes = pdfGenerator.GenerateInvoicePdf(invoice);
+    return Results.File(pdfBytes, "application/pdf", fileDownloadName: $"invoice-{id}.pdf");
+});
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

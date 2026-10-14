@@ -1,8 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "cS1vSZPAvmA=",
+  "dgSpecHash": "dOCexpGimYQ=",
   "success": true,
-  "projectFilePath": "C:\\Workspace\\mauw-erp\\src\\Mauw.Erp.Infrastructure\\Mauw.Erp.Infrastructure.csproj",
-  "expectedPackageFiles": [],
+  "projectFilePath": "/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/Mauw.Erp.Infrastructure.csproj",
+  "expectedPackageFiles": [
+    "/home/runner/.nuget/packages/questpdf/2026.9.1/questpdf.2026.9.1.nupkg.sha512"
+  ],
   "logs": []
 }
