@@ -34,7 +34,7 @@
   <!-- Clean Angular build output -->
   <Target Name="CleanWebApp" BeforeTargets="Clean">
     <RemoveDir Directories="$(MSBuildProjectDirectory)\web\dist" />
-    <RemoveDir Directories="$(MSBuildProjectDirectory)\wwwroot" />
+    <!-- Don't remove wwwroot entirely, just the generated files -->
   </Target>
 
 </Project>
