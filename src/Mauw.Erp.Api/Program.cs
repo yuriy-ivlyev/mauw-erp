@@ -68,6 +68,9 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 
+// Serve static files (Angular app)
+app.UseStaticFiles();
+
 // Map endpoints
 app.MapProductEndpoints();
 app.MapInventoryEndpoints();
@@ -75,6 +78,9 @@ app.MapContactEndpoints();
 app.MapOrderEndpoints();
 app.MapInvoiceEndpoints();
 app.MapDdtEndpoints();
+
+// Fallback to index.html for Angular routing
+app.MapFallbackToFile("index.html");
 
 // Migrate database on startup
 using (var scope = app.Services.CreateScope())

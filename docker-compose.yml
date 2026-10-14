@@ -40,20 +40,6 @@ services:
       - mauw-network
     restart: unless-stopped
 
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile.web
-      target: final
-    container_name: mauw-erp-web
-    depends_on:
-      - api
-    ports:
-      - "80:80"
-    networks:
-      - mauw-network
-    restart: unless-stopped
-
 volumes:
   postgres_data:
     driver: local
@@ -63,6 +49,7 @@ volumes:
 networks:
   mauw-network:
     driver: bridge
+
 
 
 

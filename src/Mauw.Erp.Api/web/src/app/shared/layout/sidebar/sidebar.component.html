@@ -1,43 +1,62 @@
 <aside class="w-64 bg-gray-900 text-white h-screen fixed left-0 top-0 overflow-y-auto">
   <div class="p-6">
-    <h2 class="text-2xl font-bold mb-8">Dashboard</h2>
+    <h2 class="text-2xl font-bold mb-8">MAUW ERP</h2>
     
-    <nav class="space-y-2">
-      <a routerLink="/" routerLinkActive="bg-primary" class="block px-4 py-2 rounded-md hover:bg-gray-800 transition">
-        <span class="flex items-center gap-3">
-          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
-          </svg>
-          Dashboard
-        </span>
-      </a>
-      
-      <a routerLink="/tables" routerLinkActive="bg-primary" class="block px-4 py-2 rounded-md hover:bg-gray-800 transition">
-        <span class="flex items-center gap-3">
-          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M10 10.5h4v3h-4zm-6 0h4v3H4zm6-6h4v3h-4zM4 4.5h4v3H4zm6 6h4v3h-4zm-6 0h4v3H4zm12-6h4v3h-4zm0 6h4v3h-4zm0 6h4v3h-4z"/>
-          </svg>
-          Tabelle
-        </span>
-      </a>
-      
-      <a routerLink="/forms" routerLinkActive="bg-primary" class="block px-4 py-2 rounded-md hover:bg-gray-800 transition">
-        <span class="flex items-center gap-3">
-          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-          </svg>
-          Moduli
-        </span>
-      </a>
-      
-      <a routerLink="/charts" routerLinkActive="bg-primary" class="block px-4 py-2 rounded-md hover:bg-gray-800 transition">
-        <span class="flex items-center gap-3">
-          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/>
-          </svg>
-          Grafici
-        </span>
-      </a>
+    <nav class="space-y-1">
+      <ng-container *ngFor="let item of menuItems">
+        <!-- Menu item senza figli -->
+        <ng-container *ngIf="!item.children || item.children.length === 0">
+          <a 
+            *ngIf="item.route"
+            [routerLink]="item.route" 
+            routerLinkActive="bg-blue-600" 
+            class="block px-4 py-3 rounded-md hover:bg-gray-800 transition duration-200 flex items-center gap-3 group">
+            <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+              <path [attr.d]="getSvgPath(item.icon)"/>
+            </svg>
+            <span class="text-sm font-medium">{{ item.label }}</span>
+          </a>
+        </ng-container>
+
+        <!-- Menu item con figli -->
+        <ng-container *ngIf="item.children && item.children.length > 0">
+          <div 
+            (click)="toggleSubmenu(item)"
+            class="px-4 py-3 rounded-md hover:bg-gray-800 transition duration-200 cursor-pointer flex items-center justify-between gap-3 group">
+            <span class="flex items-center gap-3 flex-1">
+              <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                <path [attr.d]="getSvgPath(item.icon)"/>
+              </svg>
+              <span class="text-sm font-medium">{{ item.label }}</span>
+            </span>
+            <svg 
+              class="w-4 h-4 transition-transform duration-200 flex-shrink-0"
+              [class.rotate-180]="!item.isCollapsed"
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+            </svg>
+          </div>
+
+          <!-- Sottomenu -->
+          <div 
+            class="ml-4 space-y-1 overflow-hidden transition-all duration-200"
+            [class.hidden]="item.isCollapsed"
+            *ngIf="!item.isCollapsed">
+            <a 
+              *ngFor="let child of item.children"
+              [routerLink]="child.route" 
+              routerLinkActive="bg-blue-600"
+              class="block px-4 py-2 rounded-md hover:bg-gray-700 transition duration-200 flex items-center gap-3 text-sm text-gray-300 hover:text-white">
+              <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                <path [attr.d]="getSvgPath(child.icon)"/>
+              </svg>
+              <span class="text-xs font-medium">{{ child.label }}</span>
+            </a>
+          </div>
+        </ng-container>
+      </ng-container>
     </nav>
   </div>
 </aside>
