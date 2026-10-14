@@ -1,0 +1,17 @@
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/bin/Debug/net10.0/Mauw.Erp.Infrastructure.deps.json
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/bin/Debug/net10.0/Mauw.Erp.Infrastructure.runtimeconfig.json
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/bin/Debug/net10.0/Mauw.Erp.Infrastructure.dll
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/bin/Debug/net10.0/Mauw.Erp.Infrastructure.pdb
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/bin/Debug/net10.0/Mauw.Erp.Domain.dll
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/bin/Debug/net10.0/Mauw.Erp.Domain.pdb
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/obj/Debug/net10.0/Mauw.Erp.Infrastructure.csproj.AssemblyReference.cache
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/obj/Debug/net10.0/Mauw.Erp.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/obj/Debug/net10.0/Mauw.Erp.Infrastructure.AssemblyInfoInputs.cache
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/obj/Debug/net10.0/Mauw.Erp.Infrastructure.AssemblyInfo.cs
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/obj/Debug/net10.0/Mauw.Erp.Infrastructure.csproj.CoreCompileInputs.cache
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/obj/Debug/net10.0/Mauw.Erp.07594ED0.Up2Date
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/obj/Debug/net10.0/Mauw.Erp.Infrastructure.dll
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/obj/Debug/net10.0/refint/Mauw.Erp.Infrastructure.dll
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/obj/Debug/net10.0/Mauw.Erp.Infrastructure.pdb
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/obj/Debug/net10.0/Mauw.Erp.Infrastructure.genruntimeconfig.cache
+/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/obj/Debug/net10.0/ref/Mauw.Erp.Infrastructure.dll

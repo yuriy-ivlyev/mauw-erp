@@ -25,12 +25,12 @@ public class ProductVariantConfiguration : IEntityTypeConfiguration<ProductVaria
 
         builder.Property(x => x.Barcode)
             .HasMaxLength(100)
+            .UseCollation("case_insensitive")
             .IsRequired();
 
         builder.HasIndex(x => x.Barcode)
             .IsUnique()
-            .HasDatabaseName("ix_product_variants_barcode_unique")
-            .UseCollation("und-x-icu");
+            .HasDatabaseName("ix_product_variants_barcode_unique");
 
         builder.Property(x => x.PurchaseCost)
             .HasColumnType("numeric(18, 4)")

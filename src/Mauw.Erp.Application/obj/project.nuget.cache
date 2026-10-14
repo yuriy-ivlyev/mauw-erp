@@ -1,11 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "yIU89K3Dxjo=",
+  "dgSpecHash": "rAXLon+uI8o=",
   "success": true,
   "projectFilePath": "/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Application/Mauw.Erp.Application.csproj",
-  "expectedPackageFiles": [
-    "/tmp/codeql-scratch-dafe354c4e770146/dbs/csharp/working/packages/microsoft.netcore.app.ref/10.0.12/microsoft.netcore.app.ref.10.0.12.nupkg.sha512",
-    "/tmp/codeql-scratch-dafe354c4e770146/dbs/csharp/working/packages/microsoft.aspnetcore.app.ref/10.0.12/microsoft.aspnetcore.app.ref.10.0.12.nupkg.sha512"
-  ],
+  "expectedPackageFiles": [],
   "logs": []
 }

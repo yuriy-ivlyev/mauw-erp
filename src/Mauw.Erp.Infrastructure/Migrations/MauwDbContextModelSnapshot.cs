@@ -20,6 +20,8 @@ namespace Mauw.Erp.Infrastructure.Migrations
                 .HasAnnotation("ProductVersion", "10.0.4")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            modelBuilder.HasCollation("case_insensitive", locale: "und-u-ks-level2", provider: "icu", deterministic: false);
+
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Mauw.Erp.Domain.Product", b =>
@@ -80,6 +82,7 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Property<string>("Barcode")
                         .IsRequired()
                         .HasMaxLength(100)
+                        .UseCollation("case_insensitive")
                         .HasColumnType("character varying(100)")
                         .HasColumnName("barcode");
 

@@ -15,6 +15,12 @@ public class MauwDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasCollation(
+            "case_insensitive",
+            locale: "und-u-ks-level2",
+            provider: "icu",
+            deterministic: false);
+
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(MauwDbContext).Assembly);
         base.OnModelCreating(modelBuilder);
     }

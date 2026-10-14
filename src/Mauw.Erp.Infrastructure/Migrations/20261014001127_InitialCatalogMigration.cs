@@ -11,6 +11,9 @@ namespace Mauw.Erp.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AlterDatabase()
+                .Annotation("Npgsql:CollationDefinition:case_insensitive", "und-u-ks-level2,icu,False");
+
             migrationBuilder.CreateTable(
                 name: "products",
                 columns: table => new
@@ -37,7 +40,7 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     product_id = table.Column<Guid>(type: "uuid", nullable: false),
                     size = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     color = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    barcode = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    barcode = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false, collation: "case_insensitive"),
                     purchase_cost = table.Column<decimal>(type: "numeric(18,4)", nullable: false),
                     stock_quantity = table.Column<int>(type: "integer", nullable: false)
                 },
@@ -72,6 +75,9 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "products");
+
+            migrationBuilder.AlterDatabase()
+                .OldAnnotation("Npgsql:CollationDefinition:case_insensitive", "und-u-ks-level2,icu,False");
         }
     }
 }
