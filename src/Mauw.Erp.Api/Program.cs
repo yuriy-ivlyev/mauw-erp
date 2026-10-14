@@ -1,8 +1,19 @@
+using Mauw.Erp.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException(
+        "Connection string 'DefaultConnection' was not found.");
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddDbContext<MauwDbContext>(options =>
+{
+    options.UseNpgsql(connectionString)
+        .UseSnakeCaseNamingConvention();
+});
 
 var app = builder.Build();
 

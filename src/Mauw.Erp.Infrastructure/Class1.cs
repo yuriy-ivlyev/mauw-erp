@@ -1,6 +1,7 @@
-﻿namespace Mauw.Erp.Infrastructure;
+﻿using Microsoft.EntityFrameworkCore;
 
-public class Class1
+namespace Mauw.Erp.Infrastructure;
+
+public sealed class MauwDbContext(DbContextOptions<MauwDbContext> options) : DbContext(options)
 {
-
 }
