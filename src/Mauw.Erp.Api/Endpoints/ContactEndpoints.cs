@@ -1,23 +1,20 @@
-using Mauw.Erp.Application.Validators;
+using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
-using Mauw.Erp.Domain.Entities;
-using Mauw.Erp.Domain.Enums;
-using Mauw.Erp.Infrastructure.DbContext;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Mauw.Erp.Api.Endpoints;
 
 /// <summary>
 /// Contact management endpoints for customers, suppliers, and agents.
+/// Thin layer delegating to IContactService.
 /// </summary>
 public static class ContactEndpoints
 {
     public static void MapContactEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/contacts")
-            .WithName("Contacts")
-            .WithOpenApi();
+            .WithName("Contacts");
 
         group.MapPost("/", CreateContact)
             .WithName("CreateContact")
@@ -40,198 +37,66 @@ public static class ContactEndpoints
             .WithSummary("Delete a contact");
     }
 
-    private static async Task<IResult> CreateContact(
+    private static async Task<Results<Created<ContactDto>, BadRequest<string>>> CreateContact(
         CreateContactRequest request,
-        MauwDbContext dbContext,
-        CreateContactRequestValidator validator)
+        IContactService contactService)
     {
-        var validationResult = await validator.ValidateAsync(request);
-        if (!validationResult.IsValid)
-            return Results.BadRequest(validationResult.Errors);
+        var result = await contactService.CreateContactAsync(request);
+        
+        if (!result.Success)
+            return TypedResults.BadRequest(result.Error);
 
-        // Verify agent exists if specified
-        if (request.AgentId.HasValue && request.AgentId != Guid.Empty)
-        {
-            var agent = await dbContext.Contacts.FirstOrDefaultAsync(c => c.Id == request.AgentId);
-            if (agent == null)
-                return Results.NotFound("Specified agent not found");
-        }
-
-        // Parse contact type from int
-        if (request.Type < 0 || request.Type > 2)
-            return Results.BadRequest("Invalid contact type");
-        var contactType = (ContactType)request.Type;
-
-        // Create contact
-        var contact = new Contact(
-            type: contactType,
-            businessName: request.BusinessName,
-            vatNumber: request.VatNumber,
-            sdiCode: request.SdiCode,
-            defaultDiscountRate: request.DefaultDiscountRate,
-            agentId: request.AgentId,
-            defaultCommissionRate: request.DefaultCommissionRate);
-
-        dbContext.Contacts.Add(contact);
-        await dbContext.SaveChangesAsync();
-
-        return Results.Created($"/api/v1/contacts/{contact.Id}", new ContactDto(
-            contact.Id,
-            contact.Type.ToString(),
-            contact.BusinessName,
-            contact.VatNumber,
-            contact.SdiCode,
-            contact.DefaultDiscountRate,
-            contact.AgentId,
-            contact.DefaultCommissionRate
-        ));
+        return TypedResults.Created($"/api/v1/contacts/{result.Data!.Id}", result.Data);
     }
 
-    private static async Task<IResult> GetContact(
+    private static async Task<Results<Ok<ContactDto>, NotFound>> GetContact(
         Guid id,
-        MauwDbContext dbContext)
+        IContactService contactService)
     {
-        var contact = await dbContext.Contacts.FirstOrDefaultAsync(c => c.Id == id);
-        if (contact == null)
-            return Results.NotFound();
+        var result = await contactService.GetContactAsync(id);
+        
+        if (!result.Success)
+            return TypedResults.NotFound();
 
-        return Results.Ok(new ContactDto(
-            contact.Id,
-            contact.Type.ToString(),
-            contact.BusinessName,
-            contact.VatNumber,
-            contact.SdiCode,
-            contact.DefaultDiscountRate,
-            contact.AgentId,
-            contact.DefaultCommissionRate
-        ));
+        return TypedResults.Ok(result.Data!);
     }
 
-    private static async Task<IResult> ListContacts(
-        string? type = null,
+    private static async Task<Ok<PagedResult<ContactDto>>> ListContacts(
+        IContactService contactService,
         int page = 1,
-        int pageSize = 10,
-        MauwDbContext dbContext = null!)
+        int pageSize = 20,
+        string? search = null)
     {
-        const int maxPageSize = 100;
-        if (pageSize > maxPageSize)
-            pageSize = maxPageSize;
-
-        var query = dbContext.Contacts.AsQueryable();
-
-        // Filter by type if specified
-        if (!string.IsNullOrEmpty(type) && Enum.TryParse<ContactType>(type, out var contactType))
-        {
-            query = query.Where(c => c.Type == contactType);
-        }
-
-        var totalCount = await query.CountAsync();
-        var contacts = await query
-            .OrderBy(c => c.BusinessName)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
-        var items = contacts.Select(c => new ContactDto(
-            c.Id,
-            c.Type.ToString(),
-            c.BusinessName,
-            c.VatNumber,
-            c.SdiCode,
-            c.DefaultDiscountRate,
-            c.AgentId,
-            c.DefaultCommissionRate
-        )).ToList();
-
-        return Results.Ok(new
-        {
-            items,
-            pageInfo = new
-            {
-                page,
-                pageSize,
-                totalCount,
-                totalPages = (int)Math.Ceiling(totalCount / (decimal)pageSize)
-            }
-        });
+        var result = await contactService.GetContactsAsync(page, pageSize, search);
+        return TypedResults.Ok(result.Data!);
     }
 
-    private static async Task<IResult> UpdateContact(
+    private static async Task<Results<Ok<ContactDto>, BadRequest<string>, NotFound>> UpdateContact(
         Guid id,
         UpdateContactRequest request,
-        MauwDbContext dbContext,
-        UpdateContactRequestValidator validator)
+        IContactService contactService)
     {
-        var contact = await dbContext.Contacts.FirstOrDefaultAsync(c => c.Id == id);
-        if (contact == null)
-            return Results.NotFound();
-
-        var validationResult = await validator.ValidateAsync(request);
-        if (!validationResult.IsValid)
-            return Results.BadRequest(validationResult.Errors);
-
-        // Verify agent exists if changing it
-        if (request.AgentId.HasValue && request.AgentId != contact.AgentId)
+        var result = await contactService.UpdateContactAsync(id, request);
+        
+        if (!result.Success)
         {
-            if (request.AgentId != Guid.Empty)
-            {
-                var agent = await dbContext.Contacts.FirstOrDefaultAsync(c => c.Id == request.AgentId);
-                if (agent == null)
-                    return Results.NotFound("Specified agent not found");
-            }
+            if (result.Error == "Contact not found")
+                return TypedResults.NotFound();
+            return TypedResults.BadRequest(result.Error);
         }
 
-        // Update properties
-        if (!string.IsNullOrEmpty(request.BusinessName))
-            contact.BusinessName = request.BusinessName;
-
-        if (!string.IsNullOrEmpty(request.VatNumber))
-            contact.VatNumber = request.VatNumber;
-
-        if (request.SdiCode != null)
-            contact.SdiCode = request.SdiCode;
-
-        if (request.DefaultDiscountRate.HasValue)
-            contact.DefaultDiscountRate = request.DefaultDiscountRate.Value;
-
-        if (request.DefaultCommissionRate.HasValue)
-            contact.DefaultCommissionRate = request.DefaultCommissionRate.Value;
-
-        if (request.AgentId.HasValue)
-            contact.AgentId = request.AgentId == Guid.Empty ? null : request.AgentId;
-
-        await dbContext.SaveChangesAsync();
-
-        return Results.Ok(new ContactDto(
-            contact.Id,
-            contact.Type.ToString(),
-            contact.BusinessName,
-            contact.VatNumber,
-            contact.SdiCode,
-            contact.DefaultDiscountRate,
-            contact.AgentId,
-            contact.DefaultCommissionRate
-        ));
+        return TypedResults.Ok(result.Data!);
     }
 
-    private static async Task<IResult> DeleteContact(
+    private static async Task<Results<NoContent, NotFound>> DeleteContact(
         Guid id,
-        MauwDbContext dbContext)
+        IContactService contactService)
     {
-        var contact = await dbContext.Contacts.FirstOrDefaultAsync(c => c.Id == id);
-        if (contact == null)
-            return Results.NotFound();
+        var result = await contactService.DeleteContactAsync(id);
+        
+        if (!result.Success)
+            return TypedResults.NotFound();
 
-        try
-        {
-            dbContext.Contacts.Remove(contact);
-            await dbContext.SaveChangesAsync();
-            return Results.NoContent();
-        }
-        catch (DbUpdateException ex)
-        {
-            // Could not delete due to foreign key constraints
-            return Results.BadRequest("Cannot delete contact: it has related orders, invoices, or commissions");
-        }
+        return TypedResults.NoContent();
     }
 }

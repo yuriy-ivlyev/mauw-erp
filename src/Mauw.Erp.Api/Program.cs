@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
-using FluentValidation;
 using Mauw.Erp.Infrastructure.DbContext;
-using Mauw.Erp.Application.Validators;
-using Mauw.Erp.Contracts.Dtos;
+using Mauw.Erp.Application.Validation;
+using Mauw.Erp.Application.Services;
+using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Api.Endpoints;
 using Mauw.Erp.Infrastructure.Reporting;
+using Mauw.Erp.Domain.Repositories;
+using Mauw.Erp.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,11 +18,28 @@ builder.Services.AddDbContext<MauwDbContext>(options =>
     options.UseNpgsql(connectionString)
 );
 
-// Add FluentValidation
-builder.Services.AddValidatorsFromAssemblyContaining<CreateProductRequestValidator>();
+// Register custom validators (no reflection)
+builder.Services.AddScoped<IValidator<CreateProductRequest>, CreateProductRequestValidator>();
+builder.Services.AddScoped<IValidator<CreateProductVariantRequest>, CreateProductVariantRequestValidator>();
+builder.Services.AddScoped<IValidator<CreateContactRequest>, CreateContactRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateContactRequest>, UpdateContactRequestValidator>();
+builder.Services.AddScoped<IValidator<CreateOrderRequest>, CreateOrderRequestValidator>();
+builder.Services.AddScoped<IValidator<CreateOrderItemRequest>, CreateOrderItemRequestValidator>();
+builder.Services.AddScoped<IValidator<BarcodeScanRequest>, BarcodeScanRequestValidator>();
+builder.Services.AddScoped<IValidator<CreateInvoiceRequest>, CreateInvoiceRequestValidator>();
 
-// Add services
-builder.Services.AddScoped<PricingService>();
+// Register repositories
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+// Register application services
+builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<IContactService, ContactService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+builder.Services.AddScoped<IInventoryService, InventoryService>();
+builder.Services.AddScoped<IDdtService, DdtService>();
+
+// Register domain services
 builder.Services.AddScoped<Mauw.Erp.Domain.Services.PricingEngine>();
 builder.Services.AddScoped<IPdfGenerator, QuestPdfGenerator>();
 
@@ -97,20 +116,3 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
-
-/// <summary>
-/// Pricing service for calculating prices with Italian fiscal rules.
-/// </summary>
-public class PricingService
-{
-    private readonly Mauw.Erp.Domain.Services.PricingEngine _pricingEngine = new();
-
-    public Mauw.Erp.Domain.Services.PricingEngine.PricingResult CalculatePricing(
-        decimal purchaseCost,
-        decimal markupRate,
-        decimal discountRate,
-        decimal vatRate)
-    {
-        return _pricingEngine.CalculatePrice(purchaseCost, markupRate, discountRate, vatRate);
-    }
-}

@@ -9,9 +9,9 @@ public class StockMovement : Entity
 {
     public Guid VariantId { get; set; }
     public StockMovementType Type { get; set; }
-    public int Quantity { get; set; } // Positive for inward, negative for outward
+    public int Quantity { get; set; }
     public decimal UnitCost { get; set; }
-    public string ReferenceDoc { get; set; }
+    public string? ReferenceDoc { get; set; }
 
     // Navigation
     public ProductVariant Variant { get; set; } = null!;
@@ -21,7 +21,7 @@ public class StockMovement : Entity
         StockMovementType type,
         int quantity,
         decimal unitCost,
-        string referenceDoc
+        string? referenceDoc = null
     ) : base()
     {
         VariantId = variantId;

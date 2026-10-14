@@ -107,7 +107,7 @@ public class RecordPaymentRequest
 /// </summary>
 public class CreateDdtRequest
 {
-    public Guid OrderId { get; set; }
+    public Guid ContactId { get; set; }
     public string DdtNumber { get; set; } = "";
 }
 

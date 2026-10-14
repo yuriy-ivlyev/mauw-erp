@@ -5,11 +5,11 @@ namespace Mauw.Erp.Contracts.Dtos;
 /// </summary>
 public record OrderDto(
     Guid Id,
-    Guid ContactId,
     string OrderNumber,
-    string Status,
+    Guid ContactId,
     DateTime OrderDate,
     decimal CustomerDiscountRate,
+    string Status,
     decimal TaxableTotal,
     decimal VatTotal,
     decimal GrossTotal,
@@ -21,11 +21,12 @@ public record OrderDto(
 /// </summary>
 public record OrderItemDto(
     Guid Id,
+    Guid OrderId,
     Guid VariantId,
     int Quantity,
     decimal UnitNetPrice,
-    decimal LineNetTotal,
     decimal VatRate,
+    decimal LineNetTotal,
     decimal LineVatTotal,
     decimal LineGrossTotal
 );
@@ -35,14 +36,15 @@ public record OrderItemDto(
 /// </summary>
 public record InvoiceDto(
     Guid Id,
-    Guid ContactId,
     string InvoiceNumber,
+    Guid ContactId,
     DateTime InvoiceDate,
     decimal TaxableTotal,
     decimal VatTotal,
     decimal GrossTotal,
-    decimal PaidAmount,
-    List<InvoiceItemDto> Items
+    string Status,
+    List<InvoiceItemDto> Items,
+    List<PaymentDto> Payments
 );
 
 /// <summary>
@@ -50,20 +52,51 @@ public record InvoiceDto(
 /// </summary>
 public record InvoiceItemDto(
     Guid Id,
+    Guid InvoiceId,
     Guid VariantId,
     int Quantity,
     decimal UnitNetPrice,
-    decimal LineNetTotal,
     decimal VatRate,
+    decimal LineNetTotal,
     decimal LineVatTotal,
     decimal LineGrossTotal
 );
 
 /// <summary>
-/// DTO for VAT breakdown (Castelletto IVA).
+/// DTO for Payment information (response).
 /// </summary>
-public record VatBreakdownDto(
+public record PaymentDto(
+    Guid Id,
+    decimal Amount,
+    DateTime PaymentDate,
+    string PaymentMethod
+);
+
+/// <summary>
+/// DTO for DDT (Transport Document) information (response).
+/// </summary>
+public record DdtDto(
+    Guid Id,
+    string DdtNumber,
+    Guid ContactId,
+    DateTime DdtDate,
+    decimal TaxableTotal,
+    decimal VatTotal,
+    decimal GrossTotal,
+    List<DdtItemDto> Items
+);
+
+/// <summary>
+/// DTO for DdtItem information (response).
+/// </summary>
+public record DdtItemDto(
+    Guid Id,
+    Guid DdtDocumentId,
+    Guid VariantId,
+    int Quantity,
+    decimal UnitNetPrice,
     decimal VatRate,
-    decimal TaxableAmount,
-    decimal VatAmount
+    decimal LineNetTotal,
+    decimal LineVatTotal,
+    decimal LineGrossTotal
 );

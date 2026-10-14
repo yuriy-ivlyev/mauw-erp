@@ -1,22 +1,20 @@
+using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
-using Mauw.Erp.Domain.Entities;
-using Mauw.Erp.Domain.Enums;
-using Mauw.Erp.Infrastructure.DbContext;
-using Mauw.Erp.Infrastructure.Reporting;
-using Microsoft.EntityFrameworkCore;
+using Mauw.Erp.Contracts.Requests;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Mauw.Erp.Api.Endpoints;
 
 /// <summary>
 /// DDT (Transport Document) management endpoints.
+/// Thin layer delegating to IDdtService.
 /// </summary>
 public static class DdtEndpoints
 {
     public static void MapDdtEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/ddts")
-            .WithName("DDTs")
-            .WithOpenApi();
+            .WithName("DDTs");
 
         group.MapPost("/", CreateDdt)
             .WithName("CreateDdt")
@@ -30,38 +28,82 @@ public static class DdtEndpoints
             .WithName("ListDdts")
             .WithSummary("List DDTs with pagination");
 
-        group.MapGet("/{id}/pdf", GetDdtPdf)
-            .WithName("GetDdtPdf")
-            .WithSummary("Generate and download DDT PDF");
+        group.MapPost("/{id}/items", AddDdtItem)
+            .WithName("AddDdtItem")
+            .WithSummary("Add an item to a DDT");
+
+        group.MapDelete("/{id}", DeleteDdt)
+            .WithName("DeleteDdt")
+            .WithSummary("Delete a DDT");
     }
 
-    private static async Task<IResult> CreateDdt(
-        MauwDbContext dbContext)
+    private static async Task<Results<Created<DdtDto>, BadRequest<string>>> CreateDdt(
+        CreateDdtRequest request,
+        IDdtService ddtService)
     {
-        // Placeholder for DDT creation
-        return Results.Ok(new { message = "DDT endpoints to be implemented" });
+        var result = await ddtService.CreateDdtAsync(request);
+        
+        if (!result.Success)
+            return TypedResults.BadRequest(result.Error);
+
+        return TypedResults.Created($"/api/v1/ddts/{result.Data!.Id}", result.Data);
     }
 
-    private static async Task<IResult> GetDdt(
+    private static async Task<Results<Ok<DdtDto>, NotFound>> GetDdt(
         Guid id,
-        MauwDbContext dbContext)
+        IDdtService ddtService)
     {
-        return Results.NotFound();
+        var result = await ddtService.GetDdtAsync(id);
+        
+        if (!result.Success)
+            return TypedResults.NotFound();
+
+        return TypedResults.Ok(result.Data!);
     }
 
-    private static async Task<IResult> ListDdts(
+    private static async Task<Ok<List<DdtDto>>> ListDdts(
+        IDdtService ddtService,
+        Guid? contactId = null,
         int page = 1,
-        int pageSize = 10,
-        MauwDbContext dbContext = null!)
+        int pageSize = 20)
     {
-        return Results.Ok(new { items = new List<object>(), pageInfo = new { page, pageSize, totalCount = 0 } });
+        if (contactId.HasValue)
+        {
+            var result = await ddtService.GetDdtsByContactAsync(contactId.Value, page, pageSize);
+            return TypedResults.Ok(result.Data!.Items);
+        }
+
+        // Return empty list for now (can implement GetAllDdts later)
+        return TypedResults.Ok(new List<DdtDto>());
     }
 
-    private static async Task<IResult> GetDdtPdf(
+    private static async Task<Results<Ok<DdtDto>, BadRequest<string>, NotFound>> AddDdtItem(
         Guid id,
-        MauwDbContext dbContext,
-        IPdfGenerator pdfGenerator)
+        CreateOrderItemRequest request,
+        IDdtService ddtService)
     {
-        return Results.NotFound();
+        var result = await ddtService.AddItemAsync(id, request);
+        
+        if (!result.Success)
+        {
+            if (result.Error.Contains("not found"))
+                return TypedResults.NotFound();
+            return TypedResults.BadRequest(result.Error);
+        }
+
+        return TypedResults.Ok(result.Data!);
+    }
+
+    private static async Task<Results<NoContent, NotFound>> DeleteDdt(
+        Guid id,
+        IDdtService ddtService)
+    {
+        var result = await ddtService.DeleteDdtAsync(id);
+        
+        if (!result.Success)
+            return TypedResults.NotFound();
+
+        return TypedResults.NoContent();
     }
 }
+

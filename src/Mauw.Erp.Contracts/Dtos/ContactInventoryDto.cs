@@ -5,13 +5,15 @@ namespace Mauw.Erp.Contracts.Dtos;
 /// </summary>
 public record ContactDto(
     Guid Id,
-    string Type,
+    int Type,
     string BusinessName,
     string VatNumber,
     string? SdiCode,
     decimal DefaultDiscountRate,
+    decimal DefaultCommissionRate,
     Guid? AgentId,
-    decimal DefaultCommissionRate
+    DateTime CreatedAt,
+    DateTime UpdatedAt
 );
 
 /// <summary>
@@ -23,7 +25,7 @@ public record StockMovementDto(
     string Type,
     int Quantity,
     decimal UnitCost,
-    string ReferenceDoc,
+    string? ReferenceDoc,
     DateTime CreatedAt
 );
 
