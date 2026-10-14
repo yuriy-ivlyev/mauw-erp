@@ -1,8 +1,12 @@
+using Mauw.Erp.Contracts;
+using Mauw.Erp.Infrastructure;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddScoped<SdiXmlInvoiceParser>();
 
 var app = builder.Build();
 
@@ -32,6 +36,27 @@ app.MapGet("/weatherforecast", () =>
     return forecast;
 })
 .WithName("GetWeatherForecast");
+
+app.MapPost("/api/v1/inventory/preview-sdi-xml",
+    async (IFormFile file, SdiXmlInvoiceParser parser, CancellationToken cancellationToken) =>
+    {
+        if (file.Length == 0)
+        {
+            return Results.BadRequest("Il file XML è vuoto.");
+        }
+
+        if (!string.Equals(Path.GetExtension(file.FileName), ".xml", StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.BadRequest("Il file deve avere estensione .xml.");
+        }
+
+        await using var fileStream = file.OpenReadStream();
+        var preview = await parser.ParseAsync(fileStream, cancellationToken);
+        return Results.Ok(preview);
+    })
+    .Accepts<IFormFile>("multipart/form-data")
+    .Produces<SdiImportPreviewDto>(StatusCodes.Status200OK)
+    .Produces(StatusCodes.Status400BadRequest);
 
 app.Run();
 

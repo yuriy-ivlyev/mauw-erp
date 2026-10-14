@@ -20,7 +20,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Mauw.Erp.Application\Mauw.Erp.Application.csproj" />
+    <ProjectReference Include="..\..\src\Mauw.Erp.Contracts\Mauw.Erp.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Mauw.Erp.Domain\Mauw.Erp.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Mauw.Erp.Infrastructure\Mauw.Erp.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

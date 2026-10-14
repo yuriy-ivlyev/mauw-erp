@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\Mauw.Erp.Contracts\Mauw.Erp.Contracts.csproj" />
     <ProjectReference Include="..\Mauw.Erp.Application\Mauw.Erp.Application.csproj" />
   </ItemGroup>
 
