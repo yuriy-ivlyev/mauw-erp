@@ -1,4 +1,5 @@
 using FluentValidation;
+using Mauw.Erp.Api;
 using Mauw.Erp.Contracts;
 
 namespace Mauw.Erp.UnitTests;
