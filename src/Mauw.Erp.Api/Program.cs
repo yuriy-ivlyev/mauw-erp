@@ -10,7 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Configure PostgreSQL connection
 var connectionString = builder.Configuration.GetConnectionString("PostgreSQL") ??
-    "Host=localhost;Database=mauw_erp;Username=postgres;******;Port=5432";
+    "Host=localhost;Database=mauw_erp;Username=postgres;postgres;Port=5432";
 
 builder.Services.AddDbContext<MauwDbContext>(options =>
     options.UseNpgsql(connectionString)
@@ -21,7 +21,14 @@ builder.Services.AddValidatorsFromAssemblyContaining<CreateProductRequestValidat
 
 // Add services
 builder.Services.AddScoped<PricingService>();
+builder.Services.AddScoped<Mauw.Erp.Domain.Services.PricingEngine>();
 builder.Services.AddScoped<IPdfGenerator, QuestPdfGenerator>();
+
+// Add Controllers
+builder.Services.AddControllers();
+
+// Add API Explorer for Swagger
+builder.Services.AddEndpointsApiExplorer();
 
 // Add Swagger/OpenAPI
 builder.Services.AddSwaggerGen(c =>

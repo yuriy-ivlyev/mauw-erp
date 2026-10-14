@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mauw-erp-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mauw_erp
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - postgres_backups:/var/lib/postgresql/backups
+      - ./init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mauw-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: final
+    container_name: mauw-erp-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__PostgreSQL: "Host=postgres;Database=mauw_erp;Username=postgres;Password=postgres;Port=5432"
+    ports:
+      - "5019:8080"
+    networks:
+      - mauw-network
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      target: final
+    container_name: mauw-erp-web
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+    networks:
+      - mauw-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  postgres_backups:
+    driver: local
+
+networks:
+  mauw-network:
+    driver: bridge
+
+
+
+
+
