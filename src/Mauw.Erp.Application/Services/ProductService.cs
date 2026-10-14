@@ -95,7 +95,19 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             imageUrl: request.ImageUrl
         );
 
-        // Delete old variants explicitly
+        // Update the product first
+        await unitOfWork.Products.UpdateAsync(product);
+        
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+        catch (ConcurrencyException ex)
+        {
+            return OperationResult<ProductDto>.Fail(ex.Message);
+        }
+
+        // Delete old variants after product update is saved
         var oldVariants = product.Variants.ToList();
         foreach (var oldVariant in oldVariants)
         {
@@ -116,9 +128,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             await unitOfWork.ProductVariants.AddAsync(variant);
         }
 
-        // Update the product itself
-        await unitOfWork.Products.UpdateAsync(product);
-        
+        // Save variant changes
         try
         {
             await unitOfWork.SaveChangesAsync();
