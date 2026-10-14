@@ -1,11 +1,15 @@
 {
   "version": 2,
-  "dgSpecHash": "t1j4jUKoCxQ=",
+  "dgSpecHash": "p9Zq4W60I4Q=",
   "success": true,
-  "projectFilePath": "C:\\Workspace\\mauw-erp\\src\\Mauw.Erp.Api\\Mauw.Erp.Api.csproj",
+  "projectFilePath": "/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Api/Mauw.Erp.Api.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\yuriy\\.nuget\\packages\\microsoft.aspnetcore.openapi\\10.0.12\\microsoft.aspnetcore.openapi.10.0.12.nupkg.sha512",
-    "C:\\Users\\yuriy\\.nuget\\packages\\microsoft.openapi\\2.12.0\\microsoft.openapi.2.12.0.nupkg.sha512"
+    "/tmp/codeql-scratch-dafe354c4e770146/dbs/csharp/working/packages/microsoft.aspnetcore.openapi/10.0.12/microsoft.aspnetcore.openapi.10.0.12.nupkg.sha512",
+    "/tmp/codeql-scratch-dafe354c4e770146/dbs/csharp/working/packages/microsoft.openapi/2.12.0/microsoft.openapi.2.12.0.nupkg.sha512",
+    "/tmp/codeql-scratch-dafe354c4e770146/dbs/csharp/working/packages/system.text.json/8.0.5/system.text.json.8.0.5.nupkg.sha512",
+    "/tmp/codeql-scratch-dafe354c4e770146/dbs/csharp/working/packages/microsoft.netcore.app.ref/10.0.12/microsoft.netcore.app.ref.10.0.12.nupkg.sha512",
+    "/tmp/codeql-scratch-dafe354c4e770146/dbs/csharp/working/packages/microsoft.aspnetcore.app.ref/10.0.12/microsoft.aspnetcore.app.ref.10.0.12.nupkg.sha512",
+    "/tmp/codeql-scratch-dafe354c4e770146/dbs/csharp/working/packages/microsoft.netcore.app.host.linux-x64/10.0.12/microsoft.netcore.app.host.linux-x64.10.0.12.nupkg.sha512"
   ],
   "logs": []
 }
