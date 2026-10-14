@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Mauw.Erp.Application")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bc678beb5acdfe43e5efd55b137f53bb75ac9f80")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a249840256ba320ef277e042dd47729132fbc19a")]
 [assembly: System.Reflection.AssemblyProductAttribute("Mauw.Erp.Application")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Mauw.Erp.Application")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
