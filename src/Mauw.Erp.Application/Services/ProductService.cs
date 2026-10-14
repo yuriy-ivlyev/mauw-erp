@@ -95,13 +95,14 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             imageUrl: request.ImageUrl
         );
 
-        // Update variants
+        // Delete old variants explicitly
         var oldVariants = product.Variants.ToList();
         foreach (var oldVariant in oldVariants)
         {
-            product.Variants.Remove(oldVariant);
+            await unitOfWork.ProductVariants.DeleteAsync(oldVariant);
         }
 
+        // Add new variants
         foreach (var variantRequest in request.Variants)
         {
             var variant = new ProductVariant(
@@ -112,10 +113,12 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
                 purchaseCost: variantRequest.PurchaseCost,
                 stockQuantity: variantRequest.StockQuantity
             );
-            product.Variants.Add(variant);
+            await unitOfWork.ProductVariants.AddAsync(variant);
         }
 
+        // Update the product itself
         await unitOfWork.Products.UpdateAsync(product);
+        
         try
         {
             await unitOfWork.SaveChangesAsync();
