@@ -1,8 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "cS1vSZPAvmA=",
+  "dgSpecHash": "5DUATKPShZs=",
   "success": true,
-  "projectFilePath": "C:\\Workspace\\mauw-erp\\src\\Mauw.Erp.Infrastructure\\Mauw.Erp.Infrastructure.csproj",
-  "expectedPackageFiles": [],
+  "projectFilePath": "/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/Mauw.Erp.Infrastructure.csproj",
+  "expectedPackageFiles": [
+    "/home/runner/.nuget/packages/fluentvalidation/12.0.0/fluentvalidation.12.0.0.nupkg.sha512"
+  ],
   "logs": []
 }

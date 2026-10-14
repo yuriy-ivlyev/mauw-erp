@@ -1,0 +1,156 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "Mauw.Erp.Api/1.0.0": {
+        "dependencies": {
+          "FluentValidation": "12.0.0",
+          "FluentValidation.DependencyInjectionExtensions": "12.0.0",
+          "Mauw.Erp.Application": "1.0.0",
+          "Mauw.Erp.Infrastructure": "1.0.0",
+          "Microsoft.AspNetCore.OpenApi": "10.0.12"
+        },
+        "runtime": {
+          "Mauw.Erp.Api.dll": {}
+        }
+      },
+      "FluentValidation/12.0.0": {
+        "runtime": {
+          "lib/net8.0/FluentValidation.dll": {
+            "assemblyVersion": "12.0.0.0",
+            "fileVersion": "12.0.0.0"
+          }
+        }
+      },
+      "FluentValidation.DependencyInjectionExtensions/12.0.0": {
+        "dependencies": {
+          "FluentValidation": "12.0.0"
+        },
+        "runtime": {
+          "lib/net8.0/FluentValidation.DependencyInjectionExtensions.dll": {
+            "assemblyVersion": "12.0.0.0",
+            "fileVersion": "12.0.0.0"
+          }
+        }
+      },
+      "Microsoft.AspNetCore.OpenApi/10.0.12": {
+        "dependencies": {
+          "Microsoft.OpenApi": "2.12.0"
+        },
+        "runtime": {
+          "lib/net10.0/Microsoft.AspNetCore.OpenApi.dll": {
+            "assemblyVersion": "10.0.12.0",
+            "fileVersion": "10.0.1226.42308"
+          }
+        }
+      },
+      "Microsoft.OpenApi/2.12.0": {
+        "runtime": {
+          "lib/net8.0/Microsoft.OpenApi.dll": {
+            "assemblyVersion": "2.12.0.0",
+            "fileVersion": "2.12.0.0"
+          }
+        }
+      },
+      "Mauw.Erp.Application/1.0.0": {
+        "dependencies": {
+          "FluentValidation": "12.0.0",
+          "Mauw.Erp.Contracts": "1.0.0",
+          "Mauw.Erp.Domain": "1.0.0"
+        },
+        "runtime": {
+          "Mauw.Erp.Application.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "Mauw.Erp.Contracts/1.0.0": {
+        "runtime": {
+          "Mauw.Erp.Contracts.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "Mauw.Erp.Domain/1.0.0": {
+        "runtime": {
+          "Mauw.Erp.Domain.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "Mauw.Erp.Infrastructure/1.0.0": {
+        "dependencies": {
+          "Mauw.Erp.Application": "1.0.0"
+        },
+        "runtime": {
+          "Mauw.Erp.Infrastructure.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Mauw.Erp.Api/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "FluentValidation/12.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-8NVLxtMUXynRHJIX3Hn1ACovaqZIJASufXIIFkD0EUbcd5PmMsL1xUD5h548gCezJ5BzlITaR9CAMrGe29aWpA==",
+      "path": "fluentvalidation/12.0.0",
+      "hashPath": "fluentvalidation.12.0.0.nupkg.sha512"
+    },
+    "FluentValidation.DependencyInjectionExtensions/12.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-B28fBRL1UjhGsBC8fwV6YBZosh+SiU1FxdD7l7p5dGPgRlVI7UnM+Lgzmg+unZtV1Zxzpaw96UY2MYfMaAd8cg==",
+      "path": "fluentvalidation.dependencyinjectionextensions/12.0.0",
+      "hashPath": "fluentvalidation.dependencyinjectionextensions.12.0.0.nupkg.sha512"
+    },
+    "Microsoft.AspNetCore.OpenApi/10.0.12": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-7RnQ/UKn+kK3JDLmTpW+vVqNErWthGPAVAy1aIiBzv4ucQ6g9NFvOJUuT0PHcpvcJxGVxctMxj6t+NESWMrgHQ==",
+      "path": "microsoft.aspnetcore.openapi/10.0.12",
+      "hashPath": "microsoft.aspnetcore.openapi.10.0.12.nupkg.sha512"
+    },
+    "Microsoft.OpenApi/2.12.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-0xB/be+f6qYOhvQPUrVsLrau+fkowYv6gt9RIkajMhwT7sZnqtcA797yW3bS5kgSje+AQW4xZgyLnW641YFioQ==",
+      "path": "microsoft.openapi/2.12.0",
+      "hashPath": "microsoft.openapi.2.12.0.nupkg.sha512"
+    },
+    "Mauw.Erp.Application/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Mauw.Erp.Contracts/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Mauw.Erp.Domain/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Mauw.Erp.Infrastructure/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

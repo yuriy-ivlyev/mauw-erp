@@ -1,11 +1,13 @@
 {
   "version": 2,
-  "dgSpecHash": "t1j4jUKoCxQ=",
+  "dgSpecHash": "LNlSW7xTHM0=",
   "success": true,
-  "projectFilePath": "C:\\Workspace\\mauw-erp\\src\\Mauw.Erp.Api\\Mauw.Erp.Api.csproj",
+  "projectFilePath": "/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Api/Mauw.Erp.Api.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\yuriy\\.nuget\\packages\\microsoft.aspnetcore.openapi\\10.0.12\\microsoft.aspnetcore.openapi.10.0.12.nupkg.sha512",
-    "C:\\Users\\yuriy\\.nuget\\packages\\microsoft.openapi\\2.12.0\\microsoft.openapi.2.12.0.nupkg.sha512"
+    "/home/runner/.nuget/packages/fluentvalidation/12.0.0/fluentvalidation.12.0.0.nupkg.sha512",
+    "/home/runner/.nuget/packages/fluentvalidation.dependencyinjectionextensions/12.0.0/fluentvalidation.dependencyinjectionextensions.12.0.0.nupkg.sha512",
+    "/home/runner/.nuget/packages/microsoft.aspnetcore.openapi/10.0.12/microsoft.aspnetcore.openapi.10.0.12.nupkg.sha512",
+    "/home/runner/.nuget/packages/microsoft.openapi/2.12.0/microsoft.openapi.2.12.0.nupkg.sha512"
   ],
   "logs": []
 }

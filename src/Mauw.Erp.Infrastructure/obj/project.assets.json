@@ -1,45 +1,124 @@
 {
   "version": 4,
   "targets": {
-    "net10.0": {}
+    "net10.0": {
+      "FluentValidation/12.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/FluentValidation.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/FluentValidation.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "Mauw.Erp.Application/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "dependencies": {
+          "FluentValidation": "12.0.0",
+          "Mauw.Erp.Contracts": "1.0.0",
+          "Mauw.Erp.Domain": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/Mauw.Erp.Application.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Mauw.Erp.Application.dll": {}
+        }
+      },
+      "Mauw.Erp.Contracts/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "compile": {
+          "bin/placeholder/Mauw.Erp.Contracts.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Mauw.Erp.Contracts.dll": {}
+        }
+      },
+      "Mauw.Erp.Domain/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v10.0",
+        "compile": {
+          "bin/placeholder/Mauw.Erp.Domain.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Mauw.Erp.Domain.dll": {}
+        }
+      }
+    }
   },
-  "libraries": {},
+  "libraries": {
+    "FluentValidation/12.0.0": {
+      "sha512": "8NVLxtMUXynRHJIX3Hn1ACovaqZIJASufXIIFkD0EUbcd5PmMsL1xUD5h548gCezJ5BzlITaR9CAMrGe29aWpA==",
+      "type": "package",
+      "path": "fluentvalidation/12.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "fluent-validation-icon.png",
+        "fluentvalidation.12.0.0.nupkg.sha512",
+        "fluentvalidation.nuspec",
+        "lib/net8.0/FluentValidation.dll",
+        "lib/net8.0/FluentValidation.xml"
+      ]
+    },
+    "Mauw.Erp.Application/1.0.0": {
+      "type": "project",
+      "path": "../Mauw.Erp.Application/Mauw.Erp.Application.csproj",
+      "msbuildProject": "../Mauw.Erp.Application/Mauw.Erp.Application.csproj"
+    },
+    "Mauw.Erp.Contracts/1.0.0": {
+      "type": "project",
+      "path": "../Mauw.Erp.Contracts/Mauw.Erp.Contracts.csproj",
+      "msbuildProject": "../Mauw.Erp.Contracts/Mauw.Erp.Contracts.csproj"
+    },
+    "Mauw.Erp.Domain/1.0.0": {
+      "type": "project",
+      "path": "../Mauw.Erp.Domain/Mauw.Erp.Domain.csproj",
+      "msbuildProject": "../Mauw.Erp.Domain/Mauw.Erp.Domain.csproj"
+    }
+  },
   "projectFileDependencyGroups": {
-    "net10.0": []
+    "net10.0": [
+      "Mauw.Erp.Application >= 1.0.0"
+    ]
   },
   "packageFolders": {
-    "C:\\Users\\yuriy\\.nuget\\packages\\": {},
-    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
+    "/home/runner/.nuget/packages/": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Workspace\\mauw-erp\\src\\Mauw.Erp.Infrastructure\\Mauw.Erp.Infrastructure.csproj",
+      "projectUniqueName": "/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/Mauw.Erp.Infrastructure.csproj",
       "projectName": "Mauw.Erp.Infrastructure",
-      "projectPath": "C:\\Workspace\\mauw-erp\\src\\Mauw.Erp.Infrastructure\\Mauw.Erp.Infrastructure.csproj",
-      "packagesPath": "C:\\Users\\yuriy\\.nuget\\packages\\",
-      "outputPath": "C:\\Workspace\\mauw-erp\\src\\Mauw.Erp.Infrastructure\\obj\\",
+      "projectPath": "/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/Mauw.Erp.Infrastructure.csproj",
+      "packagesPath": "/home/runner/.nuget/packages/",
+      "outputPath": "/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Infrastructure/obj/",
       "projectStyle": "PackageReference",
-      "fallbackFolders": [
-        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-      ],
       "configFilePaths": [
-        "C:\\Users\\yuriy\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        "/home/runner/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net10.0"
       ],
       "sources": {
-        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
         "net10.0": {
           "framework": "net10.0",
           "targetAlias": "net10.0",
-          "projectReferences": {}
+          "projectReferences": {
+            "/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Application/Mauw.Erp.Application.csproj": {
+              "projectPath": "/home/runner/work/mauw-erp/mauw-erp/src/Mauw.Erp.Application/Mauw.Erp.Application.csproj"
+            }
+          }
         }
       },
       "warningProperties": {
@@ -74,7 +153,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.401/PortableRuntimeIdentifierGraph.json",
+        "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/10.0.401/PortableRuntimeIdentifierGraph.json",
         "packagesToPrune": {
           "Microsoft.CSharp": "(,4.7.32767]",
           "Microsoft.VisualBasic": "(,10.4.32767]",
