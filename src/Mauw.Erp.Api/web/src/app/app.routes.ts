@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { AdminLayoutComponent } from './shared/layout/admin-layout.component';
 import { DashboardComponent } from './pages/dashboard/dashboard.component';
+import { BancoCassaComponent } from './pages/vendite/cassa/banco-cassa.component';
 
 // Import componenti ordini
 import { OrdiniElencoComponent } from './pages/ordini/elenco/ordini-elenco.component';
@@ -40,6 +41,12 @@ export const routes: Routes = [
         path: 'dashboard',
         component: DashboardComponent,
         title: 'Dashboard | Mauw ERP'
+      },
+      // Vendite
+      {
+        path: 'vendite/cassa',
+        component: BancoCassaComponent,
+        title: 'Banco / Cassa | Mauw ERP'
       },
       // Ordini
       {

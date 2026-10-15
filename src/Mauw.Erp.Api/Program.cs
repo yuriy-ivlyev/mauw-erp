@@ -1,14 +1,18 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Mauw.Erp.Infrastructure.DbContext;
 using Mauw.Erp.Application.Validation;
-using Mauw.Erp.Application.Services;
+using Mauw.Erp.Application.Extensions;
 using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Api.Endpoints;
+using Mauw.Erp.Api.Extensions;
 using Mauw.Erp.Infrastructure.Reporting;
 using Mauw.Erp.Domain.Repositories;
 using Mauw.Erp.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Observability: OTel tracing, metrics and structured logging
+builder.AddObservability();
 
 // Configure PostgreSQL connection
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ??
@@ -33,17 +37,12 @@ builder.Services.AddScoped<IValidator<CreateInvoiceRequest>, CreateInvoiceReques
 // Register repositories
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-// Register application services
-builder.Services.AddScoped<IProductService, ProductService>();
-builder.Services.AddScoped<IContactService, ContactService>();
-builder.Services.AddScoped<IOrderService, OrderService>();
-builder.Services.AddScoped<IInvoiceService, InvoiceService>();
-builder.Services.AddScoped<IInventoryService, InventoryService>();
-builder.Services.AddScoped<IDdtService, DdtService>();
-
 // Register domain services
 builder.Services.AddScoped<Mauw.Erp.Domain.Services.PricingEngine>();
 builder.Services.AddScoped<IPdfGenerator, QuestPdfGenerator>();
+
+// Register application services with tracing decorators
+builder.Services.AddApplicationServices();
 
 // Add Controllers
 builder.Services.AddControllers();
@@ -108,6 +107,7 @@ app.MapFallbackToFile("index.html");
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<MauwDbContext>();
+    var startupLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     try
     {
         dbContext.Database.Migrate();
@@ -115,8 +115,7 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        // Log the exception for debugging
-        Console.WriteLine($"Database initialization error: {ex}");
+        startupLogger.LogCritical(ex, "Database initialization failed");
         throw;
     }
 }

@@ -1,3 +1,4 @@
+using Mauw.Erp.Application.Diagnostics;
 using Mauw.Erp.Application.Mappers;
 using Mauw.Erp.Application.Validation;
 using Mauw.Erp.Contracts.Dtos;
@@ -5,17 +6,19 @@ using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Domain.Entities;
 using Mauw.Erp.Domain.Repositories;
 using Mauw.Erp.Domain.Services;
+using Microsoft.Extensions.Logging;
 
 namespace Mauw.Erp.Application.Services;
 
 /// <summary>
 /// Order service implementation.
 /// </summary>
-public class OrderService(
+public partial class OrderService(
     IUnitOfWork unitOfWork,
     IValidator<CreateOrderRequest> createValidator,
     IValidator<CreateOrderItemRequest> itemValidator,
-    PricingEngine pricingEngine)
+    PricingEngine pricingEngine,
+    ILogger<OrderService> logger)
     : IOrderService
 {
     public async Task<OperationResult<OrderDto>> CreateOrderAsync(CreateOrderRequest request)
@@ -24,13 +27,15 @@ public class OrderService(
         if (!validationResult.IsValid)
         {
             var errors = string.Join("; ", validationResult.Errors.Select(e => $"{e.PropertyName}: {e.Message}"));
+            LogOrderValidationFailed(logger, request.ContactId, errors);
             return OperationResult<OrderDto>.Fail(errors);
         }
 
-        // Verify contact exists
         var contact = await unitOfWork.Contacts.GetByIdAsync(request.ContactId);
         if (contact == null)
             return OperationResult<OrderDto>.Fail("Contact not found");
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
 
         var order = new Order(
             contactId: request.ContactId,
@@ -41,6 +46,12 @@ public class OrderService(
         await unitOfWork.Orders.AddAsync(order);
         await unitOfWork.SaveChangesAsync();
 
+        sw.Stop();
+        TelemetryDiagnostics.OrdersCreated.Add(1);
+        TelemetryDiagnostics.OperationDuration.Record(sw.Elapsed.TotalMilliseconds,
+            new KeyValuePair<string, object?>("operation", "order.create"));
+
+        LogOrderCreated(logger, order.OrderNumber, request.ContactId);
         return OperationResult<OrderDto>.Ok(OrderMapper.MapToDto(order));
     }
 
@@ -85,7 +96,6 @@ public class OrderService(
         if (variant == null)
             return OperationResult<OrderDto>.Fail("Variant not found");
 
-        // Calculate pricing
         var product = await unitOfWork.Products.GetByIdAsync(variant.ProductId);
         if (product == null)
             return OperationResult<OrderDto>.Fail("Product not found");
@@ -109,6 +119,9 @@ public class OrderService(
         await unitOfWork.Orders.UpdateAsync(order);
         await unitOfWork.SaveChangesAsync();
 
+        logger.LogInformation("Item {VariantId} (qty {Quantity}) added to order {OrderId}",
+            request.VariantId, request.Quantity, orderId);
+
         var updated = await unitOfWork.Orders.GetByIdAsync(orderId);
         return OperationResult<OrderDto>.Ok(OrderMapper.MapToDto(updated!));
     }
@@ -130,6 +143,8 @@ public class OrderService(
             return OperationResult<OrderDto>.Fail(ex.Message);
         }
 
+        logger.LogInformation("Order {OrderId} confirmed", orderId);
+
         var updated = await unitOfWork.Orders.GetByIdAsync(orderId);
         return OperationResult<OrderDto>.Ok(OrderMapper.MapToDto(updated!));
     }
@@ -143,6 +158,17 @@ public class OrderService(
         await unitOfWork.Orders.DeleteAsync(order);
         await unitOfWork.SaveChangesAsync();
 
+        logger.LogInformation("Order {OrderId} deleted", id);
         return OperationResult<bool>.Ok(true);
     }
+
+    // --- [LoggerMessage] source-generated log methods (zero-allocation hot path) ---
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Order {OrderNumber} created for contact {ContactId}")]
+    private static partial void LogOrderCreated(ILogger logger, string orderNumber, Guid contactId);
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "Order creation validation failed for contact {ContactId}: {Errors}")]
+    private static partial void LogOrderValidationFailed(ILogger logger, Guid contactId, string errors);
 }
