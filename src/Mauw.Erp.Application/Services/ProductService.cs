@@ -107,11 +107,20 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             return OperationResult<ProductDto>.Fail(ex.Message);
         }
 
-        // Delete old variants after product update is saved
+        // Delete old variants and save before inserting new ones to avoid unique constraint violations
         var oldVariants = product.Variants.ToList();
         foreach (var oldVariant in oldVariants)
         {
             await unitOfWork.ProductVariants.DeleteAsync(oldVariant);
+        }
+
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+        catch (ConcurrencyException ex)
+        {
+            return OperationResult<ProductDto>.Fail(ex.Message);
         }
 
         // Add new variants
@@ -128,7 +137,6 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             await unitOfWork.ProductVariants.AddAsync(variant);
         }
 
-        // Save variant changes
         try
         {
             await unitOfWork.SaveChangesAsync();

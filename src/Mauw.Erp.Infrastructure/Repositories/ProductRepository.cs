@@ -10,6 +10,13 @@ namespace Mauw.Erp.Infrastructure.Repositories;
 /// </summary>
 public class ProductRepository(MauwDbContext dbContext) : Repository<Product>(dbContext), IProductRepository
 {
+    public override async Task<Product?> GetByIdAsync(Guid id)
+    {
+        return await _dbSet
+            .Include(p => p.Variants)
+            .FirstOrDefaultAsync(p => p.Id == id);
+    }
+
     public async Task<Product?> GetByInternalCodeAsync(string internalCode)
     {
         return await _dbSet
