@@ -22,8 +22,8 @@
     <ProjectReference Include="..\Mauw.Erp.Infrastructure\Mauw.Erp.Infrastructure.csproj" />
   </ItemGroup>
 
-  <!-- Build Angular web app and copy to wwwroot -->
-  <Target Name="BuildWebApp" BeforeTargets="Build">
+  <!-- Build Angular web app and copy to wwwroot (disabled in Docker builds) -->
+  <Target Name="BuildWebApp" BeforeTargets="Build" Condition="'$(SkipNpmBuild)' != 'true'">
     <Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)\web" />
     <ItemGroup>
       <WebFiles Include="$(MSBuildProjectDirectory)\web\dist\web\browser\**\*" />

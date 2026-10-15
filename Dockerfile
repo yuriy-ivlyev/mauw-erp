@@ -16,11 +16,11 @@ COPY ["Mauw.Erp.sln", "."]
 COPY ["src/", "src/"]
 
 RUN dotnet restore "src/Mauw.Erp.Api/Mauw.Erp.Api.csproj"
-RUN dotnet build "src/Mauw.Erp.Api/Mauw.Erp.Api.csproj" -c Release -o /app/build
+RUN dotnet build "src/Mauw.Erp.Api/Mauw.Erp.Api.csproj" -c Release -o /app/build -p:SkipNpmBuild=true
 
 # Publish stage
 FROM dotnet-builder AS publish
-RUN dotnet publish "src/Mauw.Erp.Api/Mauw.Erp.Api.csproj" -c Release -o /app/publish
+RUN dotnet publish "src/Mauw.Erp.Api/Mauw.Erp.Api.csproj" -c Release -o /app/publish -p:SkipNpmBuild=true
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
