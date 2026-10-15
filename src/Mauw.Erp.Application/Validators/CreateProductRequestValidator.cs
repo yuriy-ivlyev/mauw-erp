@@ -29,9 +29,5 @@ public class CreateProductRequestValidator : AbstractValidator<CreateProductRequ
         RuleFor(x => x.VatRate)
             .GreaterThanOrEqualTo(0).WithMessage("VAT rate must be 0 or greater")
             .LessThanOrEqualTo(100).WithMessage("VAT rate must not exceed 100");
-
-        RuleFor(x => x.Variants)
-            .NotEmpty().WithMessage("Product must have at least one variant")
-            .ForEach(v => v.SetValidator(new CreateProductVariantRequestValidator()));
     }
 }

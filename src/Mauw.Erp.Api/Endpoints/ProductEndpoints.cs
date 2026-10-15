@@ -18,7 +18,7 @@ public static class ProductEndpoints
 
         group.MapPost("/", CreateProduct)
             .WithName("CreateProduct")
-            .WithSummary("Create a new product with variants");
+            .WithSummary("Create a new product");
 
         group.MapGet("/", GetProducts)
             .WithName("GetProducts")
@@ -39,6 +39,32 @@ public static class ProductEndpoints
         group.MapDelete("/{id}", DeleteProduct)
             .WithName("DeleteProduct")
             .WithSummary("Delete a product and its variants");
+
+        // Product variant endpoints
+        group.MapPost("/{productId}/variants", CreateProductVariant)
+            .WithName("CreateProductVariant")
+            .WithSummary("Create a new variant for a product");
+
+        group.MapGet("/{productId}/variants", GetProductVariants)
+            .WithName("GetProductVariants")
+            .WithSummary("Get all variants for a product");
+
+        group.MapDelete("/{productId}/variants/{variantId}", DeleteProductVariant)
+            .WithName("DeleteProductVariant")
+            .WithSummary("Delete a product variant");
+
+        // Image gallery endpoints
+        group.MapPost("/{id}/images", AddImage)
+            .WithName("AddProductImage")
+            .WithSummary("Add an image to the product gallery");
+
+        group.MapDelete("/{id}/images/{imageId}", RemoveImage)
+            .WithName("RemoveProductImage")
+            .WithSummary("Remove an image from the product gallery");
+
+        group.MapPut("/{id}/images/{imageId}/main", SetMainImage)
+            .WithName("SetMainProductImage")
+            .WithSummary("Set an image as the main product image");
     }
 
     private static async Task<Results<Created<ProductDto>, BadRequest<string>>> CreateProduct(
@@ -112,6 +138,105 @@ public static class ProductEndpoints
         
         if (!result.Success)
             return TypedResults.NotFound();
+
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<Created<ProductImageDto>, BadRequest<string>, NotFound>> AddImage(
+        Guid id,
+        AddProductImageRequest request,
+        IProductService productService)
+    {
+        var result = await productService.AddImageAsync(id, request);
+
+        if (!result.Success)
+        {
+            if (result.Error == "Product not found")
+                return TypedResults.NotFound();
+            return TypedResults.BadRequest(result.Error);
+        }
+
+        return TypedResults.Created($"/api/v1/products/{id}/images/{result.Data!.Id}", result.Data);
+    }
+
+    private static async Task<Results<NoContent, BadRequest<string>, NotFound>> RemoveImage(
+        Guid id,
+        Guid imageId,
+        IProductService productService)
+    {
+        var result = await productService.RemoveImageAsync(id, imageId);
+
+        if (!result.Success)
+        {
+            if (result.Error == "Product not found" || result.Error == "Image not found")
+                return TypedResults.NotFound();
+            return TypedResults.BadRequest(result.Error);
+        }
+
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<NoContent, BadRequest<string>, NotFound>> SetMainImage(
+        Guid id,
+        Guid imageId,
+        IProductService productService)
+    {
+        var result = await productService.SetMainImageAsync(id, imageId);
+
+        if (!result.Success)
+        {
+            if (result.Error == "Product not found" || result.Error == "Image not found")
+                return TypedResults.NotFound();
+            return TypedResults.BadRequest(result.Error);
+        }
+
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<Created<ProductVariantDto>, BadRequest<string>, NotFound>> CreateProductVariant(
+        Guid productId,
+        CreateProductVariantRequest request,
+        IProductService productService)
+    {
+        var result = await productService.CreateProductVariantAsync(productId, request);
+
+        if (!result.Success)
+        {
+            if (result.Error?.Contains("not found") == true)
+                return TypedResults.NotFound();
+            return TypedResults.BadRequest(result.Error ?? "Failed to create variant");
+        }
+
+        return TypedResults.Created(
+            $"/api/v1/products/{productId}/variants/{result.Data!.Id}",
+            result.Data);
+    }
+
+    private static async Task<Results<Ok<List<ProductVariantDto>>, NotFound>> GetProductVariants(
+        Guid productId,
+        IProductService productService)
+    {
+        var result = await productService.GetProductVariantsAsync(productId);
+
+        if (!result.Success)
+            return TypedResults.NotFound();
+
+        return TypedResults.Ok(result.Data!);
+    }
+
+    private static async Task<Results<NoContent, BadRequest<string>, NotFound>> DeleteProductVariant(
+        Guid productId,
+        Guid variantId,
+        IProductService productService)
+    {
+        var result = await productService.DeleteProductVariantAsync(productId, variantId);
+
+        if (!result.Success)
+        {
+            if (result.Error?.Contains("not found") == true)
+                return TypedResults.NotFound();
+            return TypedResults.BadRequest(result.Error ?? "Failed to delete variant");
+        }
 
         return TypedResults.NoContent();
     }

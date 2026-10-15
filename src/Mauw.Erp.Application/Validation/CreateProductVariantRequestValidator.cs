@@ -1,4 +1,4 @@
-﻿using Mauw.Erp.Contracts.Requests;
+using Mauw.Erp.Contracts.Requests;
 
 namespace Mauw.Erp.Application.Validation;
 
@@ -11,17 +11,17 @@ public class CreateProductVariantRequestValidator : IValidator<CreateProductVari
     {
         var errors = new List<ValidationError>();
 
-        // Size validation
-        if (string.IsNullOrWhiteSpace(request.Size))
-            errors.Add(new ValidationError(nameof(request.Size), "Size is required"));
-        else if (request.Size.Length > 50)
-            errors.Add(new ValidationError(nameof(request.Size), "Size must not exceed 50 characters"));
+        // ProductId validation
+        if (request.ProductId == Guid.Empty)
+            errors.Add(new ValidationError(nameof(request.ProductId), "Product ID is required"));
 
-        // Color validation
-        if (string.IsNullOrWhiteSpace(request.Color))
-            errors.Add(new ValidationError(nameof(request.Color), "Color is required"));
-        else if (request.Color.Length > 50)
-            errors.Add(new ValidationError(nameof(request.Color), "Color must not exceed 50 characters"));
+        // ColorId validation
+        if (request.ColorId == Guid.Empty)
+            errors.Add(new ValidationError(nameof(request.ColorId), "Color ID is required"));
+
+        // SizeId validation
+        if (request.SizeId == Guid.Empty)
+            errors.Add(new ValidationError(nameof(request.SizeId), "Size ID is required"));
 
         // Barcode validation
         if (string.IsNullOrWhiteSpace(request.Barcode))
@@ -32,10 +32,6 @@ public class CreateProductVariantRequestValidator : IValidator<CreateProductVari
         // PurchaseCost validation
         if (request.PurchaseCost < 0)
             errors.Add(new ValidationError(nameof(request.PurchaseCost), "Purchase cost must be greater than or equal to 0"));
-
-        // StockQuantity validation
-        if (request.StockQuantity < 0)
-            errors.Add(new ValidationError(nameof(request.StockQuantity), "Stock quantity must be greater than or equal to 0"));
 
         return errors.Count == 0 ? ValidationResult.Success() : ValidationResult.Failure(errors);
     }

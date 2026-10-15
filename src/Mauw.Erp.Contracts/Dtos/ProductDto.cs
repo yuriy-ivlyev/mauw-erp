@@ -11,6 +11,16 @@ public record ProductDto(
     string Name,
     decimal DefaultMarkupRate,
     decimal VatRate,
-    string? ImageUrl,
-    List<ProductVariantDto> Variants
-);
+    List<ProductImageDto> Images,
+    List<ProductVariantDto> Variants,
+    Guid? CategoryId = null,
+    string? CategoryName = null,
+    Guid? CollectionId = null,
+    string? CollectionName = null,
+    Guid? MaterialId = null,
+    string? MaterialName = null
+)
+{
+    /// <summary>Convenience accessor for the main image URL, for backward-compatible use in list views.</summary>
+    public string? MainImageUrl => Images.FirstOrDefault(i => i.IsMain)?.Url ?? Images.FirstOrDefault()?.Url;
+};

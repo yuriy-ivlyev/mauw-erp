@@ -92,6 +92,7 @@ app.UseStaticFiles();
 
 // Map endpoints
 app.MapProductEndpoints();
+app.MapSupportEndpoints();
 app.MapInventoryEndpoints();
 app.MapContactEndpoints();
 app.MapOrderEndpoints();

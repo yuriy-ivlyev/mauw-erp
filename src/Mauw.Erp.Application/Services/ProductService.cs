@@ -30,21 +30,10 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             name: request.Name,
             defaultMarkupRate: request.DefaultMarkupRate,
             vatRate: request.VatRate,
-            imageUrl: request.ImageUrl
+            categoryId: request.CategoryId,
+            collectionId: request.CollectionId,
+            materialId: request.MaterialId
         );
-
-        foreach (var variantRequest in request.Variants)
-        {
-            var variant = new ProductVariant(
-                productId: product.Id,
-                size: variantRequest.Size,
-                color: variantRequest.Color,
-                barcode: variantRequest.Barcode,
-                purchaseCost: variantRequest.PurchaseCost,
-                stockQuantity: variantRequest.StockQuantity
-            );
-            product.Variants.Add(variant);
-        }
 
         await unitOfWork.Products.AddAsync(product);
         await unitOfWork.SaveChangesAsync();
@@ -92,50 +81,12 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             name: request.Name,
             defaultMarkupRate: request.DefaultMarkupRate,
             vatRate: request.VatRate,
-            imageUrl: request.ImageUrl
+            categoryId: request.CategoryId,
+            collectionId: request.CollectionId,
+            materialId: request.MaterialId
         );
 
-        // Update the product first
         await unitOfWork.Products.UpdateAsync(product);
-        
-        try
-        {
-            await unitOfWork.SaveChangesAsync();
-        }
-        catch (ConcurrencyException ex)
-        {
-            return OperationResult<ProductDto>.Fail(ex.Message);
-        }
-
-        // Delete old variants and save before inserting new ones to avoid unique constraint violations
-        var oldVariants = product.Variants.ToList();
-        foreach (var oldVariant in oldVariants)
-        {
-            await unitOfWork.ProductVariants.DeleteAsync(oldVariant);
-        }
-
-        try
-        {
-            await unitOfWork.SaveChangesAsync();
-        }
-        catch (ConcurrencyException ex)
-        {
-            return OperationResult<ProductDto>.Fail(ex.Message);
-        }
-
-        // Add new variants
-        foreach (var variantRequest in request.Variants)
-        {
-            var variant = new ProductVariant(
-                productId: product.Id,
-                size: variantRequest.Size,
-                color: variantRequest.Color,
-                barcode: variantRequest.Barcode,
-                purchaseCost: variantRequest.PurchaseCost,
-                stockQuantity: variantRequest.StockQuantity
-            );
-            await unitOfWork.ProductVariants.AddAsync(variant);
-        }
 
         try
         {
@@ -177,5 +128,170 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
 
         var dto = ProductMapper.MapBarcodeVariantToDto(variant, variant.Product);
         return OperationResult<BarcodeVariantDto>.Ok(dto);
+    }
+
+    public async Task<OperationResult<ProductImageDto>> AddImageAsync(Guid productId, AddProductImageRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Url))
+            return OperationResult<ProductImageDto>.Fail("Image URL is required");
+
+        var product = await unitOfWork.Products.GetByIdAsync(productId);
+        if (product is null)
+            return OperationResult<ProductImageDto>.Fail("Product not found");
+
+        // Check if this should be main image
+        bool shouldBeMain = request.IsMain || product.Images.Count == 0;
+        
+        // If setting as main, demote all others
+        if (shouldBeMain)
+        {
+            foreach (var img in product.Images)
+                img.SetMain(false);
+        }
+
+        // Create new image (don't add to collection, add directly via repository)
+        var displayOrder = product.Images.Count > 0 ? product.Images.Max(i => i.DisplayOrder) + 1 : 0;
+        var newImage = new ProductImage(productId, request.Url, request.StorageKey, displayOrder, shouldBeMain, request.ProductVariantId);
+        
+        await unitOfWork.Products.AddImageAsync(newImage);
+
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+            return OperationResult<ProductImageDto>.Ok(ProductMapper.MapImageToDto(newImage));
+        }
+        catch (Exception ex)
+        {
+            return OperationResult<ProductImageDto>.Fail($"Failed to add image: {ex.Message}");
+        }
+    }
+
+    public async Task<OperationResult<bool>> RemoveImageAsync(Guid productId, Guid imageId)
+    {
+        var product = await unitOfWork.Products.GetByIdAsync(productId);
+        if (product is null)
+            return OperationResult<bool>.Fail("Product not found");
+
+        var image = product.Images.FirstOrDefault(i => i.Id == imageId);
+        if (image is null)
+            return OperationResult<bool>.Fail("Image not found");
+
+        bool wasMain = image.IsMain;
+        product.Images.Remove(image);
+
+        // If removing main, promote first remaining
+        if (wasMain && product.Images.Count > 0)
+            product.Images.First().SetMain(true);
+
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            return OperationResult<bool>.Fail($"Failed to remove image: {ex.Message}");
+        }
+
+        return OperationResult<bool>.Ok(true);
+    }
+
+    public async Task<OperationResult<bool>> SetMainImageAsync(Guid productId, Guid imageId)
+    {
+        var product = await unitOfWork.Products.GetByIdAsync(productId);
+        if (product is null)
+            return OperationResult<bool>.Fail("Product not found");
+
+        var image = product.Images.FirstOrDefault(i => i.Id == imageId);
+        if (image is null)
+            return OperationResult<bool>.Fail("Image not found");
+
+        // Demote all, then promote target
+        foreach (var img in product.Images)
+            img.SetMain(false);
+        
+        image.SetMain(true);
+
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            return OperationResult<bool>.Fail($"Failed to set main image: {ex.Message}");
+        }
+
+        return OperationResult<bool>.Ok(true);
+    }
+
+    public async Task<OperationResult<ProductVariantDto>> CreateProductVariantAsync(
+        Guid productId,
+        CreateProductVariantRequest request)
+    {
+        var product = await unitOfWork.Products.GetByIdAsync(productId);
+        if (product == null)
+            return OperationResult<ProductVariantDto>.Fail("Product not found");
+
+        var color = await unitOfWork.Colors.GetByIdAsync(request.ColorId);
+        if (color == null)
+            return OperationResult<ProductVariantDto>.Fail("Color not found");
+
+        var size = await unitOfWork.Sizes.GetByIdAsync(request.SizeId);
+        if (size == null)
+            return OperationResult<ProductVariantDto>.Fail("Size not found");
+
+        var variant = new ProductVariant(
+            productId: productId,
+            colorId: request.ColorId,
+            sizeId: request.SizeId,
+            barcode: request.Barcode,
+            purchaseCost: request.PurchaseCost
+        );
+
+        await unitOfWork.ProductVariants.AddAsync(variant);
+        
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            return OperationResult<ProductVariantDto>.Fail($"Failed to create variant: {ex.Message}");
+        }
+
+        return OperationResult<ProductVariantDto>.Ok(ProductMapper.MapVariantToDto(variant, product.DefaultMarkupRate));
+    }
+
+    public async Task<OperationResult<List<ProductVariantDto>>> GetProductVariantsAsync(Guid productId)
+    {
+        var product = await unitOfWork.Products.GetByIdAsync(productId);
+        if (product == null)
+            return OperationResult<List<ProductVariantDto>>.Fail("Product not found");
+
+        var variants = product.Variants.Select(v => ProductMapper.MapVariantToDto(v, product.DefaultMarkupRate)).ToList();
+        return OperationResult<List<ProductVariantDto>>.Ok(variants);
+    }
+
+    public async Task<OperationResult<bool>> DeleteProductVariantAsync(Guid productId, Guid variantId)
+    {
+        var product = await unitOfWork.Products.GetByIdAsync(productId);
+        if (product == null)
+            return OperationResult<bool>.Fail("Product not found");
+
+        var variant = product.Variants.FirstOrDefault(v => v.Id == variantId);
+        if (variant == null)
+            return OperationResult<bool>.Fail("Variant not found");
+
+        await unitOfWork.ProductVariants.DeleteAsync(variant);
+        
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            return OperationResult<bool>.Fail($"Failed to delete variant: {ex.Message}");
+        }
+
+        return OperationResult<bool>.Ok(true);
     }
 }

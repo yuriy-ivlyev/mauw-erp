@@ -10,7 +10,15 @@ namespace Mauw.Erp.Infrastructure.DbContext;
 public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.EntityFrameworkCore.DbContext(options)
 {
     public DbSet<Contact> Contacts { get; set; }
+    public DbSet<MacroCategory> MacroCategories { get; set; }
+    public DbSet<Category> Categories { get; set; }
+    public DbSet<Collection> Collections { get; set; }
+    public DbSet<Color> Colors { get; set; }
+    public DbSet<Size> Sizes { get; set; }
+    public DbSet<Material> Materials { get; set; }
+    public DbSet<MaterialComposition> MaterialCompositions { get; set; }
     public DbSet<Product> Products { get; set; }
+    public DbSet<ProductImage> ProductImages { get; set; }
     public DbSet<ProductVariant> ProductVariants { get; set; }
     public DbSet<StockMovement> StockMovements { get; set; }
     public DbSet<Order> Orders { get; set; }
@@ -55,7 +63,15 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
 
         // Apply entity configurations
         modelBuilder.ApplyConfiguration(new ContactConfiguration());
+        modelBuilder.ApplyConfiguration(new MacroCategoryConfiguration());
+        modelBuilder.ApplyConfiguration(new CategoryConfiguration());
+        modelBuilder.ApplyConfiguration(new CollectionConfiguration());
+        modelBuilder.ApplyConfiguration(new ColorConfiguration());
+        modelBuilder.ApplyConfiguration(new SizeConfiguration());
+        modelBuilder.ApplyConfiguration(new MaterialConfiguration());
+        modelBuilder.ApplyConfiguration(new MaterialCompositionConfiguration());
         modelBuilder.ApplyConfiguration(new ProductConfiguration());
+        modelBuilder.ApplyConfiguration(new ProductImageConfiguration());
         modelBuilder.ApplyConfiguration(new ProductVariantConfiguration());
         modelBuilder.ApplyConfiguration(new StockMovementConfiguration());
         modelBuilder.ApplyConfiguration(new OrderConfiguration());

@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+using FluentValidation;
 using Mauw.Erp.Contracts.Requests;
 
 namespace Mauw.Erp.Application.Validators;
@@ -10,22 +10,20 @@ public class CreateProductVariantRequestValidator : AbstractValidator<CreateProd
 {
     public CreateProductVariantRequestValidator()
     {
-        RuleFor(x => x.Size)
-            .NotEmpty().WithMessage("Size is required")
-            .MaximumLength(50).WithMessage("Size must not exceed 50 characters");
+        RuleFor(x => x.ProductId)
+            .NotEmpty().WithMessage("Product ID is required");
 
-        RuleFor(x => x.Color)
-            .NotEmpty().WithMessage("Color is required")
-            .MaximumLength(50).WithMessage("Color must not exceed 50 characters");
+        RuleFor(x => x.ColorId)
+            .NotEmpty().WithMessage("Color ID is required");
+
+        RuleFor(x => x.SizeId)
+            .NotEmpty().WithMessage("Size ID is required");
 
         RuleFor(x => x.Barcode)
             .NotEmpty().WithMessage("Barcode is required")
-            .MaximumLength(50).WithMessage("Barcode must not exceed 50 characters");
+            .MaximumLength(100).WithMessage("Barcode must not exceed 100 characters");
 
         RuleFor(x => x.PurchaseCost)
             .GreaterThanOrEqualTo(0).WithMessage("Purchase cost must be 0 or greater");
-
-        RuleFor(x => x.StockQuantity)
-            .GreaterThanOrEqualTo(0).WithMessage("Stock quantity must be 0 or greater");
     }
 }

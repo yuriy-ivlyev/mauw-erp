@@ -43,11 +43,10 @@ public class InventoryService(
             referenceDoc: request.ReferenceDoc ?? ""
         );
 
-        // Update variant stock
-        variant.UpdateStockQuantity(request.Quantity);
+        // Stock management moved to separate system
+        // TODO: Integrate with new inventory tracking
 
         await unitOfWork.StockMovements.AddAsync(movement);
-        await unitOfWork.ProductVariants.UpdateAsync(variant);
         await unitOfWork.SaveChangesAsync();
 
         var dto = new StockMovementDto(

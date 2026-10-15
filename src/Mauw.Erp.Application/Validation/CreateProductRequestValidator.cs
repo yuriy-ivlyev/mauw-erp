@@ -37,25 +37,6 @@ public class CreateProductRequestValidator : IValidator<CreateProductRequest>
         if (request.VatRate is < 0 or > 100)
             errors.Add(new ValidationError(nameof(request.VatRate), "VAT rate must be between 0 and 100"));
 
-        // Variants validation
-        if (request.Variants.Count == 0)
-            errors.Add(new ValidationError(nameof(request.Variants), "Product must have at least one variant"));
-        else
-        {
-            var variantValidator = new CreateProductVariantRequestValidator();
-            foreach (var (variant, index) in request.Variants.Select((v, i) => (v, i)))
-            {
-                var variantResult = variantValidator.Validate(variant);
-                if (!variantResult.IsValid)
-                {
-                    foreach (var error in variantResult.Errors)
-                    {
-                        errors.Add(new ValidationError($"{nameof(request.Variants)}[{index}].{error.PropertyName}", error.Message));
-                    }
-                }
-            }
-        }
-
         return errors.Count == 0 ? ValidationResult.Success() : ValidationResult.Failure(errors);
     }
 }

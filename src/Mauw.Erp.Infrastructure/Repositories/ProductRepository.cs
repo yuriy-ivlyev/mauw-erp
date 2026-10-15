@@ -14,6 +14,7 @@ public class ProductRepository(MauwDbContext dbContext) : Repository<Product>(db
     {
         return await _dbSet
             .Include(p => p.Variants)
+            .Include(p => p.Images.OrderBy(i => i.DisplayOrder))
             .FirstOrDefaultAsync(p => p.Id == id);
     }
 
@@ -21,13 +22,22 @@ public class ProductRepository(MauwDbContext dbContext) : Repository<Product>(db
     {
         return await _dbSet
             .Include(p => p.Variants)
+            .Include(p => p.Images.OrderBy(i => i.DisplayOrder))
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.InternalCode == internalCode);
     }
 
+    public async Task AddImageAsync(ProductImage image)
+    {
+        await dbContext.ProductImages.AddAsync(image);
+    }
+
     public async Task<IEnumerable<Product>> GetPaginatedAsync(int page, int pageSize, string? search = null)
     {
-        var query = _dbSet.Include(p => p.Variants).AsQueryable();
+        var query = _dbSet
+            .Include(p => p.Variants)
+            .Include(p => p.Images.OrderBy(i => i.DisplayOrder))
+            .AsQueryable();
 
         if (!string.IsNullOrEmpty(search))
         {

@@ -31,9 +31,6 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.VatRate)
             .HasPrecision(5, 2);
 
-        builder.Property(p => p.ImageUrl)
-            .HasMaxLength(500);
-
         builder.Property(p => p.CreatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
@@ -45,6 +42,21 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .WithOne(v => v.Product)
             .HasForeignKey(v => v.ProductId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(p => p.Category)
+            .WithMany()
+            .HasForeignKey(p => p.CategoryId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(p => p.Collection)
+            .WithMany()
+            .HasForeignKey(p => p.CollectionId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(p => p.Material)
+            .WithMany()
+            .HasForeignKey(p => p.MaterialId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         // Unique index for InternalCode
         builder.HasIndex(p => p.InternalCode)

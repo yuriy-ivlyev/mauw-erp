@@ -81,6 +81,105 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.ToTable("agent_commissions");
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.Category", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("MacroCategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("macro_category_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_categories");
+
+                    b.HasIndex("MacroCategoryId")
+                        .HasDatabaseName("i_x_categories_macro_category_id");
+
+                    b.ToTable("categories");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.Collection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_collections");
+
+                    b.ToTable("collections");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.Color", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("HtmlColor")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("html_color");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_colors");
+
+                    b.ToTable("colors");
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Contact", b =>
                 {
                     b.Property<Guid>("Id")
@@ -408,6 +507,99 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.ToTable("invoice_items");
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.MacroCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_macro_categories");
+
+                    b.ToTable("macro_categories");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.Material", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_materials");
+
+                    b.ToTable("materials");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.MaterialComposition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ComponentName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("component_name");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_id");
+
+                    b.Property<decimal>("PercentageValue")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("percentage_value");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_material_compositions");
+
+                    b.HasIndex("MaterialId")
+                        .HasDatabaseName("i_x_material_compositions_material_id");
+
+                    b.ToTable("material_compositions");
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Order", b =>
                 {
                     b.Property<Guid>("Id")
@@ -593,6 +785,14 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("category_id");
+
+                    b.Property<Guid?>("CollectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("collection_id");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -604,16 +804,15 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("numeric(5,2)")
                         .HasColumnName("default_markup_rate");
 
-                    b.Property<string>("ImageUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("image_url");
-
                     b.Property<string>("InternalCode")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("internal_code");
+
+                    b.Property<Guid?>("MaterialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_id");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -645,13 +844,79 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("p_k_products");
 
+                    b.HasIndex("CategoryId")
+                        .HasDatabaseName("i_x_products_category_id");
+
+                    b.HasIndex("CollectionId")
+                        .HasDatabaseName("i_x_products_collection_id");
+
                     b.HasIndex("InternalCode")
                         .IsUnique();
+
+                    b.HasIndex("MaterialId")
+                        .HasDatabaseName("i_x_products_material_id");
 
                     b.HasIndex("SupplierId", "SupplierCode")
                         .IsUnique();
 
                     b.ToTable("products");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.ProductImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("IsMain")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_main");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<Guid?>("ProductVariantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_variant_id");
+
+                    b.Property<string>("StorageKey")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("storage_key");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("url");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_product_images");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("i_x_product_images_product_id");
+
+                    b.HasIndex("ProductId", "DisplayOrder");
+
+                    b.ToTable("product_images");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.ProductVariant", b =>
@@ -667,11 +932,9 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("barcode");
 
-                    b.Property<string>("Color")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("color");
+                    b.Property<Guid>("ColorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("color_id");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -688,15 +951,9 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("purchase_cost");
 
-                    b.Property<string>("Size")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("size");
-
-                    b.Property<int>("StockQuantity")
-                        .HasColumnType("integer")
-                        .HasColumnName("stock_quantity");
+                    b.Property<Guid>("SizeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("size_id");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -710,10 +967,43 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasIndex("Barcode")
                         .IsUnique();
 
+                    b.HasIndex("ColorId")
+                        .HasDatabaseName("i_x_product_variants_color_id");
+
                     b.HasIndex("ProductId")
                         .HasDatabaseName("i_x_product_variants_product_id");
 
+                    b.HasIndex("SizeId")
+                        .HasDatabaseName("i_x_product_variants_size_id");
+
                     b.ToTable("product_variants");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.Size", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_sizes");
+
+                    b.ToTable("sizes");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.StockMovement", b =>
@@ -786,6 +1076,17 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Navigation("Agent");
 
                     b.Navigation("Invoice");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.Category", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.MacroCategory", "MacroCategory")
+                        .WithMany()
+                        .HasForeignKey("MacroCategoryId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("f_k_categories__macro_categories_macro_category_id");
+
+                    b.Navigation("MacroCategory");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Contact", b =>
@@ -865,6 +1166,18 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Navigation("Variant");
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.MaterialComposition", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.Material", "Material")
+                        .WithMany("Composition")
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_material_compositions_materials_material_id");
+
+                    b.Navigation("Material");
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Order", b =>
                 {
                     b.HasOne("Mauw.Erp.Domain.Entities.Contact", "Contact")
@@ -910,8 +1223,54 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Navigation("Invoice");
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.Product", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.Category", "Category")
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("f_k_products_categories_category_id");
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.Collection", "Collection")
+                        .WithMany()
+                        .HasForeignKey("CollectionId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("f_k_products_collections_collection_id");
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.Material", "Material")
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("f_k_products_materials_material_id");
+
+                    b.Navigation("Category");
+
+                    b.Navigation("Collection");
+
+                    b.Navigation("Material");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.ProductImage", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.Product", "Product")
+                        .WithMany("Images")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_product_images_products_product_id");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.ProductVariant", b =>
                 {
+                    b.HasOne("Mauw.Erp.Domain.Entities.Color", "Color")
+                        .WithMany()
+                        .HasForeignKey("ColorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_product_variants_colors_color_id");
+
                     b.HasOne("Mauw.Erp.Domain.Entities.Product", "Product")
                         .WithMany("Variants")
                         .HasForeignKey("ProductId")
@@ -919,7 +1278,18 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("f_k_product_variants_products_product_id");
 
+                    b.HasOne("Mauw.Erp.Domain.Entities.Size", "Size")
+                        .WithMany()
+                        .HasForeignKey("SizeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_product_variants__sizes_size_id");
+
+                    b.Navigation("Color");
+
                     b.Navigation("Product");
+
+                    b.Navigation("Size");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.StockMovement", b =>
@@ -955,6 +1325,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Navigation("Payments");
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.Material", b =>
+                {
+                    b.Navigation("Composition");
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Order", b =>
                 {
                     b.Navigation("Items");
@@ -962,6 +1337,8 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Product", b =>
                 {
+                    b.Navigation("Images");
+
                     b.Navigation("Variants");
                 });
 

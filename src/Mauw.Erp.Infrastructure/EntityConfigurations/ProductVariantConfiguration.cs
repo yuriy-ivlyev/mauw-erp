@@ -13,23 +13,12 @@ public class ProductVariantConfiguration : IEntityTypeConfiguration<ProductVaria
     {
         builder.HasKey(v => v.Id);
 
-        builder.Property(v => v.Size)
-            .IsRequired()
-            .HasMaxLength(50);
-
-        builder.Property(v => v.Color)
-            .IsRequired()
-            .HasMaxLength(50);
-
         builder.Property(v => v.Barcode)
             .IsRequired()
             .HasMaxLength(50);
 
         builder.Property(v => v.PurchaseCost)
             .HasPrecision(18, 4);
-
-        builder.Property(v => v.StockQuantity)
-            .IsRequired();
 
         builder.Property(v => v.CreatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
@@ -42,6 +31,16 @@ public class ProductVariantConfiguration : IEntityTypeConfiguration<ProductVaria
             .WithMany(p => p.Variants)
             .HasForeignKey(v => v.ProductId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(v => v.Color)
+            .WithMany()
+            .HasForeignKey(v => v.ColorId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(v => v.Size)
+            .WithMany()
+            .HasForeignKey(v => v.SizeId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasMany(v => v.StockMovements)
             .WithOne(sm => sm.Variant)

@@ -21,8 +21,27 @@ public static class ProductMapper
             Name: product.Name,
             DefaultMarkupRate: product.DefaultMarkupRate,
             VatRate: product.VatRate,
-            ImageUrl: product.ImageUrl,
-            Variants: product.Variants.Select(v => MapVariantToDto(v, product.DefaultMarkupRate)).ToList()
+            Images: product.Images.OrderBy(i => i.DisplayOrder).Select(MapImageToDto).ToList(),
+            Variants: product.Variants.Select(v => MapVariantToDto(v, product.DefaultMarkupRate)).ToList(),
+            CategoryId: product.CategoryId,
+            CategoryName: product.Category?.Name,
+            CollectionId: product.CollectionId,
+            CollectionName: product.Collection?.Name,
+            MaterialId: product.MaterialId,
+            MaterialName: product.Material?.Name
+        );
+    }
+
+    public static ProductImageDto MapImageToDto(ProductImage image)
+    {
+        return new ProductImageDto(
+            Id: image.Id,
+            ProductId: image.ProductId,
+            Url: image.Url,
+            StorageKey: image.StorageKey,
+            DisplayOrder: image.DisplayOrder,
+            IsMain: image.IsMain,
+            ProductVariantId: image.ProductVariantId
         );
     }
 
@@ -38,11 +57,11 @@ public static class ProductMapper
         return new ProductVariantDto(
             Id: variant.Id,
             ProductId: variant.ProductId,
-            Size: variant.Size,
-            Color: variant.Color,
+            Size: variant.Size?.Name ?? "N/A",
+            Color: variant.Color?.Name ?? "N/A",
             Barcode: variant.Barcode,
             PurchaseCost: variant.PurchaseCost,
-            StockQuantity: variant.StockQuantity,
+            StockQuantity: 0, // Stock moved to separate system
             ListPrice: pricingResult.ListPrice,
             FinalNetPrice: pricingResult.FinalNetPrice,
             VatAmount: 0,
@@ -64,9 +83,9 @@ public static class ProductMapper
             VariantId: variant.Id,
             ProductId: variant.ProductId,
             ProductName: product.Name,
-            Size: variant.Size,
-            Color: variant.Color,
-            StockQuantity: variant.StockQuantity,
+            Size: variant.Size?.Name ?? "N/A",
+            Color: variant.Color?.Name ?? "N/A",
+            StockQuantity: 0, // Stock moved to separate system
             UnitNetPrice: pricingResult.FinalNetPrice,
             UnitGrossPrice: pricingResult.FinalGrossPrice,
             VatRate: product.VatRate

@@ -17,6 +17,12 @@ public class UnitOfWork(MauwDbContext dbContext) : IUnitOfWork
     private IInvoiceRepository? _invoiceRepository;
     private IStockMovementRepository? _stockMovementRepository;
     private IDdtDocumentRepository? _ddtDocumentRepository;
+    private ISizeRepository? _sizeRepository;
+    private IColorRepository? _colorRepository;
+    private ICategoryRepository? _categoryRepository;
+    private ICollectionRepository? _collectionRepository;
+    private IMaterialRepository? _materialRepository;
+    private IMacroCategoryRepository? _macroCategoryRepository;
 
     public IProductRepository Products => _productRepository ??= new ProductRepository(dbContext);
     public IProductVariantRepository ProductVariants => _productVariantRepository ??= new ProductVariantRepository(dbContext);
@@ -25,6 +31,12 @@ public class UnitOfWork(MauwDbContext dbContext) : IUnitOfWork
     public IInvoiceRepository Invoices => _invoiceRepository ??= new InvoiceRepository(dbContext);
     public IStockMovementRepository StockMovements => _stockMovementRepository ??= new StockMovementRepository(dbContext);
     public IDdtDocumentRepository DdtDocuments => _ddtDocumentRepository ??= new DdtDocumentRepository(dbContext);
+    public ISizeRepository Sizes => _sizeRepository ??= new SizeRepository(dbContext);
+    public IColorRepository Colors => _colorRepository ??= new ColorRepository(dbContext);
+    public ICategoryRepository Categories => _categoryRepository ??= new CategoryRepository(dbContext);
+    public ICollectionRepository Collections => _collectionRepository ??= new CollectionRepository(dbContext);
+    public IMaterialRepository Materials => _materialRepository ??= new MaterialRepository(dbContext);
+    public IMacroCategoryRepository MacroCategories => _macroCategoryRepository ??= new MacroCategoryRepository(dbContext);
 
     public async Task SaveChangesAsync()
     {
