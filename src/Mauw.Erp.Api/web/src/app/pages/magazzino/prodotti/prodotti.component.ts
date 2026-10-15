@@ -3,8 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProductService } from '../../../services/product.service';
 import {
-  ProductDto, ProductImageDto, PageResponse,
-  CreateProductRequest, CreateProductVariantRequest, AddProductImageRequest
+  ProductDto, ProductImageDto, PageResponse, ColorDto, SizeDto, CategoryDto, CollectionDto, MaterialDto,
+  CreateProductRequest, CreateProductVariantRequest, AddProductImageRequest, ProductVariantDto
 } from '../../../models/product.model';
 
 @Component({
@@ -98,187 +98,279 @@ import {
       <div *ngIf="error" class="bg-red-100 text-red-800 p-4 rounded mt-4">{{ error }}</div>
 
       <!-- ===== Modal Crea/Modifica Prodotto ===== -->
-      <div *ngIf="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-          <div class="sticky top-0 bg-white border-b p-6 flex justify-between items-center">
+      <div *ngIf="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
+          <div class="sticky top-0 bg-white border-b p-6 flex justify-between items-center flex-shrink-0">
             <h2 class="text-2xl font-bold">{{ editingProductId ? 'Modifica Prodotto' : 'Nuovo Prodotto' }}</h2>
             <button (click)="closeModal()" class="text-gray-500 hover:text-gray-700 text-2xl">x</button>
           </div>
-          <div class="p-6 space-y-4">
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium mb-1">Codice Interno *</label>
-                <input [(ngModel)]="formData.internalCode" type="text"
-                  class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium mb-1">Nome Prodotto *</label>
-                <input [(ngModel)]="formData.name" type="text"
-                  class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium mb-1">Codice Fornitore</label>
-                <input [(ngModel)]="formData.supplierCode" type="text"
-                  class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium mb-1">Markup Rate (%)</label>
-                <input [(ngModel)]="formData.defaultMarkupRate" type="number" step="0.01"
-                  class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium mb-1">VAT Rate (%)</label>
-                <input [(ngModel)]="formData.vatRate" type="number" step="0.01"
-                  class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-            </div>
 
-            <div class="border-t pt-6">
-              <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold">Varianti</h3>
-                <button (click)="addVariant()"
-                  class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm">
-                  + Aggiungi Variante
-                </button>
-              </div>
-              <div *ngFor="let variant of formData.variants; let i = index" class="border rounded p-4 mb-4">
-                <div class="flex justify-between items-center mb-3">
-                  <h4 class="font-medium">Variante {{ i + 1 }}</h4>
-                  <button (click)="removeVariant(i)" class="text-red-600 hover:text-red-800 text-sm">Rimuovi</button>
+          <!-- Tab Navigation -->
+          <div class="border-b flex flex-shrink-0">
+            <button
+              (click)="activeTab = 'details'"
+              [class]="'flex-1 px-4 py-3 text-center font-medium border-b-2 transition ' +
+                (activeTab === 'details' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-800')">
+              Dettagli Prodotto
+            </button>
+            <button
+              *ngIf="editingProductId"
+              (click)="activeTab = 'variants'"
+              [class]="'flex-1 px-4 py-3 text-center font-medium border-b-2 transition ' +
+                (activeTab === 'variants' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-800')">
+              Varianti
+            </button>
+            <button
+              *ngIf="editingProductId"
+              (click)="activeTab = 'gallery'"
+              [class]="'flex-1 px-4 py-3 text-center font-medium border-b-2 transition ' +
+                (activeTab === 'gallery' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-800')">
+              Galleria
+            </button>
+          </div>
+
+          <div class="flex-1 overflow-y-auto p-6">
+            <!-- TAB: Details -->
+            <div *ngIf="activeTab === 'details'" class="space-y-4">
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium mb-1">Codice Interno *</label>
+                  <input [(ngModel)]="formData.internalCode" type="text"
+                    class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
-                <div class="grid grid-cols-2 gap-3">
-                  <div>
-                    <label class="block text-sm font-medium mb-1">Taglia</label>
-                    <input [(ngModel)]="variant.size" type="text" placeholder="es. M, L, XL"
-                      class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium mb-1">Colore</label>
-                    <input [(ngModel)]="variant.color" type="text" placeholder="es. Rosso, Blu"
-                      class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium mb-1">Barcode</label>
-                    <input [(ngModel)]="variant.barcode" type="text"
-                      class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium mb-1">Costo Acquisto</label>
-                    <input [(ngModel)]="variant.purchaseCost" type="number" step="0.01"
-                      class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  </div>
+                <div>
+                  <label class="block text-sm font-medium mb-1">Nome Prodotto *</label>
+                  <input [(ngModel)]="formData.name" type="text"
+                    class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
-                <div class="mt-3">
-                  <label class="block text-sm font-medium mb-1">Quantita Stock</label>
-                  <input [(ngModel)]="variant.stockQuantity" type="number"
+                <div>
+                  <label class="block text-sm font-medium mb-1">Codice Fornitore</label>
+                  <input [(ngModel)]="formData.supplierCode" type="text"
+                    class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-1">Markup Rate (%)</label>
+                  <input [(ngModel)]="formData.defaultMarkupRate" type="number" step="0.01"
+                    class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-1">VAT Rate (%)</label>
+                  <input [(ngModel)]="formData.vatRate" type="number" step="0.01"
                     class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               </div>
-            </div>
 
-            <div class="flex gap-3 justify-end border-t pt-6">
-              <button (click)="closeModal()" class="px-4 py-2 border rounded hover:bg-gray-50">Annulla</button>
-              <button (click)="saveProduct()" [disabled]="savingProduct"
-                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded disabled:opacity-50">
-                {{ savingProduct ? 'Salvataggio...' : 'Salva' }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===== Modal Galleria Immagini ===== -->
-      <div *ngIf="showGalleryModal && galleryProduct"
-        class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-
-          <!-- Header -->
-          <div class="flex justify-between items-center px-6 py-4 border-b flex-shrink-0">
-            <h2 class="text-xl font-bold truncate">{{ galleryProduct.name }}</h2>
-            <button (click)="closeGalleryModal()" class="text-gray-400 hover:text-gray-700 text-3xl leading-none">&times;</button>
-          </div>
-
-          <!-- Body: immagine grande + sidebar thumbnail -->
-          <div class="flex flex-1 min-h-0 overflow-hidden">
-
-            <!-- Immagine grande -->
-            <div class="flex-1 bg-gray-900 flex items-center justify-center p-4 min-w-0">
-              <ng-container *ngIf="selectedImage; else noSelectedImg">
-                <img [src]="selectedImage.url" alt="Immagine selezionata"
-                  class="max-w-full max-h-full object-contain rounded"
-                  (error)="onImgError($event)" />
-              </ng-container>
-              <ng-template #noSelectedImg>
-                <div class="text-gray-500 text-center">
-                  <div class="text-6xl mb-2">&#128444;</div>
-                  <p class="text-sm">Nessuna immagine</p>
+              <div class="grid grid-cols-2 gap-4 pt-4">
+                <div>
+                  <label class="block text-sm font-medium mb-1">Categoria</label>
+                  <select [(ngModel)]="formData.categoryId"
+                    class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">-- Seleziona categoria --</option>
+                    <option *ngFor="let cat of categories" [value]="cat.id">{{ cat.name }}</option>
+                  </select>
                 </div>
-              </ng-template>
+                <div>
+                  <label class="block text-sm font-medium mb-1">Collezione</label>
+                  <select [(ngModel)]="formData.collectionId"
+                    class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">-- Seleziona collezione --</option>
+                    <option *ngFor="let col of collections" [value]="col.id">{{ col.name }}</option>
+                  </select>
+                </div>
+                <div class="col-span-2">
+                  <label class="block text-sm font-medium mb-1">Materiale</label>
+                  <select [(ngModel)]="formData.materialId"
+                    class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">-- Seleziona materiale --</option>
+                    <option *ngFor="let mat of materials" [value]="mat.id">{{ mat.name }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div *ngIf="formError" class="bg-red-100 text-red-800 p-3 rounded text-sm">{{ formError }}</div>
             </div>
 
-            <!-- Sidebar destra -->
-            <div class="w-52 flex flex-col border-l flex-shrink-0">
+            <!-- TAB: Variants -->
+            <div *ngIf="activeTab === 'variants'" class="space-y-6">
+              <!-- Variant Table -->
+              <div>
+                <h3 class="text-lg font-semibold mb-4">Varianti Esistenti</h3>
+                <div *ngIf="loadingVariants" class="text-center text-gray-500 py-4">Caricamento...</div>
+                <div *ngIf="!loadingVariants && productVariants.length === 0" class="text-center text-gray-500 py-4">
+                  Nessuna variante. Aggiungi la prima variante qui sotto.
+                </div>
+                <div *ngIf="!loadingVariants && productVariants.length > 0" class="bg-white rounded border overflow-hidden">
+                  <table class="w-full text-sm">
+                    <thead class="bg-gray-100 border-b">
+                      <tr>
+                        <th class="px-4 py-3 text-left font-medium">Colore</th>
+                        <th class="px-4 py-3 text-left font-medium">Taglia</th>
+                        <th class="px-4 py-3 text-left font-medium">Barcode</th>
+                        <th class="px-4 py-3 text-left font-medium">Costo Acquisto</th>
+                        <th class="px-4 py-3 text-center font-medium">Azioni</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let variant of productVariants" class="border-b hover:bg-gray-50">
+                        <td class="px-4 py-3">
+                          <div class="flex gap-2 items-center">
+                            <div class="w-5 h-5 rounded border" [style.backgroundColor]="getColorHtml(variant.colorId)"></div>
+                            <span>{{ variant.color }}</span>
+                          </div>
+                        </td>
+                        <td class="px-4 py-3">{{ variant.size }}</td>
+                        <td class="px-4 py-3">{{ variant.barcode }}</td>
+                        <td class="px-4 py-3">&euro;{{ variant.purchaseCost.toFixed(2) }}</td>
+                        <td class="px-4 py-3 text-center">
+                          <button
+                            (click)="deleteVariant(variant.id)"
+                            [disabled]="deletingVariantId === variant.id"
+                            class="text-red-600 hover:text-red-800 text-sm disabled:opacity-50">
+                            {{ deletingVariantId === variant.id ? 'Eliminando...' : 'Elimina' }}
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-              <!-- Thumbnails scrollabili -->
-              <div class="flex-1 overflow-y-auto p-2 space-y-2">
-                <div *ngFor="let img of galleryProduct.images"
-                  (click)="selectImage(img)"
-                  class="relative rounded overflow-hidden cursor-pointer border-2 transition"
-                  [class.border-blue-500]="selectedImage?.id === img.id"
-                  [class.border-transparent]="selectedImage?.id !== img.id">
-                  <img [src]="img.url" [alt]="img.url"
-                    class="w-full h-24 object-cover"
-                    (error)="onImgError($event)" />
-                  <div *ngIf="img.isMain"
-                    class="absolute top-1 left-1 bg-yellow-400 text-xs font-bold px-1.5 py-0.5 rounded leading-none">
-                    &#9733;
+              <!-- Add Variant Form -->
+              <div class="border-t pt-6">
+                <h3 class="text-lg font-semibold mb-4">Aggiungi Nuova Variante</h3>
+                <div class="bg-gray-50 rounded p-4 space-y-4">
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-sm font-medium mb-1">Colore *</label>
+                      <select [(ngModel)]="newVariantForm.colorId"
+                        class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">-- Seleziona colore --</option>
+                        <option *ngFor="let color of colors" [value]="color.id">
+                          {{ color.name }}
+                        </option>
+                      </select>
+                      <div class="mt-2 flex gap-2 items-center" *ngIf="newVariantForm.colorId">
+                        <div class="w-6 h-6 rounded border" 
+                          [style.backgroundColor]="getColorHtml(newVariantForm.colorId)"></div>
+                        <span class="text-xs text-gray-600">{{ getColorName(newVariantForm.colorId) }}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium mb-1">Taglia *</label>
+                      <select [(ngModel)]="newVariantForm.sizeId"
+                        class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">-- Seleziona taglia --</option>
+                        <option *ngFor="let size of sizes" [value]="size.id">{{ size.name }}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium mb-1">Barcode *</label>
+                      <input [(ngModel)]="newVariantForm.barcode" type="text" placeholder="es. 1234567890"
+                        class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium mb-1">Costo Acquisto *</label>
+                      <input [(ngModel)]="newVariantForm.purchaseCost" type="number" step="0.01" placeholder="0.00"
+                        class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                  </div>
+                  <div *ngIf="variantError" class="bg-red-100 text-red-800 p-3 rounded text-sm">{{ variantError }}</div>
+                  <button
+                    (click)="addVariant()"
+                    [disabled]="savingVariant"
+                    class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded disabled:opacity-50">
+                    {{ savingVariant ? 'Aggiunta...' : '+ Aggiungi Variante' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB: Gallery -->
+            <div *ngIf="activeTab === 'gallery'" class="space-y-4">
+              <div class="flex flex-1 min-h-96 overflow-hidden gap-4">
+                <div class="flex-1 bg-gray-900 flex items-center justify-center p-4 rounded border-2 border-gray-200">
+                  <ng-container *ngIf="selectedImage; else noSelectedImg">
+                    <img [src]="selectedImage.url" alt="Immagine selezionata"
+                      class="max-w-full max-h-full object-contain rounded"
+                      (error)="onImgError($event)" />
+                  </ng-container>
+                  <ng-template #noSelectedImg>
+                    <div class="text-gray-500 text-center">
+                      <div class="text-6xl mb-2">&#128444;</div>
+                      <p class="text-sm">Nessuna immagine</p>
+                    </div>
+                  </ng-template>
+                </div>
+
+                <div class="w-48 flex flex-col border rounded">
+                  <div class="flex-1 overflow-y-auto p-2 space-y-2 border-b">
+                    <div *ngFor="let img of (galleryProduct?.images || [])"
+                      (click)="selectImage(img)"
+                      class="relative rounded overflow-hidden cursor-pointer border-2 transition"
+                      [class.border-blue-500]="selectedImage?.id === img.id"
+                      [class.border-transparent]="selectedImage?.id !== img.id">
+                      <img [src]="img.url" [alt]="img.url"
+                        class="w-full h-24 object-cover"
+                        (error)="onImgError($event)" />
+                      <div *ngIf="img.isMain" class="absolute top-1 left-1 bg-yellow-400 text-xs font-bold px-1.5 py-0.5 rounded">
+                        &#9733;
+                      </div>
+                    </div>
+                    <div *ngIf="!galleryProduct || galleryProduct.images.length === 0" class="text-gray-400 text-xs text-center py-4">
+                      Nessuna immagine
+                    </div>
+                  </div>
+
+                  <div class="border-t p-2 space-y-1 flex-shrink-0">
+                    <button *ngIf="selectedImage && !selectedImage.isMain"
+                      (click)="setMainImage(selectedImage)"
+                      class="w-full text-xs bg-yellow-400 hover:bg-yellow-500 font-semibold py-1.5 rounded">
+                      &#9733; Imposta principale
+                    </button>
+                    <button *ngIf="selectedImage"
+                      (click)="removeImage(selectedImage)"
+                      class="w-full text-xs bg-red-600 hover:bg-red-700 text-white font-semibold py-1.5 rounded">
+                      &#128465; Elimina
+                    </button>
                   </div>
                 </div>
-                <div *ngIf="!galleryProduct.images.length"
-                  class="text-gray-400 text-xs text-center py-4">
-                  Nessuna immagine
+              </div>
+
+              <div class="border-t pt-4 space-y-2">
+                <div class="flex gap-2 items-center">
+                  <input [(ngModel)]="newImageUrl" type="text" placeholder="URL nuova immagine..."
+                    class="flex-1 px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <label class="flex items-center gap-1 text-sm whitespace-nowrap">
+                    <input type="checkbox" [(ngModel)]="newImageIsMain" /> Principale
+                  </label>
+                  <button (click)="addImage()" [disabled]="!newImageUrl || addingImage"
+                    class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded disabled:opacity-50 whitespace-nowrap">
+                    {{ addingImage ? '...' : '+ Aggiungi' }}
+                  </button>
                 </div>
+                <div *ngIf="galleryError" class="bg-red-100 text-red-800 p-2 rounded text-sm">{{ galleryError }}</div>
               </div>
-
-              <!-- Azioni immagine selezionata -->
-              <div class="border-t p-2 space-y-1 flex-shrink-0">
-                <button *ngIf="selectedImage && !selectedImage.isMain"
-                  (click)="setMainImage(selectedImage)"
-                  class="w-full text-xs bg-yellow-400 hover:bg-yellow-500 font-semibold py-1.5 rounded">
-                  &#9733; Imposta principale
-                </button>
-                <button *ngIf="selectedImage"
-                  (click)="removeImage(selectedImage)"
-                  class="w-full text-xs bg-red-600 hover:bg-red-700 text-white font-semibold py-1.5 rounded">
-                  &#128465; Elimina
-                </button>
-              </div>
-
             </div>
           </div>
 
-          <!-- Footer: aggiungi immagine -->
-          <div class="border-t px-6 py-4 flex-shrink-0 space-y-2">
-            <div class="flex gap-2 items-center">
-              <input [(ngModel)]="newImageUrl" type="text" placeholder="URL nuova immagine..."
-                class="flex-1 px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              <label class="flex items-center gap-1 text-sm whitespace-nowrap">
-                <input type="checkbox" [(ngModel)]="newImageIsMain" /> Principale
-              </label>
-              <button (click)="addImage()" [disabled]="!newImageUrl || addingImage"
-                class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded disabled:opacity-50 whitespace-nowrap">
-                {{ addingImage ? '...' : '+ Aggiungi' }}
-              </button>
-            </div>
-            <div *ngIf="galleryError" class="bg-red-100 text-red-800 p-2 rounded text-sm">{{ galleryError }}</div>
+          <div class="flex gap-3 justify-end border-t p-6 flex-shrink-0">
+            <button (click)="closeModal()" class="px-4 py-2 border rounded hover:bg-gray-50">Annulla</button>
+            <button (click)="saveProduct()" [disabled]="savingProduct"
+              class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded disabled:opacity-50">
+              {{ savingProduct ? 'Salvataggio...' : (editingProductId ? 'Salva' : 'Crea Prodotto') }}
+            </button>
           </div>
         </div>
       </div>
+
+      <!-- ===== Modal Galleria Immagini (deprecated - now in modal tab) ===== -->
+      <!-- Removed: Gallery is now integrated into the product modal as a tab -->
 
     </div>
   `
 })
 export class ProdottiComponent implements OnInit {
+  // Product list
   products: ProductDto[] = [];
   currentPage = 1;
   pageSize = 20;
@@ -288,12 +380,31 @@ export class ProdottiComponent implements OnInit {
   error: string | null = null;
   searchTerm = '';
 
+  // Support data
+  colors: ColorDto[] = [];
+  sizes: SizeDto[] = [];
+  categories: CategoryDto[] = [];
+  collections: CollectionDto[] = [];
+  materials: MaterialDto[] = [];
+  loadingSupportData = false;
+
+  // Modal state
   showModal = false;
+  activeTab: 'details' | 'variants' | 'gallery' = 'details';
   editingProductId: string | null = null;
   savingProduct = false;
-  formData: CreateProductRequest = this.initializeForm();
+  formError: string | null = null;
+  formData: CreateProductRequest = this.initializeProductForm();
 
-  showGalleryModal = false;
+  // Variant management
+  productVariants: ProductVariantDto[] = [];
+  loadingVariants = false;
+  newVariantForm = this.initializeVariantForm();
+  savingVariant = false;
+  variantError: string | null = null;
+  deletingVariantId: string | null = null;
+
+  // Gallery (now within modal)
   galleryProduct: ProductDto | null = null;
   selectedImage: ProductImageDto | null = null;
   newImageUrl = '';
@@ -301,21 +412,51 @@ export class ProdottiComponent implements OnInit {
   addingImage = false;
   galleryError: string | null = null;
 
-  constructor(private productService: ProductService) {}
+  constructor(private productService: ProductService) { }
 
   ngOnInit(): void {
+    this.loadSupportData();
     this.loadProducts();
   }
 
-  private initializeForm(): CreateProductRequest {
+  private loadSupportData(): void {
+    this.loadingSupportData = true;
+    Promise.all([
+      this.productService.getColors().toPromise(),
+      this.productService.getSizes().toPromise(),
+      this.productService.getCategories().toPromise(),
+      this.productService.getCollections().toPromise(),
+      this.productService.getMaterials().toPromise()
+    ]).then(([colors, sizes, categories, collections, materials]) => {
+      this.colors = colors || [];
+      this.sizes = sizes || [];
+      this.categories = categories || [];
+      this.collections = collections || [];
+      this.materials = materials || [];
+      this.loadingSupportData = false;
+    }).catch(err => {
+      console.error('Error loading support data:', err);
+      this.loadingSupportData = false;
+    });
+  }
+
+  private initializeProductForm(): CreateProductRequest {
     return {
       supplierId: '',
       supplierCode: '',
       internalCode: '',
       name: '',
       defaultMarkupRate: 0,
-      vatRate: 0,
-      variants: []
+      vatRate: 0
+    };
+  }
+
+  private initializeVariantForm() {
+    return {
+      colorId: '',
+      sizeId: '',
+      barcode: '',
+      purchaseCost: 0
     };
   }
 
@@ -337,20 +478,35 @@ export class ProdottiComponent implements OnInit {
     });
   }
 
-  search(): void { this.currentPage = 1; this.loadProducts(); }
+  search(): void {
+    this.currentPage = 1;
+    this.loadProducts();
+  }
 
   nextPage(): void {
-    if (this.currentPage < this.totalPages) { this.currentPage++; this.loadProducts(); }
+    if (this.currentPage < this.totalPages) {
+      this.currentPage++;
+      this.loadProducts();
+    }
   }
 
   previousPage(): void {
-    if (this.currentPage > 1) { this.currentPage--; this.loadProducts(); }
+    if (this.currentPage > 1) {
+      this.currentPage--;
+      this.loadProducts();
+    }
   }
 
   openNewProductModal(): void {
     this.editingProductId = null;
-    this.formData = this.initializeForm();
-    this.formData.variants = [this.createEmptyVariant()];
+    this.formData = this.initializeProductForm();
+    this.newVariantForm = this.initializeVariantForm();
+    this.productVariants = [];
+    this.activeTab = 'details';
+    this.formError = null;
+    this.variantError = null;
+    this.galleryProduct = null;
+    this.selectedImage = null;
     this.showModal = true;
   }
 
@@ -363,57 +519,129 @@ export class ProdottiComponent implements OnInit {
       name: product.name,
       defaultMarkupRate: product.defaultMarkupRate,
       vatRate: product.vatRate,
-      variants: product.variants.map(v => ({
-        size: v.size,
-        color: v.color,
-        barcode: v.barcode,
-        purchaseCost: v.purchaseCost,
-        stockQuantity: v.stockQuantity
-      }))
+      categoryId: product.categoryId,
+      collectionId: product.collectionId,
+      materialId: product.materialId
     };
+    this.newVariantForm = this.initializeVariantForm();
+    this.activeTab = 'details';
+    this.formError = null;
+    this.variantError = null;
+    this.galleryProduct = { ...product, images: [...(product.images ?? [])] };
+    this.selectedImage = this.galleryProduct.images.find(i => i.isMain) ?? this.galleryProduct.images[0] ?? null;
+    this.loadVariants(product.id);
     this.showModal = true;
   }
 
   closeModal(): void {
     this.showModal = false;
     this.editingProductId = null;
-    this.formData = this.initializeForm();
+    this.formData = this.initializeProductForm();
+    this.newVariantForm = this.initializeVariantForm();
+    this.productVariants = [];
+    this.galleryProduct = null;
+    this.selectedImage = null;
   }
 
-  addVariant(): void { this.formData.variants.push(this.createEmptyVariant()); }
-  removeVariant(index: number): void { this.formData.variants.splice(index, 1); }
-
-  private createEmptyVariant(): CreateProductVariantRequest {
-    return { size: '', color: '', barcode: '', purchaseCost: 0, stockQuantity: 0 };
+  private loadVariants(productId: string): void {
+    this.loadingVariants = true;
+    this.productService.getProductVariants(productId).subscribe({
+      next: (variants) => {
+        this.productVariants = variants;
+        this.loadingVariants = false;
+      },
+      error: (err) => {
+        console.error('Error loading variants:', err);
+        this.loadingVariants = false;
+      }
+    });
   }
 
   saveProduct(): void {
-    if (!this.formData.name || !this.formData.internalCode || this.formData.variants.length === 0) {
-      this.error = 'Completa i campi obbligatori e aggiungi almeno una variante';
+    this.formError = null;
+    if (!this.formData.name || !this.formData.internalCode) {
+      this.formError = 'Completa i campi obbligatori (Nome e Codice Interno)';
       return;
     }
     if (!this.formData.supplierId?.trim()) {
       this.formData.supplierId = this.generateUUID();
     }
-    this.savingProduct = true;
-    this.error = null;
 
+    this.savingProduct = true;
     const operation = this.editingProductId
       ? this.productService.updateProduct(this.editingProductId, this.formData)
       : this.productService.createProduct(this.formData);
 
     operation.subscribe({
-      next: () => {
+      next: (product) => {
         this.savingProduct = false;
-        this.closeModal();
+        if (!this.editingProductId) {
+          this.editingProductId = product.id;
+          this.galleryProduct = { ...product, images: [...(product.images ?? [])] };
+          this.activeTab = 'variants';
+        }
         this.currentPage = 1;
         this.loadProducts();
       },
       error: (err) => {
-        this.error = err?.error && typeof err.error === 'string'
+        this.formError = err?.error && typeof err.error === 'string'
           ? err.error
           : (this.editingProductId ? 'Errore nella modifica del prodotto' : 'Errore nella creazione del prodotto');
         this.savingProduct = false;
+        console.error(err);
+      }
+    });
+  }
+
+  addVariant(): void {
+    this.variantError = null;
+    if (!this.newVariantForm.colorId || !this.newVariantForm.sizeId || !this.newVariantForm.barcode || this.newVariantForm.purchaseCost === null || this.newVariantForm.purchaseCost === undefined) {
+      this.variantError = 'Completa tutti i campi obbligatori';
+      return;
+    }
+    if (this.productVariants.some(v => v.barcode === this.newVariantForm.barcode)) {
+      this.variantError = 'Barcode già esistente';
+      return;
+    }
+
+    const request: CreateProductVariantRequest = {
+      productId: this.editingProductId!,
+      colorId: this.newVariantForm.colorId,
+      sizeId: this.newVariantForm.sizeId,
+      barcode: this.newVariantForm.barcode,
+      purchaseCost: this.newVariantForm.purchaseCost
+    };
+
+    this.savingVariant = true;
+    this.productService.createProductVariant(request).subscribe({
+      next: (variant) => {
+        this.productVariants.push(variant);
+        this.newVariantForm = this.initializeVariantForm();
+        this.savingVariant = false;
+      },
+      error: (err) => {
+        this.variantError = err?.error && typeof err.error === 'string'
+          ? err.error
+          : 'Errore nell\'aggiunta della variante';
+        this.savingVariant = false;
+        console.error(err);
+      }
+    });
+  }
+
+  deleteVariant(variantId: string): void {
+    if (!confirm('Sei sicuro di voler eliminare questa variante?')) return;
+    if (!this.editingProductId) return;
+
+    this.deletingVariantId = variantId;
+    this.productService.deleteProductVariant(this.editingProductId, variantId).subscribe({
+      next: () => {
+        this.productVariants = this.productVariants.filter(v => v.id !== variantId);
+        this.deletingVariantId = null;
+      },
+      error: (err) => {
+        this.variantError = 'Errore nell\'eliminazione della variante';
+        this.deletingVariantId = null;
         console.error(err);
       }
     });
@@ -423,7 +651,10 @@ export class ProdottiComponent implements OnInit {
     if (!confirm('Sei sicuro di voler eliminare questo prodotto?')) return;
     this.loading = true;
     this.productService.deleteProduct(productId).subscribe({
-      next: () => { this.loading = false; this.loadProducts(); },
+      next: () => {
+        this.loading = false;
+        this.loadProducts();
+      },
       error: (err) => {
         this.error = "Errore nell'eliminazione del prodotto";
         this.loading = false;
@@ -433,18 +664,12 @@ export class ProdottiComponent implements OnInit {
   }
 
   openGalleryModal(product: ProductDto): void {
-    this.galleryProduct = { ...product, images: [...(product.images ?? [])] };
-    this.selectedImage = this.galleryProduct.images.find(i => i.isMain) ?? this.galleryProduct.images[0] ?? null;
-    this.newImageUrl = '';
-    this.newImageIsMain = false;
-    this.galleryError = null;
-    this.showGalleryModal = true;
+    this.editProduct(product);
+    this.activeTab = 'gallery';
   }
 
   closeGalleryModal(): void {
-    this.showGalleryModal = false;
-    this.galleryProduct = null;
-    this.selectedImage = null;
+    this.closeModal();
     this.loadProducts();
   }
 
@@ -507,8 +732,19 @@ export class ProdottiComponent implements OnInit {
     });
   }
 
+  getColorHtml(colorId: string | undefined): string {
+    if (!colorId) return '#cccccc';
+    const color = this.colors.find(c => c.id === colorId);
+    return color?.htmlColor || '#cccccc';
+  }
+
+  getColorName(colorId: string | undefined): string {
+    if (!colorId) return '';
+    const color = this.colors.find(c => c.id === colorId);
+    return color?.name || '';
+  }
+
   onThumbError(event: Event, product: ProductDto): void {
-    // Prevent further error loops by clearing the URL on the model
     product.mainImageUrl = undefined;
     (event.target as HTMLImageElement).style.display = 'none';
   }

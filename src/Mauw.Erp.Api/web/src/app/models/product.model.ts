@@ -65,6 +65,11 @@ export interface ProductImageDto {
   productVariantId?: string;
 }
 
+export interface AddProductImageRequest {
+  url: string;
+  isMain: boolean;
+}
+
 export interface ProductDto {
   id: string;
   supplierId: string;
@@ -114,17 +119,6 @@ export interface CreateProductVariantRequest {
   sizeId: string;
   barcode: string;
   purchaseCost: number;
-}
-  isMain: boolean;
-  productVariantId?: string;
-}
-
-export interface CreateProductVariantRequest {
-  size: string;
-  color: string;
-  barcode: string;
-  purchaseCost: number;
-  stockQuantity: number;
 }
 
 export interface PageResponse<T> {
