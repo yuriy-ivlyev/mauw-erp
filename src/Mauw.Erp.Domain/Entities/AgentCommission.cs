@@ -8,7 +8,7 @@ namespace Mauw.Erp.Domain.Entities;
 /// excluding VAT and transport fees.
 /// Status transitions: Pending -> Accrued -> Paid
 /// </summary>
-public class AgentCommission : Entity
+public class AgentCommission : Entity<Guid>
 {
     public Guid AgentId { get; set; }
     public Guid InvoiceId { get; set; }

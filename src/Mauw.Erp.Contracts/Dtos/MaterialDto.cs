@@ -8,4 +8,4 @@ public record MaterialCompositionDto(Guid Id, string ComponentName, decimal Perc
 /// <summary>
 /// DTO for Material information (response).
 /// </summary>
-public record MaterialDto(Guid Id, string Name, List<MaterialCompositionDto> Composition);
+public record MaterialDto(Guid Id, string Name, bool IsVisible, List<MaterialCompositionDto> Composition);

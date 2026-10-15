@@ -10,6 +10,7 @@ public record CreateProductRequest(
     string Name,
     decimal DefaultMarkupRate,
     decimal VatRate,
+    decimal BasePurchaseCost,
     Guid? CategoryId = null,
     Guid? CollectionId = null,
     Guid? MaterialId = null

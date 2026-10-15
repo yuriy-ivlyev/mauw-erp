@@ -11,6 +11,7 @@ public record ProductDto(
     string Name,
     decimal DefaultMarkupRate,
     decimal VatRate,
+    decimal BasePurchaseCost,
     List<ProductImageDto> Images,
     List<ProductVariantDto> Variants,
     Guid? CategoryId = null,

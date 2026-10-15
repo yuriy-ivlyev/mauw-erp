@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mauw.Erp.Infrastructure.Repositories;
 
-public class MaterialRepository(MauwDbContext dbContext) : Repository<Material>(dbContext), IMaterialRepository
+public class MaterialRepository(MauwDbContext dbContext) : Repository<Material, Guid>(dbContext), IMaterialRepository
 {
     public async Task<Material?> GetByNameAsync(string name)
     {

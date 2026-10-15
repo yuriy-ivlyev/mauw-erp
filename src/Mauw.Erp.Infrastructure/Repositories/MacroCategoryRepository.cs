@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mauw.Erp.Infrastructure.Repositories;
 
-public class MacroCategoryRepository(MauwDbContext dbContext) : Repository<MacroCategory>(dbContext), IMacroCategoryRepository
+public class MacroCategoryRepository(MauwDbContext dbContext) : Repository<MacroCategory, Guid>(dbContext), IMacroCategoryRepository
 {
     public async Task<MacroCategory?> GetByNameAsync(string name)
     {

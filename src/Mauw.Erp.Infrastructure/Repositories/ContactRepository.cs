@@ -8,7 +8,7 @@ namespace Mauw.Erp.Infrastructure.Repositories;
 /// <summary>
 /// Contact repository implementation.
 /// </summary>
-public class ContactRepository(MauwDbContext dbContext) : Repository<Contact>(dbContext), IContactRepository
+public class ContactRepository(MauwDbContext dbContext) : Repository<Contact, Guid>(dbContext), IContactRepository
 {
     public async Task<Contact?> GetByVatNumberAsync(string vatNumber)
     {

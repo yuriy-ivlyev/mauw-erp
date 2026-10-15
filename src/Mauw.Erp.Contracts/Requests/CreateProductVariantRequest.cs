@@ -5,8 +5,8 @@ namespace Mauw.Erp.Contracts.Requests;
 /// </summary>
 public record CreateProductVariantRequest(
     Guid ProductId,
-    Guid ColorId,
-    Guid SizeId,
+    string? ColorId,
+    string? SizeId,
     string Barcode,
     decimal PurchaseCost
 );

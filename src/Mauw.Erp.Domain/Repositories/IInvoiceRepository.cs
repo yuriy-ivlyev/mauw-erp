@@ -5,7 +5,7 @@ namespace Mauw.Erp.Domain.Repositories;
 /// <summary>
 /// Invoice-specific repository operations.
 /// </summary>
-public interface IInvoiceRepository : IRepository<Invoice>
+public interface IInvoiceRepository : IRepository<Invoice, Guid>
 {
     Task<Invoice?> GetByNumberAsync(string invoiceNumber);
     Task<IEnumerable<Invoice>> GetByContactIdAsync(Guid contactId);

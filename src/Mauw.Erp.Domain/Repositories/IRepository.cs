@@ -3,15 +3,15 @@ using Mauw.Erp.Domain.Entities;
 namespace Mauw.Erp.Domain.Repositories;
 
 /// <summary>
-/// Generic repository interface for data access.
+/// Generic repository interface for data access with generic ID type.
 /// </summary>
-public interface IRepository<T> where T : Entity
+public interface IRepository<TEntity, TId> where TEntity : Entity<TId> where TId : IEquatable<TId>
 {
-    Task<T?> GetByIdAsync(Guid id);
-    Task<IEnumerable<T>> GetAllAsync();
-    Task<IEnumerable<T>> FindAsync(Func<T, bool> predicate);
-    Task AddAsync(T entity);
-    Task UpdateAsync(T entity);
-    Task DeleteAsync(T entity);
+    Task<TEntity?> GetByIdAsync(TId id);
+    Task<IEnumerable<TEntity>> GetAllAsync();
+    Task<IEnumerable<TEntity>> FindAsync(Func<TEntity, bool> predicate);
+    Task AddAsync(TEntity entity);
+    Task UpdateAsync(TEntity entity);
+    Task DeleteAsync(TEntity entity);
     Task SaveChangesAsync();
 }

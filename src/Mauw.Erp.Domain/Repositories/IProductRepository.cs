@@ -5,7 +5,7 @@ namespace Mauw.Erp.Domain.Repositories;
 /// <summary>
 /// Product-specific repository operations.
 /// </summary>
-public interface IProductRepository : IRepository<Product>
+public interface IProductRepository : IRepository<Product, Guid>
 {
     Task AddImageAsync(ProductImage image);
     Task<Product?> GetByInternalCodeAsync(string internalCode);

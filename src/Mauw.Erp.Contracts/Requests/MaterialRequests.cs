@@ -13,4 +13,4 @@ public record CreateMaterialRequest(string Name, List<MaterialCompositionData>? 
 /// <summary>
 /// Request for updating a material.
 /// </summary>
-public record UpdateMaterialRequest(string Name, List<MaterialCompositionData>? Composition);
+public record UpdateMaterialRequest(string Name, List<MaterialCompositionData>? Composition, bool IsVisible);

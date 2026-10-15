@@ -8,7 +8,7 @@ namespace Mauw.Erp.Infrastructure.Repositories;
 /// <summary>
 /// Product repository implementation.
 /// </summary>
-public class ProductRepository(MauwDbContext dbContext) : Repository<Product>(dbContext), IProductRepository
+public class ProductRepository(MauwDbContext dbContext) : Repository<Product, Guid>(dbContext), IProductRepository
 {
     public override async Task<Product?> GetByIdAsync(Guid id)
     {

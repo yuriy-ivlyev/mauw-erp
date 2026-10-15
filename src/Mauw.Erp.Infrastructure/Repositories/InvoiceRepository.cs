@@ -8,7 +8,7 @@ namespace Mauw.Erp.Infrastructure.Repositories;
 /// <summary>
 /// Invoice repository implementation.
 /// </summary>
-public class InvoiceRepository(MauwDbContext dbContext) : Repository<Invoice>(dbContext), IInvoiceRepository
+public class InvoiceRepository(MauwDbContext dbContext) : Repository<Invoice, Guid>(dbContext), IInvoiceRepository
 {
     public async Task<Invoice?> GetByNumberAsync(string invoiceNumber)
     {

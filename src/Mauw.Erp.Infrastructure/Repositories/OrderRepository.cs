@@ -8,7 +8,7 @@ namespace Mauw.Erp.Infrastructure.Repositories;
 /// <summary>
 /// Order repository implementation.
 /// </summary>
-public class OrderRepository(MauwDbContext dbContext) : Repository<Order>(dbContext), IOrderRepository
+public class OrderRepository(MauwDbContext dbContext) : Repository<Order, Guid>(dbContext), IOrderRepository
 {
     public async Task<IEnumerable<Order>> GetByContactIdAsync(Guid contactId)
     {

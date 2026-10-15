@@ -92,6 +92,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<bool>("IsVisible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_visible");
+
                     b.Property<Guid?>("MacroCategoryId")
                         .HasColumnType("uuid")
                         .HasColumnName("macro_category_id");
@@ -149,9 +153,9 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Color", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                    b.Property<string>("Id")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
                         .HasColumnName("id");
 
                     b.Property<DateTime>("CreatedAt")
@@ -160,9 +164,13 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
                     b.Property<string>("HtmlColor")
                         .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
                         .HasColumnName("html_color");
+
+                    b.Property<bool>("IsVisible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_visible");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -518,6 +526,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<bool>("IsVisible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_visible");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -544,6 +556,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<bool>("IsVisible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_visible");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -785,6 +801,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<decimal>("BasePurchaseCost")
+                        .HasColumnType("numeric")
+                        .HasColumnName("base_purchase_cost");
+
                     b.Property<Guid?>("CategoryId")
                         .HasColumnType("uuid")
                         .HasColumnName("category_id");
@@ -932,8 +952,8 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("barcode");
 
-                    b.Property<Guid?>("ColorId")
-                        .HasColumnType("uuid")
+                    b.Property<string>("ColorId")
+                        .HasColumnType("character varying(3)")
                         .HasColumnName("color_id");
 
                     b.Property<DateTime>("CreatedAt")
@@ -951,8 +971,8 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("purchase_cost");
 
-                    b.Property<Guid?>("SizeId")
-                        .HasColumnType("uuid")
+                    b.Property<string>("SizeId")
+                        .HasColumnType("character varying(5)")
                         .HasColumnName("size_id");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -981,14 +1001,18 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Size", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
+                    b.Property<string>("Id")
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)")
                         .HasColumnName("id");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<bool>("IsVisible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_visible");
 
                     b.Property<string>("Name")
                         .IsRequired()

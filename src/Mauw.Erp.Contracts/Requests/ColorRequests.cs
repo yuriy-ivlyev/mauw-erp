@@ -8,4 +8,4 @@ public record CreateColorRequest(string Name, string HtmlColor);
 /// <summary>
 /// Request for updating a color.
 /// </summary>
-public record UpdateColorRequest(string Name, string HtmlColor);
+public record UpdateColorRequest(string Name, string HtmlColor, bool IsVisible);

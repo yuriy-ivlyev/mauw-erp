@@ -9,7 +9,7 @@ namespace Mauw.Erp.Infrastructure.Repositories;
 /// StockMovement repository implementation.
 /// </summary>
 public class StockMovementRepository(MauwDbContext dbContext)
-    : Repository<StockMovement>(dbContext), IStockMovementRepository
+    : Repository<StockMovement, Guid>(dbContext), IStockMovementRepository
 {
     public async Task<IEnumerable<StockMovement>> GetByVariantIdAsync(Guid variantId)
     {

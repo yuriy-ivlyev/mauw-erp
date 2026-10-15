@@ -154,6 +154,11 @@ import {
                     class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
+                  <label class="block text-sm font-medium mb-1">Prezzo Base Fornitore *</label>
+                  <input [(ngModel)]="formData.basePurchaseCost" type="number" step="0.01" min="0"
+                    class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
                   <label class="block text-sm font-medium mb-1">VAT Rate (%)</label>
                   <input [(ngModel)]="formData.vatRate" type="number" step="0.01"
                     class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -341,7 +346,7 @@ import {
 
             <!-- TAB: Gallery -->
             <div *ngIf="activeTab === 'gallery'" class="space-y-4">
-              <div class="flex flex-1 min-h-96 overflow-hidden gap-4">
+              <div class="flex h-96 overflow-hidden gap-4">
                 <div class="flex-1 bg-gray-900 flex items-center justify-center p-4 rounded border-2 border-gray-200">
                   <ng-container *ngIf="selectedImage; else noSelectedImg">
                     <img [src]="selectedImage.url" alt="Immagine selezionata"
@@ -504,16 +509,17 @@ export class ProdottiComponent implements OnInit {
       internalCode: '',
       name: '',
       defaultMarkupRate: 0,
-      vatRate: 0
+      vatRate: 0,
+      basePurchaseCost: 0
     };
   }
 
-  private initializeVariantForm() {
+  private initializeVariantForm(defaultPurchaseCost = 0) {
     return {
       colorId: '',
       sizeId: '',
       barcode: '',
-      purchaseCost: 0
+      purchaseCost: defaultPurchaseCost
     };
   }
 
@@ -576,21 +582,17 @@ export class ProdottiComponent implements OnInit {
       name: product.name,
       defaultMarkupRate: product.defaultMarkupRate,
       vatRate: product.vatRate,
+      basePurchaseCost: product.basePurchaseCost,
       categoryId: product.categoryId,
       collectionId: product.collectionId,
       materialId: product.materialId
     };
     
-    // Pre-populate variant form with first variant's purchase cost
-    const basePrice = product.variants && product.variants.length > 0 
-      ? product.variants[0].purchaseCost 
-      : 0;
-    
     this.newVariantForm = {
       colorId: '',
       sizeId: '',
       barcode: '',
-      purchaseCost: basePrice
+      purchaseCost: product.basePurchaseCost
     };
     
     this.activeTab = 'details';
@@ -633,6 +635,10 @@ export class ProdottiComponent implements OnInit {
       this.formError = 'Completa i campi obbligatori (Nome e Codice Interno)';
       return;
     }
+    if (this.formData.basePurchaseCost == null || this.formData.basePurchaseCost < 0) {
+      this.formError = 'Il Prezzo Base Fornitore è obbligatorio';
+      return;
+    }
     if (!this.formData.supplierId?.trim()) {
       this.formData.supplierId = this.generateUUID();
     }
@@ -648,6 +654,7 @@ export class ProdottiComponent implements OnInit {
         if (!this.editingProductId) {
           this.editingProductId = product.id;
           this.galleryProduct = { ...product, images: [...(product.images ?? [])] };
+          this.newVariantForm = this.initializeVariantForm(product.basePurchaseCost);
           this.activeTab = 'variants';
         } else {
           // Prodotto aggiornato: chiudi modale
@@ -689,7 +696,7 @@ export class ProdottiComponent implements OnInit {
     this.productService.createProductVariant(request).subscribe({
       next: (variant) => {
         this.productVariants.push(variant);
-        this.newVariantForm = this.initializeVariantForm();
+        this.newVariantForm = this.initializeVariantForm(this.formData.basePurchaseCost ?? 0);
         this.savingVariant = false;
       },
       error: (err) => {

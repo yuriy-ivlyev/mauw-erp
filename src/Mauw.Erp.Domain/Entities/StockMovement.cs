@@ -5,7 +5,7 @@ using Enums;
 /// <summary>
 /// StockMovement entity tracking inventory movements.
 /// </summary>
-public class StockMovement : Entity
+public class StockMovement : Entity<Guid>
 {
     public Guid VariantId { get; set; }
     public StockMovementType Type { get; set; }

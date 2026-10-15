@@ -3,7 +3,7 @@ namespace Mauw.Erp.Domain.Entities;
 /// <summary>
 /// Product collection/line.
 /// </summary>
-public class Collection : Entity
+public class Collection : Entity<Guid>
 {
     public string Name { get; set; }
     public string? Description { get; set; }

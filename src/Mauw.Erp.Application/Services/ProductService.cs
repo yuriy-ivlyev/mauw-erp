@@ -30,6 +30,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             name: request.Name,
             defaultMarkupRate: request.DefaultMarkupRate,
             vatRate: request.VatRate,
+            basePurchaseCost: request.BasePurchaseCost,
             categoryId: request.CategoryId,
             collectionId: request.CollectionId,
             materialId: request.MaterialId
@@ -81,6 +82,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             name: request.Name,
             defaultMarkupRate: request.DefaultMarkupRate,
             vatRate: request.VatRate,
+            basePurchaseCost: request.BasePurchaseCost,
             categoryId: request.CategoryId,
             collectionId: request.CollectionId,
             materialId: request.MaterialId
@@ -231,13 +233,19 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         if (product == null)
             return OperationResult<ProductVariantDto>.Fail("Product not found");
 
-        var color = await unitOfWork.Colors.GetByIdAsync(request.ColorId);
-        if (color == null)
-            return OperationResult<ProductVariantDto>.Fail("Color not found");
+        if (!string.IsNullOrWhiteSpace(request.ColorId))
+        {
+            var color = await unitOfWork.Colors.GetByIdAsync(request.ColorId);
+            if (color == null)
+                return OperationResult<ProductVariantDto>.Fail("Color not found");
+        }
 
-        var size = await unitOfWork.Sizes.GetByIdAsync(request.SizeId);
-        if (size == null)
-            return OperationResult<ProductVariantDto>.Fail("Size not found");
+        if (!string.IsNullOrWhiteSpace(request.SizeId))
+        {
+            var size = await unitOfWork.Sizes.GetByIdAsync(request.SizeId);
+            if (size == null)
+                return OperationResult<ProductVariantDto>.Fail("Size not found");
+        }
 
         var variant = new ProductVariant(
             productId: productId,
@@ -285,17 +293,17 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             return OperationResult<ProductVariantDto>.Fail("Variant not found");
 
         // Validate Color if provided
-        if (request.ColorId.HasValue)
+        if (!string.IsNullOrWhiteSpace(request.ColorId))
         {
-            var color = await unitOfWork.Colors.GetByIdAsync(request.ColorId.Value);
+            var color = await unitOfWork.Colors.GetByIdAsync(request.ColorId);
             if (color == null)
                 return OperationResult<ProductVariantDto>.Fail("Color not found");
         }
 
         // Validate Size if provided
-        if (request.SizeId.HasValue)
+        if (!string.IsNullOrWhiteSpace(request.SizeId))
         {
-            var size = await unitOfWork.Sizes.GetByIdAsync(request.SizeId.Value);
+            var size = await unitOfWork.Sizes.GetByIdAsync(request.SizeId);
             if (size == null)
                 return OperationResult<ProductVariantDto>.Fail("Size not found");
         }

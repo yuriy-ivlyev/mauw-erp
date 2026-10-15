@@ -8,4 +8,4 @@ public record CreateSizeRequest(string Name);
 /// <summary>
 /// Request for updating a size.
 /// </summary>
-public record UpdateSizeRequest(string Name);
+public record UpdateSizeRequest(string Name, bool IsVisible);

@@ -4,7 +4,7 @@ namespace Mauw.Erp.Domain.Entities;
 /// DdtDocument entity representing a transport document (Documento di Trasporto).
 /// Created from confirmed orders and decrements physical stock.
 /// </summary>
-public class DdtDocument : Entity
+public class DdtDocument : Entity<Guid>
 {
     public Guid ContactId { get; set; }
     public string DdtNumber { get; set; }

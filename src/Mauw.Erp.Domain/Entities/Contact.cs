@@ -5,7 +5,7 @@ using Enums;
 /// <summary>
 /// Contact entity representing customers, suppliers, and agents.
 /// </summary>
-public class Contact : Entity
+public class Contact : Entity<Guid>
 {
     public ContactType Type { get; set; }
     public string BusinessName { get; set; }

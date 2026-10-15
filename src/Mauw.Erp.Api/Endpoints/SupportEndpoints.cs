@@ -22,7 +22,7 @@ public static class SupportEndpoints
             .WithName("GetColors")
             .WithSummary("Get all colors");
 
-        group.MapGet("/colors/{id:guid}", GetColor)
+        group.MapGet("/colors/{id}", GetColor)
             .WithName("GetColor")
             .WithSummary("Get color by ID");
 
@@ -30,11 +30,11 @@ public static class SupportEndpoints
             .WithName("CreateColor")
             .WithSummary("Create a new color");
 
-        group.MapPut("/colors/{id:guid}", UpdateColor)
+        group.MapPut("/colors/{id}", UpdateColor)
             .WithName("UpdateColor")
             .WithSummary("Update a color");
 
-        group.MapDelete("/colors/{id:guid}", DeleteColor)
+        group.MapDelete("/colors/{id}", DeleteColor)
             .WithName("DeleteColor")
             .WithSummary("Delete a color");
 
@@ -43,7 +43,7 @@ public static class SupportEndpoints
             .WithName("GetSizes")
             .WithSummary("Get all sizes");
 
-        group.MapGet("/sizes/{id:guid}", GetSize)
+        group.MapGet("/sizes/{id}", GetSize)
             .WithName("GetSize")
             .WithSummary("Get size by ID");
 
@@ -51,11 +51,11 @@ public static class SupportEndpoints
             .WithName("CreateSize")
             .WithSummary("Create a new size");
 
-        group.MapPut("/sizes/{id:guid}", UpdateSize)
+        group.MapPut("/sizes/{id}", UpdateSize)
             .WithName("UpdateSize")
             .WithSummary("Update a size");
 
-        group.MapDelete("/sizes/{id:guid}", DeleteSize)
+        group.MapDelete("/sizes/{id}", DeleteSize)
             .WithName("DeleteSize")
             .WithSummary("Delete a size");
 
@@ -151,7 +151,7 @@ public static class SupportEndpoints
         return TypedResults.Ok(colors.Select(SupportMapper.MapToDto).ToList());
     }
 
-    private static async Task<Results<Ok<ColorDto>, NotFound>> GetColor(Guid id, IUnitOfWork uow)
+    private static async Task<Results<Ok<ColorDto>, NotFound>> GetColor(string id, IUnitOfWork uow)
     {
         var color = await uow.Colors.GetByIdAsync(id);
         return color == null ? TypedResults.NotFound() : TypedResults.Ok(SupportMapper.MapToDto(color));
@@ -159,14 +159,15 @@ public static class SupportEndpoints
 
     private static async Task<Created<ColorDto>> CreateColor(CreateColorRequest request, IUnitOfWork uow)
     {
-        var color = new Color(request.Name, request.HtmlColor);
+        var generatedId = GenerateColorId(request.Name);
+        var color = new Color(generatedId, request.Name, request.HtmlColor);
         await uow.Colors.AddAsync(color);
         await uow.SaveChangesAsync();
         return TypedResults.Created($"/api/v1/support/colors/{color.Id}", SupportMapper.MapToDto(color));
     }
 
     private static async Task<Results<Ok<ColorDto>, NotFound>> UpdateColor(
-        Guid id,
+        string id,
         UpdateColorRequest request,
         IUnitOfWork uow)
     {
@@ -174,14 +175,23 @@ public static class SupportEndpoints
         if (color == null) return TypedResults.NotFound();
 
         color.Update(request.Name, request.HtmlColor);
+        color.IsVisible = request.IsVisible;
         await uow.SaveChangesAsync();
         return TypedResults.Ok(SupportMapper.MapToDto(color));
     }
 
-    private static async Task<Results<NoContent, NotFound>> DeleteColor(Guid id, IUnitOfWork uow)
+    private static async Task<Results<NoContent, ProblemHttpResult>> DeleteColor(string id, IUnitOfWork uow)
     {
         var color = await uow.Colors.GetByIdAsync(id);
-        if (color == null) return TypedResults.NotFound();
+        if (color == null) return TypedResults.NoContent();
+
+        var variantsWithColor = await uow.ProductVariants.GetAllAsync();
+        if (variantsWithColor.Any(pv => pv.ColorId == id))
+        {
+            return TypedResults.Problem(
+                detail: "Impossibile eliminare: il colore è utilizzato in una o più varianti prodotto.",
+                statusCode: StatusCodes.Status409Conflict);
+        }
 
         await uow.Colors.DeleteAsync(color);
         await uow.SaveChangesAsync();
@@ -195,7 +205,7 @@ public static class SupportEndpoints
         return TypedResults.Ok(sizes.Select(SupportMapper.MapToDto).ToList());
     }
 
-    private static async Task<Results<Ok<SizeDto>, NotFound>> GetSize(Guid id, IUnitOfWork uow)
+    private static async Task<Results<Ok<SizeDto>, NotFound>> GetSize(string id, IUnitOfWork uow)
     {
         var size = await uow.Sizes.GetByIdAsync(id);
         return size == null ? TypedResults.NotFound() : TypedResults.Ok(SupportMapper.MapToDto(size));
@@ -203,14 +213,15 @@ public static class SupportEndpoints
 
     private static async Task<Created<SizeDto>> CreateSize(CreateSizeRequest request, IUnitOfWork uow)
     {
-        var size = new Size(request.Name);
+        var generatedId = GenerateSizeId(request.Name);
+        var size = new Size(generatedId, request.Name);
         await uow.Sizes.AddAsync(size);
         await uow.SaveChangesAsync();
         return TypedResults.Created($"/api/v1/support/sizes/{size.Id}", SupportMapper.MapToDto(size));
     }
 
     private static async Task<Results<Ok<SizeDto>, NotFound>> UpdateSize(
-        Guid id,
+        string id,
         UpdateSizeRequest request,
         IUnitOfWork uow)
     {
@@ -218,14 +229,23 @@ public static class SupportEndpoints
         if (size == null) return TypedResults.NotFound();
 
         size.Update(request.Name);
+        size.IsVisible = request.IsVisible;
         await uow.SaveChangesAsync();
         return TypedResults.Ok(SupportMapper.MapToDto(size));
     }
 
-    private static async Task<Results<NoContent, NotFound>> DeleteSize(Guid id, IUnitOfWork uow)
+    private static async Task<Results<NoContent, ProblemHttpResult>> DeleteSize(string id, IUnitOfWork uow)
     {
         var size = await uow.Sizes.GetByIdAsync(id);
-        if (size == null) return TypedResults.NotFound();
+        if (size == null) return TypedResults.NoContent();
+
+        var variantsWithSize = await uow.ProductVariants.GetAllAsync();
+        if (variantsWithSize.Any(pv => pv.SizeId == id))
+        {
+            return TypedResults.Problem(
+                detail: "Impossibile eliminare: la taglia è utilizzata in una o più varianti prodotto.",
+                statusCode: StatusCodes.Status409Conflict);
+        }
 
         await uow.Sizes.DeleteAsync(size);
         await uow.SaveChangesAsync();
@@ -262,14 +282,23 @@ public static class SupportEndpoints
         if (category == null) return TypedResults.NotFound();
 
         category.Update(request.Name, request.MacroCategoryId);
+        category.IsVisible = request.IsVisible;
         await uow.SaveChangesAsync();
         return TypedResults.Ok(SupportMapper.MapToDto(category));
     }
 
-    private static async Task<Results<NoContent, NotFound>> DeleteCategory(Guid id, IUnitOfWork uow)
+    private static async Task<Results<NoContent, ProblemHttpResult>> DeleteCategory(Guid id, IUnitOfWork uow)
     {
         var category = await uow.Categories.GetByIdAsync(id);
-        if (category == null) return TypedResults.NotFound();
+        if (category == null) return TypedResults.NoContent();
+
+        var productsWithCategory = await uow.Products.GetAllAsync();
+        if (productsWithCategory.Any(p => p.CategoryId == id))
+        {
+            return TypedResults.Problem(
+                detail: "Impossibile eliminare: la categoria è utilizzata in uno o più prodotti.",
+                statusCode: StatusCodes.Status409Conflict);
+        }
 
         await uow.Categories.DeleteAsync(category);
         await uow.SaveChangesAsync();
@@ -341,7 +370,7 @@ public static class SupportEndpoints
         {
             foreach (var comp in request.Composition)
             {
-                material.Composition.Add(new MaterialComposition(
+                material.Composition.Add(new(
                     material.Id,
                     comp.ComponentName,
                     comp.PercentageValue
@@ -363,28 +392,23 @@ public static class SupportEndpoints
         if (material == null) return TypedResults.NotFound();
 
         material.Update(request.Name);
-
-        if (request.Composition != null)
-        {
-            material.Composition.Clear();
-            foreach (var comp in request.Composition)
-            {
-                material.Composition.Add(new MaterialComposition(
-                    material.Id,
-                    comp.ComponentName,
-                    comp.PercentageValue
-                ));
-            }
-        }
-
+        material.IsVisible = request.IsVisible;
         await uow.SaveChangesAsync();
         return TypedResults.Ok(SupportMapper.MapToDto(material));
     }
 
-    private static async Task<Results<NoContent, NotFound>> DeleteMaterial(Guid id, IUnitOfWork uow)
+    private static async Task<Results<NoContent, ProblemHttpResult>> DeleteMaterial(Guid id, IUnitOfWork uow)
     {
         var material = await uow.Materials.GetByIdAsync(id);
-        if (material == null) return TypedResults.NotFound();
+        if (material == null) return TypedResults.NoContent();
+
+        var productsWithMaterial = await uow.Products.GetAllAsync();
+        if (productsWithMaterial.Any(p => p.MaterialId == id))
+        {
+            return TypedResults.Problem(
+                detail: "Impossibile eliminare: il materiale è utilizzato in uno o più prodotti.",
+                statusCode: StatusCodes.Status409Conflict);
+        }
 
         await uow.Materials.DeleteAsync(material);
         await uow.SaveChangesAsync();
@@ -427,17 +451,38 @@ public static class SupportEndpoints
         if (macroCategory == null) return TypedResults.NotFound();
 
         macroCategory.Update(request.Name);
+        macroCategory.IsVisible = request.IsVisible;
         await uow.SaveChangesAsync();
         return TypedResults.Ok(SupportMapper.MapToDto(macroCategory));
     }
 
-    private static async Task<Results<NoContent, NotFound>> DeleteMacroCategory(Guid id, IUnitOfWork uow)
+    private static async Task<Results<NoContent, ProblemHttpResult>> DeleteMacroCategory(Guid id, IUnitOfWork uow)
     {
         var macroCategory = await uow.MacroCategories.GetByIdAsync(id);
-        if (macroCategory == null) return TypedResults.NotFound();
+        if (macroCategory == null) return TypedResults.NoContent();
+
+        var categoriesWithMacroCategory = await uow.Categories.GetAllAsync();
+        if (categoriesWithMacroCategory.Any(c => c.MacroCategoryId == id))
+        {
+            return TypedResults.Problem(
+                detail: "Impossibile eliminare: la macrocategoria è utilizzata in una o più categorie.",
+                statusCode: StatusCodes.Status409Conflict);
+        }
 
         await uow.MacroCategories.DeleteAsync(macroCategory);
         await uow.SaveChangesAsync();
         return TypedResults.NoContent();
+    }
+
+    private static string GenerateColorId(string name)
+    {
+        var normalized = name.ToUpper();
+        return normalized.Length >= 3 ? normalized.Substring(0, 3) : normalized.PadRight(3, '_');
+    }
+
+    private static string GenerateSizeId(string name)
+    {
+        var normalized = name.ToUpper();
+        return normalized.Length >= 5 ? normalized.Substring(0, 5) : normalized.PadRight(5, '_');
     }
 }

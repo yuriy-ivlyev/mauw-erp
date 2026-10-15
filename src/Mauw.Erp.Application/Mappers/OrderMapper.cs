@@ -10,7 +10,7 @@ public static class OrderMapper
 {
     public static OrderDto MapToDto(Order order)
     {
-        return new OrderDto(
+        return new(
             Id: order.Id,
             OrderNumber: order.OrderNumber,
             ContactId: order.ContactId,
@@ -26,7 +26,7 @@ public static class OrderMapper
 
     private static OrderItemDto MapItemToDto(OrderItem item)
     {
-        return new OrderItemDto(
+        return new(
             Id: item.Id,
             OrderId: item.OrderId,
             VariantId: item.VariantId,

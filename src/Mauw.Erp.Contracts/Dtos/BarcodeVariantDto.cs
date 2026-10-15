@@ -10,7 +10,6 @@ public record BarcodeVariantDto(
     string ProductName,
     string Size,
     string Color,
-    int StockQuantity,
     decimal UnitNetPrice,
     decimal UnitGrossPrice,
     decimal VatRate

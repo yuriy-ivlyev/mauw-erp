@@ -4,8 +4,8 @@ namespace Mauw.Erp.Contracts.Requests;
 /// Request for updating a product variant.
 /// </summary>
 public record UpdateProductVariantRequest(
-    Guid? ColorId,
-    Guid? SizeId,
+    string? ColorId,
+    string? SizeId,
     string Barcode,
     decimal PurchaseCost
 );

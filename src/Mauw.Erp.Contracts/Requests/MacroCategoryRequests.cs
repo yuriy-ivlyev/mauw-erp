@@ -8,4 +8,4 @@ public record CreateMacroCategoryRequest(string Name);
 /// <summary>
 /// Request for updating a macro category.
 /// </summary>
-public record UpdateMacroCategoryRequest(string Name);
+public record UpdateMacroCategoryRequest(string Name, bool IsVisible);

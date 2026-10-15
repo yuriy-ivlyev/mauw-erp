@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mauw.Erp.Infrastructure.Repositories;
 
-public class CategoryRepository(MauwDbContext dbContext) : Repository<Category>(dbContext), ICategoryRepository
+public class CategoryRepository(MauwDbContext dbContext) : Repository<Category, Guid>(dbContext), ICategoryRepository
 {
     public async Task<Category?> GetByNameAsync(string name)
     {

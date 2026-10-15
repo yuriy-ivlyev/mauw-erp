@@ -3,7 +3,7 @@
 /// <summary>
 /// DdtItem entity representing a line item in a DDT.
 /// </summary>
-public class DdtItem : Entity
+public class DdtItem : Entity<Guid>
 {
     public Guid DdtDocumentId { get; set; }
     public Guid VariantId { get; set; }

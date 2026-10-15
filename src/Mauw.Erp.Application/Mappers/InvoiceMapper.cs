@@ -10,7 +10,7 @@ public static class InvoiceMapper
 {
     public static InvoiceDto MapToDto(Invoice invoice)
     {
-        return new InvoiceDto(
+        return new(
             Id: invoice.Id,
             InvoiceNumber: invoice.InvoiceNumber,
             ContactId: invoice.ContactId,
@@ -26,7 +26,7 @@ public static class InvoiceMapper
 
     private static InvoiceItemDto MapItemToDto(InvoiceItem item)
     {
-        return new InvoiceItemDto(
+        return new(
             Id: item.Id,
             InvoiceId: item.InvoiceId,
             VariantId: item.VariantId,
@@ -41,7 +41,7 @@ public static class InvoiceMapper
 
     private static PaymentDto MapPaymentToDto(Payment payment)
     {
-        return new PaymentDto(
+        return new(
             Id: payment.Id,
             Amount: payment.Amount,
             PaymentDate: payment.PaymentDate,

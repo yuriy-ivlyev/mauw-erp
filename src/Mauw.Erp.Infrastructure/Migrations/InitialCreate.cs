@@ -1,5 +1,4 @@
-﻿using System;
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -344,7 +343,7 @@ namespace Mauw.Erp.Infrastructure.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_agent_commissions_agent_id_status",
                 table: "agent_commissions",
-                columns: new[] { "agent_id", "status" });
+                columns: ["agent_id", "status"]);
 
             migrationBuilder.CreateIndex(
                 name: "i_x_contacts_agent_id",
@@ -445,7 +444,7 @@ namespace Mauw.Erp.Infrastructure.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_products_supplier_id_supplier_code",
                 table: "products",
-                columns: new[] { "supplier_id", "supplier_code" },
+                columns: ["supplier_id", "supplier_code"],
                 unique: true);
 
             migrationBuilder.CreateIndex(

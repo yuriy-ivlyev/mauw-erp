@@ -3,7 +3,7 @@ namespace Mauw.Erp.Domain.Entities;
 /// <summary>
 /// Represents a single image in a product's gallery.
 /// </summary>
-public class ProductImage : Entity
+public class ProductImage : Entity<Guid>
 {
     public Guid ProductId { get; private set; }
     public string Url { get; private set; }

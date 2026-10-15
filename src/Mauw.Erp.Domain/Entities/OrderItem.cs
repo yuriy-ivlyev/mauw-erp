@@ -3,7 +3,7 @@
 /// <summary>
 /// OrderItem entity representing a line item in an order.
 /// </summary>
-public class OrderItem : Entity
+public class OrderItem : Entity<Guid>
 {
     public Guid OrderId { get; set; }
     public Guid VariantId { get; set; }

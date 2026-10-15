@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mauw.Erp.Infrastructure.Repositories;
 
-public class ColorRepository(MauwDbContext dbContext) : Repository<Color>(dbContext), IColorRepository
+public class ColorRepository(MauwDbContext dbContext) : Repository<Color, string>(dbContext), IColorRepository
 {
     public async Task<Color?> GetByNameAsync(string name)
     {

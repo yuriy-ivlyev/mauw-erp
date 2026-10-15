@@ -1,15 +1,15 @@
 namespace Mauw.Erp.Domain.Entities;
 
 /// <summary>
-/// Base class for all domain entities.
+/// Base class for all domain entities with generic ID type.
 /// </summary>
-public abstract class Entity
+public abstract class Entity<TId> where TId : IEquatable<TId>
 {
-    public Guid Id { get; protected set; }
+    public TId Id { get; protected set; } = default!;
     public DateTime CreatedAt { get; protected set; }
     public DateTime UpdatedAt { get; protected set; }
 
-    protected Entity(Guid id)
+    protected Entity(TId id)
     {
         Id = id;
         CreatedAt = DateTime.UtcNow;
@@ -18,7 +18,6 @@ public abstract class Entity
 
     protected Entity()
     {
-        Id = Guid.NewGuid();
         CreatedAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
     }
@@ -30,10 +29,10 @@ public abstract class Entity
 
     public override bool Equals(object? obj)
     {
-        if (obj is not Entity other)
+        if (obj is not Entity<TId> other)
             return false;
 
-        return Id == other.Id;
+        return Id.Equals(other.Id);
     }
 
     public override int GetHashCode()
@@ -41,3 +40,4 @@ public abstract class Entity
         return Id.GetHashCode();
     }
 }
+

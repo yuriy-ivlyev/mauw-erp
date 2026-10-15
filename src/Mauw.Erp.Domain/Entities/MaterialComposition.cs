@@ -3,7 +3,7 @@ namespace Mauw.Erp.Domain.Entities;
 /// <summary>
 /// Material composition breakdown (e.g., Cotton 20%, Viscose 79%).
 /// </summary>
-public class MaterialComposition : Entity
+public class MaterialComposition : Entity<Guid>
 {
     public Guid MaterialId { get; set; }
     public string ComponentName { get; set; }

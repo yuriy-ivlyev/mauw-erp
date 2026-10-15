@@ -3,7 +3,7 @@
 /// <summary>
 /// Payment entity tracking invoice payments.
 /// </summary>
-public class Payment : Entity
+public class Payment : Entity<Guid>
 {
     public Guid InvoiceId { get; set; }
     public decimal Amount { get; set; }

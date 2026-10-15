@@ -6,7 +6,7 @@ using Enums;
 /// Invoice entity representing a customer invoice.
 /// Can be immediate or deferred from DDTs.
 /// </summary>
-public class Invoice : Entity
+public class Invoice : Entity<Guid>
 {
     public Guid ContactId { get; set; }
     public string InvoiceNumber { get; set; }

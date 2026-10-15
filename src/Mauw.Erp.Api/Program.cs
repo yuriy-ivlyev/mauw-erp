@@ -15,7 +15,9 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     "Host=localhost;Database=mauw_erp;Username=postgres;Password=postgres;Port=5432";
 
 builder.Services.AddDbContext<MauwDbContext>(options =>
-    options.UseNpgsql(connectionString)
+    options
+        .UseNpgsql(connectionString)
+        .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
 );
 
 // Register custom validators (no reflection)
@@ -102,17 +104,20 @@ app.MapDdtEndpoints();
 // Fallback to index.html for Angular routing
 app.MapFallbackToFile("index.html");
 
-// Migrate database on startup
+// Migrate database on startup and initialize seed data
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<MauwDbContext>();
     try
     {
         dbContext.Database.Migrate();
+        await DbInitializer.InitializeAsync(dbContext);
     }
-    catch
+    catch (Exception ex)
     {
-        // Database migration will fail if database doesn't exist, which is expected in development
+        // Log the exception for debugging
+        Console.WriteLine($"Database initialization error: {ex}");
+        throw;
     }
 }
 

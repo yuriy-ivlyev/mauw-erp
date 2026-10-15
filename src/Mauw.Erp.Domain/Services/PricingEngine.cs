@@ -63,7 +63,7 @@ public class PricingEngine
             ? Round((marginAmount / finalNetPrice) * 100, DecimalPlaces)
             : 0;
 
-        return new PricingResult(
+        return new(
             ListPrice: listPrice,
             FinalNetPrice: finalNetPrice,
             VatAmount: vatAmount,
@@ -98,7 +98,7 @@ public class PricingEngine
             var roundedTaxableAmount = Round(sumTaxableAmounts, DecimalPlaces);
             var vatAmount = Round(roundedTaxableAmount * (group.Key / 100), DecimalPlaces);
 
-            yield return new VatBreakdown(
+            yield return new(
                 VatRate: group.Key,
                 TaxableAmount: roundedTaxableAmount,
                 VatAmount: vatAmount

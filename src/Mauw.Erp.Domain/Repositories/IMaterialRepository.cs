@@ -2,7 +2,7 @@ using Mauw.Erp.Domain.Entities;
 
 namespace Mauw.Erp.Domain.Repositories;
 
-public interface IMaterialRepository : IRepository<Material>
+public interface IMaterialRepository : IRepository<Material, Guid>
 {
     Task<Material?> GetByNameAsync(string name);
     Task<Material?> GetWithCompositionAsync(Guid id);

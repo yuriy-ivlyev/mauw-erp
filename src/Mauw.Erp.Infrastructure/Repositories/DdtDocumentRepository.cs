@@ -8,7 +8,7 @@ namespace Mauw.Erp.Infrastructure.Repositories;
 /// <summary>
 /// DdtDocument repository implementation.
 /// </summary>
-public class DdtDocumentRepository(MauwDbContext dbContext) : Repository<DdtDocument>(dbContext), IDdtDocumentRepository
+public class DdtDocumentRepository(MauwDbContext dbContext) : Repository<DdtDocument, Guid>(dbContext), IDdtDocumentRepository
 {
     public async Task<IEnumerable<DdtDocument>> GetByContactIdAsync(Guid contactId)
     {

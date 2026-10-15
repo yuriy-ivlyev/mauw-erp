@@ -6,8 +6,10 @@
 public record ProductVariantDto(
     Guid Id,
     Guid ProductId,
-    string Size,
-    string Color,
+    string? ColorId,
+    string? SizeId,
+    string? Color,
+    string? Size,
     string Barcode,
     decimal PurchaseCost,
     int StockQuantity,

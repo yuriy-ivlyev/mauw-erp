@@ -3,11 +3,11 @@ namespace Mauw.Erp.Domain.Entities;
 /// <summary>
 /// ProductVariant entity representing a specific variant of a product (size/color combination).
 /// </summary>
-public class ProductVariant : Entity
+public class ProductVariant : Entity<Guid>
 {
     public Guid ProductId { get; set; }
-    public Guid? ColorId { get; set; }
-    public Guid? SizeId { get; set; }
+    public string? ColorId { get; set; }
+    public string? SizeId { get; set; }
     public string Barcode { get; set; }
     public decimal PurchaseCost { get; set; }
 
@@ -21,8 +21,8 @@ public class ProductVariant : Entity
         Guid productId,
         string barcode,
         decimal purchaseCost,
-        Guid? colorId = null,
-        Guid? sizeId = null
+        string? colorId = null,
+        string? sizeId = null
     ) : base()
     {
         ProductId = productId;
@@ -32,7 +32,7 @@ public class ProductVariant : Entity
         SizeId = sizeId;
     }
 
-    public void Update(Guid? colorId, Guid? sizeId, string barcode, decimal purchaseCost)
+    public void Update(string? colorId, string? sizeId, string barcode, decimal purchaseCost)
     {
         ColorId = colorId;
         SizeId = sizeId;
@@ -40,4 +40,3 @@ public class ProductVariant : Entity
         PurchaseCost = purchaseCost;
     }
 }
-

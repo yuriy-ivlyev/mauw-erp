@@ -5,7 +5,7 @@ using Enums;
 /// <summary>
 /// Order entity representing a sales order.
 /// </summary>
-public class Order : Entity
+public class Order : Entity<Guid>
 {
     public Guid ContactId { get; set; }
     public string OrderNumber { get; set; }

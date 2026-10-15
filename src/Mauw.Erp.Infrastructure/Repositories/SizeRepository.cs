@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mauw.Erp.Infrastructure.Repositories;
 
-public class SizeRepository(MauwDbContext dbContext) : Repository<Size>(dbContext), ISizeRepository
+public class SizeRepository(MauwDbContext dbContext) : Repository<Size, string>(dbContext), ISizeRepository
 {
     public async Task<Size?> GetByNameAsync(string name)
     {

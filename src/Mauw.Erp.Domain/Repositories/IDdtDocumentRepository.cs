@@ -5,7 +5,7 @@ namespace Mauw.Erp.Domain.Repositories;
 /// <summary>
 /// DdtDocument-specific repository operations.
 /// </summary>
-public interface IDdtDocumentRepository : IRepository<DdtDocument>
+public interface IDdtDocumentRepository : IRepository<DdtDocument, Guid>
 {
     Task<IEnumerable<DdtDocument>> GetByContactIdAsync(Guid contactId);
     Task<DdtDocument?> GetByNumberAsync(string ddtNumber);

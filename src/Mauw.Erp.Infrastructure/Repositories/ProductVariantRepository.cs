@@ -9,7 +9,7 @@ namespace Mauw.Erp.Infrastructure.Repositories;
 /// ProductVariant repository implementation.
 /// </summary>
 public class ProductVariantRepository(MauwDbContext dbContext)
-    : Repository<ProductVariant>(dbContext), IProductVariantRepository
+    : Repository<ProductVariant, Guid>(dbContext), IProductVariantRepository
 {
     public async Task<ProductVariant?> GetByBarcodeAsync(string barcode)
     {

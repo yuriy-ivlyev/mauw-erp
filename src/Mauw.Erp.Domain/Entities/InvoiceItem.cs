@@ -3,7 +3,7 @@
 /// <summary>
 /// InvoiceItem entity representing a line item in an invoice.
 /// </summary>
-public class InvoiceItem : Entity
+public class InvoiceItem : Entity<Guid>
 {
     public Guid InvoiceId { get; set; }
     public Guid VariantId { get; set; }

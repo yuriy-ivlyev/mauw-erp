@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mauw.Erp.Infrastructure.Repositories;
 
-public class CollectionRepository(MauwDbContext dbContext) : Repository<Collection>(dbContext), ICollectionRepository
+public class CollectionRepository(MauwDbContext dbContext) : Repository<Collection, Guid>(dbContext), ICollectionRepository
 {
     public async Task<Collection?> GetByNameAsync(string name)
     {

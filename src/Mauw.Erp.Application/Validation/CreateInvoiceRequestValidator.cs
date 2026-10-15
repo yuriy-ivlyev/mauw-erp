@@ -13,7 +13,7 @@ public class CreateInvoiceRequestValidator : IValidator<CreateInvoiceRequest>
 
         // ContactId validation
         if (request.ContactId == Guid.Empty)
-            errors.Add(new ValidationError(nameof(request.ContactId), "Contact ID is required"));
+            errors.Add(new(nameof(request.ContactId), "Contact ID is required"));
 
         return errors.Count == 0 ? ValidationResult.Success() : ValidationResult.Failure(errors);
     }

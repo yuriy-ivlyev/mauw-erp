@@ -78,6 +78,7 @@ export interface ProductDto {
   name: string;
   defaultMarkupRate: number;
   vatRate: number;
+  basePurchaseCost: number;
   categoryId?: string;
   categoryName?: string;
   collectionId?: string;
@@ -96,6 +97,7 @@ export interface CreateProductRequest {
   name: string;
   defaultMarkupRate: number;
   vatRate: number;
+  basePurchaseCost: number;
   categoryId?: string;
   collectionId?: string;
   materialId?: string;
@@ -108,6 +110,7 @@ export interface UpdateProductRequest {
   name: string;
   defaultMarkupRate: number;
   vatRate: number;
+  basePurchaseCost: number;
   categoryId?: string;
   collectionId?: string;
   materialId?: string;

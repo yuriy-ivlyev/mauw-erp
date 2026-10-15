@@ -10,6 +10,10 @@ public class SizeConfiguration : IEntityTypeConfiguration<Size>
     {
         builder.HasKey(s => s.Id);
 
+        builder.Property(s => s.Id)
+            .IsRequired()
+            .HasMaxLength(5);
+
         builder.Property(s => s.Name)
             .IsRequired()
             .HasMaxLength(50);

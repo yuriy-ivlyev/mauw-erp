@@ -10,7 +10,7 @@ public static class ContactMapper
 {
     public static ContactDto MapToDto(Contact contact)
     {
-        return new ContactDto(
+        return new(
             Id: contact.Id,
             Type: (int)contact.Type,
             BusinessName: contact.BusinessName,

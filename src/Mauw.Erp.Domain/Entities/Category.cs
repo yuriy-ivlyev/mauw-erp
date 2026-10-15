@@ -3,10 +3,11 @@ namespace Mauw.Erp.Domain.Entities;
 /// <summary>
 /// Product category with optional macro category.
 /// </summary>
-public class Category : Entity
+public class Category : Entity<Guid>
 {
     public string Name { get; set; }
     public Guid? MacroCategoryId { get; set; }
+    public bool IsVisible { get; set; } = true;
 
     // Navigation
     public MacroCategory? MacroCategory { get; set; }
@@ -15,6 +16,7 @@ public class Category : Entity
     {
         Name = name;
         MacroCategoryId = macroCategoryId;
+        IsVisible = true;
     }
 
     public void Update(string name, Guid? macroCategoryId = null)

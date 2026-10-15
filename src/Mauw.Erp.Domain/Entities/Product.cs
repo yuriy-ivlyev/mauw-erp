@@ -3,7 +3,7 @@ namespace Mauw.Erp.Domain.Entities;
 /// <summary>
 /// Product entity representing a product in the catalog.
 /// </summary>
-public class Product : Entity
+public class Product : Entity<Guid>
 {
     public Guid SupplierId { get; set; }
     public string SupplierCode { get; set; }
@@ -11,6 +11,7 @@ public class Product : Entity
     public string Name { get; set; }
     public decimal DefaultMarkupRate { get; set; }
     public decimal VatRate { get; set; }
+    public decimal BasePurchaseCost { get; set; }
     public Guid? CategoryId { get; set; }
     public Guid? CollectionId { get; set; }
     public Guid? MaterialId { get; set; }
@@ -29,6 +30,7 @@ public class Product : Entity
         string name,
         decimal defaultMarkupRate,
         decimal vatRate,
+        decimal basePurchaseCost,
         Guid? categoryId = null,
         Guid? collectionId = null,
         Guid? materialId = null
@@ -40,6 +42,7 @@ public class Product : Entity
         Name = name;
         DefaultMarkupRate = defaultMarkupRate;
         VatRate = vatRate;
+        BasePurchaseCost = basePurchaseCost;
         CategoryId = categoryId;
         CollectionId = collectionId;
         MaterialId = materialId;
@@ -52,6 +55,7 @@ public class Product : Entity
         string name,
         decimal defaultMarkupRate,
         decimal vatRate,
+        decimal basePurchaseCost,
         Guid? categoryId = null,
         Guid? collectionId = null,
         Guid? materialId = null)
@@ -62,6 +66,7 @@ public class Product : Entity
         Name = name;
         DefaultMarkupRate = defaultMarkupRate;
         VatRate = vatRate;
+        BasePurchaseCost = basePurchaseCost;
         CategoryId = categoryId;
         CollectionId = collectionId;
         MaterialId = materialId;

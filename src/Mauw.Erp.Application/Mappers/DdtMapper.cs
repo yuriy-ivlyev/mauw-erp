@@ -10,7 +10,7 @@ public static class DdtMapper
 {
     public static DdtDto MapToDto(DdtDocument ddt)
     {
-        return new DdtDto(
+        return new(
             Id: ddt.Id,
             DdtNumber: ddt.DdtNumber,
             ContactId: ddt.ContactId,
@@ -24,7 +24,7 @@ public static class DdtMapper
 
     private static DdtItemDto MapItemToDto(DdtItem item)
     {
-        return new DdtItemDto(
+        return new(
             Id: item.Id,
             DdtDocumentId: item.DdtDocumentId,
             VariantId: item.VariantId,

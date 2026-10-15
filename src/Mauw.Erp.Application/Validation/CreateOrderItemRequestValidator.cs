@@ -13,11 +13,11 @@ public class CreateOrderItemRequestValidator : IValidator<CreateOrderItemRequest
 
         // VariantId validation
         if (request.VariantId == Guid.Empty)
-            errors.Add(new ValidationError(nameof(request.VariantId), "Variant ID is required"));
+            errors.Add(new(nameof(request.VariantId), "Variant ID is required"));
 
         // Quantity validation
         if (request.Quantity <= 0)
-            errors.Add(new ValidationError(nameof(request.Quantity), "Quantity must be greater than 0"));
+            errors.Add(new(nameof(request.Quantity), "Quantity must be greater than 0"));
 
         return errors.Count == 0 ? ValidationResult.Success() : ValidationResult.Failure(errors);
     }

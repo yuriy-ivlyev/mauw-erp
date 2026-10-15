@@ -21,6 +21,7 @@ public static class ProductMapper
             Name: product.Name,
             DefaultMarkupRate: product.DefaultMarkupRate,
             VatRate: product.VatRate,
+            BasePurchaseCost: product.BasePurchaseCost,
             Images: product.Images.OrderBy(i => i.DisplayOrder).Select(MapImageToDto).ToList(),
             Variants: product.Variants.Select(v => MapVariantToDto(v, product.DefaultMarkupRate)).ToList(),
             CategoryId: product.CategoryId,
@@ -34,7 +35,7 @@ public static class ProductMapper
 
     public static ProductImageDto MapImageToDto(ProductImage image)
     {
-        return new ProductImageDto(
+        return new(
             Id: image.Id,
             ProductId: image.ProductId,
             Url: image.Url,
@@ -54,14 +55,16 @@ public static class ProductMapper
             0
         );
 
-        return new ProductVariantDto(
+        return new(
             Id: variant.Id,
             ProductId: variant.ProductId,
-            Size: variant.Size?.Name ?? "N/A",
-            Color: variant.Color?.Name ?? "N/A",
+            ColorId: variant.ColorId,
+            SizeId: variant.SizeId,
+            Color: variant.Color?.Name,
+            Size: variant.Size?.Name,
             Barcode: variant.Barcode,
             PurchaseCost: variant.PurchaseCost,
-            StockQuantity: 0, // Stock moved to separate system
+            StockQuantity: 0,
             ListPrice: pricingResult.ListPrice,
             FinalNetPrice: pricingResult.FinalNetPrice,
             VatAmount: 0,
@@ -78,14 +81,13 @@ public static class ProductMapper
             product.VatRate
         );
 
-        return new BarcodeVariantDto(
+        return new(
             Barcode: variant.Barcode,
             VariantId: variant.Id,
             ProductId: variant.ProductId,
             ProductName: product.Name,
             Size: variant.Size?.Name ?? "N/A",
             Color: variant.Color?.Name ?? "N/A",
-            StockQuantity: 0, // Stock moved to separate system
             UnitNetPrice: pricingResult.FinalNetPrice,
             UnitGrossPrice: pricingResult.FinalGrossPrice,
             VatRate: product.VatRate
