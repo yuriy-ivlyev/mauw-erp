@@ -21,5 +21,6 @@ public interface IProductService
 
     Task<OperationResult<ProductVariantDto>> CreateProductVariantAsync(Guid productId, CreateProductVariantRequest request);
     Task<OperationResult<List<ProductVariantDto>>> GetProductVariantsAsync(Guid productId);
+    Task<OperationResult<ProductVariantDto>> UpdateProductVariantAsync(Guid productId, Guid variantId, UpdateProductVariantRequest request);
     Task<OperationResult<bool>> DeleteProductVariantAsync(Guid productId, Guid variantId);
 }

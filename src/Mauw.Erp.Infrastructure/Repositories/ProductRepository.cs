@@ -29,7 +29,7 @@ public class ProductRepository(MauwDbContext dbContext) : Repository<Product>(db
 
     public async Task AddImageAsync(ProductImage image)
     {
-        await dbContext.ProductImages.AddAsync(image);
+        await _dbContext.ProductImages.AddAsync(image);
     }
 
     public async Task<IEnumerable<Product>> GetPaginatedAsync(int page, int pageSize, string? search = null)

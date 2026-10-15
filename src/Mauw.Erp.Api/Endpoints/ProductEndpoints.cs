@@ -49,6 +49,10 @@ public static class ProductEndpoints
             .WithName("GetProductVariants")
             .WithSummary("Get all variants for a product");
 
+        group.MapPatch("/{productId}/variants/{variantId}", UpdateProductVariant)
+            .WithName("UpdateProductVariant")
+            .WithSummary("Update a product variant");
+
         group.MapDelete("/{productId}/variants/{variantId}", DeleteProductVariant)
             .WithName("DeleteProductVariant")
             .WithSummary("Delete a product variant");
@@ -220,6 +224,24 @@ public static class ProductEndpoints
 
         if (!result.Success)
             return TypedResults.NotFound();
+
+        return TypedResults.Ok(result.Data!);
+    }
+
+    private static async Task<Results<Ok<ProductVariantDto>, BadRequest<string>, NotFound>> UpdateProductVariant(
+        Guid productId,
+        Guid variantId,
+        UpdateProductVariantRequest request,
+        IProductService productService)
+    {
+        var result = await productService.UpdateProductVariantAsync(productId, variantId, request);
+
+        if (!result.Success)
+        {
+            if (result.Error?.Contains("not found") == true)
+                return TypedResults.NotFound();
+            return TypedResults.BadRequest(result.Error ?? "Failed to update variant");
+        }
 
         return TypedResults.Ok(result.Data!);
     }

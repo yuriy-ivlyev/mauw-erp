@@ -61,6 +61,10 @@ export class ProductService {
     return this.apiService.post<ProductVariantDto>(`${this.endpoint}/${request.productId}/variants`, request);
   }
 
+  updateProductVariant(productId: string, variantId: string, request: any): Observable<ProductVariantDto> {
+    return this.apiService.patch<ProductVariantDto>(`${this.endpoint}/${productId}/variants/${variantId}`, request);
+  }
+
   deleteProductVariant(productId: string, variantId: string): Observable<void> {
     return this.apiService.delete<void>(`${this.endpoint}/${productId}/variants/${variantId}`);
   }

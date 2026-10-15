@@ -54,7 +54,7 @@ import {
                     class="w-full h-full object-cover"
                     (error)="onThumbError($event, product)" />
                   <ng-template #noImg>
-                    <span class="text-gray-400 text-xs text-center leading-tight px-1 select-none">no image</span>
+                    <span class="text-gray-400 text-xs text-center leading-tight px-1 select-none">nessuna immagine</span>
                   </ng-template>
                 </div>
               </td>
@@ -211,24 +211,78 @@ import {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr *ngFor="let variant of productVariants" class="border-b hover:bg-gray-50">
-                        <td class="px-4 py-3">
-                          <div class="flex gap-2 items-center">
-                            <div class="w-5 h-5 rounded border" [style.backgroundColor]="getColorHtml(variant.colorId)"></div>
-                            <span>{{ variant.color }}</span>
-                          </div>
-                        </td>
-                        <td class="px-4 py-3">{{ variant.size }}</td>
-                        <td class="px-4 py-3">{{ variant.barcode }}</td>
-                        <td class="px-4 py-3">&euro;{{ variant.purchaseCost.toFixed(2) }}</td>
-                        <td class="px-4 py-3 text-center">
-                          <button
-                            (click)="deleteVariant(variant.id)"
-                            [disabled]="deletingVariantId === variant.id"
-                            class="text-red-600 hover:text-red-800 text-sm disabled:opacity-50">
-                            {{ deletingVariantId === variant.id ? 'Eliminando...' : 'Elimina' }}
-                          </button>
-                        </td>
+                      <tr *ngFor="let variant of productVariants" 
+                        [class.bg-yellow-50]="editingVariantId === variant.id"
+                        class="border-b hover:bg-gray-50">
+                        
+                        <!-- Normal mode: display data -->
+                        <ng-container *ngIf="editingVariantId !== variant.id">
+                          <td class="px-4 py-3">
+                            <div class="flex gap-2 items-center">
+                              <div class="w-5 h-5 rounded border" [style.backgroundColor]="getColorHtml(variant.colorId)"></div>
+                              <span>{{ getColorName(variant.colorId) }}</span>
+                            </div>
+                          </td>
+                          <td class="px-4 py-3">{{ getSizeName(variant.sizeId) }}</td>
+                          <td class="px-4 py-3">{{ variant.barcode }}</td>
+                          <td class="px-4 py-3">&euro;{{ variant.purchaseCost.toFixed(2) }}</td>
+                          <td class="px-4 py-3 text-center space-x-2">
+                            <button
+                              (click)="startEditVariant(variant)"
+                              class="text-blue-600 hover:text-blue-800 text-sm">
+                              Modifica
+                            </button>
+                            <button
+                              (click)="deleteVariant(variant.id)"
+                              [disabled]="deletingVariantId === variant.id"
+                              class="text-red-600 hover:text-red-800 text-sm disabled:opacity-50">
+                              {{ deletingVariantId === variant.id ? 'Eliminando...' : 'Elimina' }}
+                            </button>
+                          </td>
+                        </ng-container>
+
+                        <!-- Edit mode: form inline -->
+                        <ng-container *ngIf="editingVariantId === variant.id">
+                          <td class="px-4 py-3">
+                            <select [(ngModel)]="editingVariantForm.colorId"
+                              class="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                              <option value="">-- N/A --</option>
+                              <option *ngFor="let color of colors" [value]="color.id">
+                                {{ color.name }}
+                              </option>
+                            </select>
+                          </td>
+                          <td class="px-4 py-3">
+                            <select [(ngModel)]="editingVariantForm.sizeId"
+                              class="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                              <option value="">-- N/A --</option>
+                              <option *ngFor="let size of sizes" [value]="size.id">
+                                {{ size.name }}
+                              </option>
+                            </select>
+                          </td>
+                          <td class="px-4 py-3">
+                            <input [(ngModel)]="editingVariantForm.barcode" type="text"
+                              class="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                          </td>
+                          <td class="px-4 py-3">
+                            <input [(ngModel)]="editingVariantForm.purchaseCost" type="number" step="0.01"
+                              class="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                          </td>
+                          <td class="px-4 py-3 text-center space-x-2">
+                            <button
+                              (click)="saveVariantEdit()"
+                              [disabled]="savingVariantEdit"
+                              class="text-green-600 hover:text-green-800 text-sm font-semibold disabled:opacity-50">
+                              {{ savingVariantEdit ? '...' : 'Salva' }}
+                            </button>
+                            <button
+                              (click)="cancelVariantEdit()"
+                              class="text-gray-600 hover:text-gray-800 text-sm">
+                              Annulla
+                            </button>
+                          </td>
+                        </ng-container>
                       </tr>
                     </tbody>
                   </table>
@@ -403,6 +457,9 @@ export class ProdottiComponent implements OnInit {
   savingVariant = false;
   variantError: string | null = null;
   deletingVariantId: string | null = null;
+  editingVariantId: string | null = null;
+  savingVariantEdit = false;
+  editingVariantForm = this.initializeVariantForm();
 
   // Gallery (now within modal)
   galleryProduct: ProductDto | null = null;
@@ -523,12 +580,25 @@ export class ProdottiComponent implements OnInit {
       collectionId: product.collectionId,
       materialId: product.materialId
     };
-    this.newVariantForm = this.initializeVariantForm();
+    
+    // Pre-populate variant form with first variant's purchase cost
+    const basePrice = product.variants && product.variants.length > 0 
+      ? product.variants[0].purchaseCost 
+      : 0;
+    
+    this.newVariantForm = {
+      colorId: '',
+      sizeId: '',
+      barcode: '',
+      purchaseCost: basePrice
+    };
+    
     this.activeTab = 'details';
     this.formError = null;
     this.variantError = null;
     this.galleryProduct = { ...product, images: [...(product.images ?? [])] };
     this.selectedImage = this.galleryProduct.images.find(i => i.isMain) ?? this.galleryProduct.images[0] ?? null;
+    this.loadSupportData();
     this.loadVariants(product.id);
     this.showModal = true;
   }
@@ -579,6 +649,9 @@ export class ProdottiComponent implements OnInit {
           this.editingProductId = product.id;
           this.galleryProduct = { ...product, images: [...(product.images ?? [])] };
           this.activeTab = 'variants';
+        } else {
+          // Prodotto aggiornato: chiudi modale
+          this.closeModal();
         }
         this.currentPage = 1;
         this.loadProducts();
@@ -645,6 +718,53 @@ export class ProdottiComponent implements OnInit {
         console.error(err);
       }
     });
+  }
+
+  startEditVariant(variant: ProductVariantDto): void {
+    this.editingVariantId = variant.id;
+    this.editingVariantForm = {
+      colorId: variant.colorId || '',
+      sizeId: variant.sizeId || '',
+      barcode: variant.barcode,
+      purchaseCost: variant.purchaseCost
+    };
+    this.variantError = null;
+  }
+
+  saveVariantEdit(): void {
+    if (!this.editingProductId || !this.editingVariantId) return;
+
+    this.savingVariantEdit = true;
+    const request = {
+      colorId: this.editingVariantForm.colorId || null,
+      sizeId: this.editingVariantForm.sizeId || null,
+      barcode: this.editingVariantForm.barcode,
+      purchaseCost: this.editingVariantForm.purchaseCost
+    };
+
+    this.productService.updateProductVariant(this.editingProductId, this.editingVariantId, request).subscribe({
+      next: (updated) => {
+        const idx = this.productVariants.findIndex(v => v.id === this.editingVariantId);
+        if (idx >= 0) {
+          this.productVariants[idx] = updated;
+        }
+        this.editingVariantId = null;
+        this.savingVariantEdit = false;
+      },
+      error: (err) => {
+        this.variantError = err?.error && typeof err.error === 'string'
+          ? err.error
+          : 'Errore nella modifica della variante';
+        this.savingVariantEdit = false;
+        console.error(err);
+      }
+    });
+  }
+
+  cancelVariantEdit(): void {
+    this.editingVariantId = null;
+    this.editingVariantForm = this.initializeVariantForm();
+    this.variantError = null;
   }
 
   deleteProduct(productId: string): void {
@@ -732,18 +852,6 @@ export class ProdottiComponent implements OnInit {
     });
   }
 
-  getColorHtml(colorId: string | undefined): string {
-    if (!colorId) return '#cccccc';
-    const color = this.colors.find(c => c.id === colorId);
-    return color?.htmlColor || '#cccccc';
-  }
-
-  getColorName(colorId: string | undefined): string {
-    if (!colorId) return '';
-    const color = this.colors.find(c => c.id === colorId);
-    return color?.name || '';
-  }
-
   onThumbError(event: Event, product: ProductDto): void {
     product.mainImageUrl = undefined;
     (event.target as HTMLImageElement).style.display = 'none';
@@ -751,6 +859,24 @@ export class ProdottiComponent implements OnInit {
 
   onImgError(event: Event): void {
     (event.target as HTMLImageElement).style.display = 'none';
+  }
+
+  getSizeName(sizeId?: string): string {
+    if (!sizeId) return 'N/A';
+    const size = this.sizes.find(s => s.id === sizeId);
+    return size?.name || 'N/A';
+  }
+
+  getColorName(colorId?: string): string {
+    if (!colorId) return 'N/A';
+    const color = this.colors.find(c => c.id === colorId);
+    return color?.name || 'N/A';
+  }
+
+  getColorHtml(colorId?: string): string {
+    if (!colorId) return '#000000';
+    const color = this.colors.find(c => c.id === colorId);
+    return color?.htmlColor || '#000000';
   }
 
   private generateUUID(): string {

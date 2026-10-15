@@ -31,5 +31,13 @@ public class ProductVariant : Entity
         ColorId = colorId;
         SizeId = sizeId;
     }
+
+    public void Update(Guid? colorId, Guid? sizeId, string barcode, decimal purchaseCost)
+    {
+        ColorId = colorId;
+        SizeId = sizeId;
+        Barcode = barcode;
+        PurchaseCost = purchaseCost;
+    }
 }
 

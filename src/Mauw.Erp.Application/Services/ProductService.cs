@@ -271,6 +271,57 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         return OperationResult<List<ProductVariantDto>>.Ok(variants);
     }
 
+    public async Task<OperationResult<ProductVariantDto>> UpdateProductVariantAsync(
+        Guid productId,
+        Guid variantId,
+        UpdateProductVariantRequest request)
+    {
+        var product = await unitOfWork.Products.GetByIdAsync(productId);
+        if (product == null)
+            return OperationResult<ProductVariantDto>.Fail("Product not found");
+
+        var variant = product.Variants.FirstOrDefault(v => v.Id == variantId);
+        if (variant == null)
+            return OperationResult<ProductVariantDto>.Fail("Variant not found");
+
+        // Validate Color if provided
+        if (request.ColorId.HasValue)
+        {
+            var color = await unitOfWork.Colors.GetByIdAsync(request.ColorId.Value);
+            if (color == null)
+                return OperationResult<ProductVariantDto>.Fail("Color not found");
+        }
+
+        // Validate Size if provided
+        if (request.SizeId.HasValue)
+        {
+            var size = await unitOfWork.Sizes.GetByIdAsync(request.SizeId.Value);
+            if (size == null)
+                return OperationResult<ProductVariantDto>.Fail("Size not found");
+        }
+
+        variant.Update(
+            colorId: request.ColorId,
+            sizeId: request.SizeId,
+            barcode: request.Barcode,
+            purchaseCost: request.PurchaseCost
+        );
+
+        await unitOfWork.ProductVariants.UpdateAsync(variant);
+
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            return OperationResult<ProductVariantDto>.Fail($"Failed to update variant: {ex.Message}");
+        }
+
+        var updated = await unitOfWork.ProductVariants.GetByIdAsync(variantId);
+        return OperationResult<ProductVariantDto>.Ok(ProductMapper.MapVariantToDto(updated!, product.DefaultMarkupRate));
+    }
+
     public async Task<OperationResult<bool>> DeleteProductVariantAsync(Guid productId, Guid variantId)
     {
         var product = await unitOfWork.Products.GetByIdAsync(productId);
