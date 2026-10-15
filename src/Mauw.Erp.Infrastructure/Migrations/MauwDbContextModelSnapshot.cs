@@ -932,7 +932,7 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("barcode");
 
-                    b.Property<Guid>("ColorId")
+                    b.Property<Guid?>("ColorId")
                         .HasColumnType("uuid")
                         .HasColumnName("color_id");
 
@@ -951,7 +951,7 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("purchase_cost");
 
-                    b.Property<Guid>("SizeId")
+                    b.Property<Guid?>("SizeId")
                         .HasColumnType("uuid")
                         .HasColumnName("size_id");
 
@@ -1267,8 +1267,7 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasOne("Mauw.Erp.Domain.Entities.Color", "Color")
                         .WithMany()
                         .HasForeignKey("ColorId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
+                        .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("f_k_product_variants_colors_color_id");
 
                     b.HasOne("Mauw.Erp.Domain.Entities.Product", "Product")
@@ -1281,8 +1280,7 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasOne("Mauw.Erp.Domain.Entities.Size", "Size")
                         .WithMany()
                         .HasForeignKey("SizeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
+                        .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("f_k_product_variants__sizes_size_id");
 
                     b.Navigation("Color");

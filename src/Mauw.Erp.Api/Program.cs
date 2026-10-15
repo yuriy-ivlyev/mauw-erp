@@ -11,8 +11,8 @@ using Mauw.Erp.Infrastructure.Repositories;
 var builder = WebApplication.CreateBuilder(args);
 
 // Configure PostgreSQL connection
-var connectionString = builder.Configuration.GetConnectionString("PostgreSQL") ??
-    "Host=localhost;Database=mauw_erp;Username=postgres;postgres;Port=5432";
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ??
+    "Host=localhost;Database=mauw_erp;Username=postgres;Password=postgres;Port=5432";
 
 builder.Services.AddDbContext<MauwDbContext>(options =>
     options.UseNpgsql(connectionString)
