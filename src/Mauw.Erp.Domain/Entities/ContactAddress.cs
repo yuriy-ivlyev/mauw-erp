@@ -20,6 +20,14 @@ public class ContactAddress : Entity<Guid>
     public string? Phone { get; set; }
     public string? Email { get; set; }
     public string? AccessNotes { get; set; }
+    /// <summary>Latitudine WGS-84 (da geocoding Photon/OSM).</summary>
+    public double? Latitude { get; set; }
+    /// <summary>Longitudine WGS-84 (da geocoding Photon/OSM).</summary>
+    public double? Longitude { get; set; }
+    /// <summary>Indirizzo formattato restituito dal geocoder.</summary>
+    public string? FormattedAddress { get; set; }
+    /// <summary>ID esterno del geocoder (es. OSM node ID) per de-duplication.</summary>
+    public string? ExternalPlaceId { get; set; }
     /// <summary>FK predisposto per collegamento futuro al modulo Magazzini.</summary>
     public Guid? LinkedWarehouseId { get; set; }
 
@@ -40,7 +48,11 @@ public class ContactAddress : Entity<Guid>
         bool isMainOperationalSite = false,
         string? phone = null,
         string? email = null,
-        string? accessNotes = null) : base()
+        string? accessNotes = null,
+        double? latitude = null,
+        double? longitude = null,
+        string? formattedAddress = null,
+        string? externalPlaceId = null) : base()
     {
         ContactId = contactId;
         Purpose = purpose;
@@ -54,5 +66,9 @@ public class ContactAddress : Entity<Guid>
         Phone = phone;
         Email = email;
         AccessNotes = accessNotes;
+        Latitude = latitude;
+        Longitude = longitude;
+        FormattedAddress = formattedAddress;
+        ExternalPlaceId = externalPlaceId;
     }
 }

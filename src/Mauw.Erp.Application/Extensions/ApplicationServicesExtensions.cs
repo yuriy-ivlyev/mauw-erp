@@ -38,6 +38,14 @@ public static class ApplicationServicesExtensions
         // Contact address CRUD
         services.AddScoped<IContactAddressService, ContactAddressService>();
 
+        // VAT validation (IT checksum + EU VIES + Extra-EU)
+        services.AddScoped<IVatValidationService, VatValidationService>();
+
+        // Geocoding: Google Places (primary) + Photon/OSM (fallback)
+        services.AddScoped<GooglePlacesService>();
+        services.AddScoped<PhotonGeocodingService>();
+        services.AddScoped<IGeocodingService, FallbackGeocodingService>();
+
         return services;
     }
 }

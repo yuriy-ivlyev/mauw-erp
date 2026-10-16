@@ -63,6 +63,10 @@ public class ContactAddressRequest
     public string? Phone { get; set; }
     public string? Email { get; set; }
     public string? AccessNotes { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public string? FormattedAddress { get; set; }
+    public string? ExternalPlaceId { get; set; }
 }
 
 public class ContactPersonRequest

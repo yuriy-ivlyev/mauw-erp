@@ -2,6 +2,7 @@
 using Mauw.Erp.Infrastructure.DbContext;
 using Mauw.Erp.Application.Validation;
 using Mauw.Erp.Application.Extensions;
+using Mauw.Erp.Application.Settings;
 using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Api.Endpoints;
 using Mauw.Erp.Api.Extensions;
@@ -46,6 +47,38 @@ builder.Services.AddApplicationServices();
 
 // Memory cache (usato da CompanySettingsService)
 builder.Services.AddMemoryCache();
+
+// HttpClient per VIES (European VAT validation)
+builder.Services.AddHttpClient("ViesApi", client =>
+{
+    client.BaseAddress = new Uri("https://ec.europa.eu/taxation_customs/vies/rest-api/");
+    client.Timeout     = TimeSpan.FromSeconds(8);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+});
+
+// ── Google Places API (New) + Photon OSM fallback ────────────────────────
+// Configura la chiave con: dotnet user-secrets set "GooglePlaces:ApiKey" "PASTE_KEY_HERE"
+// Per Docker: variabile env GOOGLEPLACES__APIKEY nel file .env
+builder.Services.Configure<GooglePlacesSettings>(
+    builder.Configuration.GetSection(GooglePlacesSettings.Section));
+
+var googleApiKey = builder.Configuration["GooglePlaces:ApiKey"] ?? "";
+
+builder.Services.AddHttpClient("GooglePlacesClient", client =>
+{
+    client.BaseAddress = new Uri("https://places.googleapis.com/v1/");
+    client.Timeout     = TimeSpan.FromSeconds(10);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+    if (!string.IsNullOrWhiteSpace(googleApiKey))
+        client.DefaultRequestHeaders.Add("X-Goog-Api-Key", googleApiKey);
+});
+
+builder.Services.AddHttpClient("PhotonClient", client =>
+{
+    client.BaseAddress = new Uri("https://photon.komoot.io/");
+    client.Timeout     = TimeSpan.FromSeconds(8);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+});
 
 // Add Controllers
 builder.Services.AddControllers();
@@ -100,6 +133,8 @@ app.MapSupportEndpoints();
 app.MapInventoryEndpoints();
 app.MapContactEndpoints();
 app.MapCompanySettingsEndpoints();
+app.MapLookupsEndpoints();
+app.MapGeoEndpoints();
 app.MapOrderEndpoints();
 app.MapInvoiceEndpoints();
 app.MapDdtEndpoints();

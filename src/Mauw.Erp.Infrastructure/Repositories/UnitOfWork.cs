@@ -2,17 +2,19 @@ using Mauw.Erp.Domain.Repositories;
 using Mauw.Erp.Domain.Exceptions;
 using Mauw.Erp.Infrastructure.DbContext;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Mauw.Erp.Infrastructure.Repositories;
 
 /// <summary>
 /// Unit of Work implementation for transaction management.
 /// </summary>
-public class UnitOfWork(MauwDbContext dbContext) : IUnitOfWork
+public class UnitOfWork(MauwDbContext dbContext, IMemoryCache _cache) : IUnitOfWork
 {
     private IProductRepository? _productRepository;
     private IProductVariantRepository? _productVariantRepository;
     private IContactRepository? _contactRepository;
+    private ICountryRepository? _countryRepository;
     private IOrderRepository? _orderRepository;
     private IInvoiceRepository? _invoiceRepository;
     private IStockMovementRepository? _stockMovementRepository;
@@ -27,6 +29,8 @@ public class UnitOfWork(MauwDbContext dbContext) : IUnitOfWork
     public IProductRepository Products => _productRepository ??= new ProductRepository(dbContext);
     public IProductVariantRepository ProductVariants => _productVariantRepository ??= new ProductVariantRepository(dbContext);
     public IContactRepository Contacts => _contactRepository ??= new ContactRepository(dbContext);
+    public ICountryRepository Countries => _countryRepository ??= new CountryRepository(dbContext, _cache);
+
     public IOrderRepository Orders => _orderRepository ??= new OrderRepository(dbContext);
     public IInvoiceRepository Invoices => _invoiceRepository ??= new InvoiceRepository(dbContext);
     public IStockMovementRepository StockMovements => _stockMovementRepository ??= new StockMovementRepository(dbContext);

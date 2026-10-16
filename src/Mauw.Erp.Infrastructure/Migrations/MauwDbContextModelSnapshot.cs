@@ -374,13 +374,31 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("email");
 
+                    b.Property<string>("ExternalPlaceId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("external_place_id");
+
+                    b.Property<string>("FormattedAddress")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("formatted_address");
+
                     b.Property<bool>("IsMainOperationalSite")
                         .HasColumnType("boolean")
                         .HasColumnName("is_main_operational_site");
 
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("double precision")
+                        .HasColumnName("latitude");
+
                     b.Property<Guid?>("LinkedWarehouseId")
                         .HasColumnType("uuid")
                         .HasColumnName("linked_warehouse_id");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("double precision")
+                        .HasColumnName("longitude");
 
                     b.Property<string>("Phone")
                         .HasMaxLength(30)
@@ -388,8 +406,8 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnName("phone");
 
                     b.Property<string>("Province")
-                        .HasMaxLength(5)
-                        .HasColumnType("character varying(5)")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("province");
 
                     b.Property<int>("Purpose")
@@ -423,6 +441,9 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasName("p_k_contact_addresses");
 
                     b.HasIndex("ContactId", "Purpose");
+
+                    b.HasIndex("Latitude", "Longitude")
+                        .HasFilter("latitude IS NOT NULL AND longitude IS NOT NULL");
 
                     b.ToTable("contact_addresses", (string)null);
                 });
@@ -488,6 +509,400 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasDatabaseName("i_x_contact_persons_contact_id");
 
                     b.ToTable("contact_persons", (string)null);
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.Country", b =>
+                {
+                    b.Property<string>("IsoCode")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("iso_code");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("IsEuMember")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_eu_member");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.HasKey("IsoCode");
+
+                    b.HasIndex("DisplayOrder");
+
+                    b.ToTable("countries", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            IsoCode = "IT",
+                            DisplayOrder = 1,
+                            IsEuMember = true,
+                            Name = "Italia"
+                        },
+                        new
+                        {
+                            IsoCode = "DE",
+                            DisplayOrder = 10,
+                            IsEuMember = true,
+                            Name = "Germania"
+                        },
+                        new
+                        {
+                            IsoCode = "FR",
+                            DisplayOrder = 11,
+                            IsEuMember = true,
+                            Name = "Francia"
+                        },
+                        new
+                        {
+                            IsoCode = "ES",
+                            DisplayOrder = 12,
+                            IsEuMember = true,
+                            Name = "Spagna"
+                        },
+                        new
+                        {
+                            IsoCode = "NL",
+                            DisplayOrder = 13,
+                            IsEuMember = true,
+                            Name = "Paesi Bassi"
+                        },
+                        new
+                        {
+                            IsoCode = "BE",
+                            DisplayOrder = 14,
+                            IsEuMember = true,
+                            Name = "Belgio"
+                        },
+                        new
+                        {
+                            IsoCode = "PT",
+                            DisplayOrder = 15,
+                            IsEuMember = true,
+                            Name = "Portogallo"
+                        },
+                        new
+                        {
+                            IsoCode = "AT",
+                            DisplayOrder = 16,
+                            IsEuMember = true,
+                            Name = "Austria"
+                        },
+                        new
+                        {
+                            IsoCode = "GR",
+                            DisplayOrder = 17,
+                            IsEuMember = true,
+                            Name = "Grecia"
+                        },
+                        new
+                        {
+                            IsoCode = "PL",
+                            DisplayOrder = 18,
+                            IsEuMember = true,
+                            Name = "Polonia"
+                        },
+                        new
+                        {
+                            IsoCode = "SE",
+                            DisplayOrder = 20,
+                            IsEuMember = true,
+                            Name = "Svezia"
+                        },
+                        new
+                        {
+                            IsoCode = "DK",
+                            DisplayOrder = 21,
+                            IsEuMember = true,
+                            Name = "Danimarca"
+                        },
+                        new
+                        {
+                            IsoCode = "FI",
+                            DisplayOrder = 22,
+                            IsEuMember = true,
+                            Name = "Finlandia"
+                        },
+                        new
+                        {
+                            IsoCode = "IE",
+                            DisplayOrder = 23,
+                            IsEuMember = true,
+                            Name = "Irlanda"
+                        },
+                        new
+                        {
+                            IsoCode = "CZ",
+                            DisplayOrder = 24,
+                            IsEuMember = true,
+                            Name = "Repubblica Ceca"
+                        },
+                        new
+                        {
+                            IsoCode = "HU",
+                            DisplayOrder = 25,
+                            IsEuMember = true,
+                            Name = "Ungheria"
+                        },
+                        new
+                        {
+                            IsoCode = "RO",
+                            DisplayOrder = 26,
+                            IsEuMember = true,
+                            Name = "Romania"
+                        },
+                        new
+                        {
+                            IsoCode = "BG",
+                            DisplayOrder = 27,
+                            IsEuMember = true,
+                            Name = "Bulgaria"
+                        },
+                        new
+                        {
+                            IsoCode = "HR",
+                            DisplayOrder = 28,
+                            IsEuMember = true,
+                            Name = "Croazia"
+                        },
+                        new
+                        {
+                            IsoCode = "SK",
+                            DisplayOrder = 29,
+                            IsEuMember = true,
+                            Name = "Slovacchia"
+                        },
+                        new
+                        {
+                            IsoCode = "SI",
+                            DisplayOrder = 30,
+                            IsEuMember = true,
+                            Name = "Slovenia"
+                        },
+                        new
+                        {
+                            IsoCode = "LT",
+                            DisplayOrder = 31,
+                            IsEuMember = true,
+                            Name = "Lituania"
+                        },
+                        new
+                        {
+                            IsoCode = "LV",
+                            DisplayOrder = 32,
+                            IsEuMember = true,
+                            Name = "Lettonia"
+                        },
+                        new
+                        {
+                            IsoCode = "EE",
+                            DisplayOrder = 33,
+                            IsEuMember = true,
+                            Name = "Estonia"
+                        },
+                        new
+                        {
+                            IsoCode = "CY",
+                            DisplayOrder = 34,
+                            IsEuMember = true,
+                            Name = "Cipro"
+                        },
+                        new
+                        {
+                            IsoCode = "MT",
+                            DisplayOrder = 35,
+                            IsEuMember = true,
+                            Name = "Malta"
+                        },
+                        new
+                        {
+                            IsoCode = "LU",
+                            DisplayOrder = 36,
+                            IsEuMember = true,
+                            Name = "Lussemburgo"
+                        },
+                        new
+                        {
+                            IsoCode = "CH",
+                            DisplayOrder = 50,
+                            IsEuMember = false,
+                            Name = "Svizzera"
+                        },
+                        new
+                        {
+                            IsoCode = "GB",
+                            DisplayOrder = 51,
+                            IsEuMember = false,
+                            Name = "Regno Unito"
+                        },
+                        new
+                        {
+                            IsoCode = "NO",
+                            DisplayOrder = 52,
+                            IsEuMember = false,
+                            Name = "Norvegia"
+                        },
+                        new
+                        {
+                            IsoCode = "IS",
+                            DisplayOrder = 53,
+                            IsEuMember = false,
+                            Name = "Islanda"
+                        },
+                        new
+                        {
+                            IsoCode = "AL",
+                            DisplayOrder = 54,
+                            IsEuMember = false,
+                            Name = "Albania"
+                        },
+                        new
+                        {
+                            IsoCode = "BA",
+                            DisplayOrder = 55,
+                            IsEuMember = false,
+                            Name = "Bosnia Erzegovina"
+                        },
+                        new
+                        {
+                            IsoCode = "RS",
+                            DisplayOrder = 56,
+                            IsEuMember = false,
+                            Name = "Serbia"
+                        },
+                        new
+                        {
+                            IsoCode = "ME",
+                            DisplayOrder = 57,
+                            IsEuMember = false,
+                            Name = "Montenegro"
+                        },
+                        new
+                        {
+                            IsoCode = "MK",
+                            DisplayOrder = 58,
+                            IsEuMember = false,
+                            Name = "Macedonia del Nord"
+                        },
+                        new
+                        {
+                            IsoCode = "TR",
+                            DisplayOrder = 59,
+                            IsEuMember = false,
+                            Name = "Turchia"
+                        },
+                        new
+                        {
+                            IsoCode = "UA",
+                            DisplayOrder = 60,
+                            IsEuMember = false,
+                            Name = "Ucraina"
+                        },
+                        new
+                        {
+                            IsoCode = "RU",
+                            DisplayOrder = 61,
+                            IsEuMember = false,
+                            Name = "Russia"
+                        },
+                        new
+                        {
+                            IsoCode = "US",
+                            DisplayOrder = 80,
+                            IsEuMember = false,
+                            Name = "Stati Uniti"
+                        },
+                        new
+                        {
+                            IsoCode = "CA",
+                            DisplayOrder = 81,
+                            IsEuMember = false,
+                            Name = "Canada"
+                        },
+                        new
+                        {
+                            IsoCode = "MX",
+                            DisplayOrder = 82,
+                            IsEuMember = false,
+                            Name = "Messico"
+                        },
+                        new
+                        {
+                            IsoCode = "BR",
+                            DisplayOrder = 83,
+                            IsEuMember = false,
+                            Name = "Brasile"
+                        },
+                        new
+                        {
+                            IsoCode = "AR",
+                            DisplayOrder = 84,
+                            IsEuMember = false,
+                            Name = "Argentina"
+                        },
+                        new
+                        {
+                            IsoCode = "CN",
+                            DisplayOrder = 90,
+                            IsEuMember = false,
+                            Name = "Cina"
+                        },
+                        new
+                        {
+                            IsoCode = "JP",
+                            DisplayOrder = 91,
+                            IsEuMember = false,
+                            Name = "Giappone"
+                        },
+                        new
+                        {
+                            IsoCode = "IN",
+                            DisplayOrder = 92,
+                            IsEuMember = false,
+                            Name = "India"
+                        },
+                        new
+                        {
+                            IsoCode = "KR",
+                            DisplayOrder = 93,
+                            IsEuMember = false,
+                            Name = "Corea del Sud"
+                        },
+                        new
+                        {
+                            IsoCode = "AU",
+                            DisplayOrder = 95,
+                            IsEuMember = false,
+                            Name = "Australia"
+                        },
+                        new
+                        {
+                            IsoCode = "ZA",
+                            DisplayOrder = 96,
+                            IsEuMember = false,
+                            Name = "Sudafrica"
+                        },
+                        new
+                        {
+                            IsoCode = "AE",
+                            DisplayOrder = 97,
+                            IsEuMember = false,
+                            Name = "Emirati Arabi Uniti"
+                        },
+                        new
+                        {
+                            IsoCode = "SA",
+                            DisplayOrder = 98,
+                            IsEuMember = false,
+                            Name = "Arabia Saudita"
+                        });
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.CustomerProfile", b =>

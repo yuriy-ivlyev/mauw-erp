@@ -83,6 +83,9 @@ public static class ContactMapper
         Phone: a.Phone,
         Email: a.Email,
         AccessNotes: a.AccessNotes,
+        Latitude: a.Latitude,
+        Longitude: a.Longitude,
+        FormattedAddress: a.FormattedAddress,
         LinkedWarehouseId: a.LinkedWarehouseId
     );
 
@@ -140,6 +143,9 @@ public static class ContactMapper
         Phone: a.Phone,
         Email: a.Email,
         AccessNotes: a.AccessNotes,
+        Latitude: a.Latitude,
+        Longitude: a.Longitude,
+        FormattedAddress: a.FormattedAddress,
         LinkedWarehouseId: a.LinkedWarehouseId
     );
 }

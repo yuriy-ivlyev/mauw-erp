@@ -16,6 +16,10 @@ public static class ContactEndpoints
         var group = app.MapGroup("/api/v1/contacts")
             .WithName("Contacts");
 
+        group.MapGet("/validate-vat", ValidateVat)
+            .WithName("ValidateVat")
+            .WithSummary("Validazione formale P.IVA / Tax ID + verifica VIES (solo paesi UE)");
+
         group.MapGet("/", ListContacts)
             .WithName("ListContacts")
             .WithSummary("Paginated contact list with role/status filters");
@@ -56,6 +60,15 @@ public static class ContactEndpoints
         group.MapDelete("/{id:guid}/addresses/{addressId:guid}", DeleteAddress)
             .WithName("DeleteContactAddress")
             .WithSummary("Delete an address (LegalHeadquarters cannot be deleted)");
+    }
+
+    private static async Task<Ok<VatValidationResultDto>> ValidateVat(
+        string countryCode,
+        string vatNumber,
+        IVatValidationService vatService)
+    {
+        var result = await vatService.ValidateAsync(countryCode, vatNumber);
+        return TypedResults.Ok(result);
     }
 
     private static async Task<Ok<PagedResult<ContactSummaryDto>>> ListContacts(

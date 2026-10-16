@@ -72,6 +72,10 @@ public class ContactAddressService(IUnitOfWork unitOfWork) : IContactAddressServ
         addr.Phone                 = request.Phone;
         addr.Email                 = request.Email;
         addr.AccessNotes           = request.AccessNotes;
+        addr.Latitude              = request.Latitude;
+        addr.Longitude             = request.Longitude;
+        addr.FormattedAddress      = request.FormattedAddress;
+        addr.ExternalPlaceId       = request.ExternalPlaceId;
 
         await unitOfWork.Contacts.UpdateAsync(contact);
         await unitOfWork.SaveChangesAsync();
@@ -96,5 +100,6 @@ public class ContactAddressService(IUnitOfWork unitOfWork) : IContactAddressServ
         Street: a.Street, ZipCode: a.ZipCode, City: a.City, Province: a.Province,
         CountryCode: a.CountryCode, IsMainOperationalSite: a.IsMainOperationalSite,
         Phone: a.Phone, Email: a.Email, AccessNotes: a.AccessNotes,
+        Latitude: a.Latitude, Longitude: a.Longitude, FormattedAddress: a.FormattedAddress,
         LinkedWarehouseId: a.LinkedWarehouseId);
 }

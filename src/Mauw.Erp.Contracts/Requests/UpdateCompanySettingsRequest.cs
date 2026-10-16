@@ -34,4 +34,8 @@ public class CompanyAddressSiteRequest
     public string? AccessNotes { get; set; }
     /// <summary>Scopo opzionale per sedi operative (default OperationalSite).</summary>
     public string Purpose { get; set; } = "OperationalSite";
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public string? FormattedAddress { get; set; }
+    public string? ExternalPlaceId { get; set; }
 }

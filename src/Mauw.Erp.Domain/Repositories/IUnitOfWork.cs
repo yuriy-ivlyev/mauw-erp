@@ -8,6 +8,7 @@ public interface IUnitOfWork : IDisposable
     IProductRepository Products { get; }
     IProductVariantRepository ProductVariants { get; }
     IContactRepository Contacts { get; }
+    ICountryRepository Countries { get; }
     IOrderRepository Orders { get; }
     IInvoiceRepository Invoices { get; }
     IStockMovementRepository StockMovements { get; }

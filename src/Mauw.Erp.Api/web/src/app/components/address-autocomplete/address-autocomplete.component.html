@@ -1,0 +1,27 @@
+<div class="relative">
+  <div class="flex items-center gap-1">
+    <input
+      [(ngModel)]="query"
+      (ngModelChange)="onInput(); onClear()"
+      (blur)="close()"
+      type="text"
+      [placeholder]="placeholder"
+      autocomplete="off"
+      class="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+    <svg *ngIf="loading" class="h-4 w-4 animate-spin text-gray-400 flex-shrink-0"
+      xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+    </svg>
+  </div>
+
+  <ul *ngIf="showDropdown"
+    class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto text-sm">
+    <li *ngFor="let s of suggestions"
+      (mousedown)="select(s)"
+      class="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b last:border-0">
+      <span class="font-medium">{{ s.mainText }}</span>
+      <span *ngIf="s.secondaryText" class="text-gray-400 ml-1">{{ s.secondaryText }}</span>
+    </li>
+  </ul>
+</div>

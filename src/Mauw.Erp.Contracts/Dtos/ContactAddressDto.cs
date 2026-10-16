@@ -13,5 +13,8 @@ public record ContactAddressDto(
     string? Phone,
     string? Email,
     string? AccessNotes,
+    double? Latitude,
+    double? Longitude,
+    string? FormattedAddress,
     Guid? LinkedWarehouseId
 );

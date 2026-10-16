@@ -180,5 +180,6 @@ public class CompanySettingsService(
         Street: a.Street, ZipCode: a.ZipCode, City: a.City, Province: a.Province,
         CountryCode: a.CountryCode, IsMainOperationalSite: a.IsMainOperationalSite,
         Phone: a.Phone, Email: a.Email, AccessNotes: a.AccessNotes,
+        Latitude: a.Latitude, Longitude: a.Longitude, FormattedAddress: a.FormattedAddress,
         LinkedWarehouseId: a.LinkedWarehouseId);
 }

@@ -3,14 +3,18 @@ import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { ContactService } from '../../../services/contact.service';
+import { CountryService } from '../../../services/country.service';
 import { ContactDetail } from '../../../models/contact.model';
+import { CountryDto, VatValidationResult } from '../../../models/country.model';
+import { VatLookupComponent } from '../../../components/vat-lookup/vat-lookup.component';
+import { AddressAutocompleteComponent, ParsedAddress } from '../../../components/address-autocomplete/address-autocomplete.component';
 
 type Tab = 'fiscal' | 'addresses' | 'persons' | 'customer' | 'supplier' | 'agent';
 
 @Component({
   selector: 'app-anagrafica-modifica',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, VatLookupComponent, AddressAutocompleteComponent],
   templateUrl: './anagrafica-modifica.component.html'
 })
 export class AnagraficaModificaComponent implements OnInit {
@@ -21,21 +25,35 @@ export class AnagraficaModificaComponent implements OnInit {
   editId: string | null = null;
   successMessage = '';
   errorMessage = '';
+  vatResult: VatValidationResult | null = null;
 
   // Tab-visibility toggles for role tabs
   hasCustomer = false;
   hasSupplier = false;
   hasAgent    = false;
 
+  countries: CountryDto[] = [];
+  get selectedCountry(): string { return this.form?.get('countryCode')?.value ?? 'IT'; }
+  get selectedVatNumber(): string { return this.form?.get('vatNumber')?.value ?? ''; }
+  get isExtraEu(): boolean {
+    return this.selectedCountry !== '' &&
+      !this.countries.find(c => c.isoCode === this.selectedCountry)?.isEuMember;
+  }
+
   constructor(
     private fb: FormBuilder,
     private contactService: ContactService,
+    private countryService: CountryService,
     private router: Router,
     private route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
     this.buildForm();
+    this.countryService.getCountries().subscribe(c => {
+      this.countries = c;
+      this.countryService.preload(); // popola cache per VatLookup
+    });
     this.editId = this.route.snapshot.paramMap.get('id');
     if (this.editId) this.loadContact(this.editId);
   }
@@ -139,12 +157,46 @@ export class AnagraficaModificaComponent implements OnInit {
       isMainOperationalSite:[data?.isMainOperationalSite ?? false],
       phone:                [data?.phone  ?? ''],
       email:                [data?.email  ?? '', Validators.email],
-      accessNotes:          [data?.accessNotes ?? '']
+      accessNotes:          [data?.accessNotes ?? ''],
+      latitude:             [data?.latitude    ?? null],
+      longitude:            [data?.longitude   ?? null],
+      formattedAddress:     [data?.formattedAddress ?? ''],
+      externalPlaceId:      [data?.externalPlaceId  ?? null]
     });
   }
 
   addAddress(): void { this.addresses.push(this.buildAddressGroup()); }
   removeAddress(i: number): void { this.addresses.removeAt(i); }
+
+  /** Popola automaticamente i campi dell'indirizzo dalla selezione Photon. */
+  onAddressSelected(i: number, parsed: ParsedAddress): void {
+    this.addresses.at(i).patchValue({
+      street:          parsed.street,
+      zipCode:         parsed.zipCode,
+      city:            parsed.city,
+      province:        parsed.province,
+      countryCode:     parsed.countryCode,
+      latitude:        parsed.latitude,
+      longitude:       parsed.longitude,
+      formattedAddress:parsed.formattedAddress,
+      externalPlaceId: parsed.externalPlaceId
+    });
+  }
+
+  /** Gestisce il risultato della verifica P.IVA VIES. */
+  onVatValidated(result: VatValidationResult): void {
+    this.vatResult = result;
+    if (result.companyName && !this.form.get('businessName')?.value)
+      this.form.patchValue({ businessName: result.companyName });
+    // Se Extra-EU forza SDI = XXXXXXX
+    if (this.isExtraEu)
+      this.form.patchValue({ sdiCode: 'XXXXXXX' });
+  }
+
+  onCountryChange(): void {
+    if (this.isExtraEu) this.form.patchValue({ sdiCode: 'XXXXXXX' });
+    this.vatResult = null;
+  }
 
   // ── Persons ───────────────────────────────────────────────────────────────
 
