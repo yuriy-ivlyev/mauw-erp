@@ -40,7 +40,7 @@ export class MenuService {
         { label: 'Banco / Cassa', route: '/vendite/cassa',          icon: ICONS.cash      },
         { label: 'Ordini',        route: '/ordini/elenco',          icon: ICONS.orders    },
         { label: 'Preventivi',    route: '/fatturazione/preventivi', icon: ICONS.quote     },
-        { label: 'Clienti',       route: '/clienti',                icon: ICONS.contacts  }
+        { label: 'Anagrafiche',   route: '/anagrafiche/elenco',     icon: ICONS.contacts  }
       ]
     },
     {
@@ -72,6 +72,14 @@ export class MenuService {
         { label: 'Taglie & Curve',    route: '/magazzino/taglie',        icon: ICONS.sizes      },
         { label: 'Colori',            route: '/magazzino/colori',        icon: ICONS.colors     },
         { label: 'Materiali',         route: '/magazzino/materiali',     icon: ICONS.materials  }
+      ]
+    },
+    {
+      label: 'Impostazioni',
+      icon: ICONS.settings,
+      isCollapsed: true,
+      children: [
+        { label: 'Nostra Azienda', route: '/impostazioni/azienda', icon: ICONS.contacts }
       ]
     }
   ];

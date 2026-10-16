@@ -1,0 +1,270 @@
+<div class="p-6 max-w-5xl mx-auto">
+
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold">Impostazioni Azienda</h1>
+    <button (click)="save()" [disabled]="saving"
+      class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-5 py-2 rounded font-medium">
+      {{ saving ? 'Salvataggio…' : 'Salva Dati Aziendali' }}
+    </button>
+  </div>
+
+  <div *ngIf="loading" class="p-10 text-center text-gray-500">Caricamento…</div>
+
+  <div *ngIf="successMessage" class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">{{ successMessage }}</div>
+  <div *ngIf="errorMessage"   class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">{{ errorMessage }}</div>
+
+  <div *ngIf="!loading" [formGroup]="form" class="space-y-8">
+
+    <!-- ── Dati societari ──────────────────────────────────────────────── -->
+    <section class="bg-white rounded-lg shadow p-6">
+      <h2 class="text-xl font-semibold mb-4 text-gray-800">Dati Societari e Fiscali</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Ragione Sociale *</label>
+          <input formControlName="businessName" type="text"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Partita IVA</label>
+          <input formControlName="vatNumber" type="text"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Codice Fiscale</label>
+          <input formControlName="taxCode" type="text"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Codice SDI</label>
+          <input formControlName="sdiCode" type="text" maxlength="7"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">PEC</label>
+          <input formControlName="pecEmail" type="email"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Regime Fiscale</label>
+          <select formControlName="fiscalRegime"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+            <option value="">-- Non specificato --</option>
+            <option value="RF01">RF01 – Ordinario</option>
+            <option value="RF02">RF02 – Contribuenti minimi</option>
+            <option value="RF19">RF19 – Forfettario</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Paese</label>
+          <input formControlName="countryCode" type="text" maxlength="3"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+
+        <!-- REA -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Ufficio REA (prov.)</label>
+          <input formControlName="reaOffice" type="text" maxlength="5" placeholder="MI"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">N. REA</label>
+          <input formControlName="reaNumber" type="text" placeholder="1234567"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Capitale Sociale (€)</label>
+          <input formControlName="shareCapital" type="number" step="0.01" min="0"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+
+        <div class="flex flex-col gap-3 justify-center">
+          <label class="flex items-center gap-2">
+            <input type="checkbox" formControlName="isSoleShareholder" class="w-4 h-4" />
+            <span class="text-sm text-gray-700">Socio unico</span>
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" formControlName="isInLiquidation" class="w-4 h-4" />
+            <span class="text-sm text-red-600 font-medium">In liquidazione</span>
+          </label>
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
+          <input formControlName="logoUrl" type="url" placeholder="https://…"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Sede Legale ─────────────────────────────────────────────────── -->
+    <section class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+      <h2 class="text-xl font-semibold mb-4 text-gray-800">🏛️ Sede Legale <span class="text-sm font-normal text-gray-500">(obbligatoria)</span></h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="md:col-span-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Indirizzo *</label>
+          <input formControlName="hqStreet" type="text" placeholder="Via Roma, 1"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">CAP *</label>
+          <input formControlName="hqZipCode" type="text"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Città *</label>
+          <input formControlName="hqCity" type="text"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Provincia</label>
+          <input formControlName="hqProvince" type="text" maxlength="5"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Paese</label>
+          <input formControlName="hqCountry" type="text" maxlength="3"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Telefono</label>
+          <input formControlName="hqPhone" type="tel"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Email sede</label>
+          <input formControlName="hqEmail" type="email"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+      </div>
+    </section>
+
+  </div><!-- end form -->
+
+  <!-- ── Sedi Operative ───────────────────────────────────────────────────── -->
+  <section *ngIf="!loading" class="mt-8 bg-white rounded-lg shadow p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-semibold text-gray-800">🏭 Sedi Operative</h2>
+      <button (click)="openAddSite()"
+        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-medium">
+        + Aggiungi Sede
+      </button>
+    </div>
+
+    <div *ngIf="!company?.operationalSites?.length" class="text-gray-400 italic text-sm">
+      Nessuna sede operativa configurata.
+    </div>
+
+    <table *ngIf="company?.operationalSites?.length" class="w-full text-sm">
+      <thead class="bg-gray-50 border-b">
+        <tr>
+          <th class="px-4 py-2 text-left font-semibold text-gray-700">Nome</th>
+          <th class="px-4 py-2 text-left font-semibold text-gray-700">Tipo</th>
+          <th class="px-4 py-2 text-left font-semibold text-gray-700">Indirizzo</th>
+          <th class="px-4 py-2 text-left font-semibold text-gray-700">Telefono</th>
+          <th class="px-4 py-2 text-left font-semibold text-gray-700">Azioni</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let site of company?.operationalSites" class="border-b hover:bg-gray-50">
+          <td class="px-4 py-3 font-medium">
+            {{ site.siteName || '—' }}
+            <span *ngIf="site.isMainOperationalSite"
+              class="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">Principale</span>
+          </td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs">{{ purposeLabel(site.purpose) }}</span>
+          </td>
+          <td class="px-4 py-3 text-gray-600">
+            {{ site.street }}, {{ site.zipCode }} {{ site.city }}
+            <span *ngIf="site.province"> ({{ site.province }})</span>
+          </td>
+          <td class="px-4 py-3 text-gray-600">{{ site.phone || '—' }}</td>
+          <td class="px-4 py-3 space-x-2">
+            <button (click)="openEditSite(site)"
+              class="bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded text-xs">Modifica</button>
+            <button (click)="deleteSite(site.id)"
+              class="bg-red-500 hover:bg-red-600 text-white py-1 px-2 rounded text-xs">Elimina</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ── Modale Sede Operativa ─────────────────────────────────────────────── -->
+  <div *ngIf="showSiteModal"
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
+      <h2 class="text-xl font-bold mb-4">{{ editingSiteId ? 'Modifica Sede' : 'Nuova Sede Operativa' }}</h2>
+
+      <form [formGroup]="siteForm" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-gray-600 mb-1">Tipo sede</label>
+          <select formControlName="purpose"
+            class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+            <option value="OperationalSite">Sede Operativa</option>
+            <option value="WarehouseSite">Magazzino</option>
+            <option value="Administrative">Sede Amministrativa</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-600 mb-1">Nome sede</label>
+          <input formControlName="siteName" type="text"
+            class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-xs text-gray-600 mb-1">Indirizzo *</label>
+          <input formControlName="street" type="text"
+            class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-600 mb-1">CAP *</label>
+          <input formControlName="zipCode" type="text"
+            class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-600 mb-1">Città *</label>
+          <input formControlName="city" type="text"
+            class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-600 mb-1">Provincia</label>
+          <input formControlName="province" type="text" maxlength="5"
+            class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-600 mb-1">Telefono</label>
+          <input formControlName="phone" type="tel"
+            class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-600 mb-1">Email</label>
+          <input formControlName="email" type="email"
+            class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-xs text-gray-600 mb-1">Note accesso</label>
+          <textarea formControlName="accessNotes" rows="2"
+            class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"></textarea>
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="checkbox" formControlName="isMainOperationalSite" class="w-4 h-4" />
+          <label class="text-sm text-gray-700">Sede principale</label>
+        </div>
+      </form>
+
+      <div class="flex gap-3 mt-5">
+        <button (click)="saveSite()" [disabled]="savingSite"
+          class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 rounded font-medium">
+          {{ savingSite ? 'Salvataggio…' : (editingSiteId ? 'Aggiorna' : 'Aggiungi') }}
+        </button>
+        <button (click)="closeSiteModal()"
+          class="flex-1 bg-gray-400 hover:bg-gray-500 text-white py-2 rounded font-medium">
+          Annulla
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>

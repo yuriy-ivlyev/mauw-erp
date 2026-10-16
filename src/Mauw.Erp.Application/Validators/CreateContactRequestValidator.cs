@@ -1,32 +1,26 @@
-﻿using FluentValidation;
+using FluentValidation;
 using Mauw.Erp.Contracts.Requests;
 
 namespace Mauw.Erp.Application.Validators;
 
-/// <summary>
-/// Validator for CreateContactRequest.
-/// </summary>
 public class CreateContactRequestValidator : AbstractValidator<CreateContactRequest>
 {
     public CreateContactRequestValidator()
     {
-        RuleFor(x => x.Type)
-            .IsInEnum().WithMessage("Contact type is invalid");
-
         RuleFor(x => x.BusinessName)
             .NotEmpty().WithMessage("Business name is required")
             .MaximumLength(255).WithMessage("Business name must not exceed 255 characters");
 
         RuleFor(x => x.VatNumber)
-            .NotEmpty().WithMessage("VAT number is required")
-            .MaximumLength(50).WithMessage("VAT number must not exceed 50 characters");
+            .MaximumLength(20).WithMessage("VAT number must not exceed 20 characters")
+            .When(x => x.VatNumber != null);
 
-        RuleFor(x => x.DefaultDiscountRate)
-            .GreaterThanOrEqualTo(0).WithMessage("Discount rate must be 0 or greater")
-            .LessThanOrEqualTo(100).WithMessage("Discount rate must not exceed 100");
+        RuleFor(x => x.TaxCode)
+            .MaximumLength(16).WithMessage("Tax code must not exceed 16 characters")
+            .When(x => x.TaxCode != null);
 
-        RuleFor(x => x.DefaultCommissionRate)
-            .GreaterThanOrEqualTo(0).WithMessage("Commission rate must be 0 or greater")
-            .LessThanOrEqualTo(100).WithMessage("Commission rate must not exceed 100");
+        RuleFor(x => x.SdiCode)
+            .MaximumLength(7).WithMessage("SDI code must not exceed 7 characters")
+            .When(x => x.SdiCode != null);
     }
 }

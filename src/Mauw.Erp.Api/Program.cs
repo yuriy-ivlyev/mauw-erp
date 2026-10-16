@@ -44,6 +44,9 @@ builder.Services.AddScoped<IPdfGenerator, QuestPdfGenerator>();
 // Register application services with tracing decorators
 builder.Services.AddApplicationServices();
 
+// Memory cache (usato da CompanySettingsService)
+builder.Services.AddMemoryCache();
+
 // Add Controllers
 builder.Services.AddControllers();
 
@@ -96,6 +99,7 @@ app.MapProductEndpoints();
 app.MapSupportEndpoints();
 app.MapInventoryEndpoints();
 app.MapContactEndpoints();
+app.MapCompanySettingsEndpoints();
 app.MapOrderEndpoints();
 app.MapInvoiceEndpoints();
 app.MapDdtEndpoints();

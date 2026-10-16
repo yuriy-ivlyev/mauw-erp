@@ -4,13 +4,14 @@ using Mauw.Erp.Contracts.Requests;
 namespace Mauw.Erp.Application.Services;
 
 /// <summary>
-/// Contact application service.
+/// Contact application service – Party-Role pattern with soft delete.
 /// </summary>
 public interface IContactService
 {
-    Task<OperationResult<ContactDto>> CreateContactAsync(CreateContactRequest request);
-    Task<OperationResult<ContactDto>> GetContactAsync(Guid id);
-    Task<OperationResult<PagedResult<ContactDto>>> GetContactsAsync(int page, int pageSize, string? search = null);
-    Task<OperationResult<ContactDto>> UpdateContactAsync(Guid id, UpdateContactRequest request);
-    Task<OperationResult<bool>> DeleteContactAsync(Guid id);
+    Task<OperationResult<PagedResult<ContactSummaryDto>>> GetPagedAsync(ContactFilterRequest request);
+    Task<OperationResult<ContactDetailDto>> GetByIdAsync(Guid id);
+    Task<OperationResult<ContactDetailDto>> CreateAsync(CreateContactRequest request);
+    Task<OperationResult<ContactDetailDto>> UpdateAsync(Guid id, UpdateContactRequest request);
+    Task<OperationResult<bool>> DeleteAsync(Guid id);
+    Task<OperationResult<bool>> ToggleBlockCustomerAsync(Guid contactId, bool isBlocked, string? reason);
 }

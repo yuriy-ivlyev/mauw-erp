@@ -1,9 +1,9 @@
-﻿using Mauw.Erp.Contracts.Requests;
+using Mauw.Erp.Contracts.Requests;
 
 namespace Mauw.Erp.Application.Validation;
 
 /// <summary>
-/// Validator for UpdateContactRequest without reflection.
+/// Validator for UpdateContactRequest (partial update).
 /// </summary>
 public class UpdateContactRequestValidator : IValidator<UpdateContactRequest>
 {
@@ -11,21 +11,30 @@ public class UpdateContactRequestValidator : IValidator<UpdateContactRequest>
     {
         var errors = new List<ValidationError>();
 
-        // BusinessName conditional validation
-        if (!string.IsNullOrWhiteSpace(request.BusinessName) && request.BusinessName.Length > 255)
+        if (request.BusinessName is { Length: 0 })
+            errors.Add(new(nameof(request.BusinessName), "Business name cannot be empty"));
+        else if (request.BusinessName is { Length: > 255 })
             errors.Add(new(nameof(request.BusinessName), "Business name must not exceed 255 characters"));
 
-        // VatNumber conditional validation
-        if (!string.IsNullOrWhiteSpace(request.VatNumber) && request.VatNumber.Length > 50)
-            errors.Add(new(nameof(request.VatNumber), "VAT number must not exceed 50 characters"));
+        if (request.VatNumber is { Length: > 20 })
+            errors.Add(new(nameof(request.VatNumber), "VAT number must not exceed 20 characters"));
 
-        // DefaultDiscountRate conditional validation
-        if (request.DefaultDiscountRate.HasValue && (request.DefaultDiscountRate < 0 || request.DefaultDiscountRate > 100))
-            errors.Add(new(nameof(request.DefaultDiscountRate), "Default discount rate must be between 0 and 100"));
+        if (request.TaxCode is { Length: > 16 })
+            errors.Add(new(nameof(request.TaxCode), "Tax code must not exceed 16 characters"));
 
-        // DefaultCommissionRate conditional validation
-        if (request.DefaultCommissionRate.HasValue && (request.DefaultCommissionRate < 0 || request.DefaultCommissionRate > 100))
-            errors.Add(new(nameof(request.DefaultCommissionRate), "Default commission rate must be between 0 and 100"));
+        if (request.SdiCode is { Length: > 7 })
+            errors.Add(new(nameof(request.SdiCode), "SDI code must not exceed 7 characters"));
+
+        if (request.CustomerProfile is not null)
+        {
+            if (request.CustomerProfile.FinancialDiscountRate is < 0 or > 100)
+                errors.Add(new("CustomerProfile.FinancialDiscountRate", "Discount rate must be between 0 and 100"));
+            if (request.CustomerProfile.CreditLimit < 0)
+                errors.Add(new("CustomerProfile.CreditLimit", "Credit limit must be >= 0"));
+        }
+
+        if (request.AgentProfile?.DefaultCommissionRate is < 0 or > 100)
+            errors.Add(new("AgentProfile.DefaultCommissionRate", "Commission rate must be between 0 and 100"));
 
         return errors.Count == 0 ? ValidationResult.Success() : ValidationResult.Failure(errors);
     }

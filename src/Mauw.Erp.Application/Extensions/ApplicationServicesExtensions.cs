@@ -6,10 +6,6 @@ namespace Mauw.Erp.Application.Extensions;
 
 public static class ApplicationServicesExtensions
 {
-    /// <summary>
-    /// Registers all application services with their tracing decorators.
-    /// Each concrete service is resolvable directly; the interface resolves the decorator.
-    /// </summary>
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         services.AddScoped<OrderService>();
@@ -35,6 +31,12 @@ public static class ApplicationServicesExtensions
         services.AddScoped<DdtService>();
         services.AddScoped<IDdtService>(sp =>
             new TracingDdtService(sp.GetRequiredService<DdtService>()));
+
+        // Company settings (singleton-ish via IMemoryCache)
+        services.AddScoped<ICompanySettingsService, CompanySettingsService>();
+
+        // Contact address CRUD
+        services.AddScoped<IContactAddressService, ContactAddressService>();
 
         return services;
     }

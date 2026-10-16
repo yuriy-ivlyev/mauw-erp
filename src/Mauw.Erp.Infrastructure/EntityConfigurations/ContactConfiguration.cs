@@ -1,52 +1,43 @@
+using Mauw.Erp.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Mauw.Erp.Domain.Entities;
 
 namespace Mauw.Erp.Infrastructure.DbContext;
 
 /// <summary>
-/// Entity configuration for Contact entities.
+/// Entity configuration for Contact (Party) entity.
+/// Implements soft-delete global query filter and unique partial index on VatNumber.
 /// </summary>
 public class ContactConfiguration : IEntityTypeConfiguration<Contact>
 {
     public void Configure(EntityTypeBuilder<Contact> builder)
     {
+        builder.ToTable("contacts");
         builder.HasKey(c => c.Id);
 
-        builder.Property(c => c.BusinessName)
-            .IsRequired()
-            .HasMaxLength(255);
+        builder.Property(c => c.BusinessName).IsRequired().HasMaxLength(255);
+        builder.Property(c => c.VatNumber).HasMaxLength(20);
+        builder.Property(c => c.TaxCode).HasMaxLength(16);
+        builder.Property(c => c.SdiCode).HasMaxLength(7);
+        builder.Property(c => c.PecEmail).HasMaxLength(255);
+        builder.Property(c => c.CountryCode).IsRequired().HasMaxLength(3).HasDefaultValue("IT");
+        builder.Property(c => c.FiscalRegime).HasMaxLength(10);
+        builder.Property(c => c.Status).IsRequired();
+        builder.Property(c => c.DeletedBy).HasMaxLength(255);
 
-        builder.Property(c => c.VatNumber)
-            .IsRequired()
-            .HasMaxLength(50);
+        // Corporate / Internal-Company fields
+        builder.Property(c => c.ReaNumber).HasMaxLength(20);
+        builder.Property(c => c.ReaOffice).HasMaxLength(5);
+        builder.Property(c => c.ShareCapital).HasPrecision(18, 2);
+        builder.Property(c => c.LogoUrl).HasMaxLength(1000);
 
-        builder.Property(c => c.SdiCode)
-            .HasMaxLength(50);
+        builder.Property(c => c.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        builder.Property(c => c.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-        builder.Property(c => c.Type)
-            .IsRequired();
+        // Soft delete global filter
+        builder.HasQueryFilter(c => !c.IsDeleted);
 
-        builder.Property(c => c.DefaultDiscountRate)
-            .HasPrecision(5, 2);
-
-        builder.Property(c => c.DefaultCommissionRate)
-            .HasPrecision(5, 2);
-
-        builder.Property(c => c.CreatedAt)
-            .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-        builder.Property(c => c.UpdatedAt)
-            .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-        // Self-referencing foreign key for Agent
-        builder.HasOne(c => c.Agent)
-            .WithMany()
-            .HasForeignKey(c => c.AgentId)
-            .IsRequired(false)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        // Relationships
+        // Relationships preserved from previous model
         builder.HasMany(c => c.Orders)
             .WithOne(o => o.Contact)
             .HasForeignKey(o => o.ContactId)
@@ -57,8 +48,15 @@ public class ContactConfiguration : IEntityTypeConfiguration<Contact>
             .HasForeignKey(ac => ac.AgentId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Unique index for VAT Number
+        // Partial unique index on VatNumber (PostgreSQL allows multiple NULLs)
         builder.HasIndex(c => c.VatNumber)
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("vat_number IS NOT NULL");
+
+        builder.HasIndex(c => c.TaxCode)
+            .HasFilter("tax_code IS NOT NULL");
+
+        builder.HasIndex(c => c.BusinessName);
+        builder.HasIndex(c => c.Status);
     }
 }

@@ -1,0 +1,350 @@
+<div class="p-6 max-w-5xl mx-auto">
+
+  <!-- Header -->
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold">{{ editId ? 'Modifica Anagrafica' : 'Nuova Anagrafica' }}</h1>
+    <div class="flex gap-2">
+      <button (click)="cancel()" class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded">Annulla</button>
+      <button (click)="save()" [disabled]="saving"
+        class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded font-medium">
+        {{ saving ? 'Salvataggio…' : 'Salva' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Messaggi -->
+  <div *ngIf="successMessage" class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">{{ successMessage }}</div>
+  <div *ngIf="errorMessage"   class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">{{ errorMessage }}</div>
+
+  <!-- Loading -->
+  <div *ngIf="loading" class="p-12 text-center text-gray-500">Caricamento…</div>
+
+  <div *ngIf="!loading" [formGroup]="form">
+
+    <!-- TAB BAR -->
+    <div class="flex border-b mb-6 overflow-x-auto">
+      <button *ngFor="let tab of [
+        { key: 'fiscal',    label: 'Dati Fiscali' },
+        { key: 'addresses', label: 'Indirizzi' },
+        { key: 'persons',   label: 'Referenti' },
+        { key: 'customer',  label: '🧑‍💼 Cliente',  toggle: true, active: hasCustomer,  prop: 'hasCustomer' },
+        { key: 'supplier',  label: '🏭 Fornitore', toggle: true, active: hasSupplier, prop: 'hasSupplier' },
+        { key: 'agent',     label: '🤝 Agente',    toggle: true, active: hasAgent,    prop: 'hasAgent'    }
+      ]"
+        (click)="setTab(tab.key)"
+        [class]="'px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition ' +
+          (activeTab === tab.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700')">
+        {{ tab.label }}
+      </button>
+    </div>
+
+    <!-- ── TAB: Dati Fiscali ─────────────────────────────────────────────── -->
+    <div *ngIf="activeTab === 'fiscal'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Ragione Sociale *</label>
+        <input formControlName="businessName" type="text"
+          class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="es. Rossi S.r.l." />
+        <p *ngIf="form.get('businessName')?.invalid && form.get('businessName')?.touched"
+          class="text-red-500 text-xs mt-1">Campo obbligatorio (max 255 caratteri).</p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Partita IVA</label>
+        <input formControlName="vatNumber" type="text" placeholder="es. 01234567890"
+          class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Codice Fiscale</label>
+        <input formControlName="taxCode" type="text" placeholder="es. RSSMRA80A01H501U"
+          class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Codice SDI (max 7)</label>
+        <input formControlName="sdiCode" type="text" maxlength="7" placeholder="es. XXXXXXX"
+          class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">PEC</label>
+        <input formControlName="pecEmail" type="email" placeholder="pec@esempio.it"
+          class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Paese</label>
+        <input formControlName="countryCode" type="text" maxlength="3"
+          class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Regime Fiscale SDI</label>
+        <select formControlName="fiscalRegime"
+          class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">-- Non specificato --</option>
+          <option value="RF01">RF01 – Ordinario</option>
+          <option value="RF02">RF02 – Contribuenti minimi</option>
+          <option value="RF19">RF19 – Regime forfettario</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Stato</label>
+        <select formControlName="status"
+          class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="Draft">Bozza</option>
+          <option value="Active">Attivo</option>
+          <option value="Suspended">Sospeso</option>
+          <option value="Archived">Archiviato</option>
+        </select>
+      </div>
+
+    </div>
+
+    <!-- ── TAB: Indirizzi ────────────────────────────────────────────────── -->
+    <div *ngIf="activeTab === 'addresses'">
+      <div class="flex justify-between mb-4">
+        <h2 class="text-lg font-semibold">Indirizzi</h2>
+        <button type="button" (click)="addAddress()"
+          class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
+          + Aggiungi Indirizzo
+        </button>
+      </div>
+
+      <div formArrayName="addresses" class="space-y-4">
+        <div *ngFor="let addrCtrl of addresses.controls; let i = index"
+          [formGroupName]="i" class="bg-gray-50 border rounded-lg p-4">
+          <div class="flex justify-between mb-3">
+            <span class="font-medium text-sm">Indirizzo {{ i + 1 }}</span>
+            <button type="button" (click)="removeAddress(i)" class="text-red-500 hover:text-red-700 text-sm">Rimuovi</button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs text-gray-600 mb-1">Scopo</label>
+              <select formControlName="purpose"
+                class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                <option value="LegalHeadquarters">Sede Legale</option>
+                <option value="OperationalSite">Sede Operativa</option>
+                <option value="WarehouseSite">Magazzino</option>
+                <option value="Administrative">Sede Amministrativa</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-600 mb-1">Nome sede</label>
+              <input formControlName="siteName" type="text"
+                class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-600 mb-1">Telefono</label>
+              <input formControlName="phone" type="tel"
+                class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-xs text-gray-600 mb-1">Via / Indirizzo *</label>
+              <input formControlName="street" type="text" placeholder="Via Roma, 1"
+                class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-600 mb-1">Email sede</label>
+              <input formControlName="email" type="email"
+                class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-600 mb-1">CAP *</label>
+              <input formControlName="zipCode" type="text" maxlength="10"
+                class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-600 mb-1">Città *</label>
+              <input formControlName="city" type="text"
+                class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-600 mb-1">Provincia</label>
+              <input formControlName="province" type="text" maxlength="5"
+                class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div class="md:col-span-3">
+              <label class="block text-xs text-gray-600 mb-1">Note accesso / scarico</label>
+              <input formControlName="accessNotes" type="text"
+                class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div class="flex items-center gap-2">
+              <input type="checkbox" formControlName="isMainOperationalSite" class="w-4 h-4" />
+              <label class="text-sm text-gray-700">Sede operativa principale</label>
+            </div>
+          </div>
+        </div>
+        <p *ngIf="addresses.length === 0" class="text-gray-400 text-sm italic">Nessun indirizzo inserito.</p>
+      </div>
+    </div>
+
+    <!-- ── TAB: Referenti ────────────────────────────────────────────────── -->
+    <div *ngIf="activeTab === 'persons'">
+      <div class="flex justify-between mb-4">
+        <h2 class="text-lg font-semibold">Referenti Aziendali</h2>
+        <button type="button" (click)="addPerson()"
+          class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
+          + Aggiungi Referente
+        </button>
+      </div>
+
+      <div formArrayName="persons" class="space-y-4">
+        <div *ngFor="let personCtrl of persons.controls; let i = index"
+          [formGroupName]="i" class="bg-gray-50 border rounded-lg p-4">
+          <div class="flex justify-between mb-3">
+            <span class="font-medium text-sm">Referente {{ i + 1 }}</span>
+            <button type="button" (click)="removePerson(i)" class="text-red-500 hover:text-red-700 text-sm">Rimuovi</button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs text-gray-600 mb-1">Nome *</label>
+              <input formControlName="firstName" type="text"
+                class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-600 mb-1">Cognome *</label>
+              <input formControlName="lastName" type="text"
+                class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-600 mb-1">Ruolo</label>
+              <select formControlName="role"
+                class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                <option value="">-- Seleziona --</option>
+                <option value="Acquisti">Acquisti</option>
+                <option value="Amministrazione">Amministrazione</option>
+                <option value="Magazzino">Magazzino</option>
+                <option value="Commerciale">Commerciale</option>
+                <option value="Direzione">Direzione</option>
+                <option value="Altro">Altro</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-600 mb-1">Email</label>
+              <input formControlName="email" type="email"
+                class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-600 mb-1">Telefono</label>
+              <input formControlName="phone" type="tel"
+                class="w-full px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div class="flex items-center gap-2 mt-4">
+              <input type="checkbox" formControlName="isPrimary" class="w-4 h-4" />
+              <label class="text-sm text-gray-700">Referente principale</label>
+            </div>
+          </div>
+        </div>
+        <p *ngIf="persons.length === 0" class="text-gray-400 text-sm italic">Nessun referente inserito.</p>
+      </div>
+    </div>
+
+    <!-- ── TAB: Cliente ──────────────────────────────────────────────────── -->
+    <div *ngIf="activeTab === 'customer'">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold">Profilo Cliente</h2>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" [(ngModel)]="hasCustomer" [ngModelOptions]="{standalone: true}" class="w-4 h-4" />
+          <span class="text-sm text-gray-700">Abilitato come Cliente</span>
+        </label>
+      </div>
+      <div *ngIf="!hasCustomer" class="p-8 text-center text-gray-400 italic">
+        Abilita il ruolo Cliente per configurare questa sezione.
+      </div>
+      <div *ngIf="hasCustomer" formGroupName="customer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Sconto Finanziario (%)</label>
+          <input formControlName="financialDiscountRate" type="number" step="0.01" min="0" max="100"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Fido Accordato (€)</label>
+          <input formControlName="creditLimit" type="number" step="0.01" min="0"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Note Consegna</label>
+          <textarea formControlName="deliveryNotes" rows="3"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+            placeholder="Istruzioni speciali per lo scarico merci…"></textarea>
+        </div>
+        <div class="md:col-span-2 bg-red-50 border border-red-200 rounded-lg p-4">
+          <div class="flex items-center gap-3 mb-2">
+            <input type="checkbox" formControlName="isBlocked" class="w-4 h-4" />
+            <label class="text-sm font-medium text-red-700">Blocco Commerciale</label>
+          </div>
+          <input *ngIf="form.get('customer.isBlocked')?.value"
+            formControlName="blockReason" type="text" placeholder="Motivazione blocco…"
+            class="w-full px-4 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-400 text-sm" />
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: Fornitore ────────────────────────────────────────────────── -->
+    <div *ngIf="activeTab === 'supplier'">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold">Profilo Fornitore</h2>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" [(ngModel)]="hasSupplier" [ngModelOptions]="{standalone: true}" class="w-4 h-4" />
+          <span class="text-sm text-gray-700">Abilitato come Fornitore</span>
+        </label>
+      </div>
+      <div *ngIf="!hasSupplier" class="p-8 text-center text-gray-400 italic">
+        Abilita il ruolo Fornitore per configurare questa sezione.
+      </div>
+      <div *ngIf="hasSupplier" formGroupName="supplier" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">IBAN</label>
+          <input formControlName="iban" type="text" maxlength="34" placeholder="IT60X0542811101000000123456"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">BIC / SWIFT</label>
+          <input formControlName="bicSwift" type="text" maxlength="11"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: Agente ───────────────────────────────────────────────────── -->
+    <div *ngIf="activeTab === 'agent'">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold">Profilo Agente</h2>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" [(ngModel)]="hasAgent" [ngModelOptions]="{standalone: true}" class="w-4 h-4" />
+          <span class="text-sm text-gray-700">Abilitato come Agente</span>
+        </label>
+      </div>
+      <div *ngIf="!hasAgent" class="p-8 text-center text-gray-400 italic">
+        Abilita il ruolo Agente per configurare questa sezione.
+      </div>
+      <div *ngIf="hasAgent" formGroupName="agent" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Provvigione Base (%)</label>
+          <input formControlName="defaultCommissionRate" type="number" step="0.01" min="0" max="100"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Area di Competenza</label>
+          <input formControlName="operatingArea" type="text" placeholder="es. Lombardia, Nord Italia"
+            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end form -->
+
+  <!-- Bottom save bar -->
+  <div *ngIf="!loading" class="mt-8 flex justify-end gap-3">
+    <button (click)="cancel()" class="bg-gray-400 hover:bg-gray-500 text-white px-6 py-2 rounded">Annulla</button>
+    <button (click)="save()" [disabled]="saving"
+      class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-2 rounded font-medium">
+      {{ saving ? 'Salvataggio…' : (editId ? 'Aggiorna' : 'Crea Anagrafica') }}
+    </button>
+  </div>
+
+</div>

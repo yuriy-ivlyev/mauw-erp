@@ -10,6 +10,11 @@ namespace Mauw.Erp.Infrastructure.DbContext;
 public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.EntityFrameworkCore.DbContext(options)
 {
     public DbSet<Contact> Contacts { get; set; }
+    public DbSet<CustomerProfile> CustomerProfiles { get; set; }
+    public DbSet<SupplierProfile> SupplierProfiles { get; set; }
+    public DbSet<AgentProfile> AgentProfiles { get; set; }
+    public DbSet<ContactAddress> ContactAddresses { get; set; }
+    public DbSet<ContactPerson> ContactPersons { get; set; }
     public DbSet<MacroCategory> MacroCategories { get; set; }
     public DbSet<Category> Categories { get; set; }
     public DbSet<Collection> Collections { get; set; }
@@ -63,6 +68,11 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
 
         // Apply entity configurations
         modelBuilder.ApplyConfiguration(new ContactConfiguration());
+        modelBuilder.ApplyConfiguration(new CustomerProfileConfiguration());
+        modelBuilder.ApplyConfiguration(new SupplierProfileConfiguration());
+        modelBuilder.ApplyConfiguration(new AgentProfileConfiguration());
+        modelBuilder.ApplyConfiguration(new ContactAddressConfiguration());
+        modelBuilder.ApplyConfiguration(new ContactPersonConfiguration());
         modelBuilder.ApplyConfiguration(new MacroCategoryConfiguration());
         modelBuilder.ApplyConfiguration(new CategoryConfiguration());
         modelBuilder.ApplyConfiguration(new CollectionConfiguration());

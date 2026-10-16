@@ -81,6 +81,27 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.ToTable("agent_commissions");
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.AgentProfile", b =>
+                {
+                    b.Property<Guid>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<decimal>("DefaultCommissionRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("default_commission_rate");
+
+                    b.Property<string>("OperatingArea")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("operating_area");
+
+                    b.HasKey("ContactId");
+
+                    b.ToTable("agent_profiles", (string)null);
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Category", b =>
                 {
                     b.Property<Guid>("Id")
@@ -195,15 +216,19 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid?>("AgentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("agent_id");
-
                     b.Property<string>("BusinessName")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("business_name");
+
+                    b.Property<string>("CountryCode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasDefaultValue("IT")
+                        .HasColumnName("country_code");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -211,24 +236,74 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<decimal>("DefaultCommissionRate")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("default_commission_rate");
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
 
-                    b.Property<decimal>("DefaultDiscountRate")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("default_discount_rate");
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<string>("FiscalRegime")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("fiscal_regime");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsInLiquidation")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_in_liquidation");
+
+                    b.Property<bool>("IsInternalCompany")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_internal_company");
+
+                    b.Property<bool?>("IsSoleShareholder")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_sole_shareholder");
+
+                    b.Property<string>("LogoUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("logo_url");
+
+                    b.Property<string>("PecEmail")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("pec_email");
+
+                    b.Property<string>("ReaNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("rea_number");
+
+                    b.Property<string>("ReaOffice")
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)")
+                        .HasColumnName("rea_office");
 
                     b.Property<string>("SdiCode")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
                         .HasColumnName("sdi_code");
 
-                    b.Property<int>("Type")
+                    b.Property<decimal?>("ShareCapital")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("share_capital");
+
+                    b.Property<int>("Status")
                         .HasColumnType("integer")
-                        .HasColumnName("type");
+                        .HasColumnName("status");
+
+                    b.Property<string>("TaxCode")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("tax_code");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -237,21 +312,229 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<string>("VatNumber")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
                         .HasColumnName("vat_number");
 
                     b.HasKey("Id")
                         .HasName("p_k_contacts");
 
-                    b.HasIndex("AgentId")
-                        .HasDatabaseName("i_x_contacts_agent_id");
+                    b.HasIndex("BusinessName");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("TaxCode")
+                        .HasFilter("tax_code IS NOT NULL");
 
                     b.HasIndex("VatNumber")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("vat_number IS NOT NULL");
 
-                    b.ToTable("contacts");
+                    b.ToTable("contacts", (string)null);
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.ContactAddress", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AccessNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("access_notes");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("city");
+
+                    b.Property<Guid>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<string>("CountryCode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasDefaultValue("IT")
+                        .HasColumnName("country_code");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("email");
+
+                    b.Property<bool>("IsMainOperationalSite")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_main_operational_site");
+
+                    b.Property<Guid?>("LinkedWarehouseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("linked_warehouse_id");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("Province")
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)")
+                        .HasColumnName("province");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("integer")
+                        .HasColumnName("purpose");
+
+                    b.Property<string>("SiteName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("site_name");
+
+                    b.Property<string>("Street")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("street");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("ZipCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("zip_code");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_contact_addresses");
+
+                    b.HasIndex("ContactId", "Purpose");
+
+                    b.ToTable("contact_addresses", (string)null);
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.ContactPerson", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("first_name");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_primary");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("last_name");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("Role")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("role");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_contact_persons");
+
+                    b.HasIndex("ContactId")
+                        .HasDatabaseName("i_x_contact_persons_contact_id");
+
+                    b.ToTable("contact_persons", (string)null);
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.CustomerProfile", b =>
+                {
+                    b.Property<Guid>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<string>("BlockReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("block_reason");
+
+                    b.Property<decimal>("CreditLimit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("credit_limit");
+
+                    b.Property<Guid?>("DefaultAgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("default_agent_id");
+
+                    b.Property<string>("DeliveryNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("delivery_notes");
+
+                    b.Property<decimal>("FinancialDiscountRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("financial_discount_rate");
+
+                    b.Property<bool>("IsBlocked")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_blocked");
+
+                    b.Property<Guid?>("PaymentTermId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payment_term_id");
+
+                    b.Property<Guid?>("PriceListId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("price_list_id");
+
+                    b.HasKey("ContactId");
+
+                    b.ToTable("customer_profiles", (string)null);
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.DdtDocument", b =>
@@ -1081,6 +1364,31 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.ToTable("stock_movements");
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierProfile", b =>
+                {
+                    b.Property<Guid>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<string>("BicSwift")
+                        .HasMaxLength(11)
+                        .HasColumnType("character varying(11)")
+                        .HasColumnName("bic_swift");
+
+                    b.Property<string>("Iban")
+                        .HasMaxLength(34)
+                        .HasColumnType("character varying(34)")
+                        .HasColumnName("iban");
+
+                    b.Property<Guid?>("PaymentTermId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payment_term_id");
+
+                    b.HasKey("ContactId");
+
+                    b.ToTable("supplier_profiles", (string)null);
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.AgentCommission", b =>
                 {
                     b.HasOne("Mauw.Erp.Domain.Entities.Contact", "Agent")
@@ -1102,6 +1410,18 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Navigation("Invoice");
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.AgentProfile", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.Contact", "Contact")
+                        .WithOne("AgentProfile")
+                        .HasForeignKey("Mauw.Erp.Domain.Entities.AgentProfile", "ContactId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_agent_profiles__contacts_contact_id");
+
+                    b.Navigation("Contact");
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Category", b =>
                 {
                     b.HasOne("Mauw.Erp.Domain.Entities.MacroCategory", "MacroCategory")
@@ -1113,15 +1433,40 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Navigation("MacroCategory");
                 });
 
-            modelBuilder.Entity("Mauw.Erp.Domain.Entities.Contact", b =>
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.ContactAddress", b =>
                 {
-                    b.HasOne("Mauw.Erp.Domain.Entities.Contact", "Agent")
-                        .WithMany()
-                        .HasForeignKey("AgentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("f_k_contacts_contacts_agent_id");
+                    b.HasOne("Mauw.Erp.Domain.Entities.Contact", "Contact")
+                        .WithMany("Addresses")
+                        .HasForeignKey("ContactId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_contact_addresses_contacts_contact_id");
 
-                    b.Navigation("Agent");
+                    b.Navigation("Contact");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.ContactPerson", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.Contact", "Contact")
+                        .WithMany("Persons")
+                        .HasForeignKey("ContactId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_contact_persons_contacts_contact_id");
+
+                    b.Navigation("Contact");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.CustomerProfile", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.Contact", "Contact")
+                        .WithOne("CustomerProfile")
+                        .HasForeignKey("Mauw.Erp.Domain.Entities.CustomerProfile", "ContactId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_customer_profiles_contacts_contact_id");
+
+                    b.Navigation("Contact");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.DdtDocument", b =>
@@ -1326,11 +1671,33 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Navigation("Variant");
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierProfile", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.Contact", "Contact")
+                        .WithOne("SupplierProfile")
+                        .HasForeignKey("Mauw.Erp.Domain.Entities.SupplierProfile", "ContactId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_supplier_profiles_contacts_contact_id");
+
+                    b.Navigation("Contact");
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Contact", b =>
                 {
+                    b.Navigation("Addresses");
+
+                    b.Navigation("AgentProfile");
+
                     b.Navigation("Commissions");
 
+                    b.Navigation("CustomerProfile");
+
                     b.Navigation("Orders");
+
+                    b.Navigation("Persons");
+
+                    b.Navigation("SupplierProfile");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.DdtDocument", b =>
