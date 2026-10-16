@@ -80,5 +80,25 @@ public static class DbInitializer
             context.Contacts.Add(mauw);
             await context.SaveChangesAsync();
         }
+
+        if (!await context.Warehouses.IgnoreQueryFilters().AnyAsync())
+        {
+            var internalCompany = await context.Contacts
+                .IgnoreQueryFilters()
+                .Include(c => c.Addresses)
+                .FirstOrDefaultAsync(c => c.IsInternalCompany && !c.IsDeleted);
+
+            if (internalCompany?.Addresses.FirstOrDefault() is { } address)
+            {
+                var warehouses = new List<Warehouse>
+                {
+                    new("WH-CENTRALE", "Magazzino Centrale", WarehouseType.Standard, address.Id, isSellable: true, isDefault: true),
+                    new("WH-FALLATI", "Magazzino Capi Fallati", WarehouseType.Defective, address.Id, isSellable: false, isDefault: false)
+                };
+
+                await context.Warehouses.AddRangeAsync(warehouses);
+                await context.SaveChangesAsync();
+            }
+        }
     }
 }

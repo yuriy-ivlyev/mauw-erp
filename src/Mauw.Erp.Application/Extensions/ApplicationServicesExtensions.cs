@@ -28,6 +28,8 @@ public static class ApplicationServicesExtensions
         services.AddScoped<IInventoryService>(sp =>
             new TracingInventoryService(sp.GetRequiredService<InventoryService>()));
 
+        services.AddScoped<IStockService, StockService>();
+
         services.AddScoped<DdtService>();
         services.AddScoped<IDdtService>(sp =>
             new TracingDdtService(sp.GetRequiredService<DdtService>()));
@@ -37,6 +39,7 @@ public static class ApplicationServicesExtensions
 
         // Contact address CRUD
         services.AddScoped<IContactAddressService, ContactAddressService>();
+        services.AddScoped<IWarehouseService, WarehouseService>();
 
         // VAT validation (IT checksum + EU VIES + Extra-EU)
         services.AddScoped<IVatValidationService, VatValidationService>();

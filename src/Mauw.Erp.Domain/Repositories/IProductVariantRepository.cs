@@ -8,4 +8,9 @@ namespace Mauw.Erp.Domain.Repositories;
 public interface IProductVariantRepository : IRepository<ProductVariant, Guid>
 {
     Task<ProductVariant?> GetByBarcodeAsync(string barcode);
+
+    /// <summary>
+    /// Ricerca full-text varianti per barcode, nome prodotto, colore o taglia.
+    /// </summary>
+    Task<IEnumerable<ProductVariant>> SearchAsync(string query, int limit = 10);
 }

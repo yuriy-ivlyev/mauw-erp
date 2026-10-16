@@ -18,4 +18,24 @@ public class ProductVariantRepository(MauwDbContext dbContext)
             .AsNoTracking()
             .FirstOrDefaultAsync(v => v.Barcode.ToLower() == barcode.ToLower());
     }
+
+    public async Task<IEnumerable<ProductVariant>> SearchAsync(string query, int limit = 10)
+    {
+        var term = query.Trim().ToLower();
+
+        return await _dbSet
+            .Include(v => v.Product)
+            .Include(v => v.Color)
+            .Include(v => v.Size)
+            .AsNoTracking()
+            .Where(v =>
+                v.Barcode.ToLower().Contains(term) ||
+                v.Product.Name.ToLower().Contains(term) ||
+                (v.Color != null && v.Color.Name.ToLower().Contains(term)) ||
+                (v.Size  != null && v.Size.Name.ToLower().Contains(term)))
+            .OrderBy(v => v.Barcode.ToLower() == term ? 0 : 1)  // exact barcode first
+            .ThenBy(v => v.Product.Name)
+            .Take(limit)
+            .ToListAsync();
+    }
 }

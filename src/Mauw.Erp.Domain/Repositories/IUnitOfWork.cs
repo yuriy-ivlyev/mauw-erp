@@ -12,6 +12,7 @@ public interface IUnitOfWork : IDisposable
     IOrderRepository Orders { get; }
     IInvoiceRepository Invoices { get; }
     IStockMovementRepository StockMovements { get; }
+    IStockRepository Stock { get; }
     IDdtDocumentRepository DdtDocuments { get; }
     ISizeRepository Sizes { get; }
     IColorRepository Colors { get; }
@@ -19,6 +20,7 @@ public interface IUnitOfWork : IDisposable
     ICollectionRepository Collections { get; }
     IMaterialRepository Materials { get; }
     IMacroCategoryRepository MacroCategories { get; }
+    IWarehouseRepository Warehouses { get; }
     
     Task SaveChangesAsync();
     Task BeginTransactionAsync();

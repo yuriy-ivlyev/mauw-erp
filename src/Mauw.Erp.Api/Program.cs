@@ -132,6 +132,7 @@ app.MapProductEndpoints();
 app.MapSupportEndpoints();
 app.MapInventoryEndpoints();
 app.MapContactEndpoints();
+app.MapWarehouseEndpoints();
 app.MapCompanySettingsEndpoints();
 app.MapLookupsEndpoints();
 app.MapGeoEndpoints();

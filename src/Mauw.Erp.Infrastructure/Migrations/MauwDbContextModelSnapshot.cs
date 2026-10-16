@@ -1728,6 +1728,63 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.ToTable("sizes");
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.StockItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("ProductVariantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_variant_id");
+
+                    b.Property<decimal>("QuantityOnHand")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)")
+                        .HasColumnName("quantity_on_hand");
+
+                    b.Property<decimal>("QuantityReserved")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)")
+                        .HasColumnName("quantity_reserved");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)")
+                        .HasColumnName("unit_cost");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_stock_items");
+
+                    b.HasIndex("ProductVariantId")
+                        .HasDatabaseName("i_x_stock_items_product_variant_id");
+
+                    b.HasIndex("WarehouseId")
+                        .HasDatabaseName("i_x_stock_items_warehouse_id");
+
+                    b.HasIndex("WarehouseId", "ProductVariantId")
+                        .IsUnique();
+
+                    b.ToTable("stock_items", (string)null);
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.StockMovement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1741,12 +1798,31 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTime>("MovementDateUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("movement_date_utc")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
                     b.Property<int>("Quantity")
                         .HasColumnType("integer")
                         .HasColumnName("quantity");
 
+                    b.Property<int?>("Reason")
+                        .HasColumnType("integer")
+                        .HasColumnName("reason");
+
                     b.Property<string>("ReferenceDoc")
-                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("reference_doc");
@@ -1770,11 +1846,19 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("variant_id");
 
+                    b.Property<Guid?>("WarehouseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("warehouse_id");
+
                     b.HasKey("Id")
                         .HasName("p_k_stock_movements");
 
+                    b.HasIndex("MovementDateUtc");
+
                     b.HasIndex("VariantId")
                         .HasDatabaseName("i_x_stock_movements_variant_id");
+
+                    b.HasIndex("WarehouseId", "VariantId");
 
                     b.ToTable("stock_movements");
                 });
@@ -1802,6 +1886,88 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasKey("ContactId");
 
                     b.ToTable("supplier_profiles", (string)null);
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.Warehouse", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<Guid>("ContactAddressId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_address_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_default");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsSellable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_sellable");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer")
+                        .HasColumnName("type");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_warehouses");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasFilter("is_deleted = false");
+
+                    b.HasIndex("ContactAddressId")
+                        .HasDatabaseName("i_x_warehouses_contact_address_id");
+
+                    b.ToTable("warehouses", (string)null);
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.AgentCommission", b =>
@@ -2074,6 +2240,27 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Navigation("Size");
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.StockItem", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.ProductVariant", "ProductVariant")
+                        .WithMany()
+                        .HasForeignKey("ProductVariantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_stock_items_product_variants_product_variant_id");
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_stock_items__warehouses_warehouse_id");
+
+                    b.Navigation("ProductVariant");
+
+                    b.Navigation("Warehouse");
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.StockMovement", b =>
                 {
                     b.HasOne("Mauw.Erp.Domain.Entities.ProductVariant", "Variant")
@@ -2083,7 +2270,15 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("f_k_stock_movements_product_variants_variant_id");
 
+                    b.HasOne("Mauw.Erp.Domain.Entities.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("f_k_stock_movements__warehouses_warehouse_id");
+
                     b.Navigation("Variant");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierProfile", b =>
@@ -2096,6 +2291,18 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasConstraintName("f_k_supplier_profiles_contacts_contact_id");
 
                     b.Navigation("Contact");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.Warehouse", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.ContactAddress", "Address")
+                        .WithMany()
+                        .HasForeignKey("ContactAddressId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_warehouses_contact_addresses_contact_address_id");
+
+                    b.Navigation("Address");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Contact", b =>

@@ -14,12 +14,14 @@ interface BarcodeVariant {
   unitNetPrice: number;
   unitGrossPrice: number;
   vatRate: number;
+  quantityAvailable: number; // da WH-CENTRALE
 }
 
 interface CartItem extends BarcodeVariant {
   quantity: number;
   lineNetTotal: number;
   lineGrossTotal: number;
+  maxQuantity: number; // limite giacenza disponibile
 }
 
 interface Contact {
@@ -92,13 +94,18 @@ interface PageResponse<T> {
         <div *ngIf="searchResults.length > 0"
           class="mt-2 max-h-52 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100 shadow-sm">
           <div *ngFor="let v of searchResults"
-            class="px-3 py-2.5 hover:bg-blue-50 cursor-pointer transition"
-            (click)="addVariantToCart(v)">
+            class="px-3 py-2.5 cursor-pointer transition"
+            [class.hover:bg-blue-50]="v.quantityAvailable > 0"
+            [class.bg-red-50]="v.quantityAvailable <= 0"
+            (click)="v.quantityAvailable > 0 && addVariantToCart(v)">
             <div class="font-medium text-sm text-gray-800">{{ v.productName }}</div>
-            <div class="flex gap-2 mt-0.5">
+            <div class="flex gap-2 mt-0.5 items-center">
               <span class="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{{ v.color || '–' }}</span>
               <span class="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{{ v.size || '–' }}</span>
               <span class="text-xs text-blue-700 font-semibold ml-auto">{{ v.unitGrossPrice | number:'1.2-2' }} €</span>
+              <span [class]="'text-xs font-semibold px-1.5 py-0.5 rounded ' + (v.quantityAvailable > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600')">
+                {{ v.quantityAvailable > 0 ? (v.quantityAvailable + ' pz') : 'Esaurito' }}
+              </span>
             </div>
           </div>
         </div>
@@ -168,6 +175,9 @@ interface PageResponse<T> {
               <span *ngIf="item.color" class="text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{{ item.color }}</span>
               <span *ngIf="item.size" class="text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{{ item.size }}</span>
               <span class="text-xs text-gray-400 font-mono">{{ item.barcode }}</span>
+              <span [class]="'text-xs px-1.5 py-0.5 rounded font-semibold ' + (item.maxQuantity > item.quantity ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500')">
+                Disp: {{ item.maxQuantity }} pz
+              </span>
             </div>
           </div>
 
@@ -185,7 +195,8 @@ interface PageResponse<T> {
             </button>
             <span class="w-8 text-center font-bold text-gray-800">{{ item.quantity }}</span>
             <button (click)="increaseQty(i)"
-              class="w-7 h-7 rounded-full bg-blue-600 hover:bg-blue-700 flex items-center justify-center text-white font-bold text-sm transition">
+              [disabled]="item.quantity >= item.maxQuantity"
+              class="w-7 h-7 rounded-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 flex items-center justify-center text-white font-bold text-sm transition">
               +
             </button>
           </div>
@@ -274,6 +285,9 @@ export class BancoCassaComponent implements OnInit {
   // Cart
   cart: CartItem[] = [];
 
+  // Default warehouse ID for stock checks (resolved at startup)
+  private defaultWarehouseId: string | null = null;
+
   // Generation
   generating: 'ddt' | 'invoice' | null = null;
   generateError: string | null = null;
@@ -286,7 +300,19 @@ export class BancoCassaComponent implements OnInit {
 
   constructor(private api: ApiService, private router: Router) {}
 
-  ngOnInit(): void {}
+  ngOnInit(): void {
+    this.loadDefaultWarehouse();
+  }
+
+  private loadDefaultWarehouse(): void {
+    this.api.get<any>('v1/warehouses?page=1&pageSize=100&isActive=true').subscribe({
+      next: (res) => {
+        const def = (res.items as any[]).find((w: any) => w.isDefault);
+        this.defaultWarehouseId = def?.id ?? null;
+      },
+      error: () => {}
+    });
+  }
 
   // ── Barcode ──────────────────────────────────────────────
   onBarcodeInput(): void {
@@ -298,7 +324,11 @@ export class BancoCassaComponent implements OnInit {
     if (!code) return;
     this.barcodeError = null;
     this.lookingUp = true;
-    this.api.get<BarcodeVariant>(`v1/products/barcode/${encodeURIComponent(code)}`).subscribe({
+    // Use stock-aware endpoint when warehouse is known
+    const url = this.defaultWarehouseId
+      ? `v1/inventory/barcode/${encodeURIComponent(code)}?warehouseId=${this.defaultWarehouseId}`
+      : `v1/products/barcode/${encodeURIComponent(code)}`;
+    this.api.get<BarcodeVariant>(url).subscribe({
       next: (v) => {
         this.addVariantToCart(v);
         this.barcodeInput_value = '';
@@ -334,7 +364,8 @@ export class BancoCassaComponent implements OnInit {
             color: v.color || '',
             unitNetPrice: v.finalNetPrice,
             unitGrossPrice: v.finalGrossPrice,
-            vatRate: p.vatRate ?? 22
+            vatRate: p.vatRate ?? 22,
+            quantityAvailable: 9999 // stock non disponibile da ricerca testuale
           }))
         );
         this.searchDone = true;
@@ -371,12 +402,21 @@ export class BancoCassaComponent implements OnInit {
 
   // ── Cart ──────────────────────────────────────────────────
   addVariantToCart(v: BarcodeVariant): void {
+    const available = v.quantityAvailable ?? 9999;
     const existing = this.cart.find(i => i.variantId === v.variantId);
     if (existing) {
-      existing.quantity++;
-      this.recalcLine(existing);
+      if (existing.quantity < existing.maxQuantity) {
+        existing.quantity++;
+        this.recalcLine(existing);
+      } else {
+        this.barcodeError = `Giacenza esaurita (max ${existing.maxQuantity} pz disponibili)`;
+      }
     } else {
-      const item: CartItem = { ...v, quantity: 1, lineNetTotal: v.unitNetPrice, lineGrossTotal: v.unitGrossPrice };
+      if (available <= 0) {
+        this.barcodeError = `⚠️ Giacenza esaurita – articolo non disponibile in ${v.productName}`;
+        return;
+      }
+      const item: CartItem = { ...v, quantity: 1, lineNetTotal: v.unitNetPrice, lineGrossTotal: v.unitGrossPrice, maxQuantity: available };
       this.cart.push(item);
     }
     this.productSearch = '';
@@ -384,8 +424,13 @@ export class BancoCassaComponent implements OnInit {
   }
 
   increaseQty(i: number): void {
-    this.cart[i].quantity++;
-    this.recalcLine(this.cart[i]);
+    const item = this.cart[i];
+    if (item.quantity >= item.maxQuantity) {
+      this.generateError = `Giacenza massima raggiunta per "${item.productName}" (${item.maxQuantity} pz)`;
+      return;
+    }
+    item.quantity++;
+    this.recalcLine(item);
   }
 
   decreaseQty(i: number): void {
@@ -433,13 +478,10 @@ export class BancoCassaComponent implements OnInit {
       unitVatAmount: +(item.unitNetPrice * (item.vatRate / 100)).toFixed(4)
     }));
 
-    // Send items sequentially
     const sendNext = (idx: number) => {
       if (idx >= requests.length) {
-        this.generating = null;
-        this.cart = [];
-        this.documentNumber = '';
-        this.router.navigate([type === 'ddt' ? '/ddt/elenco' : '/fatturazione/fatture']);
+        // Record ShowroomSale movements on WH-CENTRALE
+        this.recordStockMovements(docId, type);
         return;
       }
       this.api.post<any>(endpoint, requests[idx]).subscribe({
@@ -448,5 +490,40 @@ export class BancoCassaComponent implements OnInit {
       });
     };
     sendNext(0);
+  }
+
+  private recordStockMovements(docRef: string, type: 'ddt' | 'invoice'): void {
+    if (!this.defaultWarehouseId) {
+      this.finalizeAfterGeneration(type);
+      return;
+    }
+    const cartSnapshot = [...this.cart];
+    const sendMovement = (idx: number) => {
+      if (idx >= cartSnapshot.length) {
+        this.finalizeAfterGeneration(type);
+        return;
+      }
+      const item = cartSnapshot[idx];
+      const body = {
+        warehouseId: this.defaultWarehouseId,
+        productVariantId: item.variantId,
+        reason: 2, // ShowroomSale
+        quantity: -item.quantity, // uscita
+        documentReference: docRef,
+        notes: `Vendita cassa – ${type === 'ddt' ? 'DDT' : 'Fattura'}`
+      };
+      this.api.post<any>('v1/inventory/movements', body).subscribe({
+        next: () => sendMovement(idx + 1),
+        error: () => sendMovement(idx + 1) // non blocca: log solo in console
+      });
+    };
+    sendMovement(0);
+  }
+
+  private finalizeAfterGeneration(type: 'ddt' | 'invoice'): void {
+    this.generating = null;
+    this.cart = [];
+    this.documentNumber = '';
+    this.router.navigate([type === 'ddt' ? '/ddt/elenco' : '/fatturazione/fatture']);
   }
 }

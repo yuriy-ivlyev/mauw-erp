@@ -17,6 +17,7 @@ import { DdtElencoComponent } from './pages/ddt/elenco/ddt-elenco.component';
 import { DdtNuovoComponent } from './pages/ddt/nuovo/ddt-nuovo.component';
 
 // Magazzino
+import { MagazziniComponent } from './pages/magazzino/magazzini/magazzini.component';
 import { ProdottiComponent } from './pages/magazzino/prodotti/prodotti.component';
 import { MovimentiComponent } from './pages/magazzino/movimenti/movimenti.component';
 import { InventarioComponent } from './pages/magazzino/inventario/inventario.component';
@@ -32,6 +33,9 @@ import { AnagraficaModificaComponent } from './pages/anagrafiche/modifica/anagra
 
 // Impostazioni
 import { ImpostazioniAziendaComponent } from './pages/impostazioni/azienda/impostazioni-azienda.component';
+
+// Catalogo
+import { ListiniComponent } from './pages/catalogo/listini/listini.component';
 
 export const routes: Routes = [
   {
@@ -58,6 +62,7 @@ export const routes: Routes = [
       { path: 'ddt/nuovo',  component: DdtNuovoComponent,  title: 'Nuovo DDT | Mauw ERP' },
 
       // Magazzino
+      { path: 'magazzino/magazzini',      component: MagazziniComponent,     title: 'Magazzini | Mauw ERP' },
       { path: 'magazzino/prodotti',       component: ProdottiComponent,      title: 'Prodotti | Mauw ERP' },
       { path: 'magazzino/movimenti',      component: MovimentiComponent,     title: 'Movimenti | Mauw ERP' },
       { path: 'magazzino/inventario',     component: InventarioComponent,    title: 'Inventario | Mauw ERP' },
@@ -73,7 +78,10 @@ export const routes: Routes = [
       { path: 'anagrafiche/:id/modifica',     component: AnagraficaModificaComponent, title: 'Modifica Anagrafica | Mauw ERP' },
 
       // Impostazioni
-      { path: 'impostazioni/azienda', component: ImpostazioniAziendaComponent, title: 'Impostazioni Azienda | Mauw ERP' }
+      { path: 'impostazioni/azienda', component: ImpostazioniAziendaComponent, title: 'Impostazioni Azienda | Mauw ERP' },
+
+      // Catalogo
+      { path: 'catalogo/listini', component: ListiniComponent, title: 'Listini Prezzi | Mauw ERP' }
     ]
   }
 ];

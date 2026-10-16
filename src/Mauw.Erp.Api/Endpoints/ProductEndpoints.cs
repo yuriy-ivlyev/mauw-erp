@@ -1,6 +1,7 @@
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
+using Mauw.Erp.Domain.Repositories;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Mauw.Erp.Api.Endpoints;
@@ -23,6 +24,10 @@ public static class ProductEndpoints
         group.MapGet("/", GetProducts)
             .WithName("GetProducts")
             .WithSummary("Get paginated product list");
+
+        group.MapGet("/variants/search", SearchVariants)
+            .WithName("SearchVariants")
+            .WithSummary("Ricerca varianti per barcode, nome prodotto, colore o taglia (autocomplete)");
 
         group.MapGet("/barcode/{barcode}", GetVariantByBarcode)
             .WithName("GetVariantByBarcode")
@@ -103,6 +108,39 @@ public static class ProductEndpoints
             return TypedResults.NotFound();
 
         return TypedResults.Ok(result.Data!);
+    }
+
+    private static async Task<Ok<List<VariantSearchDto>>> SearchVariants(
+        string? q,
+        IUnitOfWork unitOfWork,
+        IStockService stockService,
+        Guid? warehouseId = null,
+        int limit = 10)
+    {
+        if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 1)
+            return TypedResults.Ok(new List<VariantSearchDto>());
+
+        var variants = await unitOfWork.ProductVariants.SearchAsync(q.Trim(), Math.Min(limit, 30));
+
+        var results = new List<VariantSearchDto>();
+        foreach (var v in variants)
+        {
+            var stock = warehouseId.HasValue
+                ? (await stockService.GetAvailableQtyAsync(warehouseId.Value, v.Id)).Data
+                : 0m;
+
+            results.Add(new VariantSearchDto(
+                VariantId:    v.Id,
+                ProductId:    v.ProductId,
+                ProductName:  v.Product.Name,
+                Sku:          v.Barcode, // barcode doubles as SKU in this domain
+                Barcode:      v.Barcode,
+                ColorName:    v.Color?.Name,
+                SizeName:     v.Size?.Name,
+                CurrentStock: stock));
+        }
+
+        return TypedResults.Ok(results);
     }
 
     private static async Task<Results<Ok<BarcodeVariantDto>, NotFound>> GetVariantByBarcode(

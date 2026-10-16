@@ -12,5 +12,6 @@ public record BarcodeVariantDto(
     string Color,
     decimal UnitNetPrice,
     decimal UnitGrossPrice,
-    decimal VatRate
+    decimal VatRate,
+    decimal QuantityAvailable = 0
 );

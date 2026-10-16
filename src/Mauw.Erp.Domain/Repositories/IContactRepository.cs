@@ -22,6 +22,8 @@ public interface IContactRepository : IRepository<Contact, Guid>
 
     Task<Contact?> GetByIdWithDetailsAsync(Guid id);
 
+    Task<bool> AddressExistsAsync(Guid addressId);
+
     /// <summary>Restituisce il contatto "Nostra Azienda" (IsInternalCompany == true), ignorando i filtri globali.</summary>
     Task<Contact?> GetInternalCompanyAsync();
 }

@@ -23,8 +23,20 @@ public class StockMovementConfiguration : IEntityTypeConfiguration<StockMovement
             .HasPrecision(18, 4);
 
         builder.Property(sm => sm.ReferenceDoc)
-            .IsRequired()
+            .IsRequired(false)
             .HasMaxLength(100);
+
+        builder.Property(sm => sm.Reason)
+            .IsRequired(false);
+
+        builder.Property(sm => sm.MovementDateUtc)
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        builder.Property(sm => sm.Notes)
+            .HasMaxLength(500);
+
+        builder.Property(sm => sm.CreatedByUserId)
+            .HasMaxLength(200);
 
         builder.Property(sm => sm.CreatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
@@ -38,7 +50,15 @@ public class StockMovementConfiguration : IEntityTypeConfiguration<StockMovement
             .HasForeignKey(sm => sm.VariantId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasOne(sm => sm.Warehouse)
+            .WithMany()
+            .HasForeignKey(sm => sm.WarehouseId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // Index for faster variant lookups
         builder.HasIndex(sm => sm.VariantId);
+        builder.HasIndex(sm => new { sm.WarehouseId, sm.VariantId });
+        builder.HasIndex(sm => sm.MovementDateUtc);
     }
 }

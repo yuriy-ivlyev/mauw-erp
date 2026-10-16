@@ -17,4 +17,12 @@ public sealed class TracingInventoryService(IInventoryService inner) : TracingDe
     public Task<OperationResult<BarcodeVariantDto>> GetVariantByBarcodeAsync(string barcode) =>
         TraceAsync("Inventory.GetVariantByBarcode", () => inner.GetVariantByBarcodeAsync(barcode),
             a => a?.SetTag("barcode", barcode));
+
+    public Task<OperationResult<BarcodeVariantDto>> GetVariantByBarcodeWithStockAsync(string barcode, Guid warehouseId) =>
+        TraceAsync("Inventory.GetVariantByBarcodeWithStock", () => inner.GetVariantByBarcodeWithStockAsync(barcode, warehouseId),
+            a =>
+            {
+                a?.SetTag("barcode", barcode);
+                a?.SetTag("warehouse.id", warehouseId);
+            });
 }

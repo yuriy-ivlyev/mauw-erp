@@ -1,0 +1,98 @@
+<div class="p-6">
+  <div class="mb-6 flex justify-between items-center">
+    <h1 class="text-3xl font-bold">Giacenze Magazzino</h1>
+    <span class="text-sm text-gray-500">{{ totalCount }} articoli</span>
+  </div>
+
+  <!-- Filters -->
+  <div class="mb-4 flex flex-wrap gap-3">
+    <select [(ngModel)]="filterWarehouseId" (change)="onFilterChange()"
+      class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <option value="">Tutti i magazzini</option>
+      <option *ngFor="let w of warehouses" [value]="w.id">{{ w.code }} – {{ w.name }}</option>
+    </select>
+
+    <input type="text" [(ngModel)]="search" (keyup.enter)="onSearch()"
+      placeholder="Cerca prodotto o barcode..."
+      class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-64">
+
+    <button (click)="onSearch()"
+      class="bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded font-medium">
+      Cerca
+    </button>
+  </div>
+
+  <!-- Error -->
+  <div *ngIf="errorMessage" class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+    {{ errorMessage }}
+  </div>
+
+  <!-- Table -->
+  <div class="bg-white rounded-lg shadow overflow-x-auto">
+    <div *ngIf="loading && stockItems.length === 0" class="p-8 text-center text-gray-400">
+      Caricamento giacenze...
+    </div>
+
+    <table *ngIf="!loading || stockItems.length > 0" class="w-full text-sm">
+      <thead class="bg-gray-50 border-b">
+        <tr>
+          <th class="px-4 py-3 text-left font-semibold text-gray-700">Barcode</th>
+          <th class="px-4 py-3 text-left font-semibold text-gray-700">Prodotto</th>
+          <th class="px-4 py-3 text-left font-semibold text-gray-700">Colore / Taglia</th>
+          <th class="px-4 py-3 text-left font-semibold text-gray-700">Magazzino</th>
+          <th class="px-4 py-3 text-right font-semibold text-gray-700">Fisica</th>
+          <th class="px-4 py-3 text-right font-semibold text-gray-700">Impegnata</th>
+          <th class="px-4 py-3 text-right font-semibold text-gray-700">Disponibile</th>
+          <th class="px-4 py-3 text-right font-semibold text-gray-700">Costo Unit.</th>
+          <th class="px-4 py-3 text-right font-semibold text-gray-700">Valore Est.</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let s of stockItems" class="border-b hover:bg-gray-50">
+          <td class="px-4 py-3 font-mono text-xs text-gray-600">{{ s.barcode }}</td>
+          <td class="px-4 py-3 font-medium text-gray-900">{{ s.productName }}</td>
+          <td class="px-4 py-3 text-gray-600">
+            <span *ngIf="s.color" class="inline-block bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-xs mr-1">{{ s.color }}</span>
+            <span *ngIf="s.size" class="inline-block bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-xs">{{ s.size }}</span>
+            <span *ngIf="!s.color && !s.size" class="text-gray-400">–</span>
+          </td>
+          <td class="px-4 py-3">
+            <span class="bg-indigo-50 text-indigo-700 text-xs font-mono px-2 py-0.5 rounded">{{ s.warehouseCode }}</span>
+          </td>
+          <td class="px-4 py-3 text-right">{{ s.quantityOnHand | number:'1.0-3' }}</td>
+          <td class="px-4 py-3 text-right text-orange-600">{{ s.quantityReserved | number:'1.0-3' }}</td>
+          <td class="px-4 py-3 text-right" [class]="stockClass(s.quantityAvailable)">
+            {{ s.quantityAvailable | number:'1.0-3' }}
+          </td>
+          <td class="px-4 py-3 text-right text-gray-600">
+            {{ s.unitCost != null ? (s.unitCost | number:'1.2-2') + ' €' : '–' }}
+          </td>
+          <td class="px-4 py-3 text-right font-semibold text-gray-800">
+            {{ s.estimatedValue != null ? (s.estimatedValue | number:'1.2-2') + ' €' : '–' }}
+          </td>
+        </tr>
+
+        <!-- Totale stimato -->
+        <tr *ngIf="stockItems.length > 0" class="bg-gray-50 font-semibold">
+          <td colspan="8" class="px-4 py-3 text-right text-gray-600">Valore Stimato Totale (pagina):</td>
+          <td class="px-4 py-3 text-right text-blue-700">{{ totalEstimatedValue() | number:'1.2-2' }} €</td>
+        </tr>
+
+        <tr *ngIf="stockItems.length === 0 && !loading">
+          <td colspan="9" class="px-6 py-10 text-center text-gray-400">
+            Nessuna giacenza trovata. Registra un movimento per popolare l'inventario.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div *ngIf="totalPages > 1" class="mt-4 flex items-center gap-3 text-sm">
+    <button (click)="prevPage()" [disabled]="page === 1"
+      class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-40">← Prec</button>
+    <span class="text-gray-600">Pagina {{ page }} di {{ totalPages }} ({{ totalCount }} totali)</span>
+    <button (click)="nextPage()" [disabled]="page === totalPages"
+      class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-40">Succ →</button>
+  </div>
+</div>

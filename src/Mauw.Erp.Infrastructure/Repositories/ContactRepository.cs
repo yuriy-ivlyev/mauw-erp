@@ -80,6 +80,9 @@ public class ContactRepository(MauwDbContext dbContext) : Repository<Contact, Gu
             .AsSplitQuery()
             .FirstOrDefaultAsync(c => c.Id == id);
 
+    public async Task<bool> AddressExistsAsync(Guid addressId) =>
+        await _dbSet.AnyAsync(c => c.Addresses.Any(a => a.Id == addressId));
+
     public async Task<Contact?> GetInternalCompanyAsync() =>
         await _dbSet
             .IgnoreQueryFilters()                       // bypass soft-delete filter

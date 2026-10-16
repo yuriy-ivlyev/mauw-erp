@@ -18,6 +18,7 @@ public class UnitOfWork(MauwDbContext dbContext, IMemoryCache _cache) : IUnitOfW
     private IOrderRepository? _orderRepository;
     private IInvoiceRepository? _invoiceRepository;
     private IStockMovementRepository? _stockMovementRepository;
+    private IStockRepository? _stockRepository;
     private IDdtDocumentRepository? _ddtDocumentRepository;
     private ISizeRepository? _sizeRepository;
     private IColorRepository? _colorRepository;
@@ -25,6 +26,7 @@ public class UnitOfWork(MauwDbContext dbContext, IMemoryCache _cache) : IUnitOfW
     private ICollectionRepository? _collectionRepository;
     private IMaterialRepository? _materialRepository;
     private IMacroCategoryRepository? _macroCategoryRepository;
+    private IWarehouseRepository? _warehouseRepository;
 
     public IProductRepository Products => _productRepository ??= new ProductRepository(dbContext);
     public IProductVariantRepository ProductVariants => _productVariantRepository ??= new ProductVariantRepository(dbContext);
@@ -34,6 +36,7 @@ public class UnitOfWork(MauwDbContext dbContext, IMemoryCache _cache) : IUnitOfW
     public IOrderRepository Orders => _orderRepository ??= new OrderRepository(dbContext);
     public IInvoiceRepository Invoices => _invoiceRepository ??= new InvoiceRepository(dbContext);
     public IStockMovementRepository StockMovements => _stockMovementRepository ??= new StockMovementRepository(dbContext);
+    public IStockRepository Stock => _stockRepository ??= new StockRepository(dbContext);
     public IDdtDocumentRepository DdtDocuments => _ddtDocumentRepository ??= new DdtDocumentRepository(dbContext);
     public ISizeRepository Sizes => _sizeRepository ??= new SizeRepository(dbContext);
     public IColorRepository Colors => _colorRepository ??= new ColorRepository(dbContext);
@@ -41,6 +44,7 @@ public class UnitOfWork(MauwDbContext dbContext, IMemoryCache _cache) : IUnitOfW
     public ICollectionRepository Collections => _collectionRepository ??= new CollectionRepository(dbContext);
     public IMaterialRepository Materials => _materialRepository ??= new MaterialRepository(dbContext);
     public IMacroCategoryRepository MacroCategories => _macroCategoryRepository ??= new MacroCategoryRepository(dbContext);
+    public IWarehouseRepository Warehouses => _warehouseRepository ??= new WarehouseRepository(dbContext);
 
     public async Task SaveChangesAsync()
     {
