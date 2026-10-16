@@ -278,4 +278,8 @@ public class ContactService(
 
     private static string JoinErrors(Validation.ValidationResult result) =>
         string.Join("; ", result.Errors.Select(e => $"{e.PropertyName}: {e.Message}"));
+
+    /// <summary>Converte stringa vuota/whitespace in null, evitando violazioni UNIQUE su colonne nullable.</summary>
+    private static string? Normalize(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
