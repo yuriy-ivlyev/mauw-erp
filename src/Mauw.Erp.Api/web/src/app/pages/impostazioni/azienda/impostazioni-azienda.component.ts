@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { CompanySettingsService } from '../../../services/company-settings.service';
 import { CompanySettings, CompanyAddressSite, CompanyAddressSiteRequest } from '../../../models/company-settings.model';
+import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
 
 @Component({
   selector: 'app-impostazioni-azienda',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, ConfirmDeleteModalComponent],
   templateUrl: './impostazioni-azienda.component.html'
 })
 export class ImpostazioniAziendaComponent implements OnInit {
@@ -199,8 +200,20 @@ export class ImpostazioniAziendaComponent implements OnInit {
     });
   }
 
+  confirmDeleteId: string | null = null;
+
+  askDelete(id: string): void { this.confirmDeleteId = id; }
+
+  onDeleteConfirmed(): void {
+    if (!this.confirmDeleteId) return;
+    const id = this.confirmDeleteId;
+    this.confirmDeleteId = null;
+    this.deleteSite(id);
+  }
+
+  onDeleteCancelled(): void { this.confirmDeleteId = null; }
+
   deleteSite(siteId: string): void {
-    if (!confirm('Eliminare questa sede?')) return;
     this.service.deleteOperationalSite(siteId).subscribe({
       next: () => this.loadCompany(),
       error: (err) => (this.errorMessage = err?.error ?? 'Errore durante l\'eliminazione.')

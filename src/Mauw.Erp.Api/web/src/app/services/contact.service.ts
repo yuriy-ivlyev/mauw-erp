@@ -52,4 +52,12 @@ export class ContactService {
   toggleBlock(id: string, request: ToggleBlockRequest): Observable<void> {
     return this.http.patch<void>(`${this.base}/${id}/customer-block`, request);
   }
+
+  deleteAddress(contactId: string, addressId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${contactId}/addresses/${addressId}`);
+  }
+
+  deletePerson(contactId: string, personId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${contactId}/persons/${personId}`);
+  }
 }

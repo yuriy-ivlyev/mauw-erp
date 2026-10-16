@@ -184,8 +184,8 @@
           <td class="px-4 py-3 space-x-2">
             <button (click)="openEditSite(site)"
               class="bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded text-xs">Modifica</button>
-            <button (click)="deleteSite(site.id)"
-              class="bg-red-500 hover:bg-red-600 text-white py-1 px-2 rounded text-xs">Elimina</button>
+            <button (click)="askDelete(site.id)"
+              class="bg-red-600 hover:bg-red-700 text-white py-1 px-2 rounded text-xs">Elimina</button>
           </td>
         </tr>
       </tbody>
@@ -266,5 +266,13 @@
       </div>
     </div>
   </div>
+
+  <!-- Conferma eliminazione sede -->
+  <app-confirm-delete-modal
+    [isOpen]="!!confirmDeleteId"
+    message="Sei sicuro di voler eliminare questa sede? L'operazione non può essere annullata."
+    (confirmed)="onDeleteConfirmed()"
+    (cancelled)="onDeleteCancelled()">
+  </app-confirm-delete-modal>
 
 </div>

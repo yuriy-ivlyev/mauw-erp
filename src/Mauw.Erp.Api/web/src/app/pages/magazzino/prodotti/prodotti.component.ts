@@ -1,5 +1,6 @@
 ﻿import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
 import { FormsModule } from '@angular/forms';
 import { ProductService } from '../../../services/product.service';
 import {
@@ -10,7 +11,7 @@ import {
 @Component({
   selector: 'app-prodotti',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ConfirmDeleteModalComponent],
   template: `
     <div class="p-6">
       <div class="flex justify-between items-center mb-6">
@@ -238,7 +239,7 @@ import {
                               Modifica
                             </button>
                             <button
-                              (click)="deleteVariant(variant.id)"
+                              (click)="askDelete(variant.id, 'variant')"
                               [disabled]="deletingVariantId === variant.id"
                               class="text-red-600 hover:text-red-800 text-sm disabled:opacity-50">
                               {{ deletingVariantId === variant.id ? 'Eliminando...' : 'Elimina' }}
@@ -387,7 +388,7 @@ import {
                       &#9733; Imposta principale
                     </button>
                     <button *ngIf="selectedImage"
-                      (click)="removeImage(selectedImage)"
+                      (click)="askDelete(selectedImage.id, 'image')"
                       class="w-full text-xs bg-red-600 hover:bg-red-700 text-white font-semibold py-1.5 rounded">
                       &#128465; Elimina
                     </button>
@@ -425,6 +426,12 @@ import {
       <!-- ===== Modal Galleria Immagini (deprecated - now in modal tab) ===== -->
       <!-- Removed: Gallery is now integrated into the product modal as a tab -->
 
+    <app-confirm-delete-modal
+      [isOpen]="!!confirmDeleteId"
+      message="Sei sicuro di voler eliminare questo elemento? L'operazione non è reversibile."
+      (confirmed)="onDeleteConfirmed()"
+      (cancelled)="onDeleteCancelled()">
+    </app-confirm-delete-modal>
     </div>
   `
 })
@@ -454,6 +461,29 @@ export class ProdottiComponent implements OnInit {
   savingProduct = false;
   formError: string | null = null;
   formData: CreateProductRequest = this.initializeProductForm();
+
+  confirmDeleteId: string | null = null;
+  confirmDeleteType: 'product' | 'variant' | 'image' | null = null;
+
+  askDelete(id: string, type: 'product' | 'variant' | 'image' = 'product'): void {
+    this.confirmDeleteId = id;
+    this.confirmDeleteType = type;
+  }
+
+  onDeleteConfirmed(): void {
+    if (!this.confirmDeleteId) return;
+    const id = this.confirmDeleteId;
+    const type = this.confirmDeleteType;
+    this.confirmDeleteId = null;
+    this.confirmDeleteType = null;
+    if (type === 'product') this.deleteProduct(id);
+    else if (type === 'variant') this.deleteVariant(id);
+  }
+
+  onDeleteCancelled(): void {
+    this.confirmDeleteId = null;
+    this.confirmDeleteType = null;
+  }
 
   // Variant management
   productVariants: ProductVariantDto[] = [];
@@ -710,7 +740,6 @@ export class ProdottiComponent implements OnInit {
   }
 
   deleteVariant(variantId: string): void {
-    if (!confirm('Sei sicuro di voler eliminare questa variante?')) return;
     if (!this.editingProductId) return;
 
     this.deletingVariantId = variantId;
@@ -775,7 +804,6 @@ export class ProdottiComponent implements OnInit {
   }
 
   deleteProduct(productId: string): void {
-    if (!confirm('Sei sicuro di voler eliminare questo prodotto?')) return;
     this.loading = true;
     this.productService.deleteProduct(productId).subscribe({
       next: () => {
@@ -894,3 +922,5 @@ export class ProdottiComponent implements OnInit {
     });
   }
 }
+
+

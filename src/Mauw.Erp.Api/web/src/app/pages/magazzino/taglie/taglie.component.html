@@ -1,4 +1,4 @@
-<div class="p-6">
+﻿<div class="p-6">
   <div class="mb-6 flex justify-between items-center">
     <h1 class="text-3xl font-bold">Gestione Taglie</h1>
     <button 
@@ -33,7 +33,7 @@
             [readonly]="editingId != null">
           <div *ngIf="editingId" class="text-gray-500 text-xs mt-1">ID non modificabile</div>
           <div *ngIf="form.get('name')?.invalid && form.get('name')?.touched" class="text-red-500 text-sm mt-1">
-            Il nome è obbligatorio
+            Il nome Ã¨ obbligatorio
           </div>
         </div>
 
@@ -67,7 +67,7 @@
         <tr>
           <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">ID</th>
           <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nome</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Visibilità</th>
+          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">VisibilitÃ </th>
           <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Azioni</th>
         </tr>
       </thead>
@@ -84,8 +84,8 @@
           </td>
           <td class="px-6 py-4 text-sm space-x-2">
             <button 
-              (click)="deleteSize(size.id)"
-              class="bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded text-xs font-medium">
+              (click)="askDelete(size.id)"
+              class="bg-red-600 hover:bg-red-700 text-white py-1 px-3 rounded text-xs font-medium">
               Elimina
             </button>
           </td>
@@ -101,4 +101,15 @@
   <div *ngIf="deleteMessage" class="mt-4 p-4 bg-yellow-100 border border-yellow-400 text-yellow-800 rounded">
     {{ deleteMessage }}
   </div>
+
+  <!-- Conferma eliminazione (REGOLA: non eliminare mai senza conferma) -->
+  <app-confirm-delete-modal
+    [isOpen]="!!confirmDeleteId"
+    message="Sei sicuro di voler eliminare questo elemento? Questa azione non puo essere annullata."
+    (confirmed)="onDeleteConfirmed()"
+    (cancelled)="onDeleteCancelled()">
+  </app-confirm-delete-modal>
 </div>
+
+
+

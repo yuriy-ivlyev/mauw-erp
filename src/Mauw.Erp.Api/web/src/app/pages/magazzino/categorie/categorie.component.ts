@@ -1,12 +1,13 @@
-import { Component, OnInit } from '@angular/core';
+﻿import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { SupportService, CategoryDto, CreateCategoryRequest, UpdateCategoryRequest, MacroCategoryDto } from '../../../services/support.service';
 
 @Component({
   selector: 'app-categorie',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, ConfirmDeleteModalComponent],
   templateUrl: './categorie.component.html',
   styleUrl: './categorie.component.scss'
 })
@@ -20,6 +21,7 @@ export class CategorieComponent implements OnInit {
   successMessage = '';
   loading = false;
   deleteMessage = '';
+  confirmDeleteId: string | null = null;
 
   constructor(
     private supportService: SupportService,
@@ -128,9 +130,7 @@ export class CategorieComponent implements OnInit {
   }
 
   deleteCategory(id: string) {
-    if (!confirm('Sei sicuro di voler eliminare questa categoria?')) return;
-
-    this.loading = true;
+        this.loading = true;
     this.supportService.deleteCategory(id).subscribe({
       next: () => {
         this.successMessage = 'Categoria eliminata con successo';
@@ -139,7 +139,7 @@ export class CategorieComponent implements OnInit {
       },
       error: (err) => {
         if (err.status === 409) {
-          this.deleteMessage = err.error?.detail || 'Questa categoria è utilizzata in uno o più prodotti e non può essere eliminata. Puoi disattivarla dalla visibilità.';
+          this.deleteMessage = err.error?.detail || 'Questa categoria Ã¨ utilizzata in uno o piÃ¹ prodotti e non puÃ² essere eliminata. Puoi disattivarla dalla visibilitÃ .';
         } else {
           this.errorMessage = err.error?.detail || 'Errore nell\'eliminazione della categoria';
         }
@@ -161,7 +161,7 @@ export class CategorieComponent implements OnInit {
         setTimeout(() => this.successMessage = '', 3000);
       },
       error: (err) => {
-        this.errorMessage = 'Errore nell\'aggiornamento della visibilità';
+        this.errorMessage = 'Errore nell\'aggiornamento della visibilitÃ ';
       }
     });
   }
@@ -170,4 +170,17 @@ export class CategorieComponent implements OnInit {
     if (!id) return '-';
     return this.macroCategories.find(m => m.id === id)?.name || '-';
   }
+
+
+  askDelete(id: string): void { this.confirmDeleteId = id; }
+
+  onDeleteConfirmed(): void {
+    if (!this.confirmDeleteId) return;
+    const id = this.confirmDeleteId;
+    this.confirmDeleteId = null;
+    this.deleteCategory(id);
+  }
+
+  onDeleteCancelled(): void { this.confirmDeleteId = null; }
 }
+

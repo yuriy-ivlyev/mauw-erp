@@ -1,12 +1,13 @@
-import { Component, OnInit } from '@angular/core';
+﻿import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { SupportService, MacroCategoryDto, CreateMacroCategoryRequest, UpdateMacroCategoryRequest } from '../../../services/support.service';
 
 @Component({
   selector: 'app-macro-categorie',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, ConfirmDeleteModalComponent],
   templateUrl: './macro-categorie.component.html',
   styleUrl: './macro-categorie.component.scss'
 })
@@ -19,6 +20,7 @@ export class MacroCategorieComponent implements OnInit {
   successMessage = '';
   loading = false;
   deleteMessage = '';
+  confirmDeleteId: string | null = null;
 
   constructor(
     private supportService: SupportService,
@@ -111,9 +113,7 @@ export class MacroCategorieComponent implements OnInit {
   }
 
   deleteMacroCategory(id: string) {
-    if (!confirm('Sei sicuro di voler eliminare questa macro categoria?')) return;
-
-    this.loading = true;
+        this.loading = true;
     this.supportService.deleteMacroCategory(id).subscribe({
       next: () => {
         this.successMessage = 'Macro categoria eliminata con successo';
@@ -122,7 +122,7 @@ export class MacroCategorieComponent implements OnInit {
       },
       error: (err) => {
         if (err.status === 409) {
-          this.deleteMessage = err.error?.detail || 'Questa macro categoria è utilizzata in una o più categorie e non può essere eliminata. Puoi disattivarla dalla visibilità.';
+          this.deleteMessage = err.error?.detail || 'Questa macro categoria Ã¨ utilizzata in una o piÃ¹ categorie e non puÃ² essere eliminata. Puoi disattivarla dalla visibilitÃ .';
         } else {
           this.errorMessage = err.error?.detail || 'Errore nell\'eliminazione della macro categoria';
         }
@@ -143,8 +143,23 @@ export class MacroCategorieComponent implements OnInit {
         setTimeout(() => this.successMessage = '', 3000);
       },
       error: (err) => {
-        this.errorMessage = 'Errore nell\'aggiornamento della visibilità';
+        this.errorMessage = 'Errore nell\'aggiornamento della visibilitÃ ';
       }
     });
   }
+
+
+  askDelete(id: string): void { this.confirmDeleteId = id; }
+
+  onDeleteConfirmed(): void {
+    if (!this.confirmDeleteId) return;
+    const id = this.confirmDeleteId;
+    this.confirmDeleteId = null;
+    this.deleteMacroCategory(id);
+  }
+
+  onDeleteCancelled(): void { this.confirmDeleteId = null; }
 }
+
+
+

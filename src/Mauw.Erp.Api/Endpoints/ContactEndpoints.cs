@@ -60,6 +60,10 @@ public static class ContactEndpoints
         group.MapDelete("/{id:guid}/addresses/{addressId:guid}", DeleteAddress)
             .WithName("DeleteContactAddress")
             .WithSummary("Delete an address (LegalHeadquarters cannot be deleted)");
+
+        group.MapDelete("/{id:guid}/persons/{personId:guid}", DeletePerson)
+            .WithName("DeleteContactPerson")
+            .WithSummary("Delete a contact person (referente)");
     }
 
     private static async Task<Ok<VatValidationResultDto>> ValidateVat(
@@ -206,6 +210,18 @@ public static class ContactEndpoints
         if (!result.Success)
         {
             if (result.Error is "Contact not found" or "Indirizzo non trovato.") return TypedResults.NotFound();
+            return TypedResults.BadRequest(result.Error);
+        }
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<NoContent, BadRequest<string>, NotFound>> DeletePerson(
+        Guid id, Guid personId, IContactAddressService addressService)
+    {
+        var result = await addressService.DeletePersonAsync(id, personId);
+        if (!result.Success)
+        {
+            if (result.Error is "Contact not found" or "Person not found") return TypedResults.NotFound();
             return TypedResults.BadRequest(result.Error);
         }
         return TypedResults.NoContent();

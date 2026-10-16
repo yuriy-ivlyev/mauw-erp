@@ -1,12 +1,13 @@
-import { Component, OnInit } from '@angular/core';
+﻿import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { SupportService, ColorDto, CreateColorRequest, UpdateColorRequest } from '../../../services/support.service';
 
 @Component({
   selector: 'app-colori',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, ConfirmDeleteModalComponent],
   templateUrl: './colori.component.html',
   styleUrl: './colori.component.scss'
 })
@@ -19,6 +20,7 @@ export class ColoriComponent implements OnInit {
   successMessage = '';
   loading = false;
   deleteMessage = '';
+  confirmDeleteId: string | null = null;
 
   constructor(
     private supportService: SupportService,
@@ -115,9 +117,7 @@ export class ColoriComponent implements OnInit {
   }
 
   deleteColor(id: string) {
-    if (!confirm('Sei sicuro di voler eliminare questo colore?')) return;
-
-    this.loading = true;
+        this.loading = true;
     this.supportService.deleteColor(id).subscribe({
       next: () => {
         this.successMessage = 'Colore eliminato con successo';
@@ -126,7 +126,7 @@ export class ColoriComponent implements OnInit {
       },
       error: (err) => {
         if (err.status === 409) {
-          this.deleteMessage = err.error?.detail || 'Questo colore è utilizzato in uno o più prodotti e non può essere eliminato. Puoi disattivarlo dalla visibilità.';
+          this.deleteMessage = err.error?.detail || 'Questo colore Ã¨ utilizzato in uno o piÃ¹ prodotti e non puÃ² essere eliminato. Puoi disattivarlo dalla visibilitÃ .';
         } else {
           this.errorMessage = err.error?.detail || 'Errore nell\'eliminazione del colore';
         }
@@ -148,8 +148,23 @@ export class ColoriComponent implements OnInit {
         setTimeout(() => this.successMessage = '', 3000);
       },
       error: (err) => {
-        this.errorMessage = 'Errore nell\'aggiornamento della visibilità';
+        this.errorMessage = 'Errore nell\'aggiornamento della visibilitÃ ';
       }
     });
   }
+
+
+  askDelete(id: string): void { this.confirmDeleteId = id; }
+
+  onDeleteConfirmed(): void {
+    if (!this.confirmDeleteId) return;
+    const id = this.confirmDeleteId;
+    this.confirmDeleteId = null;
+    this.deleteColor(id);
+  }
+
+  onDeleteCancelled(): void { this.confirmDeleteId = null; }
 }
+
+
+

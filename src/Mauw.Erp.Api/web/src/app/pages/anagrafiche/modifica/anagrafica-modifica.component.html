@@ -147,7 +147,10 @@
           [formGroupName]="i" class="bg-gray-50 border rounded-lg p-4">
           <div class="flex justify-between mb-3">
             <span class="font-medium text-sm">Indirizzo {{ i + 1 }}</span>
-            <button type="button" (click)="removeAddress(i)" class="text-red-500 hover:text-red-700 text-sm">Rimuovi</button>
+            <button type="button" (click)="askRemoveAddress(i)"
+              class="bg-red-600 hover:bg-red-700 text-white py-0.5 px-2 rounded text-xs font-medium">
+              Rimuovi
+            </button>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
@@ -239,7 +242,10 @@
           [formGroupName]="i" class="bg-gray-50 border rounded-lg p-4">
           <div class="flex justify-between mb-3">
             <span class="font-medium text-sm">Referente {{ i + 1 }}</span>
-            <button type="button" (click)="removePerson(i)" class="text-red-500 hover:text-red-700 text-sm">Rimuovi</button>
+            <button type="button" (click)="askRemovePerson(i)"
+              class="bg-red-600 hover:bg-red-700 text-white py-0.5 px-2 rounded text-xs font-medium">
+              Rimuovi
+            </button>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
@@ -388,5 +394,16 @@
       {{ saving ? 'Salvataggio…' : (editId ? 'Aggiorna' : 'Crea Anagrafica') }}
     </button>
   </div>
+
+  <!-- Conferma eliminazione indirizzo / referente -->
+  <app-confirm-delete-modal
+    [isOpen]="confirmDeleteIdx !== null"
+    [title]="confirmDeleteType === 'address' ? 'Elimina indirizzo' : 'Elimina referente'"
+    [message]="confirmDeleteType === 'address'
+      ? 'Sei sicuro di voler eliminare questo indirizzo? Se già salvato verrà rimosso immediatamente dal database.'
+      : 'Sei sicuro di voler eliminare questo referente? Se già salvato verrà rimosso immediatamente dal database.'"
+    (confirmed)="onDeleteConfirmed()"
+    (cancelled)="onDeleteCancelled()">
+  </app-confirm-delete-modal>
 
 </div>

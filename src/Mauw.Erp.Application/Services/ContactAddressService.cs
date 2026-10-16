@@ -95,6 +95,20 @@ public class ContactAddressService(IUnitOfWork unitOfWork) : IContactAddressServ
         return OperationResult<bool>.Ok(true);
     }
 
+    public async Task<OperationResult<bool>> DeletePersonAsync(Guid contactId, Guid personId)
+    {
+        var contact = await unitOfWork.Contacts.GetByIdWithDetailsAsync(contactId);
+        if (contact is null) return OperationResult<bool>.Fail("Contact not found");
+
+        var person = contact.Persons.FirstOrDefault(p => p.Id == personId);
+        if (person is null) return OperationResult<bool>.Fail("Person not found");
+
+        contact.Persons.Remove(person);
+        await unitOfWork.Contacts.UpdateAsync(contact);
+        await unitOfWork.SaveChangesAsync();
+        return OperationResult<bool>.Ok(true);
+    }
+
     private static ContactAddressDto MapAddress(ContactAddress a) => new(
         Id: a.Id, Purpose: a.Purpose.ToString(), SiteName: a.SiteName,
         Street: a.Street, ZipCode: a.ZipCode, City: a.City, Province: a.Province,

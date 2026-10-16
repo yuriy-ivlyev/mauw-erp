@@ -6,11 +6,12 @@ import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 import { ContactService } from '../../../services/contact.service';
 import { ContactSummary, ContactFilterParams, PagedResult } from '../../../models/contact.model';
+import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
 
 @Component({
   selector: 'app-anagrafiche-elenco',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, ConfirmDeleteModalComponent],
   templateUrl: './anagrafiche-elenco.component.html'
 })
 export class AnagraficheElencoComponent implements OnInit, OnDestroy {

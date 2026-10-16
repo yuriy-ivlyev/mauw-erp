@@ -1,12 +1,13 @@
-import { Component, OnInit } from '@angular/core';
+﻿import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
 import { SupportService, MaterialDto, CreateMaterialRequest, UpdateMaterialRequest } from '../../../services/support.service';
 
 @Component({
   selector: 'app-materiali',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, ConfirmDeleteModalComponent],
   templateUrl: './materiali.component.html',
   styleUrl: './materiali.component.scss'
 })
@@ -19,6 +20,7 @@ export class MmaterialiComponent implements OnInit {
   successMessage = '';
   loading = false;
   deleteMessage = '';
+  confirmDeleteId: string | null = null;
 
   constructor(
     private supportService: SupportService,
@@ -139,9 +141,7 @@ export class MmaterialiComponent implements OnInit {
   }
 
   deleteMaterial(id: string) {
-    if (!confirm('Sei sicuro di voler eliminare questo materiale?')) return;
-
-    this.loading = true;
+        this.loading = true;
     this.supportService.deleteMaterial(id).subscribe({
       next: () => {
         this.successMessage = 'Materiale eliminato con successo';
@@ -150,7 +150,7 @@ export class MmaterialiComponent implements OnInit {
       },
       error: (err) => {
         if (err.status === 409) {
-          this.deleteMessage = err.error?.detail || 'Questo materiale è utilizzato in uno o più prodotti e non può essere eliminato. Puoi disattivarlo dalla visibilità.';
+          this.deleteMessage = err.error?.detail || 'Questo materiale Ã¨ utilizzato in uno o piÃ¹ prodotti e non puÃ² essere eliminato. Puoi disattivarlo dalla visibilitÃ .';
         } else {
           this.errorMessage = err.error?.detail || 'Errore nell\'eliminazione del materiale';
         }
@@ -175,8 +175,23 @@ export class MmaterialiComponent implements OnInit {
         setTimeout(() => this.successMessage = '', 3000);
       },
       error: (err) => {
-        this.errorMessage = 'Errore nell\'aggiornamento della visibilità';
+        this.errorMessage = 'Errore nell\'aggiornamento della visibilitÃ ';
       }
     });
   }
+
+
+  askDelete(id: string): void { this.confirmDeleteId = id; }
+
+  onDeleteConfirmed(): void {
+    if (!this.confirmDeleteId) return;
+    const id = this.confirmDeleteId;
+    this.confirmDeleteId = null;
+    this.deleteMaterial(id);
+  }
+
+  onDeleteCancelled(): void { this.confirmDeleteId = null; }
 }
+
+
+

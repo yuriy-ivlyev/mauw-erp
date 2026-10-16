@@ -8,13 +8,14 @@ import { ContactDetail } from '../../../models/contact.model';
 import { CountryDto, VatValidationResult } from '../../../models/country.model';
 import { VatLookupComponent } from '../../../components/vat-lookup/vat-lookup.component';
 import { AddressAutocompleteComponent, ParsedAddress } from '../../../components/address-autocomplete/address-autocomplete.component';
+import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
 
 type Tab = 'fiscal' | 'addresses' | 'persons' | 'customer' | 'supplier' | 'agent';
 
 @Component({
   selector: 'app-anagrafica-modifica',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, VatLookupComponent, AddressAutocompleteComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, VatLookupComponent, AddressAutocompleteComponent, ConfirmDeleteModalComponent],
   templateUrl: './anagrafica-modifica.component.html'
 })
 export class AnagraficaModificaComponent implements OnInit {
@@ -143,10 +144,43 @@ export class AnagraficaModificaComponent implements OnInit {
     });
   }
 
+  // ── Confirm delete modal ──────────────────────────────────────────────────
+  confirmDeleteType: 'address' | 'person' | null = null;
+  confirmDeleteIdx: number | null = null;
+
+  askRemoveAddress(i: number): void {
+    this.confirmDeleteType = 'address';
+    this.confirmDeleteIdx  = i;
+  }
+
+  askRemovePerson(i: number): void {
+    this.confirmDeleteType = 'person';
+    this.confirmDeleteIdx  = i;
+  }
+
+  onDeleteConfirmed(): void {
+    const type = this.confirmDeleteType;
+    const idx  = this.confirmDeleteIdx;
+    this.confirmDeleteType = null;
+    this.confirmDeleteIdx  = null;
+
+    if (idx === null) return;
+
+    if (type === 'address') this.doRemoveAddress(idx);
+    if (type === 'person')  this.doRemovePerson(idx);
+  }
+
+  onDeleteCancelled(): void {
+    this.confirmDeleteType = null;
+    this.confirmDeleteIdx  = null;
+  }
+
   // ── Addresses ─────────────────────────────────────────────────────────────
 
   buildAddressGroup(data?: any): FormGroup {
     return this.fb.group({
+      // id tracks the server-side ID (empty string = not yet saved to DB)
+      id:                   [data?.id ?? ''],
       purpose:              [data?.purpose ?? 'LegalHeadquarters'],
       siteName:             [data?.siteName ?? ''],
       street:               [data?.street  ?? '', Validators.required],
@@ -166,9 +200,25 @@ export class AnagraficaModificaComponent implements OnInit {
   }
 
   addAddress(): void { this.addresses.push(this.buildAddressGroup()); }
-  removeAddress(i: number): void { this.addresses.removeAt(i); }
 
-  /** Popola automaticamente i campi dell'indirizzo dalla selezione Photon. */
+  /** Rimuove un indirizzo: se già salvato in DB chiama l'API di delete; se nuovo rimuove solo dal FormArray. */
+  private doRemoveAddress(i: number): void {
+    const ctrl = this.addresses.at(i);
+    const addressId: string = ctrl.get('id')?.value ?? '';
+
+    if (addressId && this.editId) {
+      // Già in DB → chiamata API immediata
+      this.contactService.deleteAddress(this.editId, addressId).subscribe({
+        next: ()  => { this.addresses.removeAt(i); },
+        error: (e) => { this.errorMessage = e?.error ?? 'Errore durante l\'eliminazione dell\'indirizzo.'; }
+      });
+    } else {
+      // Non ancora salvato → rimuove solo dalla UI
+      this.addresses.removeAt(i);
+    }
+  }
+
+  /** Popola automaticamente i campi dell'indirizzo dalla selezione Photon / Google. */
   onAddressSelected(i: number, parsed: ParsedAddress): void {
     this.addresses.at(i).patchValue({
       street:          parsed.street,
@@ -183,25 +233,11 @@ export class AnagraficaModificaComponent implements OnInit {
     });
   }
 
-  /** Gestisce il risultato della verifica P.IVA VIES. */
-  onVatValidated(result: VatValidationResult): void {
-    this.vatResult = result;
-    if (result.companyName && !this.form.get('businessName')?.value)
-      this.form.patchValue({ businessName: result.companyName });
-    // Se Extra-EU forza SDI = XXXXXXX
-    if (this.isExtraEu)
-      this.form.patchValue({ sdiCode: 'XXXXXXX' });
-  }
-
-  onCountryChange(): void {
-    if (this.isExtraEu) this.form.patchValue({ sdiCode: 'XXXXXXX' });
-    this.vatResult = null;
-  }
-
   // ── Persons ───────────────────────────────────────────────────────────────
 
   buildPersonGroup(data?: any): FormGroup {
     return this.fb.group({
+      id:        [data?.id ?? ''],
       firstName: [data?.firstName ?? '', Validators.required],
       lastName:  [data?.lastName  ?? '', Validators.required],
       role:      [data?.role      ?? ''],
@@ -212,7 +248,34 @@ export class AnagraficaModificaComponent implements OnInit {
   }
 
   addPerson(): void { this.persons.push(this.buildPersonGroup()); }
-  removePerson(i: number): void { this.persons.removeAt(i); }
+
+  /** Rimuove un referente: se già in DB chiama l'API; altrimenti solo UI. */
+  private doRemovePerson(i: number): void {
+    const ctrl     = this.persons.at(i);
+    const personId: string = ctrl.get('id')?.value ?? '';
+
+    if (personId && this.editId) {
+      this.contactService.deletePerson(this.editId, personId).subscribe({
+        next: ()  => { this.persons.removeAt(i); },
+        error: (e) => { this.errorMessage = e?.error ?? 'Errore durante l\'eliminazione del referente.'; }
+      });
+    } else {
+      this.persons.removeAt(i);
+    }
+  }
+
+  /** Gestisce il risultato della verifica P.IVA VIES. */
+  onVatValidated(result: VatValidationResult): void {
+    this.vatResult = result;
+    if (result.companyName && !this.form.get('businessName')?.value)
+      this.form.patchValue({ businessName: result.companyName });
+    if (this.isExtraEu) this.form.patchValue({ sdiCode: 'XXXXXXX' });
+  }
+
+  onCountryChange(): void {
+    if (this.isExtraEu) this.form.patchValue({ sdiCode: 'XXXXXXX' });
+    this.vatResult = null;
+  }
 
   // ── Save ──────────────────────────────────────────────────────────────────
 
