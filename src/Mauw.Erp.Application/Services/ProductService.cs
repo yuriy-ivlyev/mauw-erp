@@ -5,6 +5,7 @@ using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Domain.Entities;
 using Mauw.Erp.Domain.Exceptions;
 using Mauw.Erp.Domain.Repositories;
+using Mauw.Erp.Domain.Services;
 
 namespace Mauw.Erp.Application.Services;
 
@@ -14,6 +15,7 @@ namespace Mauw.Erp.Application.Services;
 public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequest> validator)
     : IProductService
 {
+    private static readonly PricingEngine PricingEngine = new();
     public async Task<OperationResult<ProductDto>> CreateProductAsync(CreateProductRequest request)
     {
         var validationResult = validator.Validate(request);
@@ -33,10 +35,25 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             basePurchaseCost: request.BasePurchaseCost,
             categoryId: request.CategoryId,
             collectionId: request.CollectionId,
-            materialId: request.MaterialId
+            materialId: request.MaterialId,
+            hasVariants: request.HasVariants
         );
 
         await unitOfWork.Products.AddAsync(product);
+
+        // For products without variants, auto-create a single default variant
+        if (!product.HasVariants)
+        {
+            var defaultBarcode = $"MNVR-{product.InternalCode}-{Guid.NewGuid():N[..8]}";
+            var defaultVariant = new ProductVariant(
+                productId: product.Id,
+                barcode: $"MNVR-{product.InternalCode.ToUpper()}-{Guid.NewGuid().ToString("N")[..8].ToUpper()}",
+                purchaseCost: product.BasePurchaseCost,
+                colorId: null,
+                sizeId: null
+            );
+            await unitOfWork.ProductVariants.AddAsync(defaultVariant);
+        }
         await unitOfWork.SaveChangesAsync();
 
         return OperationResult<ProductDto>.Ok(ProductMapper.MapToDto(product));
@@ -85,7 +102,8 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             basePurchaseCost: request.BasePurchaseCost,
             categoryId: request.CategoryId,
             collectionId: request.CollectionId,
-            materialId: request.MaterialId
+            materialId: request.MaterialId,
+            hasVariants: request.HasVariants
         );
 
         await unitOfWork.Products.UpdateAsync(product);
@@ -352,5 +370,75 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         }
 
         return OperationResult<bool>.Ok(true);
+    }
+
+    public async Task<OperationResult<List<ProductParentDto>>> SearchParentProductsAsync(string query, int limit = 20)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            return OperationResult<List<ProductParentDto>>.Ok([]);
+
+        var products = await unitOfWork.Products.SearchParentsAsync(query.Trim(), Math.Min(limit, 50));
+        var dtos = products.Select(p => new ProductParentDto(
+            ProductId: p.Id,
+            SupplierCode: p.SupplierCode,
+            InternalCode: p.InternalCode,
+            Name: p.Name,
+            HasVariants: p.HasVariants,
+            VariantCount: p.Variants.Count
+        )).ToList();
+
+        return OperationResult<List<ProductParentDto>>.Ok(dtos);
+    }
+
+    public async Task<OperationResult<ProductMatrixDto>> GetProductMatrixAsync(Guid productId, Guid warehouseId)
+    {
+        var product = await unitOfWork.Products.GetByIdAsync(productId);
+        if (product == null)
+            return OperationResult<ProductMatrixDto>.Fail("Product not found");
+
+        var sizes = product.Variants
+            .Where(v => v.Size != null)
+            .Select(v => v.Size!)
+            .DistinctBy(s => s.Id)
+            .OrderBy(s => s.Name)
+            .Select((s, idx) => new MatrixSizeDto(s.Id, s.Name, idx))
+            .ToList();
+
+        var colors = product.Variants
+            .Where(v => v.Color != null)
+            .Select(v => v.Color!)
+            .DistinctBy(c => c.Id)
+            .OrderBy(c => c.Name)
+            .Select(c => new MatrixColorDto(c.Id, c.Name, c.HtmlColor))
+            .ToList();
+
+        var cells = new List<MatrixCellDto>();
+        foreach (var variant in product.Variants)
+        {
+            var stock = await unitOfWork.Stock.GetAvailableQtyAsync(warehouseId, variant.Id);
+            var pricingResult = PricingEngine.CalculatePrice(
+                variant.PurchaseCost, product.DefaultMarkupRate, 0, product.VatRate);
+
+            cells.Add(new MatrixCellDto(
+                VariantId: variant.Id,
+                ColorId: variant.ColorId,
+                SizeId: variant.SizeId,
+                Barcode: variant.Barcode,
+                UnitPrice: pricingResult.FinalGrossPrice,
+                AvailableStock: stock
+            ));
+        }
+
+        var matrix = new ProductMatrixDto(
+            ProductId: product.Id,
+            SupplierCode: product.SupplierCode,
+            ProductName: product.Name,
+            HasVariants: product.HasVariants,
+            Sizes: sizes,
+            Colors: colors,
+            Cells: cells
+        );
+
+        return OperationResult<ProductMatrixDto>.Ok(matrix);
     }
 }

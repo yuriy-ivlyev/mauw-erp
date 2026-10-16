@@ -24,6 +24,7 @@ public static class ProductMapper
             BasePurchaseCost: product.BasePurchaseCost,
             Images: product.Images.OrderBy(i => i.DisplayOrder).Select(MapImageToDto).ToList(),
             Variants: product.Variants.Select(v => MapVariantToDto(v, product.DefaultMarkupRate)).ToList(),
+            HasVariants: product.HasVariants,
             CategoryId: product.CategoryId,
             CategoryName: product.Category?.Name,
             CollectionId: product.CollectionId,

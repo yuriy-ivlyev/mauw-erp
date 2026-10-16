@@ -15,6 +15,7 @@ public class Product : Entity<Guid>
     public Guid? CategoryId { get; set; }
     public Guid? CollectionId { get; set; }
     public Guid? MaterialId { get; set; }
+    public bool HasVariants { get; set; } = true;
 
     // Navigation
     public Category? Category { get; set; }
@@ -33,7 +34,8 @@ public class Product : Entity<Guid>
         decimal basePurchaseCost,
         Guid? categoryId = null,
         Guid? collectionId = null,
-        Guid? materialId = null
+        Guid? materialId = null,
+        bool hasVariants = true
     ) : base()
     {
         SupplierId = supplierId;
@@ -46,6 +48,7 @@ public class Product : Entity<Guid>
         CategoryId = categoryId;
         CollectionId = collectionId;
         MaterialId = materialId;
+        HasVariants = hasVariants;
     }
 
     public void Update(
@@ -58,7 +61,8 @@ public class Product : Entity<Guid>
         decimal basePurchaseCost,
         Guid? categoryId = null,
         Guid? collectionId = null,
-        Guid? materialId = null)
+        Guid? materialId = null,
+        bool? hasVariants = null)
     {
         SupplierId = supplierId;
         SupplierCode = supplierCode;
@@ -70,6 +74,7 @@ public class Product : Entity<Guid>
         CategoryId = categoryId;
         CollectionId = collectionId;
         MaterialId = materialId;
+        if (hasVariants.HasValue) HasVariants = hasVariants.Value;
         UpdateTimestamp();
     }
 

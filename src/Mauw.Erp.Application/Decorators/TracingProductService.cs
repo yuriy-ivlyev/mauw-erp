@@ -72,4 +72,16 @@ public sealed class TracingProductService(IProductService inner) : TracingDecora
                 a?.SetTag("product.id", productId);
                 a?.SetTag("variant.id", variantId);
             });
+
+    public Task<OperationResult<List<ProductParentDto>>> SearchParentProductsAsync(string query, int limit = 20) =>
+        TraceAsync("Product.SearchParents", () => inner.SearchParentProductsAsync(query, limit),
+            a => a?.SetTag("query", query));
+
+    public Task<OperationResult<ProductMatrixDto>> GetProductMatrixAsync(Guid productId, Guid warehouseId) =>
+        TraceAsync("Product.GetMatrix", () => inner.GetProductMatrixAsync(productId, warehouseId),
+            a =>
+            {
+                a?.SetTag("product.id", productId);
+                a?.SetTag("warehouse.id", warehouseId);
+            });
 }

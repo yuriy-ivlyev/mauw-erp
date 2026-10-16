@@ -14,6 +14,8 @@ public interface IProductService
     Task<OperationResult<ProductDto>> UpdateProductAsync(Guid id, CreateProductRequest request);
     Task<OperationResult<bool>> DeleteProductAsync(Guid id);
     Task<OperationResult<BarcodeVariantDto>> GetVariantByBarcodeAsync(string barcode);
+    Task<OperationResult<List<ProductParentDto>>> SearchParentProductsAsync(string query, int limit = 20);
+    Task<OperationResult<ProductMatrixDto>> GetProductMatrixAsync(Guid productId, Guid warehouseId);
 
     Task<OperationResult<ProductImageDto>> AddImageAsync(Guid productId, AddProductImageRequest request);
     Task<OperationResult<bool>> RemoveImageAsync(Guid productId, Guid imageId);

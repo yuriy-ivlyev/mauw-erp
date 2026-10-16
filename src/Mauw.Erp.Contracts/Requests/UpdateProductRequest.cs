@@ -13,5 +13,6 @@ public record UpdateProductRequest(
     decimal BasePurchaseCost,
     Guid? CategoryId = null,
     Guid? CollectionId = null,
-    Guid? MaterialId = null
+    Guid? MaterialId = null,
+    bool HasVariants = true
 );

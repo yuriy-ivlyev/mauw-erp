@@ -14,6 +14,7 @@ public record ProductDto(
     decimal BasePurchaseCost,
     List<ProductImageDto> Images,
     List<ProductVariantDto> Variants,
+    bool HasVariants = true,
     Guid? CategoryId = null,
     string? CategoryName = null,
     Guid? CollectionId = null,

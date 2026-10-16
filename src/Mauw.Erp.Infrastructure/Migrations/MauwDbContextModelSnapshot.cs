@@ -1522,6 +1522,12 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("numeric(5,2)")
                         .HasColumnName("default_markup_rate");
 
+                    b.Property<bool>("HasVariants")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("has_variants");
+
                     b.Property<string>("InternalCode")
                         .IsRequired()
                         .HasMaxLength(100)

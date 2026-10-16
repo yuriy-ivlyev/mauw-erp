@@ -79,6 +79,7 @@ export interface ProductDto {
   defaultMarkupRate: number;
   vatRate: number;
   basePurchaseCost: number;
+  hasVariants: boolean;
   categoryId?: string;
   categoryName?: string;
   collectionId?: string;
@@ -98,6 +99,7 @@ export interface CreateProductRequest {
   defaultMarkupRate: number;
   vatRate: number;
   basePurchaseCost: number;
+  hasVariants: boolean;
   categoryId?: string;
   collectionId?: string;
   materialId?: string;
@@ -111,9 +113,50 @@ export interface UpdateProductRequest {
   defaultMarkupRate: number;
   vatRate: number;
   basePurchaseCost: number;
+  hasVariants: boolean;
   categoryId?: string;
   collectionId?: string;
   materialId?: string;
+}
+
+export interface ProductParentDto {
+  productId: string;
+  supplierCode: string;
+  internalCode: string;
+  name: string;
+  hasVariants: boolean;
+  variantCount: number;
+}
+
+export interface MatrixSizeDto {
+  id: string;
+  name: string;
+  displayOrder: number;
+}
+
+export interface MatrixColorDto {
+  id: string;
+  name: string;
+  htmlColor: string;
+}
+
+export interface MatrixCellDto {
+  variantId: string;
+  colorId: string | null;
+  sizeId: string | null;
+  barcode: string;
+  unitPrice: number;
+  availableStock: number;
+}
+
+export interface ProductMatrixDto {
+  productId: string;
+  supplierCode: string;
+  productName: string;
+  hasVariants: boolean;
+  sizes: MatrixSizeDto[];
+  colors: MatrixColorDto[];
+  cells: MatrixCellDto[];
 }
 
 export interface CreateProductVariantRequest {

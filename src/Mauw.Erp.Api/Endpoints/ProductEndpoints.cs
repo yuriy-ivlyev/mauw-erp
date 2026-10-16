@@ -25,6 +25,14 @@ public static class ProductEndpoints
             .WithName("GetProducts")
             .WithSummary("Get paginated product list");
 
+        group.MapGet("/search-parents", SearchParentProducts)
+            .WithName("SearchParentProducts")
+            .WithSummary("Cerca prodotti padre per nome o codice fornitore (per Cassa/POS)");
+
+        group.MapGet("/{productId}/matrix", GetProductMatrix)
+            .WithName("GetProductMatrix")
+            .WithSummary("Ottieni la matrice taglia/colore con giacenze per un prodotto");
+
         group.MapGet("/variants/search", SearchVariants)
             .WithName("SearchVariants")
             .WithSummary("Ricerca varianti per barcode, nome prodotto, colore o taglia (autocomplete)");
@@ -299,5 +307,31 @@ public static class ProductEndpoints
         }
 
         return TypedResults.NoContent();
+    }
+
+    private static async Task<Ok<List<ProductParentDto>>> SearchParentProducts(
+        IProductService productService,
+        string? q = null,
+        int limit = 20)
+    {
+        if (string.IsNullOrWhiteSpace(q))
+            return TypedResults.Ok(new List<ProductParentDto>());
+
+        var result = await productService.SearchParentProductsAsync(q, limit);
+        return TypedResults.Ok(result.Data ?? []);
+    }
+
+    private static async Task<Results<Ok<ProductMatrixDto>, NotFound>> GetProductMatrix(
+        Guid productId,
+        IProductService productService,
+        Guid? warehouseId = null)
+    {
+        var wh = warehouseId ?? Guid.Empty;
+        var result = await productService.GetProductMatrixAsync(productId, wh);
+
+        if (!result.Success)
+            return TypedResults.NotFound();
+
+        return TypedResults.Ok(result.Data!);
     }
 }

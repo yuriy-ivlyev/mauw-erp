@@ -540,7 +540,8 @@ export class ProdottiComponent implements OnInit {
       name: '',
       defaultMarkupRate: 0,
       vatRate: 0,
-      basePurchaseCost: 0
+      basePurchaseCost: 0,
+      hasVariants: true
     };
   }
 
@@ -613,6 +614,7 @@ export class ProdottiComponent implements OnInit {
       defaultMarkupRate: product.defaultMarkupRate,
       vatRate: product.vatRate,
       basePurchaseCost: product.basePurchaseCost,
+      hasVariants: product.hasVariants ?? true,
       categoryId: product.categoryId,
       collectionId: product.collectionId,
       materialId: product.materialId

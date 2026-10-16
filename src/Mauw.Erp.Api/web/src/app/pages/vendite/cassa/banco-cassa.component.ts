@@ -3,6 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../../services/api.service';
+import { ProductService } from '../../../services/product.service';
+import { ProductMatrixModalComponent, MatrixSelection } from './product-matrix-modal.component';
+import { ProductParentDto, ProductMatrixDto } from '../../../models/product.model';
 
 interface BarcodeVariant {
   barcode: string;
@@ -39,28 +42,64 @@ interface PageResponse<T> {
 @Component({
   selector: 'app-banco-cassa',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ProductMatrixModalComponent],
   template: `
-<div class="flex h-[calc(100vh-4rem)] bg-gray-100 overflow-hidden">
+<!-- Matrix modal overlay -->
+<app-product-matrix-modal
+  *ngIf="matrixProduct"
+  [matrix]="matrixProduct"
+  [vatRate]="selectedVatRate"
+  (cancel)="closeMatrix()"
+  (confirmed)="onMatrixConfirmed($event)">
+</app-product-matrix-modal>
 
-  <!-- ===== LEFT: Scanner + Ricerca ===== -->
-  <div class="w-80 flex flex-col bg-white border-r shadow-sm flex-shrink-0">
-    <div class="p-4 border-b bg-gray-50">
-      <h2 class="text-lg font-bold text-gray-800 mb-3">📦 Aggiungi Articolo</h2>
+<div class="flex h-[calc(100vh-7rem)] bg-gray-100 overflow-hidden">
+
+  <!-- ===== LEFT: Cliente + Scanner + Ricerca ===== -->
+  <div class="w-80 flex flex-col bg-white border-r shadow-sm flex-shrink-0 overflow-hidden">
+
+    <!-- 1. CLIENTE OBBLIGATORIO -->
+    <div class="p-4 border-b" [class.bg-green-50]="selectedContact" [class.bg-orange-50]="!selectedContact">
+      <label class="block text-xs font-semibold uppercase tracking-wide mb-1"
+        [class.text-orange-600]="!selectedContact" [class.text-green-700]="selectedContact">
+        {{ selectedContact ? '✓ Cliente selezionato' : '⚠️ Seleziona Cliente (obbligatorio)' }}
+      </label>
+      <input [(ngModel)]="contactSearch" (input)="onContactSearch()"
+        type="text"
+        [placeholder]="selectedContact ? selectedContact.businessName : 'Cerca cliente o azienda...'"
+        class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none"
+        [class.border-green-400]="selectedContact"
+        [class.border-orange-400]="!selectedContact"
+        [class.bg-white]="true" />
+      <div *ngIf="contactResults.length > 0"
+        class="mt-1 max-h-40 overflow-y-auto border border-gray-200 rounded-lg divide-y shadow-sm bg-white z-20 relative">
+        <div *ngFor="let c of contactResults"
+          class="px-3 py-2 hover:bg-blue-50 cursor-pointer"
+          (click)="selectContact(c)">
+          <div class="text-sm font-medium">{{ c.businessName }}</div>
+          <div class="text-xs text-gray-500">P.IVA: {{ c.vatNumber }}</div>
+        </div>
+      </div>
+      <div *ngIf="selectedContact" class="mt-2 flex items-center justify-between">
+        <span class="text-xs font-medium text-green-800">{{ selectedContact.businessName }}</span>
+        <button (click)="clearContact()" class="text-green-400 hover:text-red-500 text-lg leading-none transition">&times;</button>
+      </div>
+    </div>
+
+    <!-- 2. SCANNER + RICERCA (disabilitati senza cliente) -->
+    <div class="p-4 border-b bg-gray-50 flex-1 overflow-y-auto min-h-0" [class.opacity-40]="!selectedContact" [class.pointer-events-none]="!selectedContact">
+      <h2 class="text-sm font-bold text-gray-700 mb-3">📦 Aggiungi Articolo</h2>
 
       <!-- Barcode scanner -->
       <div class="mb-4">
-        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-          Scansiona Barcode
-        </label>
+        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Scansiona Barcode</label>
         <div class="relative">
-          <input #barcodeInput
+          <input #barcodeInputEl
             [(ngModel)]="barcodeInput_value"
             (keydown.enter)="lookupBarcode()"
             (input)="onBarcodeInput()"
             type="text"
             placeholder="Barcode / codice..."
-            autofocus
             class="w-full pl-9 pr-3 py-2.5 border-2 rounded-lg text-sm focus:outline-none focus:border-blue-500 font-mono"
             [class.border-red-400]="barcodeError"
             [class.border-gray-200]="!barcodeError" />
@@ -72,74 +111,44 @@ interface PageResponse<T> {
         <p *ngIf="barcodeError" class="text-red-500 text-xs mt-1">{{ barcodeError }}</p>
         <button (click)="lookupBarcode()" [disabled]="!barcodeInput_value || lookingUp"
           class="mt-2 w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg transition">
-          {{ lookingUp ? '...' : '+ Aggiungi' }}
+          {{ lookingUp ? '...' : '+ Aggiungi da Barcode' }}
         </button>
       </div>
 
       <div class="relative flex items-center mb-4">
         <div class="flex-grow border-t border-gray-200"></div>
-        <span class="mx-3 text-xs text-gray-400 font-medium">oppure cerca</span>
+        <span class="mx-3 text-xs text-gray-400 font-medium">oppure cerca modello</span>
         <div class="flex-grow border-t border-gray-200"></div>
       </div>
 
-      <!-- Product search -->
+      <!-- Product PARENT search -->
       <div>
-        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-          Cerca per Nome / Codice
-        </label>
+        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Cerca per Nome / Codice Fornitore</label>
         <input [(ngModel)]="productSearch" (input)="onProductSearch()"
-          type="text" placeholder="Nome o codice interno..."
+          type="text" placeholder="Es. AB26W220 o nome articolo..."
           class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500" />
 
-        <div *ngIf="searchResults.length > 0"
-          class="mt-2 max-h-52 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100 shadow-sm">
-          <div *ngFor="let v of searchResults"
-            class="px-3 py-2.5 cursor-pointer transition"
-            [class.hover:bg-blue-50]="v.quantityAvailable > 0"
-            [class.bg-red-50]="v.quantityAvailable <= 0"
-            (click)="v.quantityAvailable > 0 && addVariantToCart(v)">
-            <div class="font-medium text-sm text-gray-800">{{ v.productName }}</div>
+        <div *ngIf="parentResults.length > 0"
+          class="mt-2 max-h-56 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100 shadow-sm bg-white">
+          <div *ngFor="let p of parentResults"
+            class="px-3 py-2.5 hover:bg-blue-50 cursor-pointer transition"
+            (click)="onParentProductClick(p)">
+            <div class="font-medium text-sm text-gray-800 truncate">{{ p.name }}</div>
             <div class="flex gap-2 mt-0.5 items-center">
-              <span class="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{{ v.color || '–' }}</span>
-              <span class="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{{ v.size || '–' }}</span>
-              <span class="text-xs text-blue-700 font-semibold ml-auto">{{ v.unitGrossPrice | number:'1.2-2' }} €</span>
-              <span [class]="'text-xs font-semibold px-1.5 py-0.5 rounded ' + (v.quantityAvailable > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600')">
-                {{ v.quantityAvailable > 0 ? (v.quantityAvailable + ' pz') : 'Esaurito' }}
-              </span>
+              <span class="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-mono">{{ p.supplierCode }}</span>
+              <span *ngIf="p.hasVariants" class="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Taglia/Colore</span>
+              <span *ngIf="!p.hasVariants" class="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">Unico</span>
+              <span class="text-xs text-gray-400 ml-auto">{{ p.variantCount }} var.</span>
             </div>
           </div>
         </div>
-        <p *ngIf="searchDone && searchResults.length === 0 && productSearch" class="text-xs text-gray-400 mt-2 text-center">
+        <p *ngIf="searchDone && parentResults.length === 0 && productSearch" class="text-xs text-gray-400 mt-2 text-center">
           Nessun risultato
         </p>
       </div>
     </div>
 
-    <!-- Client selector -->
-    <div class="p-4 border-b">
-      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Cliente *</label>
-      <input [(ngModel)]="contactSearch" (input)="onContactSearch()"
-        type="text"
-        [placeholder]="selectedContact ? selectedContact.businessName : 'Cerca cliente...'"
-        class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-blue-500"
-        [class.border-blue-500]="selectedContact"
-        [class.border-gray-200]="!selectedContact" />
-      <div *ngIf="contactResults.length > 0"
-        class="mt-1 max-h-40 overflow-y-auto border border-gray-200 rounded-lg divide-y shadow-sm">
-        <div *ngFor="let c of contactResults"
-          class="px-3 py-2 hover:bg-blue-50 cursor-pointer"
-          (click)="selectContact(c)">
-          <div class="text-sm font-medium">{{ c.businessName }}</div>
-          <div class="text-xs text-gray-500">P.IVA: {{ c.vatNumber }}</div>
-        </div>
-      </div>
-      <div *ngIf="selectedContact" class="mt-2 flex items-center justify-between bg-blue-50 px-2 py-1.5 rounded">
-        <span class="text-xs font-medium text-blue-800">✓ {{ selectedContact.businessName }}</span>
-        <button (click)="clearContact()" class="text-blue-400 hover:text-blue-600 text-lg leading-none">&times;</button>
-      </div>
-    </div>
-
-    <!-- DDT number -->
+    <!-- 3. N° DOCUMENTO -->
     <div class="p-4">
       <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">N° Documento</label>
       <input [(ngModel)]="documentNumber" type="text" placeholder="Autogenerato se vuoto"
@@ -158,7 +167,7 @@ interface PageResponse<T> {
     </div>
 
     <!-- Cart items -->
-    <div class="flex-1 overflow-y-auto p-6">
+    <div class="flex-1 overflow-y-auto p-6 min-h-0">
       <div *ngIf="cart.length === 0" class="flex flex-col items-center justify-center h-full text-gray-400">
         <div class="text-6xl mb-4">🛍️</div>
         <p class="text-lg font-medium">Carrello vuoto</p>
@@ -267,11 +276,16 @@ export class BancoCassaComponent implements OnInit {
   barcodeError: string | null = null;
   lookingUp = false;
 
-  // Product search
+  // Product PARENT search
   productSearch = '';
-  searchResults: BarcodeVariant[] = [];
+  parentResults: ProductParentDto[] = [];
   searchDone = false;
   private searchTimer: any;
+
+  // Matrix modal
+  matrixProduct: ProductMatrixDto | null = null;
+  selectedVatRate = 22;
+  matrixLoading = false;
 
   // Contact
   contactSearch = '';
@@ -285,7 +299,7 @@ export class BancoCassaComponent implements OnInit {
   // Cart
   cart: CartItem[] = [];
 
-  // Default warehouse ID for stock checks (resolved at startup)
+  // Default warehouse
   private defaultWarehouseId: string | null = null;
 
   // Generation
@@ -298,7 +312,11 @@ export class BancoCassaComponent implements OnInit {
     return { net, vat: gross - net, gross };
   }
 
-  constructor(private api: ApiService, private router: Router) {}
+  constructor(
+    private api: ApiService,
+    private productService: ProductService,
+    private router: Router
+  ) {}
 
   ngOnInit(): void {
     this.loadDefaultWarehouse();
@@ -330,7 +348,7 @@ export class BancoCassaComponent implements OnInit {
       : `v1/products/barcode/${encodeURIComponent(code)}`;
     this.api.get<BarcodeVariant>(url).subscribe({
       next: (v) => {
-        this.addVariantToCart(v);
+        this.addBarcodeVariantToCart(v);
         this.barcodeInput_value = '';
         this.lookingUp = false;
       },
@@ -341,37 +359,85 @@ export class BancoCassaComponent implements OnInit {
     });
   }
 
-  // ── Product search ────────────────────────────────────────
+  // ── Product search (parent products) ─────────────────────
   onProductSearch(): void {
     clearTimeout(this.searchTimer);
     this.searchDone = false;
-    if (!this.productSearch.trim()) { this.searchResults = []; return; }
-    this.searchTimer = setTimeout(() => this.runProductSearch(), 350);
+    if (!this.productSearch.trim()) { this.parentResults = []; return; }
+    this.searchTimer = setTimeout(() => this.runParentSearch(), 350);
   }
 
-  private runProductSearch(): void {
+  private runParentSearch(): void {
     const q = this.productSearch.trim();
-    this.api.get<PageResponse<any>>(`v1/products?page=1&pageSize=30&search=${encodeURIComponent(q)}`).subscribe({
-      next: (res) => {
-        // Flatten products → variants for the results list
-        this.searchResults = (res.items || []).flatMap((p: any) =>
-          (p.variants || []).map((v: any): BarcodeVariant => ({
-            barcode: v.barcode,
-            variantId: v.id,
-            productId: p.id,
-            productName: p.name,
-            size: v.size || '',
-            color: v.color || '',
-            unitNetPrice: v.finalNetPrice,
-            unitGrossPrice: v.finalGrossPrice,
-            vatRate: p.vatRate ?? 22,
-            quantityAvailable: 9999 // stock non disponibile da ricerca testuale
-          }))
-        );
-        this.searchDone = true;
-      },
-      error: () => { this.searchResults = []; this.searchDone = true; }
+    this.productService.searchParents(q, 20).subscribe({
+      next: (res) => { this.parentResults = res; this.searchDone = true; },
+      error: () => { this.parentResults = []; this.searchDone = true; }
     });
+  }
+
+  onParentProductClick(p: ProductParentDto): void {
+    this.productSearch = '';
+    this.parentResults = [];
+    this.barcodeError = null;
+
+    if (!p.hasVariants) {
+      // Single-variant product: load matrix to get the single cell and add directly
+      this.matrixLoading = true;
+      this.productService.getProductMatrix(p.productId, this.defaultWarehouseId ?? undefined).subscribe({
+        next: (matrix) => {
+          this.matrixLoading = false;
+          if (matrix.cells.length > 0) {
+            const cell = matrix.cells[0];
+            this.addBarcodeVariantToCart({
+              barcode: cell.barcode,
+              variantId: cell.variantId,
+              productId: p.productId,
+              productName: p.name,
+              size: '',
+              color: '',
+              unitNetPrice: cell.unitPrice / 1.22,
+              unitGrossPrice: cell.unitPrice,
+              vatRate: 22,
+              quantityAvailable: cell.availableStock
+            });
+          }
+        },
+        error: () => { this.matrixLoading = false; }
+      });
+    } else {
+      // Product with variants: open matrix modal
+      this.matrixLoading = true;
+      this.productService.getProductMatrix(p.productId, this.defaultWarehouseId ?? undefined).subscribe({
+        next: (matrix) => {
+          this.matrixLoading = false;
+          this.matrixProduct = matrix;
+          this.selectedVatRate = 22;
+        },
+        error: () => { this.matrixLoading = false; }
+      });
+    }
+  }
+
+  closeMatrix(): void {
+    this.matrixProduct = null;
+  }
+
+  onMatrixConfirmed(selections: MatrixSelection[]): void {
+    this.matrixProduct = null;
+    for (const s of selections) {
+      this.addBarcodeVariantToCart({
+        barcode: s.barcode,
+        variantId: s.variantId,
+        productId: '',
+        productName: s.productName,
+        size: s.sizeName ?? '',
+        color: s.colorName ?? '',
+        unitNetPrice: s.unitPrice / (1 + s.vatRate / 100),
+        unitGrossPrice: s.unitPrice,
+        vatRate: s.vatRate,
+        quantityAvailable: s.availableStock
+      }, s.quantity);
+    }
   }
 
   // ── Contact search ────────────────────────────────────────
@@ -401,26 +467,38 @@ export class BancoCassaComponent implements OnInit {
   }
 
   // ── Cart ──────────────────────────────────────────────────
-  addVariantToCart(v: BarcodeVariant): void {
+  addBarcodeVariantToCart(v: BarcodeVariant, qty = 1): void {
     const available = v.quantityAvailable ?? 9999;
     const existing = this.cart.find(i => i.variantId === v.variantId);
     if (existing) {
-      if (existing.quantity < existing.maxQuantity) {
-        existing.quantity++;
+      const newQty = existing.quantity + qty;
+      if (newQty <= existing.maxQuantity) {
+        existing.quantity = newQty;
         this.recalcLine(existing);
       } else {
         this.barcodeError = `Giacenza esaurita (max ${existing.maxQuantity} pz disponibili)`;
       }
     } else {
-      if (available <= 0) {
-        this.barcodeError = `⚠️ Giacenza esaurita – articolo non disponibile in ${v.productName}`;
+      if (available <= 0 && qty > 0) {
+        this.barcodeError = `⚠️ Giacenza esaurita – ${v.productName}`;
         return;
       }
-      const item: CartItem = { ...v, quantity: 1, lineNetTotal: v.unitNetPrice, lineGrossTotal: v.unitGrossPrice, maxQuantity: available };
+      const item: CartItem = {
+        ...v,
+        quantity: qty,
+        lineNetTotal: v.unitNetPrice * qty,
+        lineGrossTotal: v.unitGrossPrice * qty,
+        maxQuantity: Math.max(available, qty)
+      };
       this.cart.push(item);
     }
     this.productSearch = '';
-    this.searchResults = [];
+    this.parentResults = [];
+  }
+
+  /** @deprecated use addBarcodeVariantToCart */
+  addVariantToCart(v: BarcodeVariant): void {
+    this.addBarcodeVariantToCart(v);
   }
 
   increaseQty(i: number): void {

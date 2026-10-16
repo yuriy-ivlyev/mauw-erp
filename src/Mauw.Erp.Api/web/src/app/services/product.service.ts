@@ -14,7 +14,9 @@ import {
   CollectionDto,
   MaterialDto,
   MacroCategoryDto,
-  PageResponse
+  PageResponse,
+  ProductParentDto,
+  ProductMatrixDto
 } from '../models/product.model';
 import { Observable } from 'rxjs';
 
@@ -71,6 +73,17 @@ export class ProductService {
 
   getVariantByBarcode(barcode: string): Observable<any> {
     return this.apiService.get<any>(`${this.endpoint}/barcode/${barcode}`);
+  }
+
+  searchParents(q: string, limit = 20): Observable<ProductParentDto[]> {
+    return this.apiService.get<ProductParentDto[]>(
+      `${this.endpoint}/search-parents?q=${encodeURIComponent(q)}&limit=${limit}`
+    );
+  }
+
+  getProductMatrix(productId: string, warehouseId?: string): Observable<ProductMatrixDto> {
+    const whParam = warehouseId ? `?warehouseId=${warehouseId}` : '';
+    return this.apiService.get<ProductMatrixDto>(`${this.endpoint}/${productId}/matrix${whParam}`);
   }
 
   // Images

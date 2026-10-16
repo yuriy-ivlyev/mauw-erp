@@ -31,6 +31,10 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.VatRate)
             .HasPrecision(5, 2);
 
+        builder.Property(p => p.HasVariants)
+            .HasDefaultValue(true)
+            .IsRequired();
+
         builder.Property(p => p.CreatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 

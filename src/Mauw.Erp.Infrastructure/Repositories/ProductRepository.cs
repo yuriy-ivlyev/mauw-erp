@@ -13,8 +13,12 @@ public class ProductRepository(MauwDbContext dbContext) : Repository<Product, Gu
     public override async Task<Product?> GetByIdAsync(Guid id)
     {
         return await _dbSet
-            .Include(p => p.Variants)
+            .Include(p => p.Variants).ThenInclude(v => v.Color)
+            .Include(p => p.Variants).ThenInclude(v => v.Size)
             .Include(p => p.Images.OrderBy(i => i.DisplayOrder))
+            .Include(p => p.Category)
+            .Include(p => p.Collection)
+            .Include(p => p.Material)
             .FirstOrDefaultAsync(p => p.Id == id);
     }
 
@@ -63,5 +67,46 @@ public class ProductRepository(MauwDbContext dbContext) : Repository<Product, Gu
         }
 
         return await query.CountAsync();
+    }
+
+    public async Task<IEnumerable<Product>> SearchParentsAsync(string query, int limit = 20)
+    {
+        var term = query.Trim().ToLower();
+        return await _dbSet
+            .Include(p => p.Variants)
+            .ThenInclude(v => v.Color)
+            .Include(p => p.Variants)
+            .ThenInclude(v => v.Size)
+            .AsNoTracking()
+            .Where(p =>
+                p.Name.ToLower().Contains(term) ||
+                p.SupplierCode.ToLower().Contains(term) ||
+                p.InternalCode.ToLower().Contains(term))
+            .OrderBy(p => p.Name)
+            .Take(limit)
+            .ToListAsync();
+    }
+
+    public async Task<Product?> GetByIdWithStockAsync(Guid id, Guid warehouseId)
+    {
+        return await _dbSet
+            .Include(p => p.Variants)
+            .ThenInclude(v => v.Color)
+            .Include(p => p.Variants)
+            .ThenInclude(v => v.Size)
+            .Include(p => p.Variants)
+            .ThenInclude(v => v.StockMovements)
+            .FirstOrDefaultAsync(p => p.Id == id);
+    }
+
+    public async Task<Product?> GetBySupplierCodeAsync(Guid supplierId, string supplierCode)
+    {
+        return await _dbSet
+            .Include(p => p.Variants)
+            .ThenInclude(v => v.Color)
+            .Include(p => p.Variants)
+            .ThenInclude(v => v.Size)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.SupplierId == supplierId && p.SupplierCode == supplierCode);
     }
 }
