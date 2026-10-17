@@ -2,7 +2,7 @@ using Mauw.Erp.Api.Services;
 using Mauw.Erp.Application.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
-using Microsoft.Identity.Web;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Mauw.Erp.Api.Extensions;
 
@@ -12,53 +12,66 @@ public static class AuthExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
-            .AddMicrosoftIdentityWebApp(configuration.GetSection("AzureAd"));
+        var azureAd = configuration.GetSection("AzureAd");
+        var tenantId  = azureAd["TenantId"]  ?? throw new InvalidOperationException("AzureAd:TenantId is missing");
+        var clientId  = azureAd["ClientId"]   ?? throw new InvalidOperationException("AzureAd:ClientId is missing");
+        var authority = $"{azureAd["Instance"]?.TrimEnd('/')}/{tenantId}/v2.0";
 
-        // Map Entra ID 'roles' app-role claim → ClaimTypes.Role so [Authorize(Roles=...)] works.
-        // Also switch to Authorization Code flow (more secure than implicit id_token flow).
-        // In the App Registration: Authentication → ensure redirect URI is added as "Web" type;
-        // no need to enable "ID tokens" under Implicit grant.
-        services.Configure<OpenIdConnectOptions>(
-            OpenIdConnectDefaults.AuthenticationScheme,
-            options =>
+        services.AddAuthentication(options =>
             {
-                options.ResponseType = "code";   // Authorization Code flow, not implicit
-                options.TokenValidationParameters.RoleClaimType = "roles";
-                options.SaveTokens = false;      // tokens stored server-side in the session cookie
-            });
-
-        // Harden the application session cookie
-        services.Configure<CookieAuthenticationOptions>(
-            CookieAuthenticationDefaults.AuthenticationScheme,
-            options =>
+                options.DefaultScheme          = CookieAuthenticationDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+            })
+            .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
             {
-                options.Cookie.Name       = "Mauw.Session";
-                options.Cookie.HttpOnly   = true;
-                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-                options.Cookie.SameSite   = SameSiteMode.Strict;
+                options.Cookie.Name        = "Mauw.Session";
+                options.Cookie.HttpOnly    = true;
+                options.Cookie.SecurePolicy  = CookieSecurePolicy.Always;
+                options.Cookie.SameSite    = SameSiteMode.Strict;
 
-                // Return 401 for API paths instead of redirecting to Microsoft login
-                options.Events.OnRedirectToLogin = context =>
+                // For API paths return 401 instead of redirecting to login
+                options.Events.OnRedirectToLogin = ctx =>
                 {
-                    if (context.Request.Path.StartsWithSegments("/api"))
+                    if (ctx.Request.Path.StartsWithSegments("/api"))
                     {
-                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
                         return Task.CompletedTask;
                     }
-                    context.Response.Redirect(context.RedirectUri);
+                    ctx.Response.Redirect(ctx.RedirectUri);
                     return Task.CompletedTask;
                 };
 
-                options.Events.OnRedirectToAccessDenied = context =>
+                options.Events.OnRedirectToAccessDenied = ctx =>
                 {
-                    if (context.Request.Path.StartsWithSegments("/api"))
+                    if (ctx.Request.Path.StartsWithSegments("/api"))
                     {
-                        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                        ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
                         return Task.CompletedTask;
                     }
-                    context.Response.Redirect(context.RedirectUri);
+                    ctx.Response.Redirect(ctx.RedirectUri);
                     return Task.CompletedTask;
+                };
+            })
+            .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
+            {
+                options.Authority        = authority;
+                options.ClientId         = clientId;
+                options.ResponseType     = "code";
+                options.UsePkce          = true;        // public client: PKCE, no secret
+                options.CallbackPath     = azureAd["CallbackPath"] ?? "/signin-oidc";
+                options.SignedOutCallbackPath = azureAd["SignedOutCallbackPath"] ?? "/signout-callback-oidc";
+                options.SaveTokens       = false;
+
+                options.Scope.Clear();
+                options.Scope.Add("openid");
+                options.Scope.Add("profile");
+                options.Scope.Add("email");
+
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    NameClaimType = "name",
+                    RoleClaimType = "roles",      // map Entra ID app roles → ClaimTypes.Role
+                    ValidateIssuer = true
                 };
             });
 
