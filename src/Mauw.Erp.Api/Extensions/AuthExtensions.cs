@@ -12,10 +12,12 @@ public static class AuthExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var azureAd = configuration.GetSection("AzureAd");
-        var tenantId  = azureAd["TenantId"]  ?? throw new InvalidOperationException("AzureAd:TenantId is missing");
-        var clientId  = azureAd["ClientId"]   ?? throw new InvalidOperationException("AzureAd:ClientId is missing");
-        var authority = $"{azureAd["Instance"]?.TrimEnd('/')}/{tenantId}/v2.0";
+        var azureAd      = configuration.GetSection("AzureAd");
+        var tenantId     = azureAd["TenantId"]     ?? throw new InvalidOperationException("AzureAd:TenantId is missing");
+        var clientId     = azureAd["ClientId"]     ?? throw new InvalidOperationException("AzureAd:ClientId is missing");
+        var clientSecret = azureAd["ClientSecret"];   // present → confidential client (Web platform)
+        var authority    = $"{azureAd["Instance"]?.TrimEnd('/')}/{tenantId}/v2.0";
+        var isConfidential = !string.IsNullOrWhiteSpace(clientSecret);
 
         services.AddAuthentication(options =>
             {
@@ -24,12 +26,11 @@ public static class AuthExtensions
             })
             .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
             {
-                options.Cookie.Name        = "Mauw.Session";
-                options.Cookie.HttpOnly    = true;
-                options.Cookie.SecurePolicy  = CookieSecurePolicy.Always;
-                options.Cookie.SameSite    = SameSiteMode.Strict;
+                options.Cookie.Name         = "Mauw.Session";
+                options.Cookie.HttpOnly     = true;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                options.Cookie.SameSite     = SameSiteMode.Strict;
 
-                // For API paths return 401 instead of redirecting to login
                 options.Events.OnRedirectToLogin = ctx =>
                 {
                     if (ctx.Request.Path.StartsWithSegments("/api"))
@@ -54,13 +55,17 @@ public static class AuthExtensions
             })
             .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
             {
-                options.Authority        = authority;
-                options.ClientId         = clientId;
-                options.ResponseType     = "code";
-                options.UsePkce          = true;        // public client: PKCE, no secret
-                options.CallbackPath     = azureAd["CallbackPath"] ?? "/signin-oidc";
+                options.Authority            = authority;
+                options.ClientId             = clientId;
+                options.ResponseType         = "code";
+                options.UsePkce              = true;   // recommended for both public and confidential clients
+                options.CallbackPath         = azureAd["CallbackPath"]         ?? "/signin-oidc";
                 options.SignedOutCallbackPath = azureAd["SignedOutCallbackPath"] ?? "/signout-callback-oidc";
-                options.SaveTokens       = false;
+                options.SaveTokens           = false;
+
+                // Confidential client (Web platform): send secret for server-side token exchange
+                if (isConfidential)
+                    options.ClientSecret = clientSecret;
 
                 options.Scope.Clear();
                 options.Scope.Add("openid");
@@ -70,7 +75,7 @@ public static class AuthExtensions
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     NameClaimType = "name",
-                    RoleClaimType = "roles",      // map Entra ID app roles → ClaimTypes.Role
+                    RoleClaimType = "roles",
                     ValidateIssuer = true
                 };
             });
