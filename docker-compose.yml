@@ -1,5 +1,3 @@
-﻿version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -51,11 +49,11 @@ services:
       ASPNETCORE_URLS: "https://+:8443"
       ASPNETCORE_Kestrel__Certificates__Default__Path: /certs/aspnetapp.pfx
       ASPNETCORE_Kestrel__Certificates__Default__Password: "MauwDev2024!"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       ConnectionStrings__DefaultConnection: "Host=postgres;Database=mauw_erp;Username=postgres;Password=postgres;Port=5432"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
       OTEL_SERVICE_NAME: mauw-erp-backend
-      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       AzureAd__ClientSecret: "${AZURE_CLIENT_SECRET}"
     ports:
       - "5019:8443"
