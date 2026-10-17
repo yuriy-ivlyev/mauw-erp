@@ -40,6 +40,7 @@ builder.Services.AddScoped<IValidator<CreateInvoiceRequest>, CreateInvoiceReques
 
 // Register repositories
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<Mauw.Erp.Domain.Repositories.ICassaSessionRepository, Mauw.Erp.Infrastructure.Repositories.CassaSessionRepository>();
 
 // Register domain services
 builder.Services.AddScoped<Mauw.Erp.Domain.Services.PricingEngine>();
@@ -147,6 +148,7 @@ app.MapGeoEndpoints();
 app.MapOrderEndpoints();
 app.MapInvoiceEndpoints();
 app.MapDdtEndpoints();
+app.MapCassaSessionEndpoints();
 
 // Fallback to index.html for Angular routing
 app.MapFallbackToFile("index.html");

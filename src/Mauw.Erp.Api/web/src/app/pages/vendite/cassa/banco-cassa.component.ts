@@ -6,6 +6,7 @@ import { ApiService } from '../../../services/api.service';
 import { ProductService } from '../../../services/product.service';
 import { ProductMatrixModalComponent, MatrixSelection } from './product-matrix-modal.component';
 import { ProductParentDto, ProductMatrixDto } from '../../../models/product.model';
+import { CassaSessionService, CartItem, CassaContact, PausedSessionSummary } from '../../../services/cassa-session.service';
 
 interface BarcodeVariant {
   barcode: string;
@@ -21,20 +22,6 @@ interface BarcodeVariant {
   weightGrams?: number | null;
 }
 
-interface CartItem extends BarcodeVariant {
-  quantity: number;
-  lineNetTotal: number;
-  lineGrossTotal: number;
-  maxQuantity: number; // limite giacenza disponibile
-}
-
-interface Contact {
-  id: string;
-  businessName: string;
-  vatNumber: string;
-  defaultDiscountRate: number;
-}
-
 interface PageResponse<T> {
   items: T[];
   totalCount: number;
@@ -45,6 +32,8 @@ interface PageResponse<T> {
   standalone: true,
   imports: [CommonModule, FormsModule, ProductMatrixModalComponent],
   template: `
+<!-- ===== MODALI ===== -->
+
 <!-- Matrix modal overlay -->
 <app-product-matrix-modal
   *ngIf="matrixProduct"
@@ -54,7 +43,112 @@ interface PageResponse<T> {
   (confirmed)="onMatrixConfirmed($event)">
 </app-product-matrix-modal>
 
-<div class="flex h-[calc(100vh-7rem)] bg-gray-100 overflow-hidden">
+<!-- Conferma svuota carrello -->
+<div *ngIf="showClearCartConfirm"
+  class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+    <h2 class="text-lg font-bold text-gray-800 mb-2">Svuota carrello?</h2>
+    <p class="text-sm text-gray-500 mb-6">Tutti gli articoli verranno rimossi. L'operazione non è reversibile.</p>
+    <div class="flex gap-3 justify-end">
+      <button (click)="showClearCartConfirm = false" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition">Annulla</button>
+      <button (click)="confirmClearCart()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition">Svuota</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sessione sospesa con successo -->
+<div *ngIf="showSuspendSuccess"
+  class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+    <div class="text-center mb-4">
+      <div class="text-5xl mb-3">⏸️</div>
+      <h2 class="text-xl font-bold text-gray-800">Sessione sospesa</h2>
+      <p class="text-sm text-gray-500 mt-1">Comunica questo codice all'operatore che dovrà riprendere la sessione</p>
+    </div>
+    <div class="bg-blue-50 border-2 border-blue-300 rounded-xl p-4 text-center mb-6">
+      <div class="text-xs text-blue-500 uppercase font-semibold mb-1">Codice sessione</div>
+      <div class="text-3xl font-mono font-bold text-blue-700 tracking-widest">{{ currentSessionCode }}</div>
+    </div>
+    <button (click)="closeSuspendSuccess()" class="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition">Chiudi</button>
+  </div>
+</div>
+
+<!-- Modale riprendi sessione -->
+<div *ngIf="showResumeModal"
+  class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+    <h2 class="text-lg font-bold text-gray-800 mb-1">Riprendi sessione</h2>
+    <p class="text-sm text-gray-500 mb-4">Seleziona una sessione sospesa da riprendere su questo terminale.</p>
+    <div *ngIf="loadingPausedSessions" class="text-center py-8 text-gray-400">Caricamento...</div>
+    <div *ngIf="!loadingPausedSessions && pausedSessions.length === 0" class="text-center py-8 text-gray-400">
+      <div class="text-3xl mb-2">🔍</div>
+      <p class="text-sm">Nessuna sessione sospesa trovata</p>
+    </div>
+    <div *ngIf="!loadingPausedSessions && pausedSessions.length > 0" class="space-y-2 max-h-72 overflow-y-auto mb-4">
+      <div *ngFor="let s of pausedSessions"
+        class="border rounded-xl px-4 py-3 flex items-center justify-between hover:bg-blue-50 transition">
+        <div>
+          <div class="font-mono font-bold text-blue-700 text-sm">{{ s.sessionCode }}</div>
+          <div class="text-xs text-gray-500 mt-0.5">
+            {{ s.contactName ?? 'Nessun cliente' }} · {{ s.cartItemCount }} articoli ·
+            {{ s.updatedAt | date:'dd/MM HH:mm' }}
+          </div>
+        </div>
+        <button (click)="doResumeSession(s)"
+          [disabled]="resumeLoading"
+          class="ml-4 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition">
+          {{ resumeLoading ? '...' : '▶ Riprendi' }}
+        </button>
+      </div>
+    </div>
+    <button (click)="showResumeModal = false" class="w-full px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg transition">Chiudi</button>
+  </div>
+</div>
+
+<!-- Conferma termina sessione -->
+<div *ngIf="showTerminateConfirm"
+  class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+    <h2 class="text-lg font-bold text-gray-800 mb-2">Terminare la sessione?</h2>
+    <p class="text-sm text-gray-500 mb-6">Il carrello verrà svuotato e la sessione non sarà più recuperabile da nessun terminale.</p>
+    <div class="flex gap-3 justify-end">
+      <button (click)="showTerminateConfirm = false" [disabled]="terminateLoading" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition">Annulla</button>
+      <button (click)="doTerminateSession()" [disabled]="terminateLoading"
+        class="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white text-sm font-semibold rounded-lg transition">
+        {{ terminateLoading ? '...' : 'Termina' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== LAYOUT PRINCIPALE ===== -->
+<div class="flex flex-col h-[calc(100vh-7rem)] bg-gray-100 overflow-hidden">
+
+  <!-- Barra sessione -->
+  <div class="bg-white border-b px-4 py-2 flex items-center justify-between flex-shrink-0">
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-gray-400 font-medium uppercase tracking-wide">Sessione:</span>
+      <span *ngIf="currentSessionCode" class="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">{{ currentSessionCode }}</span>
+      <span *ngIf="!currentSessionCode" class="text-xs text-gray-400 italic">non salvata</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button (click)="openResumeModal()"
+        class="px-3 py-1.5 text-xs font-semibold text-blue-600 border border-blue-200 hover:bg-blue-50 rounded-lg transition flex items-center gap-1">
+        ▶ Riprendi sessione
+      </button>
+      <button (click)="suspendSession()"
+        [disabled]="cart.length === 0 || suspendLoading"
+        class="px-3 py-1.5 text-xs font-semibold text-yellow-700 border border-yellow-300 bg-yellow-50 hover:bg-yellow-100 disabled:opacity-40 rounded-lg transition flex items-center gap-1">
+        {{ suspendLoading ? '...' : '⏸ Sospendi' }}
+      </button>
+      <button (click)="showTerminateConfirm = true"
+        class="px-3 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition flex items-center gap-1">
+        🔴 Termina sessione
+      </button>
+    </div>
+  </div>
+
+  <div class="flex flex-1 overflow-hidden">
 
   <!-- ===== LEFT: Cliente + Scanner + Ricerca ===== -->
   <div class="w-80 flex flex-col bg-white border-r shadow-sm flex-shrink-0 overflow-hidden">
@@ -152,7 +246,7 @@ interface PageResponse<T> {
     <!-- 3. N° DOCUMENTO -->
     <div class="p-4">
       <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">N° Documento</label>
-      <input [(ngModel)]="documentNumber" type="text" placeholder="Autogenerato se vuoto"
+      <input [(ngModel)]="documentNumber" (ngModelChange)="sessionService.setDocumentNumber($event)" type="text" placeholder="Autogenerato se vuoto"
         class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500" />
     </div>
   </div>
@@ -161,8 +255,8 @@ interface PageResponse<T> {
   <div class="flex-1 flex flex-col overflow-hidden">
     <div class="px-6 py-4 bg-white border-b flex items-center justify-between">
       <h1 class="text-xl font-bold text-gray-800">🛒 Banco / Cassa Showroom</h1>
-      <button *ngIf="cart.length > 0" (click)="clearCart()"
-        class="text-xs text-red-400 hover:text-red-600 font-medium border border-red-200 hover:border-red-400 px-3 py-1 rounded transition">
+      <button *ngIf="cart.length > 0" (click)="showClearCartConfirm = true"
+        class="text-xs text-red-600 hover:text-white hover:bg-red-600 font-medium border border-red-400 hover:border-red-600 px-3 py-1 rounded transition">
         Svuota carrello
       </button>
     </div>
@@ -271,7 +365,8 @@ interface PageResponse<T> {
     </div>
   </div>
 
-</div>
+  </div><!-- /flex row -->
+</div><!-- /flex-col outer -->
   `
 })
 export class BancoCassaComponent implements OnInit {
@@ -293,8 +388,8 @@ export class BancoCassaComponent implements OnInit {
 
   // Contact
   contactSearch = '';
-  contactResults: Contact[] = [];
-  selectedContact: Contact | null = null;
+  contactResults: CassaContact[] = [];
+  selectedContact: CassaContact | null = null;
   private contactTimer: any;
 
   // Document
@@ -310,6 +405,18 @@ export class BancoCassaComponent implements OnInit {
   generating: 'ddt' | 'invoice' | null = null;
   generateError: string | null = null;
 
+  // Session management
+  currentSessionCode: string | null = null;
+  showSuspendSuccess = false;
+  showResumeModal = false;
+  showTerminateConfirm = false;
+  showClearCartConfirm = false;
+  pausedSessions: PausedSessionSummary[] = [];
+  loadingPausedSessions = false;
+  suspendLoading = false;
+  terminateLoading = false;
+  resumeLoading = false;
+
   get totals() {
     const net   = this.cart.reduce((s, i) => s + i.lineNetTotal, 0);
     const gross = this.cart.reduce((s, i) => s + i.lineGrossTotal, 0);
@@ -320,11 +427,23 @@ export class BancoCassaComponent implements OnInit {
   constructor(
     private api: ApiService,
     private productService: ProductService,
-    private router: Router
+    private router: Router,
+    private sessionService: CassaSessionService
   ) {}
 
   ngOnInit(): void {
+    const snap = this.sessionService.snapshot;
+    this.cart = snap.cart;
+    this.selectedContact = snap.selectedContact;
+    this.documentNumber = snap.documentNumber;
+    this.currentSessionCode = snap.sessionCode;
     this.loadDefaultWarehouse();
+  }
+
+  private syncToService(): void {
+    this.sessionService.setCart(this.cart);
+    this.sessionService.setContact(this.selectedContact);
+    this.sessionService.setDocumentNumber(this.documentNumber);
   }
 
   private loadDefaultWarehouse(): void {
@@ -455,21 +574,23 @@ export class BancoCassaComponent implements OnInit {
 
   private runContactSearch(): void {
     const q = this.contactSearch.trim();
-    this.api.get<PageResponse<Contact>>(`v1/contacts?page=1&pageSize=20&search=${encodeURIComponent(q)}`).subscribe({
+    this.api.get<PageResponse<CassaContact>>(`v1/contacts?page=1&pageSize=20&search=${encodeURIComponent(q)}`).subscribe({
       next: (res) => { this.contactResults = res.items || []; },
       error: () => { this.contactResults = []; }
     });
   }
 
-  selectContact(c: Contact): void {
+  selectContact(c: CassaContact): void {
     this.selectedContact = c;
     this.contactSearch = '';
     this.contactResults = [];
+    this.syncToService();
   }
 
   clearContact(): void {
     this.selectedContact = null;
     this.contactSearch = '';
+    this.syncToService();
   }
 
   // ── Cart ──────────────────────────────────────────────────
@@ -500,6 +621,7 @@ export class BancoCassaComponent implements OnInit {
     }
     this.productSearch = '';
     this.parentResults = [];
+    this.syncToService();
   }
 
   /** @deprecated use addBarcodeVariantToCart */
@@ -515,17 +637,26 @@ export class BancoCassaComponent implements OnInit {
     }
     item.quantity++;
     this.recalcLine(item);
+    this.syncToService();
   }
 
   decreaseQty(i: number): void {
     if (this.cart[i].quantity <= 1) { this.removeItem(i); return; }
     this.cart[i].quantity--;
     this.recalcLine(this.cart[i]);
+    this.syncToService();
   }
 
-  removeItem(i: number): void { this.cart.splice(i, 1); }
+  removeItem(i: number): void {
+    this.cart.splice(i, 1);
+    this.syncToService();
+  }
 
-  clearCart(): void { this.cart = []; }
+  confirmClearCart(): void {
+    this.cart = [];
+    this.showClearCartConfirm = false;
+    this.syncToService();
+  }
 
   private recalcLine(item: CartItem): void {
     item.lineNetTotal   = item.unitNetPrice   * item.quantity;
@@ -606,8 +737,93 @@ export class BancoCassaComponent implements OnInit {
 
   private finalizeAfterGeneration(type: 'ddt' | 'invoice'): void {
     this.generating = null;
+    this.sessionService.clearSession();
     this.cart = [];
     this.documentNumber = '';
+    this.currentSessionCode = null;
     this.router.navigate([type === 'ddt' ? '/ddt/elenco' : '/fatturazione/fatture']);
+  }
+
+  // ── Session management ─────────────────────────────────────
+  suspendSession(): void {
+    if (this.cart.length === 0) return;
+    this.suspendLoading = true;
+    this.sessionService.setCart(this.cart);
+    this.sessionService.setContact(this.selectedContact);
+    this.sessionService.setDocumentNumber(this.documentNumber);
+
+    this.sessionService.createOrPauseSession().subscribe({
+      next: (dto) => {
+        this.sessionService.setSessionRef(dto.id, dto.sessionCode);
+        this.currentSessionCode = dto.sessionCode;
+        this.suspendLoading = false;
+        this.showSuspendSuccess = true;
+      },
+      error: () => { this.suspendLoading = false; }
+    });
+  }
+
+  closeSuspendSuccess(): void {
+    this.showSuspendSuccess = false;
+    this.sessionService.clearSession();
+    this.cart = [];
+    this.selectedContact = null;
+    this.documentNumber = '';
+    this.currentSessionCode = null;
+  }
+
+  openResumeModal(): void {
+    this.showResumeModal = true;
+    this.loadingPausedSessions = true;
+    this.sessionService.getPausedSessions().subscribe({
+      next: (list) => { this.pausedSessions = list; this.loadingPausedSessions = false; },
+      error: () => { this.pausedSessions = []; this.loadingPausedSessions = false; }
+    });
+  }
+
+  doResumeSession(summary: PausedSessionSummary): void {
+    this.resumeLoading = true;
+    this.sessionService.resumeSession(summary.id).subscribe({
+      next: () => {
+        this.sessionService.loadSessionDetail(summary.id).subscribe({
+          next: (detail) => {
+            this.sessionService.applyLoadedSession(detail);
+            const snap = this.sessionService.snapshot;
+            this.cart = snap.cart;
+            this.selectedContact = snap.selectedContact;
+            this.documentNumber = snap.documentNumber;
+            this.currentSessionCode = snap.sessionCode;
+            this.resumeLoading = false;
+            this.showResumeModal = false;
+          },
+          error: () => { this.resumeLoading = false; }
+        });
+      },
+      error: () => { this.resumeLoading = false; }
+    });
+  }
+
+  doTerminateSession(): void {
+    this.terminateLoading = true;
+    const sessionId = this.sessionService.snapshot.sessionId;
+
+    const cleanup = () => {
+      this.sessionService.clearSession();
+      this.cart = [];
+      this.selectedContact = null;
+      this.documentNumber = '';
+      this.currentSessionCode = null;
+      this.terminateLoading = false;
+      this.showTerminateConfirm = false;
+    };
+
+    if (sessionId) {
+      this.sessionService.terminateSession(sessionId).subscribe({
+        next: cleanup,
+        error: cleanup // clean locally even if server call fails
+      });
+    } else {
+      cleanup();
+    }
   }
 }

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Infrastructure.EntityConfigurations;
 
 namespace Mauw.Erp.Infrastructure.DbContext;
 
@@ -37,6 +38,7 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
     public DbSet<Payment> Payments { get; set; }
     public DbSet<AgentCommission> AgentCommissions { get; set; }
     public DbSet<Warehouse> Warehouses { get; set; }
+    public DbSet<CassaSession> CassaSessions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -98,6 +100,7 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
         modelBuilder.ApplyConfiguration(new PaymentConfiguration());
         modelBuilder.ApplyConfiguration(new AgentCommissionConfiguration());
         modelBuilder.ApplyConfiguration(new WarehouseConfiguration());
+        modelBuilder.ApplyConfiguration(new CassaSessionConfiguration());
     }
 
     /// <summary>

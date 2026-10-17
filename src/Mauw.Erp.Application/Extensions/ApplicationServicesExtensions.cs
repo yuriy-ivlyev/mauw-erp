@@ -41,6 +41,9 @@ public static class ApplicationServicesExtensions
         services.AddScoped<IContactAddressService, ContactAddressService>();
         services.AddScoped<IWarehouseService, WarehouseService>();
 
+        // Cassa session management
+        services.AddScoped<ICassaSessionService, CassaSessionService>();
+
         // VAT validation (IT checksum + EU VIES + Extra-EU)
         services.AddScoped<IVatValidationService, VatValidationService>();
 
