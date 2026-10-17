@@ -56,8 +56,6 @@ services:
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
       OTEL_SERVICE_NAME: mauw-erp-backend
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
-      AzureAd__TenantId: "${AZURE_TENANT_ID}"
-      AzureAd__ClientId: "${AZURE_CLIENT_ID}"
       AzureAd__ClientSecret: "${AZURE_CLIENT_SECRET}"
     ports:
       - "5019:8443"
