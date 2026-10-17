@@ -15,10 +15,18 @@ public static class AuthExtensions
         services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
             .AddMicrosoftIdentityWebApp(configuration.GetSection("AzureAd"));
 
-        // Map Entra ID 'roles' app-role claim → ClaimTypes.Role so [Authorize(Roles=...)] works
+        // Map Entra ID 'roles' app-role claim → ClaimTypes.Role so [Authorize(Roles=...)] works.
+        // Also switch to Authorization Code flow (more secure than implicit id_token flow).
+        // In the App Registration: Authentication → ensure redirect URI is added as "Web" type;
+        // no need to enable "ID tokens" under Implicit grant.
         services.Configure<OpenIdConnectOptions>(
             OpenIdConnectDefaults.AuthenticationScheme,
-            options => options.TokenValidationParameters.RoleClaimType = "roles");
+            options =>
+            {
+                options.ResponseType = "code";   // Authorization Code flow, not implicit
+                options.TokenValidationParameters.RoleClaimType = "roles";
+                options.SaveTokens = false;      // tokens stored server-side in the session cookie
+            });
 
         // Harden the application session cookie
         services.Configure<CookieAuthenticationOptions>(
