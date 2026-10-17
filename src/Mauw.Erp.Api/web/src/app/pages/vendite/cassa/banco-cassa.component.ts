@@ -787,24 +787,34 @@ export class BancoCassaComponent implements OnInit {
 
   doResumeSession(summary: PausedSessionSummary): void {
     this.resumeLoading = true;
-    this.sessionService.resumeSession(summary.id).subscribe({
-      next: () => {
-        this.sessionService.loadSessionDetail(summary.id).subscribe({
-          next: (detail) => {
-            this.sessionService.applyLoadedSession(detail);
-            const snap = this.sessionService.snapshot;
-            this.cart = snap.cart;
-            this.selectedContact = snap.selectedContact;
-            this.documentNumber = snap.documentNumber;
-            this.currentSessionCode = snap.sessionCode;
-            this.resumeLoading = false;
-            this.showResumeModal = false;
-          },
-          error: () => { this.resumeLoading = false; }
-        });
-      },
-      error: () => { this.resumeLoading = false; }
-    });
+    const currentSessionId = this.sessionService.snapshot.sessionId;
+
+    const proceedResume = () => {
+      this.sessionService.resumeSession(summary.id).subscribe({
+        next: (detail) => {
+          this.sessionService.applyLoadedSession(detail);
+          const snap = this.sessionService.snapshot;
+          this.cart = snap.cart;
+          this.selectedContact = snap.selectedContact;
+          this.documentNumber = snap.documentNumber;
+          this.currentSessionCode = snap.sessionCode;
+          this.resumeLoading = false;
+          this.showResumeModal = false;
+        },
+        error: () => { this.resumeLoading = false; }
+      });
+    };
+
+    // Se c'è una sessione attiva diversa da quella che stiamo riprendendo,
+    // la sospende prima di caricare la nuova, così non va "persa"
+    if (currentSessionId && currentSessionId !== summary.id) {
+      this.sessionService.createOrPauseSession().subscribe({
+        next: () => { this.sessionService.clearSession(); proceedResume(); },
+        error:  () => { this.sessionService.clearSession(); proceedResume(); }
+      });
+    } else {
+      proceedResume();
+    }
   }
 
   doTerminateSession(): void {
