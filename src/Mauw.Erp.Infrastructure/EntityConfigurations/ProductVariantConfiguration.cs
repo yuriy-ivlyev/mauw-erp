@@ -20,6 +20,10 @@ public class ProductVariantConfiguration : IEntityTypeConfiguration<ProductVaria
         builder.Property(v => v.PurchaseCost)
             .HasPrecision(18, 4);
 
+        builder.Property(v => v.WeightGrams)
+            .HasPrecision(10, 2)
+            .IsRequired(false);
+
         builder.Property(v => v.CreatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 

@@ -10,6 +10,7 @@ public class ProductVariant : Entity<Guid>
     public string? SizeId { get; set; }
     public string Barcode { get; set; }
     public decimal PurchaseCost { get; set; }
+    public decimal? WeightGrams { get; set; }
 
     // Navigation
     public Product Product { get; set; } = null!;
@@ -22,7 +23,8 @@ public class ProductVariant : Entity<Guid>
         string barcode,
         decimal purchaseCost,
         string? colorId = null,
-        string? sizeId = null
+        string? sizeId = null,
+        decimal? weightGrams = null
     ) : base()
     {
         ProductId = productId;
@@ -30,13 +32,15 @@ public class ProductVariant : Entity<Guid>
         PurchaseCost = purchaseCost;
         ColorId = colorId;
         SizeId = sizeId;
+        WeightGrams = weightGrams;
     }
 
-    public void Update(string? colorId, string? sizeId, string barcode, decimal purchaseCost)
+    public void Update(string? colorId, string? sizeId, string barcode, decimal purchaseCost, decimal? weightGrams = null)
     {
         ColorId = colorId;
         SizeId = sizeId;
         Barcode = barcode;
         PurchaseCost = purchaseCost;
+        WeightGrams = weightGrams;
     }
 }

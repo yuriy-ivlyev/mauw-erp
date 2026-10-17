@@ -38,54 +38,57 @@ export class MenuService {
       icon: ICONS.cart,
       isCollapsed: false,
       children: [
-        { label: 'Cassa',      route: '/vendite/cassa',          icon: ICONS.cash      },
-        { label: 'Ordini',     route: '/ordini/elenco',          icon: ICONS.orders    },
-        { label: 'Preventivi', route: '/fatturazione/preventivi', icon: ICONS.quote    },
-        { label: 'Contatti',   route: '/anagrafiche/elenco',     icon: ICONS.contacts  }
+        { label: 'Cassa',      route: '/vendite/cassa',          icon: ICONS.cash,     roles: ['Admin', 'Cashier'] },
+        { label: 'Ordini',     route: '/ordini/elenco',          icon: ICONS.orders,   roles: ['Admin', 'Sales', 'Cashier'] },
+        { label: 'Preventivi', route: '/fatturazione/preventivi', icon: ICONS.quote,   roles: ['Admin', 'Sales', 'Accounting'] },
+        { label: 'Contatti',   route: '/anagrafiche/elenco',     icon: ICONS.contacts, roles: ['Admin', 'Sales', 'Accounting'] }
       ]
     },
     {
       label: 'Catalogo',
       icon: ICONS.tag,
       isCollapsed: true,
+      roles: ['Admin', 'Sales', 'Warehouse'],
       children: [
-        { label: 'Prodotti',       route: '/magazzino/prodotti',        icon: ICONS.products   },
-        { label: 'Listini',        route: '/catalogo/listini',          icon: ICONS.priceList  },
-        // ── Attributi (separatore) ─────────────────────────────────────
+        { label: 'Prodotti',        route: '/magazzino/prodotti',        icon: ICONS.products,   roles: ['Admin', 'Warehouse'] },
+        { label: 'Listini',         route: '/catalogo/listini',          icon: ICONS.priceList,  roles: ['Admin', 'Sales'] },
         { label: 'Attributi', icon: '', isSeparator: true },
-        { label: 'Categorie',      route: '/magazzino/categorie',       icon: ICONS.categories },
-        { label: 'Macro Categorie',route: '/magazzino/macro-categorie', icon: ICONS.categories },
-        { label: 'Taglie',         route: '/magazzino/taglie',          icon: ICONS.sizes      },
-        { label: 'Colori',         route: '/magazzino/colori',          icon: ICONS.colors     },
-        { label: 'Materiali',      route: '/magazzino/materiali',       icon: ICONS.materials  }
+        { label: 'Categorie',       route: '/magazzino/categorie',       icon: ICONS.categories, roles: ['Admin', 'Warehouse'] },
+        { label: 'Macro Categorie', route: '/magazzino/macro-categorie', icon: ICONS.categories, roles: ['Admin', 'Warehouse'] },
+        { label: 'Taglie',          route: '/magazzino/taglie',          icon: ICONS.sizes,      roles: ['Admin', 'Warehouse'] },
+        { label: 'Colori',          route: '/magazzino/colori',          icon: ICONS.colors,     roles: ['Admin', 'Warehouse'] },
+        { label: 'Materiali',       route: '/magazzino/materiali',       icon: ICONS.materials,  roles: ['Admin', 'Warehouse'] }
       ]
     },
     {
       label: 'Magazzino',
       icon: ICONS.box,
       isCollapsed: true,
+      roles: ['Admin', 'Warehouse'],
       children: [
-        { label: 'Magazzini',  route: '/magazzino/magazzini',     icon: ICONS.warehouse  },
-        { label: 'Giacenze',   route: '/magazzino/inventario',    icon: ICONS.inventory  },
-        { label: 'Movimenti',  route: '/magazzino/movimenti',     icon: ICONS.movements  },
-        { label: 'DDT',        route: '/ddt/elenco',              icon: ICONS.ddt        }
+        { label: 'Magazzini', route: '/magazzino/magazzini',  icon: ICONS.warehouse, roles: ['Admin', 'Warehouse'] },
+        { label: 'Giacenze',  route: '/magazzino/inventario', icon: ICONS.inventory, roles: ['Admin', 'Warehouse'] },
+        { label: 'Movimenti', route: '/magazzino/movimenti',  icon: ICONS.movements, roles: ['Admin', 'Warehouse'] },
+        { label: 'DDT',       route: '/ddt/elenco',           icon: ICONS.ddt,       roles: ['Admin', 'Warehouse'] }
       ]
     },
     {
       label: 'Fiscale',
       icon: ICONS.invoice,
       isCollapsed: true,
+      roles: ['Admin', 'Accounting'],
       children: [
-        { label: 'Fatture',      route: '/fatturazione/fatture',      icon: ICONS.invoice    },
-        { label: 'Note Credito', route: '/fatturazione/nota-credito', icon: ICONS.creditNote }
+        { label: 'Fatture',      route: '/fatturazione/fatture',      icon: ICONS.invoice,    roles: ['Admin', 'Accounting'] },
+        { label: 'Note Credito', route: '/fatturazione/nota-credito', icon: ICONS.creditNote, roles: ['Admin', 'Accounting'] }
       ]
     },
     {
       label: 'Sistema',
       icon: ICONS.settings,
       isCollapsed: true,
+      roles: ['Admin'],
       children: [
-        { label: 'Azienda', route: '/impostazioni/azienda', icon: ICONS.company }
+        { label: 'Azienda', route: '/impostazioni/azienda', icon: ICONS.company, roles: ['Admin'] }
       ]
     }
   ];

@@ -19,7 +19,8 @@ public record MatrixCellDto(
     string? SizeId,
     string Barcode,
     decimal UnitPrice,
-    decimal AvailableStock
+    decimal AvailableStock,
+    decimal? WeightGrams = null
 );
 
 /// <summary>

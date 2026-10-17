@@ -53,6 +53,7 @@ export interface ProductVariantDto {
   finalNetPrice: number;
   vatAmount: number;
   finalGrossPrice: number;
+  weightGrams?: number | null;
 }
 
 export interface ProductImageDto {
@@ -147,6 +148,7 @@ export interface MatrixCellDto {
   barcode: string;
   unitPrice: number;
   availableStock: number;
+  weightGrams?: number | null;
 }
 
 export interface ProductMatrixDto {
@@ -165,6 +167,7 @@ export interface CreateProductVariantRequest {
   sizeId: string;
   barcode: string;
   purchaseCost: number;
+  weightGrams?: number | null;
 }
 
 export interface PageResponse<T> {

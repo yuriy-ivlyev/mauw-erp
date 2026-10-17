@@ -12,6 +12,7 @@ export interface MatrixSelection {
   quantity: number;
   availableStock: number;
   vatRate: number;
+  weightGrams?: number | null;
 }
 
 @Component({
@@ -231,7 +232,8 @@ export class ProductMatrixModalComponent implements OnInit {
         unitPrice: cell.unitPrice,
         quantity: qty,
         availableStock: cell.availableStock,
-        vatRate: this.vatRate
+        vatRate: this.vatRate,
+        weightGrams: cell.weightGrams
       });
     });
 

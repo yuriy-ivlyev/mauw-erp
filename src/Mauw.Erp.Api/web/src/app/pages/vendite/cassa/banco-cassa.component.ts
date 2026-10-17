@@ -17,7 +17,8 @@ interface BarcodeVariant {
   unitNetPrice: number;
   unitGrossPrice: number;
   vatRate: number;
-  quantityAvailable: number; // da WH-CENTRALE
+  quantityAvailable: number;
+  weightGrams?: number | null;
 }
 
 interface CartItem extends BarcodeVariant {
@@ -226,44 +227,47 @@ interface PageResponse<T> {
     </div>
 
     <!-- Totals + Actions -->
-    <div *ngIf="cart.length > 0" class="bg-white border-t px-6 py-4">
-      <div class="flex items-end justify-between gap-6">
-        <!-- Totals -->
-        <div class="grid grid-cols-3 gap-6 flex-1">
-          <div class="text-center">
-            <div class="text-xs text-gray-500 font-medium uppercase tracking-wide mb-0.5">Imponibile</div>
-            <div class="text-xl font-bold text-gray-700">{{ totals.net | number:'1.2-2' }} €</div>
+    <div *ngIf="cart.length > 0" class="bg-white border-t px-4 py-2.5 flex-shrink-0">
+      <div class="flex items-center justify-between gap-4">
+
+        <!-- Totals: compact inline -->
+        <div class="flex items-center gap-5 divide-x divide-gray-200">
+          <div class="text-right pr-5">
+            <div class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">Imponibile</div>
+            <div class="text-sm font-semibold text-gray-700">{{ totals.net | number:'1.2-2' }} €</div>
           </div>
-          <div class="text-center">
-            <div class="text-xs text-gray-500 font-medium uppercase tracking-wide mb-0.5">IVA</div>
-            <div class="text-xl font-bold text-gray-600">{{ totals.vat | number:'1.2-2' }} €</div>
+          <div class="text-right pr-5">
+            <div class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">IVA</div>
+            <div class="text-sm font-semibold text-gray-500">{{ totals.vat | number:'1.2-2' }} €</div>
           </div>
-          <div class="text-center">
-            <div class="text-xs text-gray-500 font-medium uppercase tracking-wide mb-0.5">Totale Lordo</div>
-            <div class="text-2xl font-extrabold text-blue-700">{{ totals.gross | number:'1.2-2' }} €</div>
+          <div class="text-right pr-5">
+            <div class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">Totale Lordo</div>
+            <div class="text-base font-extrabold text-blue-700">{{ totals.gross | number:'1.2-2' }} €</div>
+          </div>
+          <div class="text-right">
+            <div class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">Peso</div>
+            <div class="text-sm font-medium text-gray-400">{{ totals.weightKg | number:'1.2-2' }} kg</div>
           </div>
         </div>
 
-        <!-- Action buttons -->
-        <div class="flex gap-3 flex-shrink-0">
+        <!-- Action buttons: aligned right -->
+        <div class="flex gap-2 flex-shrink-0 ml-auto">
           <button (click)="generateDocument('ddt')"
             [disabled]="!selectedContact || generating"
-            class="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white font-bold rounded-xl shadow transition flex items-center gap-2">
-            <span class="text-lg">🚚</span>
-            <span>{{ generating === 'ddt' ? 'Generazione...' : 'Genera DDT' }}</span>
+            class="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white text-sm font-semibold rounded-lg shadow transition flex items-center gap-1.5">
+            <span>🚚</span>
+            <span>{{ generating === 'ddt' ? '...' : 'DDT' }}</span>
           </button>
           <button (click)="generateDocument('invoice')"
             [disabled]="!selectedContact || generating"
-            class="px-6 py-3 bg-blue-700 hover:bg-blue-800 disabled:opacity-40 text-white font-bold rounded-xl shadow transition flex items-center gap-2">
-            <span class="text-lg">🧾</span>
-            <span>{{ generating === 'invoice' ? 'Generazione...' : 'Fattura Accompagnatoria' }}</span>
+            class="px-4 py-2 bg-blue-700 hover:bg-blue-800 disabled:opacity-40 text-white text-sm font-semibold rounded-lg shadow transition flex items-center gap-1.5">
+            <span>🧾</span>
+            <span>{{ generating === 'invoice' ? '...' : 'Fattura' }}</span>
           </button>
         </div>
       </div>
-      <p *ngIf="!selectedContact" class="text-xs text-orange-500 mt-2">
-        ⚠️ Seleziona un cliente per procedere
-      </p>
-      <p *ngIf="generateError" class="text-xs text-red-500 mt-2">{{ generateError }}</p>
+      <p *ngIf="!selectedContact" class="text-[11px] text-orange-500 mt-1">⚠️ Seleziona un cliente per procedere</p>
+      <p *ngIf="generateError" class="text-[11px] text-red-500 mt-1">{{ generateError }}</p>
     </div>
   </div>
 
@@ -309,7 +313,8 @@ export class BancoCassaComponent implements OnInit {
   get totals() {
     const net   = this.cart.reduce((s, i) => s + i.lineNetTotal, 0);
     const gross = this.cart.reduce((s, i) => s + i.lineGrossTotal, 0);
-    return { net, vat: gross - net, gross };
+    const weightG = this.cart.reduce((s, i) => s + (i.weightGrams ?? 0) * i.quantity, 0);
+    return { net, vat: gross - net, gross, weightKg: weightG / 1000 };
   }
 
   constructor(
@@ -435,7 +440,8 @@ export class BancoCassaComponent implements OnInit {
         unitNetPrice: s.unitPrice / (1 + s.vatRate / 100),
         unitGrossPrice: s.unitPrice,
         vatRate: s.vatRate,
-        quantityAvailable: s.availableStock
+        quantityAvailable: s.availableStock,
+        weightGrams: s.weightGrams
       }, s.quantity);
     }
   }

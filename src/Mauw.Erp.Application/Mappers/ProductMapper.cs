@@ -69,7 +69,8 @@ public static class ProductMapper
             ListPrice: pricingResult.ListPrice,
             FinalNetPrice: pricingResult.FinalNetPrice,
             VatAmount: 0,
-            FinalGrossPrice: pricingResult.FinalNetPrice
+            FinalGrossPrice: pricingResult.FinalNetPrice,
+            WeightGrams: variant.WeightGrams
         );
     }
 
@@ -91,7 +92,8 @@ public static class ProductMapper
             Color: variant.Color?.Name ?? "N/A",
             UnitNetPrice: pricingResult.FinalNetPrice,
             UnitGrossPrice: pricingResult.FinalGrossPrice,
-            VatRate: product.VatRate
+            VatRate: product.VatRate,
+            WeightGrams: variant.WeightGrams
         );
     }
 

@@ -270,7 +270,8 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             colorId: request.ColorId,
             sizeId: request.SizeId,
             barcode: request.Barcode,
-            purchaseCost: request.PurchaseCost
+            purchaseCost: request.PurchaseCost,
+            weightGrams: request.WeightGrams
         );
 
         await unitOfWork.ProductVariants.AddAsync(variant);
@@ -330,7 +331,8 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             colorId: request.ColorId,
             sizeId: request.SizeId,
             barcode: request.Barcode,
-            purchaseCost: request.PurchaseCost
+            purchaseCost: request.PurchaseCost,
+            weightGrams: request.WeightGrams
         );
 
         await unitOfWork.ProductVariants.UpdateAsync(variant);
@@ -425,7 +427,8 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
                 SizeId: variant.SizeId,
                 Barcode: variant.Barcode,
                 UnitPrice: pricingResult.FinalGrossPrice,
-                AvailableStock: stock
+                AvailableStock: stock,
+                WeightGrams: variant.WeightGrams
             ));
         }
 

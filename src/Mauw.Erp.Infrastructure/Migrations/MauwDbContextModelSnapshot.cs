@@ -1685,6 +1685,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnName("updated_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<decimal?>("WeightGrams")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("weight_grams");
+
                     b.HasKey("Id")
                         .HasName("p_k_product_variants");
 

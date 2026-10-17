@@ -15,6 +15,8 @@ public class ProductVariantRepository(MauwDbContext dbContext)
     {
         return await _dbSet
             .Include(v => v.Product)
+            .Include(v => v.Color)
+            .Include(v => v.Size)
             .AsNoTracking()
             .FirstOrDefaultAsync(v => v.Barcode.ToLower() == barcode.ToLower());
     }

@@ -2,6 +2,8 @@ import { Routes } from '@angular/router';
 import { AdminLayoutComponent } from './shared/layout/admin-layout.component';
 import { DashboardComponent } from './pages/dashboard/dashboard.component';
 import { BancoCassaComponent } from './pages/vendite/cassa/banco-cassa.component';
+import { authGuard } from './guards/auth.guard';
+import { roleGuard } from './guards/role.guard';
 
 // Ordini
 import { OrdiniElencoComponent } from './pages/ordini/elenco/ordini-elenco.component';
@@ -41,47 +43,48 @@ export const routes: Routes = [
   {
     path: '',
     component: AdminLayoutComponent,
+    canActivate: [authGuard],
     children: [
       { path: '',          component: DashboardComponent, pathMatch: 'full', title: 'Dashboard | Mauw ERP' },
       { path: 'dashboard', component: DashboardComponent, title: 'Dashboard | Mauw ERP' },
 
       // Vendite
-      { path: 'vendite/cassa',         component: BancoCassaComponent,  title: 'Banco / Cassa | Mauw ERP' },
+      { path: 'vendite/cassa', component: BancoCassaComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Cashier'] }, title: 'Banco / Cassa | Mauw ERP' },
 
       // Ordini
-      { path: 'ordini/elenco',         component: OrdiniElencoComponent, title: 'Elenco Ordini | Mauw ERP' },
-      { path: 'ordini/nuovo',          component: OrdiniNuovoComponent,  title: 'Nuovo Ordine | Mauw ERP' },
+      { path: 'ordini/elenco', component: OrdiniElencoComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Cashier'] }, title: 'Elenco Ordini | Mauw ERP' },
+      { path: 'ordini/nuovo',  component: OrdiniNuovoComponent,  canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Cashier'] }, title: 'Nuovo Ordine | Mauw ERP' },
 
       // Fatturazione
-      { path: 'fatturazione/fatture',      component: FattureComponent,     title: 'Fatture | Mauw ERP' },
-      { path: 'fatturazione/preventivi',   component: PreventiviComponent,  title: 'Preventivi | Mauw ERP' },
-      { path: 'fatturazione/nota-credito', component: NotaCreditoComponent, title: 'Nota Credito | Mauw ERP' },
+      { path: 'fatturazione/fatture',      component: FattureComponent,     canActivate: [roleGuard], data: { roles: ['Admin', 'Accounting'] }, title: 'Fatture | Mauw ERP' },
+      { path: 'fatturazione/preventivi',   component: PreventiviComponent,  canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Accounting'] }, title: 'Preventivi | Mauw ERP' },
+      { path: 'fatturazione/nota-credito', component: NotaCreditoComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Accounting'] }, title: 'Nota Credito | Mauw ERP' },
 
       // DDT
-      { path: 'ddt/elenco', component: DdtElencoComponent, title: 'Elenco DDT | Mauw ERP' },
-      { path: 'ddt/nuovo',  component: DdtNuovoComponent,  title: 'Nuovo DDT | Mauw ERP' },
+      { path: 'ddt/elenco', component: DdtElencoComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Elenco DDT | Mauw ERP' },
+      { path: 'ddt/nuovo',  component: DdtNuovoComponent,  canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Nuovo DDT | Mauw ERP' },
 
       // Magazzino
-      { path: 'magazzino/magazzini',      component: MagazziniComponent,     title: 'Magazzini | Mauw ERP' },
-      { path: 'magazzino/prodotti',       component: ProdottiComponent,      title: 'Prodotti | Mauw ERP' },
-      { path: 'magazzino/movimenti',      component: MovimentiComponent,     title: 'Movimenti | Mauw ERP' },
-      { path: 'magazzino/inventario',     component: InventarioComponent,    title: 'Inventario | Mauw ERP' },
-      { path: 'magazzino/categorie',      component: CategorieComponent,     title: 'Categorie | Mauw ERP' },
-      { path: 'magazzino/colori',         component: ColoriComponent,        title: 'Colori | Mauw ERP' },
-      { path: 'magazzino/taglie',         component: TaglieComponent,        title: 'Taglie | Mauw ERP' },
-      { path: 'magazzino/materiali',      component: MmaterialiComponent,    title: 'Materiali | Mauw ERP' },
-      { path: 'magazzino/macro-categorie',component: MacroCategorieComponent,title: 'Macro Categorie | Mauw ERP' },
+      { path: 'magazzino/magazzini',       component: MagazziniComponent,      canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Magazzini | Mauw ERP' },
+      { path: 'magazzino/prodotti',        component: ProdottiComponent,       canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Prodotti | Mauw ERP' },
+      { path: 'magazzino/movimenti',       component: MovimentiComponent,      canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Movimenti | Mauw ERP' },
+      { path: 'magazzino/inventario',      component: InventarioComponent,     canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Inventario | Mauw ERP' },
+      { path: 'magazzino/categorie',       component: CategorieComponent,      canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Categorie | Mauw ERP' },
+      { path: 'magazzino/colori',          component: ColoriComponent,         canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Colori | Mauw ERP' },
+      { path: 'magazzino/taglie',          component: TaglieComponent,         canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Taglie | Mauw ERP' },
+      { path: 'magazzino/materiali',       component: MmaterialiComponent,     canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Materiali | Mauw ERP' },
+      { path: 'magazzino/macro-categorie', component: MacroCategorieComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Macro Categorie | Mauw ERP' },
 
       // Anagrafiche
-      { path: 'anagrafiche/elenco',           component: AnagraficheElencoComponent,  title: 'Anagrafiche | Mauw ERP' },
-      { path: 'anagrafiche/nuovo',            component: AnagraficaModificaComponent, title: 'Nuova Anagrafica | Mauw ERP' },
-      { path: 'anagrafiche/:id/modifica',     component: AnagraficaModificaComponent, title: 'Modifica Anagrafica | Mauw ERP' },
+      { path: 'anagrafiche/elenco',       component: AnagraficheElencoComponent,  canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Accounting'] }, title: 'Anagrafiche | Mauw ERP' },
+      { path: 'anagrafiche/nuovo',        component: AnagraficaModificaComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales'] }, title: 'Nuova Anagrafica | Mauw ERP' },
+      { path: 'anagrafiche/:id/modifica', component: AnagraficaModificaComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales'] }, title: 'Modifica Anagrafica | Mauw ERP' },
 
-      // Impostazioni
-      { path: 'impostazioni/azienda', component: ImpostazioniAziendaComponent, title: 'Impostazioni Azienda | Mauw ERP' },
+      // Impostazioni — solo Admin
+      { path: 'impostazioni/azienda', component: ImpostazioniAziendaComponent, canActivate: [roleGuard], data: { roles: ['Admin'] }, title: 'Impostazioni Azienda | Mauw ERP' },
 
       // Catalogo
-      { path: 'catalogo/listini', component: ListiniComponent, title: 'Listini Prezzi | Mauw ERP' }
+      { path: 'catalogo/listini', component: ListiniComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales'] }, title: 'Listini Prezzi | Mauw ERP' }
     ]
   }
 ];

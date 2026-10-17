@@ -15,6 +15,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Observability: OTel tracing, metrics and structured logging
 builder.AddObservability();
 
+// Microsoft Entra ID SSO (BFF pattern — HttpOnly cookie session)
+builder.Services.AddMicrosoftEntraAuth(builder.Configuration);
+
 // Configure PostgreSQL connection
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ??
     "Host=localhost;Database=mauw_erp;Username=postgres;Password=postgres;Port=5432";
@@ -124,10 +127,15 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 
+// Auth middleware must come after CORS and before endpoints
+app.UseAuthentication();
+app.UseAuthorization();
+
 // Serve static files (Angular app)
 app.UseStaticFiles();
 
 // Map endpoints
+app.MapControllers();
 app.MapProductEndpoints();
 app.MapSupportEndpoints();
 app.MapInventoryEndpoints();

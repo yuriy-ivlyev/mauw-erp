@@ -16,5 +16,6 @@ public record ProductVariantDto(
     decimal ListPrice,
     decimal FinalNetPrice,
     decimal VatAmount,
-    decimal FinalGrossPrice
+    decimal FinalGrossPrice,
+    decimal? WeightGrams = null
 );

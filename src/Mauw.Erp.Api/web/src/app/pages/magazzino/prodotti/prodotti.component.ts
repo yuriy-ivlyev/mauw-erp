@@ -213,6 +213,7 @@ import {
                         <th class="px-4 py-3 text-left font-medium">Taglia</th>
                         <th class="px-4 py-3 text-left font-medium">Barcode</th>
                         <th class="px-4 py-3 text-left font-medium">Costo Acquisto</th>
+                        <th class="px-4 py-3 text-left font-medium">Peso (g)</th>
                         <th class="px-4 py-3 text-center font-medium">Azioni</th>
                       </tr>
                     </thead>
@@ -232,6 +233,7 @@ import {
                           <td class="px-4 py-3">{{ getSizeName(variant.sizeId) }}</td>
                           <td class="px-4 py-3">{{ variant.barcode }}</td>
                           <td class="px-4 py-3">&euro;{{ variant.purchaseCost.toFixed(2) }}</td>
+                          <td class="px-4 py-3 text-gray-500">{{ variant.weightGrams != null ? (variant.weightGrams + ' g') : '—' }}</td>
                           <td class="px-4 py-3 text-center space-x-2">
                             <button
                               (click)="startEditVariant(variant)"
@@ -273,6 +275,10 @@ import {
                           </td>
                           <td class="px-4 py-3">
                             <input [(ngModel)]="editingVariantForm.purchaseCost" type="number" step="0.01"
+                              class="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                          </td>
+                          <td class="px-4 py-3">
+                            <input [(ngModel)]="editingVariantForm.weightGrams" type="number" step="1" min="0" placeholder="g"
                               class="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                           </td>
                           <td class="px-4 py-3 text-center space-x-2">
@@ -331,6 +337,11 @@ import {
                     <div>
                       <label class="block text-sm font-medium mb-1">Costo Acquisto *</label>
                       <input [(ngModel)]="newVariantForm.purchaseCost" type="number" step="0.01" placeholder="0.00"
+                        class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium mb-1">Peso (grammi)</label>
+                      <input [(ngModel)]="newVariantForm.weightGrams" type="number" step="1" min="0" placeholder="es. 350"
                         class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                   </div>
@@ -550,7 +561,8 @@ export class ProdottiComponent implements OnInit {
       colorId: '',
       sizeId: '',
       barcode: '',
-      purchaseCost: defaultPurchaseCost
+      purchaseCost: defaultPurchaseCost,
+      weightGrams: null as number | null
     };
   }
 
@@ -624,7 +636,8 @@ export class ProdottiComponent implements OnInit {
       colorId: '',
       sizeId: '',
       barcode: '',
-      purchaseCost: product.basePurchaseCost
+      purchaseCost: product.basePurchaseCost,
+      weightGrams: null
     };
     
     this.activeTab = 'details';
@@ -721,7 +734,8 @@ export class ProdottiComponent implements OnInit {
       colorId: this.newVariantForm.colorId,
       sizeId: this.newVariantForm.sizeId,
       barcode: this.newVariantForm.barcode,
-      purchaseCost: this.newVariantForm.purchaseCost
+      purchaseCost: this.newVariantForm.purchaseCost,
+      weightGrams: this.newVariantForm.weightGrams || null
     };
 
     this.savingVariant = true;
@@ -764,7 +778,8 @@ export class ProdottiComponent implements OnInit {
       colorId: variant.colorId || '',
       sizeId: variant.sizeId || '',
       barcode: variant.barcode,
-      purchaseCost: variant.purchaseCost
+      purchaseCost: variant.purchaseCost,
+      weightGrams: variant.weightGrams ?? null
     };
     this.variantError = null;
   }
@@ -777,7 +792,8 @@ export class ProdottiComponent implements OnInit {
       colorId: this.editingVariantForm.colorId || null,
       sizeId: this.editingVariantForm.sizeId || null,
       barcode: this.editingVariantForm.barcode,
-      purchaseCost: this.editingVariantForm.purchaseCost
+      purchaseCost: this.editingVariantForm.purchaseCost,
+      weightGrams: this.editingVariantForm.weightGrams || null
     };
 
     this.productService.updateProductVariant(this.editingProductId, this.editingVariantId, request).subscribe({
