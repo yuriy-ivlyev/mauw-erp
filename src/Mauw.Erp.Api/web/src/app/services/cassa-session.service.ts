@@ -48,6 +48,7 @@ export interface SavedSessionDetail {
   sessionCode: string;
   contactId: string | null;
   contactName: string | null;
+  contactVatNumber: string | null;
   documentReference: string | null;
   items: SavedCartItemDto[];
 }
@@ -170,7 +171,7 @@ export class CassaSessionService {
     }));
 
     const contact = detail.contactId
-      ? { id: detail.contactId, businessName: detail.contactName ?? '', vatNumber: '', defaultDiscountRate: 0 }
+      ? { id: detail.contactId, businessName: detail.contactName ?? '', vatNumber: detail.contactVatNumber ?? '', defaultDiscountRate: 0 }
       : null;
 
     this.state = {

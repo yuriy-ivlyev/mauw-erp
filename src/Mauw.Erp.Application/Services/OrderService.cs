@@ -279,6 +279,7 @@ public partial class OrderService(
             order.OrderNumber,
             order.ContactId.ToString(),
             contactName,
+            order.Contact?.VatNumber,
             order.DocumentReference,
             order.Items.Select(i => new CassaCartItemDto(
                 i.VariantId,

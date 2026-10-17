@@ -177,7 +177,10 @@ interface PageResponse<T> {
         </div>
       </div>
       <div *ngIf="selectedContact" class="mt-2 flex items-center justify-between">
-        <span class="text-xs font-medium text-green-800">{{ selectedContact.businessName }}</span>
+        <div>
+          <div class="text-xs font-semibold text-green-800">{{ selectedContact.businessName }}</div>
+          <div *ngIf="selectedContact.vatNumber" class="text-xs text-green-600 font-mono">P.IVA: {{ selectedContact.vatNumber }}</div>
+        </div>
         <button (click)="clearContact()" class="text-green-400 hover:text-red-500 text-lg leading-none transition">&times;</button>
       </div>
     </div>

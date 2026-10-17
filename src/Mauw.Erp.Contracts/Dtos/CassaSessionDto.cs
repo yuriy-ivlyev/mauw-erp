@@ -20,6 +20,7 @@ public record CassaSessionDetailDto(
     string SessionCode,
     string? ContactId,
     string? ContactName,
+    string? ContactVatNumber,
     string? DocumentReference,
     List<CassaCartItemDto> Items
 );
