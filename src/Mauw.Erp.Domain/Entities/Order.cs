@@ -15,6 +15,8 @@ public class Order : Entity<Guid>
     public decimal TaxableTotal { get; set; }
     public decimal VatTotal { get; set; }
     public decimal GrossTotal { get; set; }
+    public string? TerminalId { get; set; }
+    public string? DocumentReference { get; set; }
 
     // Navigation
     public Contact Contact { get; set; } = null!;
@@ -65,6 +67,41 @@ public class Order : Entity<Guid>
             throw new InvalidOperationException("Cannot confirm an order without items.");
 
         Status = OrderStatus.Confirmed;
+        UpdateTimestamp();
+    }
+
+    public void Suspend(string? terminalId)
+    {
+        Status = OrderStatus.Suspended;
+        TerminalId = terminalId;
+        UpdateTimestamp();
+    }
+
+    public void Resume(string? terminalId)
+    {
+        Status = OrderStatus.Draft;
+        TerminalId = terminalId;
+        UpdateTimestamp();
+    }
+
+    public void Terminate()
+    {
+        Status = OrderStatus.Terminated;
+        UpdateTimestamp();
+    }
+
+    public void SetDocumentReference(string? docRef)
+    {
+        DocumentReference = docRef;
+        UpdateTimestamp();
+    }
+
+    public void ClearItems()
+    {
+        Items.Clear();
+        TaxableTotal = 0;
+        VatTotal = 0;
+        GrossTotal = 0;
         UpdateTimestamp();
     }
 }

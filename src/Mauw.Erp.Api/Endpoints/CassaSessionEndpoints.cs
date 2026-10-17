@@ -18,15 +18,15 @@ public static class CassaSessionEndpoints
 
         group.MapGet("/paused", GetPausedSessions)
             .WithName("GetPausedCassaSessions")
-            .WithSummary("Elenca le sessioni cassa in pausa");
+            .WithSummary("Elenca le sessioni cassa sospese");
 
         group.MapGet("/{id:guid}", GetSession)
             .WithName("GetCassaSession")
-            .WithSummary("Dettaglio sessione cassa");
+            .WithSummary("Dettaglio sessione cassa con articoli");
 
         group.MapPatch("/{id:guid}/pause", PauseSession)
             .WithName("PauseCassaSession")
-            .WithSummary("Sospende la sessione cassa");
+            .WithSummary("Aggiorna e sospende la sessione cassa");
 
         group.MapPatch("/{id:guid}/resume", ResumeSession)
             .WithName("ResumeCassaSession")
@@ -37,52 +37,52 @@ public static class CassaSessionEndpoints
             .WithSummary("Termina definitivamente la sessione cassa");
     }
 
-    private static async Task<Results<Ok<CassaSessionDto>, BadRequest<string>>> CreateSession(
+    private static async Task<Results<Ok<CassaSessionDetailDto>, BadRequest<string>>> CreateSession(
         CreateCassaSessionRequest request,
-        ICassaSessionService service)
+        IOrderService orderService)
     {
-        var result = await service.CreateSessionAsync(request);
+        var result = await orderService.CreateCassaSessionAsync(request);
         return result.Success ? TypedResults.Ok(result.Data!) : TypedResults.BadRequest(result.Error);
     }
 
     private static async Task<Ok<IEnumerable<CassaSessionSummaryDto>>> GetPausedSessions(
-        ICassaSessionService service)
+        IOrderService orderService)
     {
-        var result = await service.GetPausedSessionsAsync();
+        var result = await orderService.GetSuspendedSessionsAsync();
         return TypedResults.Ok(result.Data ?? []);
     }
 
-    private static async Task<Results<Ok<CassaSessionDto>, NotFound<string>>> GetSession(
+    private static async Task<Results<Ok<CassaSessionDetailDto>, NotFound<string>>> GetSession(
         Guid id,
-        ICassaSessionService service)
+        IOrderService orderService)
     {
-        var result = await service.GetByIdAsync(id);
+        var result = await orderService.GetCassaSessionAsync(id);
         return result.Success ? TypedResults.Ok(result.Data!) : TypedResults.NotFound(result.Error);
     }
 
-    private static async Task<Results<Ok<CassaSessionDto>, NotFound<string>>> PauseSession(
+    private static async Task<Results<Ok<CassaSessionDetailDto>, NotFound<string>>> PauseSession(
         Guid id,
-        PauseCassaSessionRequest request,
-        ICassaSessionService service)
+        UpdateCassaSessionRequest request,
+        IOrderService orderService)
     {
-        var result = await service.PauseSessionAsync(id, request);
+        var result = await orderService.UpdateCassaSessionAsync(id, request);
         return result.Success ? TypedResults.Ok(result.Data!) : TypedResults.NotFound(result.Error);
     }
 
-    private static async Task<Results<Ok<CassaSessionDto>, NotFound<string>>> ResumeSession(
+    private static async Task<Results<Ok<CassaSessionDetailDto>, NotFound<string>>> ResumeSession(
         Guid id,
         ResumeCassaSessionRequest request,
-        ICassaSessionService service)
+        IOrderService orderService)
     {
-        var result = await service.ResumeSessionAsync(id, request);
+        var result = await orderService.ResumeCassaSessionAsync(id, request.TerminalId);
         return result.Success ? TypedResults.Ok(result.Data!) : TypedResults.NotFound(result.Error);
     }
 
     private static async Task<Results<Ok, NotFound<string>>> TerminateSession(
         Guid id,
-        ICassaSessionService service)
+        IOrderService orderService)
     {
-        var result = await service.TerminateSessionAsync(id);
+        var result = await orderService.TerminateCassaSessionAsync(id);
         return result.Success ? TypedResults.Ok() : TypedResults.NotFound(result.Error);
     }
 }

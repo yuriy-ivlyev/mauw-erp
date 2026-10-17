@@ -13,6 +13,7 @@ public class OrderItem : Entity<Guid>
     public decimal VatRate { get; set; }
     public decimal LineVatTotal { get; set; }
     public decimal LineGrossTotal { get; set; }
+    public int MaxQuantity { get; set; }
 
     // Navigation
     public Order Order { get; set; } = null!;
@@ -23,7 +24,8 @@ public class OrderItem : Entity<Guid>
         Guid variantId,
         int quantity,
         decimal unitNetPrice,
-        decimal vatRate
+        decimal vatRate,
+        int maxQuantity = 0
     ) : base()
     {
         OrderId = orderId;
@@ -31,6 +33,7 @@ public class OrderItem : Entity<Guid>
         Quantity = quantity;
         UnitNetPrice = unitNetPrice;
         VatRate = vatRate;
+        MaxQuantity = maxQuantity > 0 ? maxQuantity : quantity;
 
         // Calculate line totals
         LineNetTotal = decimal.Round(unitNetPrice * quantity, 2, MidpointRounding.AwayFromZero);

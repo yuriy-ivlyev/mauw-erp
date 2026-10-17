@@ -1,21 +1,25 @@
 namespace Mauw.Erp.Contracts.Requests;
 
+public record CassaCartItemRequest(
+    Guid VariantId,
+    int Quantity,
+    decimal UnitNetPrice,
+    decimal VatRate,
+    int MaxQuantity
+);
+
 public record CreateCassaSessionRequest(
-    string CartJson,
-    string? ContactId,
-    string? ContactName,
-    string? DocumentNumber,
-    string? TerminalId
+    Guid ContactId,
+    string? DocumentReference,
+    string? TerminalId,
+    List<CassaCartItemRequest> Items
 );
 
-public record PauseCassaSessionRequest(
-    string CartJson,
-    string? ContactId,
-    string? ContactName,
-    string? DocumentNumber,
-    string? TerminalId
+public record UpdateCassaSessionRequest(
+    Guid ContactId,
+    string? DocumentReference,
+    string? TerminalId,
+    List<CassaCartItemRequest> Items
 );
 
-public record ResumeCassaSessionRequest(
-    string? TerminalId
-);
+public record ResumeCassaSessionRequest(string? TerminalId);

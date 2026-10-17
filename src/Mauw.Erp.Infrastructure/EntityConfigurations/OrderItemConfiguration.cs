@@ -31,6 +31,10 @@ public class OrderItemConfiguration : IEntityTypeConfiguration<OrderItem>
         builder.Property(oi => oi.LineGrossTotal)
             .HasPrecision(18, 2);
 
+        builder.Property(oi => oi.MaxQuantity)
+            .IsRequired()
+            .HasDefaultValue(0);
+
         builder.Property(oi => oi.CreatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 

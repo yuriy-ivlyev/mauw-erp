@@ -46,10 +46,25 @@ export interface PausedSessionSummary {
 export interface SavedSessionDetail {
   id: string;
   sessionCode: string;
-  cartJson: string;
   contactId: string | null;
   contactName: string | null;
-  documentNumber: string | null;
+  documentReference: string | null;
+  items: SavedCartItemDto[];
+}
+
+export interface SavedCartItemDto {
+  variantId: string;
+  barcode: string;
+  productId: string;
+  productName: string;
+  size: string;
+  color: string;
+  unitNetPrice: number;
+  unitGrossPrice: number;
+  vatRate: number;
+  quantity: number;
+  maxQuantity: number;
+  weightGrams?: number | null;
 }
 
 const STORAGE_KEY = 'mauw_cassa_session';
@@ -101,22 +116,26 @@ export class CassaSessionService {
     this.stateSubject.next({ ...this.state });
   }
 
-  createOrPauseSession(terminalId?: string) {
-    const body = {
-      cartJson: JSON.stringify(this.state.cart),
-      contactId: this.state.selectedContact?.id ?? null,
-      contactName: this.state.selectedContact?.businessName ?? null,
-      documentNumber: this.state.documentNumber || null,
-      terminalId: terminalId ?? null
-    };
+  createOrPauseSession() {
+    const items = this.state.cart.map(i => ({
+      variantId: i.variantId,
+      quantity: i.quantity,
+      unitNetPrice: i.unitNetPrice,
+      vatRate: i.vatRate,
+      maxQuantity: i.maxQuantity
+    }));
+    const contactId = this.state.selectedContact!.id;
+
     if (this.state.sessionId) {
+      const body = { contactId, documentReference: this.state.documentNumber || null, terminalId: null, items };
       return this.api.patch<SavedSessionDetail>(`v1/cassa/sessions/${this.state.sessionId}/pause`, body);
     }
+    const body = { contactId, documentReference: this.state.documentNumber || null, terminalId: null, items };
     return this.api.post<SavedSessionDetail>('v1/cassa/sessions', body);
   }
 
-  resumeSession(sessionId: string, terminalId?: string) {
-    return this.api.patch<SavedSessionDetail>(`v1/cassa/sessions/${sessionId}/resume`, { terminalId: terminalId ?? null });
+  resumeSession(sessionId: string) {
+    return this.api.patch<SavedSessionDetail>(`v1/cassa/sessions/${sessionId}/resume`, { terminalId: null });
   }
 
   terminateSession(sessionId: string) {
@@ -132,8 +151,23 @@ export class CassaSessionService {
   }
 
   applyLoadedSession(detail: SavedSessionDetail): void {
-    let cart: CartItem[] = [];
-    try { cart = JSON.parse(detail.cartJson) as CartItem[]; } catch { }
+    const cart: CartItem[] = detail.items.map(i => ({
+      barcode: i.barcode,
+      variantId: i.variantId,
+      productId: i.productId,
+      productName: i.productName,
+      size: i.size,
+      color: i.color,
+      unitNetPrice: i.unitNetPrice,
+      unitGrossPrice: i.unitGrossPrice,
+      vatRate: i.vatRate,
+      quantityAvailable: i.maxQuantity,
+      weightGrams: i.weightGrams,
+      quantity: i.quantity,
+      lineNetTotal: i.unitNetPrice * i.quantity,
+      lineGrossTotal: i.unitGrossPrice * i.quantity,
+      maxQuantity: i.maxQuantity
+    }));
 
     const contact = detail.contactId
       ? { id: detail.contactId, businessName: detail.contactName ?? '', vatNumber: '', defaultDiscountRate: 0 }
@@ -144,7 +178,7 @@ export class CassaSessionService {
       sessionCode: detail.sessionCode,
       cart,
       selectedContact: contact,
-      documentNumber: detail.documentNumber ?? ''
+      documentNumber: detail.documentReference ?? ''
     };
     this.persist();
   }

@@ -1,4 +1,5 @@
-﻿using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Domain.Enums;
 
 namespace Mauw.Erp.Domain.Repositories;
 
@@ -8,4 +9,7 @@ namespace Mauw.Erp.Domain.Repositories;
 public interface IOrderRepository : IRepository<Order, Guid>
 {
     Task<IEnumerable<Order>> GetByContactIdAsync(Guid contactId);
+    Task<int> CountCassaSessionsAsync();
+    Task<IEnumerable<Order>> GetSuspendedCassaSessionsAsync();
+    Task<Order?> GetCassaSessionWithItemsAsync(Guid id);
 }

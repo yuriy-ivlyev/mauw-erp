@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Mauw.Erp.Infrastructure.Migrations
 {
     [DbContext(typeof(MauwDbContext))]
-    [Migration("20261017201707_AddCassaSession")]
-    partial class AddCassaSession
+    [Migration("20261017204302_RefactorCassaSessionToOrder")]
+    partial class RefactorCassaSessionToOrder
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -103,67 +103,6 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasKey("ContactId");
 
                     b.ToTable("agent_profiles", (string)null);
-                });
-
-            modelBuilder.Entity("Mauw.Erp.Domain.Entities.CassaSession", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("CartJson")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("cart_json");
-
-                    b.Property<string>("ContactId")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("contact_id");
-
-                    b.Property<string>("ContactName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("contact_name");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("DocumentNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("document_number");
-
-                    b.Property<string>("SessionCode")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("session_code");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer")
-                        .HasColumnName("status");
-
-                    b.Property<string>("TerminalId")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("terminal_id");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("p_k_cassa_sessions");
-
-                    b.HasIndex("SessionCode")
-                        .IsUnique();
-
-                    b.HasIndex("Status");
-
-                    b.ToTable("cassa_sessions");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Category", b =>
@@ -1400,6 +1339,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("numeric(5,2)")
                         .HasColumnName("customer_discount_rate");
 
+                    b.Property<string>("DocumentReference")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("document_reference");
+
                     b.Property<decimal>("GrossTotal")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -1423,6 +1367,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("taxable_total");
+
+                    b.Property<string>("TerminalId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("terminal_id");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -1474,6 +1423,12 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("line_vat_total");
+
+                    b.Property<int>("MaxQuantity")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("max_quantity");
 
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid")

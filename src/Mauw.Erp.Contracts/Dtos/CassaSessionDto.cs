@@ -1,16 +1,27 @@
 namespace Mauw.Erp.Contracts.Dtos;
 
-public record CassaSessionDto(
+public record CassaCartItemDto(
+    Guid VariantId,
+    string Barcode,
+    string ProductId,
+    string ProductName,
+    string Size,
+    string Color,
+    decimal UnitNetPrice,
+    decimal UnitGrossPrice,
+    decimal VatRate,
+    int Quantity,
+    int MaxQuantity,
+    decimal? WeightGrams
+);
+
+public record CassaSessionDetailDto(
     Guid Id,
     string SessionCode,
-    string Status,
-    string CartJson,
     string? ContactId,
     string? ContactName,
-    string? DocumentNumber,
-    string? TerminalId,
-    DateTime CreatedAt,
-    DateTime UpdatedAt
+    string? DocumentReference,
+    List<CassaCartItemDto> Items
 );
 
 public record CassaSessionSummaryDto(

@@ -14,4 +14,12 @@ public interface IOrderService
     Task<OperationResult<OrderDto>> AddItemAsync(Guid orderId, CreateOrderItemRequest request);
     Task<OperationResult<OrderDto>> ConfirmOrderAsync(Guid orderId);
     Task<OperationResult<bool>> DeleteOrderAsync(Guid id);
+
+    // Cassa session operations
+    Task<OperationResult<CassaSessionDetailDto>> CreateCassaSessionAsync(CreateCassaSessionRequest request);
+    Task<OperationResult<CassaSessionDetailDto>> UpdateCassaSessionAsync(Guid orderId, UpdateCassaSessionRequest request);
+    Task<OperationResult<CassaSessionDetailDto>> ResumeCassaSessionAsync(Guid orderId, string? terminalId);
+    Task<OperationResult<bool>> TerminateCassaSessionAsync(Guid orderId);
+    Task<OperationResult<IEnumerable<CassaSessionSummaryDto>>> GetSuspendedSessionsAsync();
+    Task<OperationResult<CassaSessionDetailDto>> GetCassaSessionAsync(Guid orderId);
 }

@@ -35,6 +35,12 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.GrossTotal)
             .HasPrecision(18, 2);
 
+        builder.Property(o => o.TerminalId)
+            .HasMaxLength(100);
+
+        builder.Property(o => o.DocumentReference)
+            .HasMaxLength(100);
+
         builder.Property(o => o.CreatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 

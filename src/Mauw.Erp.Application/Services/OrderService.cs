@@ -162,6 +162,140 @@ public partial class OrderService(
         return OperationResult<bool>.Ok(true);
     }
 
+    // ── Cassa session operations ──────────────────────────────
+
+    public async Task<OperationResult<CassaSessionDetailDto>> CreateCassaSessionAsync(CreateCassaSessionRequest request)
+    {
+        var contact = await unitOfWork.Contacts.GetByIdAsync(request.ContactId);
+        if (contact is null)
+            return OperationResult<CassaSessionDetailDto>.Fail("Cliente non trovato");
+
+        var count = await unitOfWork.Orders.CountCassaSessionsAsync();
+        var sessionCode = $"CASSA-{(count + 1):D3}";
+
+        var order = new Order(request.ContactId, sessionCode);
+        order.SetDocumentReference(request.DocumentReference);
+        order.Suspend(request.TerminalId);
+
+        await unitOfWork.Orders.AddAsync(order);
+        await unitOfWork.SaveChangesAsync();
+
+        foreach (var item in request.Items)
+        {
+            var orderItem = new OrderItem(order.Id, item.VariantId, item.Quantity, item.UnitNetPrice, item.VatRate, item.MaxQuantity);
+            order.AddItem(orderItem);
+        }
+        await unitOfWork.Orders.UpdateAsync(order);
+        await unitOfWork.SaveChangesAsync();
+
+        logger.LogInformation("Cassa session {Code} created", sessionCode);
+
+        var loaded = await unitOfWork.Orders.GetCassaSessionWithItemsAsync(order.Id);
+        return OperationResult<CassaSessionDetailDto>.Ok(MapCassaDetail(loaded!, contact.BusinessName));
+    }
+
+    public async Task<OperationResult<CassaSessionDetailDto>> UpdateCassaSessionAsync(Guid orderId, UpdateCassaSessionRequest request)
+    {
+        var order = await unitOfWork.Orders.GetCassaSessionWithItemsAsync(orderId);
+        if (order is null)
+            return OperationResult<CassaSessionDetailDto>.Fail("Sessione non trovata");
+
+        var contact = await unitOfWork.Contacts.GetByIdAsync(request.ContactId);
+        if (contact is null)
+            return OperationResult<CassaSessionDetailDto>.Fail("Cliente non trovato");
+
+        order.ContactId = request.ContactId;
+        order.SetDocumentReference(request.DocumentReference);
+        order.ClearItems();
+
+        foreach (var item in request.Items)
+        {
+            var orderItem = new OrderItem(order.Id, item.VariantId, item.Quantity, item.UnitNetPrice, item.VatRate, item.MaxQuantity);
+            order.AddItem(orderItem);
+        }
+
+        order.Suspend(request.TerminalId);
+        await unitOfWork.Orders.UpdateAsync(order);
+        await unitOfWork.SaveChangesAsync();
+
+        var loaded = await unitOfWork.Orders.GetCassaSessionWithItemsAsync(order.Id);
+        return OperationResult<CassaSessionDetailDto>.Ok(MapCassaDetail(loaded!, contact.BusinessName));
+    }
+
+    public async Task<OperationResult<CassaSessionDetailDto>> ResumeCassaSessionAsync(Guid orderId, string? terminalId)
+    {
+        var order = await unitOfWork.Orders.GetCassaSessionWithItemsAsync(orderId);
+        if (order is null)
+            return OperationResult<CassaSessionDetailDto>.Fail("Sessione non trovata");
+
+        order.Resume(terminalId);
+        await unitOfWork.Orders.UpdateAsync(order);
+        await unitOfWork.SaveChangesAsync();
+
+        var contactName = order.Contact?.BusinessName ?? "";
+        return OperationResult<CassaSessionDetailDto>.Ok(MapCassaDetail(order, contactName));
+    }
+
+    public async Task<OperationResult<bool>> TerminateCassaSessionAsync(Guid orderId)
+    {
+        var order = await unitOfWork.Orders.GetByIdAsync(orderId);
+        if (order is null)
+            return OperationResult<bool>.Fail("Sessione non trovata");
+
+        order.Terminate();
+        await unitOfWork.Orders.UpdateAsync(order);
+        await unitOfWork.SaveChangesAsync();
+
+        logger.LogInformation("Cassa session {OrderId} terminated", orderId);
+        return OperationResult<bool>.Ok(true);
+    }
+
+    public async Task<OperationResult<IEnumerable<CassaSessionSummaryDto>>> GetSuspendedSessionsAsync()
+    {
+        var orders = await unitOfWork.Orders.GetSuspendedCassaSessionsAsync();
+        var dtos = orders.Select(o => new CassaSessionSummaryDto(
+            o.Id,
+            o.OrderNumber,
+            o.Contact?.BusinessName,
+            o.Items.Count,
+            o.UpdatedAt));
+
+        return OperationResult<IEnumerable<CassaSessionSummaryDto>>.Ok(dtos);
+    }
+
+    public async Task<OperationResult<CassaSessionDetailDto>> GetCassaSessionAsync(Guid orderId)
+    {
+        var order = await unitOfWork.Orders.GetCassaSessionWithItemsAsync(orderId);
+        if (order is null)
+            return OperationResult<CassaSessionDetailDto>.Fail("Sessione non trovata");
+
+        var contactName = order.Contact?.BusinessName ?? "";
+        return OperationResult<CassaSessionDetailDto>.Ok(MapCassaDetail(order, contactName));
+    }
+
+    private static CassaSessionDetailDto MapCassaDetail(Order order, string contactName) =>
+        new(
+            order.Id,
+            order.OrderNumber,
+            order.ContactId.ToString(),
+            contactName,
+            order.DocumentReference,
+            order.Items.Select(i => new CassaCartItemDto(
+                i.VariantId,
+                i.Variant?.Barcode ?? "",
+                i.Variant?.ProductId.ToString() ?? "",
+                i.Variant?.Product?.Name ?? "",
+                i.Variant?.Size?.Name ?? "",
+                i.Variant?.Color?.Name ?? "",
+                i.UnitNetPrice,
+                i.UnitNetPrice * (1 + i.VatRate / 100),
+                i.VatRate,
+                i.Quantity,
+                i.MaxQuantity,
+                i.Variant?.WeightGrams
+            )).ToList()
+        );
+
     // --- [LoggerMessage] source-generated log methods (zero-allocation hot path) ---
 
     [LoggerMessage(Level = LogLevel.Information,

@@ -137,7 +137,8 @@ interface PageResponse<T> {
         ▶ Riprendi sessione
       </button>
       <button (click)="suspendSession()"
-        [disabled]="cart.length === 0 || suspendLoading"
+        [disabled]="cart.length === 0 || !selectedContact || suspendLoading"
+        [title]="!selectedContact ? 'Seleziona un cliente per sospendere' : ''"
         class="px-3 py-1.5 text-xs font-semibold text-yellow-700 border border-yellow-300 bg-yellow-50 hover:bg-yellow-100 disabled:opacity-40 rounded-lg transition flex items-center gap-1">
         {{ suspendLoading ? '...' : '⏸ Sospendi' }}
       </button>
@@ -746,7 +747,7 @@ export class BancoCassaComponent implements OnInit {
 
   // ── Session management ─────────────────────────────────────
   suspendSession(): void {
-    if (this.cart.length === 0) return;
+    if (this.cart.length === 0 || !this.selectedContact) return;
     this.suspendLoading = true;
     this.sessionService.setCart(this.cart);
     this.sessionService.setContact(this.selectedContact);

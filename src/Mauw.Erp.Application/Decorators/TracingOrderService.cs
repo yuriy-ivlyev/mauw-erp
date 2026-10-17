@@ -33,4 +33,23 @@ public sealed class TracingOrderService(IOrderService inner) : TracingDecoratorB
     public Task<OperationResult<bool>> DeleteOrderAsync(Guid id) =>
         TraceAsync("Order.Delete", () => inner.DeleteOrderAsync(id),
             a => a?.SetTag("order.id", id));
+
+    // ── Cassa session pass-throughs (no extra tracing needed) ──
+    public Task<OperationResult<CassaSessionDetailDto>> CreateCassaSessionAsync(CreateCassaSessionRequest request) =>
+        inner.CreateCassaSessionAsync(request);
+
+    public Task<OperationResult<CassaSessionDetailDto>> UpdateCassaSessionAsync(Guid orderId, UpdateCassaSessionRequest request) =>
+        inner.UpdateCassaSessionAsync(orderId, request);
+
+    public Task<OperationResult<CassaSessionDetailDto>> ResumeCassaSessionAsync(Guid orderId, string? terminalId) =>
+        inner.ResumeCassaSessionAsync(orderId, terminalId);
+
+    public Task<OperationResult<bool>> TerminateCassaSessionAsync(Guid orderId) =>
+        inner.TerminateCassaSessionAsync(orderId);
+
+    public Task<OperationResult<IEnumerable<CassaSessionSummaryDto>>> GetSuspendedSessionsAsync() =>
+        inner.GetSuspendedSessionsAsync();
+
+    public Task<OperationResult<CassaSessionDetailDto>> GetCassaSessionAsync(Guid orderId) =>
+        inner.GetCassaSessionAsync(orderId);
 }
