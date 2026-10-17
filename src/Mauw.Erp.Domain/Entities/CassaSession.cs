@@ -28,7 +28,7 @@ public class CassaSession : Entity<Guid>
         ContactName = contactName;
         DocumentNumber = documentNumber;
         TerminalId = terminalId;
-        Status = CassaSessionStatus.Active;
+        Status = CassaSessionStatus.Paused;
     }
 
     public void Pause(string cartJson, string? contactId, string? contactName, string? documentNumber, string? terminalId)
