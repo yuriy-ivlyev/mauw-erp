@@ -428,7 +428,7 @@ export class BancoCassaComponent implements OnInit {
     private api: ApiService,
     private productService: ProductService,
     private router: Router,
-    private sessionService: CassaSessionService
+    protected sessionService: CassaSessionService
   ) {}
 
   ngOnInit(): void {
