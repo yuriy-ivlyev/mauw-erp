@@ -787,17 +787,20 @@ export class BancoCassaComponent implements OnInit {
 
   doResumeSession(summary: PausedSessionSummary): void {
     this.resumeLoading = true;
-    const currentSessionId = this.sessionService.snapshot.sessionId;
+    const snap = this.sessionService.snapshot;
+    const currentSessionId = snap.sessionId;
+    const hasUnsavedCart = snap.cart.length > 0 && snap.sessionId !== summary.id;
+    const canAutoSuspend = hasUnsavedCart && !!snap.selectedContact;
 
     const proceedResume = () => {
       this.sessionService.resumeSession(summary.id).subscribe({
         next: (detail) => {
           this.sessionService.applyLoadedSession(detail);
-          const snap = this.sessionService.snapshot;
-          this.cart = snap.cart;
-          this.selectedContact = snap.selectedContact;
-          this.documentNumber = snap.documentNumber;
-          this.currentSessionCode = snap.sessionCode;
+          const s = this.sessionService.snapshot;
+          this.cart = s.cart;
+          this.selectedContact = s.selectedContact;
+          this.documentNumber = s.documentNumber;
+          this.currentSessionCode = s.sessionCode;
           this.resumeLoading = false;
           this.showResumeModal = false;
         },
@@ -805,13 +808,17 @@ export class BancoCassaComponent implements OnInit {
       });
     };
 
-    // Se c'è una sessione attiva diversa da quella che stiamo riprendendo,
-    // la sospende prima di caricare la nuova, così non va "persa"
-    if (currentSessionId && currentSessionId !== summary.id) {
+    if (canAutoSuspend) {
+      // Salva prima la sessione corrente (nuova o esistente) poi carica la nuova
       this.sessionService.createOrPauseSession().subscribe({
         next: () => { this.sessionService.clearSession(); proceedResume(); },
-        error:  () => { this.sessionService.clearSession(); proceedResume(); }
+        error: () => { this.sessionService.clearSession(); proceedResume(); }
       });
+    } else if (hasUnsavedCart && !snap.selectedContact) {
+      // Carrello con articoli ma nessun cliente → impossibile auto-sospendere
+      this.resumeLoading = false;
+      this.showResumeModal = false;
+      alert('Seleziona un cliente prima di passare ad un\'altra sessione, oppure svuota il carrello.');
     } else {
       proceedResume();
     }
