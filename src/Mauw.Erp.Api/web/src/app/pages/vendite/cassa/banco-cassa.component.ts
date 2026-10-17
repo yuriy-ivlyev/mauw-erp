@@ -789,8 +789,8 @@ export class BancoCassaComponent implements OnInit {
     this.resumeLoading = true;
     const snap = this.sessionService.snapshot;
     const currentSessionId = snap.sessionId;
-    const hasUnsavedCart = snap.cart.length > 0 && snap.sessionId !== summary.id;
-    const canAutoSuspend = hasUnsavedCart && !!snap.selectedContact;
+    const switchingSession = currentSessionId && currentSessionId !== summary.id;
+    const hasNewCart = !currentSessionId && snap.cart.length > 0;
 
     const proceedResume = () => {
       this.sessionService.resumeSession(summary.id).subscribe({
@@ -808,17 +808,23 @@ export class BancoCassaComponent implements OnInit {
       });
     };
 
-    if (canAutoSuspend) {
-      // Salva prima la sessione corrente (nuova o esistente) poi carica la nuova
+    if (switchingSession) {
+      // Sessione tracciata attiva → sospendi sempre prima di passare ad un'altra
       this.sessionService.createOrPauseSession().subscribe({
         next: () => { this.sessionService.clearSession(); proceedResume(); },
         error: () => { this.sessionService.clearSession(); proceedResume(); }
       });
-    } else if (hasUnsavedCart && !snap.selectedContact) {
-      // Carrello con articoli ma nessun cliente → impossibile auto-sospendere
+    } else if (hasNewCart && snap.selectedContact) {
+      // Carrello nuovo (non salvato) con cliente → crea sessione prima di passare
+      this.sessionService.createOrPauseSession().subscribe({
+        next: () => { this.sessionService.clearSession(); proceedResume(); },
+        error: () => { this.sessionService.clearSession(); proceedResume(); }
+      });
+    } else if (hasNewCart && !snap.selectedContact) {
+      // Carrello nuovo senza cliente → impossibile sospendere
       this.resumeLoading = false;
       this.showResumeModal = false;
-      alert('Seleziona un cliente prima di passare ad un\'altra sessione, oppure svuota il carrello.');
+      alert('Seleziona un cliente per poter sospendere la sessione corrente prima di passare ad un\'altra.');
     } else {
       proceedResume();
     }
