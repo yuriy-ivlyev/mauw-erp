@@ -5,6 +5,7 @@ using Mauw.Erp.Contracts.Dtos.Pdf;
 using Mauw.Erp.Contracts.Interfaces;
 using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Domain.Enums;
 using Mauw.Erp.Domain.Services;
 using Mauw.Erp.Infrastructure.Branding;
 using Mauw.Erp.Infrastructure.DbContext;
@@ -65,6 +66,40 @@ public class CompanyInvoiceSettingsTests
         Assert.False(refreshed.IsShareCapitalFullyPaid);
         Assert.Null(refreshed.Iban);
         Assert.Null(refreshed.InvoiceNotes);
+    }
+
+    [Fact]
+    public async Task AddingOperationalSiteThenSavingCompanyPreservesAddressReferences()
+    {
+        await using var db = CreateDb();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var company = new Contact("Mauw") { IsInternalCompany = true };
+        var legalAddress = company.SetLegalHeadquarters("Via Roma 1", "00100", "Roma");
+        db.Add(company);
+        db.Add(new Warehouse("WH-1", "Magazzino", WarehouseType.Standard, legalAddress.Id, isSellable: true));
+        await db.SaveChangesAsync();
+
+        var service = new CompanySettingsService(new UnitOfWork(db, cache), cache,
+            NullLogger<CompanySettingsService>.Instance);
+        var siteResult = await service.AddOperationalSiteAsync(new CompanyAddressSiteRequest
+        {
+            Purpose = "WarehouseSite",
+            SiteName = "Deposito",
+            Street = "Via Milano 2",
+            ZipCode = "20100",
+            City = "Milano"
+        });
+        Assert.True(siteResult.Success, siteResult.Error);
+
+        var result = await service.UpsertCompanyAsync(Request());
+
+        Assert.True(result.Success, result.Error);
+        var storedAddresses = await db.ContactAddresses.OrderBy(a => a.Purpose).ToListAsync();
+        var warehouse = await db.Warehouses.SingleAsync();
+        Assert.Equal(2, storedAddresses.Count);
+        Assert.Contains(storedAddresses, a => a.Id == legalAddress.Id && a.Purpose == AddressPurpose.LegalHeadquarters);
+        Assert.Contains(storedAddresses, a => a.Id == siteResult.Data!.Id && a.Purpose == AddressPurpose.WarehouseSite);
+        Assert.Equal(legalAddress.Id, warehouse.ContactAddressId);
     }
 
     [Theory]

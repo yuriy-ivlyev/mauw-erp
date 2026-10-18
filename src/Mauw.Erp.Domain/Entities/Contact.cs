@@ -140,7 +140,18 @@ public class Contact : Entity<Guid>
         string? phone = null, string? email = null)
     {
         var existing = LegalHeadquarters;
-        if (existing is not null) Addresses.Remove(existing);
+        if (existing is not null)
+        {
+            existing.Street = street;
+            existing.ZipCode = zipCode;
+            existing.City = city;
+            existing.Province = province;
+            existing.CountryCode = countryCode;
+            existing.Phone = phone;
+            existing.Email = email;
+            UpdateTimestamp();
+            return existing;
+        }
 
         var hq = new ContactAddress(Id, AddressPurpose.LegalHeadquarters,
             street, zipCode, city, province, countryCode,
