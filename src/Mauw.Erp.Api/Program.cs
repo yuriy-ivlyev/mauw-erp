@@ -131,9 +131,6 @@ app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Serve static files (Angular app)
-app.UseStaticFiles();
-
 // Map endpoints
 app.MapControllers();
 app.MapProductEndpoints();
@@ -148,9 +145,6 @@ app.MapOrderEndpoints();
 app.MapInvoiceEndpoints();
 app.MapDdtEndpoints();
 app.MapCassaSessionEndpoints();
-
-// Fallback to index.html for Angular routing
-app.MapFallbackToFile("index.html");
 
 // Migrate database on startup and initialize seed data
 using (var scope = app.Services.CreateScope())

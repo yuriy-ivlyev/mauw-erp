@@ -1,37 +1,32 @@
-# Build stage - Node.js
-FROM node:20-alpine AS web-builder
-WORKDIR /app/web
+# API .NET (il frontend Angular ha un Dockerfile separato in src/Mauw.Erp.Web)
 
-COPY src/Mauw.Erp.Api/web/package*.json ./
-RUN npm ci --legacy-peer-deps
-
-COPY src/Mauw.Erp.Api/web .
-RUN npm run build
-
-# Build stage - .NET
+# Build stage
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS dotnet-builder
 WORKDIR /src
 
-COPY ["Mauw.Erp.sln", "."]
-COPY ["src/", "src/"]
-
+# Restore separato dal sorgente per sfruttare la cache dei layer
+COPY ["Directory.Packages.props", "./"]
+COPY ["src/Mauw.Erp.Api/Mauw.Erp.Api.csproj", "src/Mauw.Erp.Api/"]
+COPY ["src/Mauw.Erp.Application/Mauw.Erp.Application.csproj", "src/Mauw.Erp.Application/"]
+COPY ["src/Mauw.Erp.Contracts/Mauw.Erp.Contracts.csproj", "src/Mauw.Erp.Contracts/"]
+COPY ["src/Mauw.Erp.Domain/Mauw.Erp.Domain.csproj", "src/Mauw.Erp.Domain/"]
+COPY ["src/Mauw.Erp.Infrastructure/Mauw.Erp.Infrastructure.csproj", "src/Mauw.Erp.Infrastructure/"]
 RUN dotnet restore "src/Mauw.Erp.Api/Mauw.Erp.Api.csproj"
-RUN dotnet build "src/Mauw.Erp.Api/Mauw.Erp.Api.csproj" -c Release -o /app/build -p:SkipNpmBuild=true
+
+COPY ["src/", "src/"]
 
 # Publish stage
 FROM dotnet-builder AS publish
-RUN dotnet publish "src/Mauw.Erp.Api/Mauw.Erp.Api.csproj" -c Release -o /app/publish -p:SkipNpmBuild=true
+RUN dotnet publish "src/Mauw.Erp.Api/Mauw.Erp.Api.csproj" -c Release -o /app/publish --no-restore
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
 COPY --from=publish /app/publish .
-COPY --from=web-builder /app/web/dist/web/browser ./wwwroot
 
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Development
 
 ENTRYPOINT ["dotnet", "Mauw.Erp.Api.dll"]
-

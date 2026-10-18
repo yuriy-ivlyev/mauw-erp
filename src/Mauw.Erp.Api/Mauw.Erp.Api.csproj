@@ -30,19 +30,4 @@
     <ProjectReference Include="..\Mauw.Erp.Infrastructure\Mauw.Erp.Infrastructure.csproj" />
   </ItemGroup>
 
-  <!-- Build Angular web app and copy to wwwroot (disabled in Docker builds) -->
-  <Target Name="BuildWebApp" BeforeTargets="Build" Condition="'$(SkipNpmBuild)' != 'true'">
-    <Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)\web" />
-    <ItemGroup>
-      <WebFiles Include="$(MSBuildProjectDirectory)\web\dist\web\browser\**\*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(WebFiles)" DestinationFolder="$(MSBuildProjectDirectory)\wwwroot\%(RecursiveDir)" />
-  </Target>
-
-  <!-- Clean Angular build output -->
-  <Target Name="CleanWebApp" BeforeTargets="Clean">
-    <RemoveDir Directories="$(MSBuildProjectDirectory)\web\dist" />
-    <!-- Don't remove wwwroot entirely, just the generated files -->
-  </Target>
-
 </Project>

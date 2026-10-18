@@ -7,6 +7,11 @@
 **/.vscode
 **/.idea
 **/dist
+**/.angular
+src/Mauw.Erp.Web
+certs
+docs
+.idea
 **/build
 **/coverage
 **/.env

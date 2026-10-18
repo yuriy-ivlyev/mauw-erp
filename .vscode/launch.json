@@ -1,0 +1,40 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Docker: build modificati + up",
+      "type": "node-terminal",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-up.ps1 -Target auto"
+    },
+    {
+      "name": "Docker: rebuild solo API (C#) + up",
+      "type": "node-terminal",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-up.ps1 -Target api"
+    },
+    {
+      "name": "Docker: rebuild solo Web (Angular) + up",
+      "type": "node-terminal",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-up.ps1 -Target web"
+    },
+    {
+      "name": "Docker: rebuild tutto + up",
+      "type": "node-terminal",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-up.ps1 -Target all"
+    },
+    {
+      "name": "Docker: down",
+      "type": "node-terminal",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-up.ps1 -Target down"
+    }
+  ]
+}

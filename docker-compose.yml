@@ -39,6 +39,7 @@ services:
       dockerfile: Dockerfile
       target: final
     container_name: mauw-erp-api
+    image: mauw-erp-api:local
     depends_on:
       postgres:
         condition: service_healthy
@@ -46,17 +47,48 @@ services:
         condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ASPNETCORE_URLS: "https://+:8443"
-      ASPNETCORE_Kestrel__Certificates__Default__Path: /certs/aspnetapp.pfx
-      ASPNETCORE_Kestrel__Certificates__Default__Password: "MauwDev2024!"
+      ASPNETCORE_URLS: "http://+:8080"
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       ConnectionStrings__DefaultConnection: "Host=postgres;Database=mauw_erp;Username=postgres;Password=postgres;Port=5432"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
       OTEL_SERVICE_NAME: mauw-erp-backend
       AzureAd__ClientSecret: "${AZURE_CLIENT_SECRET}"
+    # Nessuna porta pubblicata: l'API e' raggiungibile solo dalla rete interna (web -> api:8080)
+    expose:
+      - "8080"
+    networks:
+      - mauw-network
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./src/Mauw.Erp.Web
+      dockerfile: Dockerfile
+    container_name: mauw-erp-web
+    image: mauw-erp-web:local
+    depends_on:
+      - api
+    environment:
+      API_UPSTREAM: http://api:8080
+    networks:
+      - mauw-network
+    restart: unless-stopped
+
+  proxy:
+    build:
+      context: ./proxy
+      dockerfile: Dockerfile
+    container_name: mauw-erp-proxy
+    image: mauw-erp-proxy:local
+    depends_on:
+      - web
+    environment:
+      CERT_PASSWORD: "${CERT_PASSWORD:-MauwDev2024!}"
+      WEB_UPSTREAM: http://web:80
     ports:
-      - "5019:8443"
+      # 5019 e' la porta HTTPS storica (redirect URI Entra ID: https://localhost:5019/signin-oidc)
+      - "${HTTPS_PORT:-5019}:443"
     volumes:
       - ./certs:/certs:ro
     networks:
