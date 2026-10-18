@@ -1,0 +1,137 @@
+# Regole permanenti di sviluppo
+
+Rispondere brevemente; fornire dettagli estesi solo se richiesti.
+Preferire dependency injection, configurazioni DI in metodi di estensione e
+`Program.cs` minimale. Per errori di validazione usare il Result pattern.
+
+## Contabilita italiana: invarianti obbligatori
+
+Queste regole si applicano a fatture, preventivi, ordini, DDT e relativi
+refactoring. Il riferimento unico per il calcolo e
+`Mauw.Erp.Domain.Services.ItalianAccountingCalculator`, registrato tramite DI.
+Non duplicare formule in servizi applicativi, entita, mapper, PDF o frontend.
+Il calcolatore deve restare puro, deterministico e senza I/O; input e risultati
+fiscali sono record immutabili. Gli errori restituiscono `AccountingResult<T>`:
+non usare eccezioni per input invalidi, non ignorare errori o inventare valori.
+
+### Precisione e arrotondamento
+
+- Utilizzare esclusivamente `decimal` e letterali `m` per importi, prezzi,
+  quantita fiscali, percentuali e aliquote: mai `double`, `float` o conversioni
+  attraverso tipi binari floating-point.
+- Ogni arrotondamento monetario deve specificare
+  `MidpointRounding.AwayFromZero`, inclusi importi negativi.
+- Prezzi unitari netti: da 2 a 8 decimali, senza arrotondamento preventivo al
+  centesimo. Conservare la precisione nel database, nelle API e nel PDF.
+- Aliquote IVA: da 0 a 100, al massimo 2 decimali. Sconti: da 0 a 100.
+  Quantita fiscali `decimal`, anche frazionarie; zero non valido. Le quantita
+  intere delle entita di magazzino non limitano il calcolatore condiviso.
+- Importi di riga e totali monetari del progetto hanno esattamente 2 decimali,
+  anche quando nulli (zero monetario: `0.00m`).
+
+### DettaglioLinee: 2.2.1
+
+Il prezzo unitario e al netto dell'IVA e prima dello sconto. Applicare lo sconto
+percentuale una sola volta, senza arrotondare il prezzo unitario scontato:
+
+```csharp
+decimal prezzoTotale = Math.Round(
+    quantita * prezzoUnitario * (1m - scontoPercentuale / 100m),
+    2, MidpointRounding.AwayFromZero);
+```
+
+`PrezzoUnitario` e il campo **2.2.1.9**; `PrezzoTotale` e **2.2.1.11**.
+Verificare la coerenza aritmetica del controllo SDI **00423**.
+Sulla singola riga NON calcolare, arrotondare o sommare IVA o lordo.
+I campi legacy nullable `LineVatTotal` e `LineGrossTotal` restano solo per
+compatibilita: le nuove righe li lasciano null e non sono fonti contabili.
+
+Per prezzi iniziali ivati usare:
+
+```csharp
+decimal prezzoUnitarioNetto = Math.Round(
+    prezzoLordo / (1m + aliquotaIva / 100m),
+    8, MidpointRounding.AwayFromZero);
+```
+
+Conservare almeno 4 decimali dello scorporo quando necessari, fino a 8;
+non ricalcolare il netto da un prezzo di visualizzazione a 2 decimali.
+Trasmettere il lordo originale al backend per lo scorporo `decimal`.
+
+### DatiRiepilogo: 2.2.2
+
+Raggruppare SEMPRE per chiave composta `(AliquotaIVA, CodiceNatura)`,
+mai per sola aliquota e mai derivando l'aliquota da imposte arrotondate.
+
+Per ciascun gruppo:
+
+```csharp
+decimal imponibileImporto = righeDelGruppo.Sum(riga => riga.LineNetTotal);
+decimal imposta = aliquotaIva == 0m
+    ? 0.00m
+    : Math.Round(imponibileImporto * aliquotaIva / 100m,
+        2, MidpointRounding.AwayFromZero);
+```
+
+- `ImponibileImporto` (**2.2.2.5**, controllo **00422**) e la somma esatta
+  dei totali di riga gia arrotondati: non sommare prodotti non arrotondati.
+- `Imposta` (**2.2.2.6**, controllo **00421**) si calcola UNA volta
+  sull'imponibile del gruppo, mai come somma di IVA unitaria o di riga.
+- Con aliquota zero `Natura` (**2.2.2.2**) e obbligatoria.
+  Codici ammessi: N1, N2.1, N2.2, N3.1-N3.6, N4, N5, N6.1-N6.9, N7.
+  Non usare codici generici obsoleti N2, N3 o N6.
+- Con aliquota positiva Natura deve essere null.
+- Non attribuire Nature predefinite a documenti storici non classificati:
+  restituire un errore esplicito e richiedere la corretta classificazione.
+
+### Totali, persistenza e presentazione
+
+`TotaleImponibile = somma degli imponibili dei gruppi`.
+`TotaleImposta = somma delle imposte dei gruppi`.
+`TotaleDocumento = TotaleImponibile + TotaleImposta`.
+Le spese accessorie devono essere righe esplicite con aliquota/Natura e
+partecipare al castelletto; non aggiungerle ciecamente dopo il calcolo IVA.
+Questa politica non implementa automaticamente bollo, ritenute, casse,
+split payment, esigibilita IVA o altri regimi speciali.
+
+Il campo `ImportoTotaleDocumento` e **2.1.1.9**, NON 2.4.2.2.
+Le API, i totali persistiti e i PDF devono usare il medesimo risultato fiscale.
+Il frontend puo mostrare stime, chiaramente indicate, ma non costituisce
+fonte contabile. Il PDF deve mostrare la precisione utile del prezzo unitario
+(`0.00######`), importi a 2 decimali, sconto, aliquota e Natura.
+Non ricavare un'aliquota media da una nota di credito multialiquota:
+occorrono righe e classificazioni esplicite.
+
+Mantenere i prezzi unitari persistiti a 8 decimali e gli importi a 2.
+Validare l'intero documento prima di modificare o salvare righe e totali.
+Le migrazioni non devono riscrivere automaticamente importi di documenti
+storici o classificazioni fiscali; serve una revisione esplicita.
+Usare gli strumenti .NET deterministici per migrazioni:
+`dotnet ef migrations add` e `dotnet ef database update`.
+
+### Test obbligatori per modifiche contabili
+
+Usare xUnit con valori `decimal`, mai dati monetari `double` in `InlineData`.
+Preservare e ampliare i test per:
+
+- fattura standard al 22% e mista 22% / 10% / 0% con N3.2;
+- gruppi con aliquota zero e Nature diverse;
+- scorporo 23,00 x 5: imponibile 94,26, IVA 20,74, totale 115,00;
+- scorporo 94,18 x 5: imponibile 385,98, IVA 84,92, totale 470,90;
+- due righe nette da 0,03 al 22%: imponibile 0,06 e IVA 0,01, NON 0,02;
+- quantita frazionarie, sconti, midpoint positivi e negativi;
+- precisione, input invalidi, Natura mancante/incompatibile e overflow;
+- immutabilita, determinismo, nessuna mutazione dopo validazione fallita;
+- coerenza tra aggregati, persistenza e presentazione PDF.
+
+### Riferimenti ufficiali e limiti
+
+- [Documentazione formato FatturaPA](https://www.fatturapa.gov.it/it/norme-e-regole/documentazione-fattura-elettronica/formato-fatturapa/)
+- [Specifiche tecniche formato, versione 1.4](https://www.fatturapa.gov.it/export/documenti/fatturapa/v1.4/Specifiche_tecniche_del_formato_FatturaPA_V1.4.pdf)
+- [Schema ordinario privati 1.2.3](https://www.fatturapa.gov.it/export/documenti/fatturapa/v1.4/Schema_VFPR12_v1.2.3.xsd)
+
+La scelta di `PrezzoTotale` a esattamente 2 decimali e una politica tassativa
+del progetto: non descriverla come unico formato consentito dallo schema,
+che permette maggiore precisione per alcuni campi prezzo. I test aritmetici
+non certificano da soli la conformita completa SDI: un futuro esportatore XML
+deve anche validare XSD, vincoli documentali e controlli SDI aggiornati.

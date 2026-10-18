@@ -1,4 +1,4 @@
-﻿namespace Mauw.Erp.Domain.Repositories;
+namespace Mauw.Erp.Domain.Repositories;
 
 /// <summary>
 /// Unit of Work for transaction management.
@@ -11,6 +11,7 @@ public interface IUnitOfWork : IDisposable
     ICountryRepository Countries { get; }
     IOrderRepository Orders { get; }
     IInvoiceRepository Invoices { get; }
+    ICreditNoteRepository CreditNotes { get; }
     IStockMovementRepository StockMovements { get; }
     IStockRepository Stock { get; }
     IDdtDocumentRepository DdtDocuments { get; }
@@ -21,7 +22,7 @@ public interface IUnitOfWork : IDisposable
     IMaterialRepository Materials { get; }
     IMacroCategoryRepository MacroCategories { get; }
     IWarehouseRepository Warehouses { get; }
-    
+
     Task SaveChangesAsync();
     Task BeginTransactionAsync();
     Task CommitAsync();

@@ -17,6 +17,7 @@ public class UnitOfWork(MauwDbContext dbContext, IMemoryCache _cache) : IUnitOfW
     private ICountryRepository? _countryRepository;
     private IOrderRepository? _orderRepository;
     private IInvoiceRepository? _invoiceRepository;
+    private ICreditNoteRepository? _creditNoteRepository;
     private IStockMovementRepository? _stockMovementRepository;
     private IStockRepository? _stockRepository;
     private IDdtDocumentRepository? _ddtDocumentRepository;
@@ -35,6 +36,7 @@ public class UnitOfWork(MauwDbContext dbContext, IMemoryCache _cache) : IUnitOfW
 
     public IOrderRepository Orders => _orderRepository ??= new OrderRepository(dbContext);
     public IInvoiceRepository Invoices => _invoiceRepository ??= new InvoiceRepository(dbContext);
+    public ICreditNoteRepository CreditNotes => _creditNoteRepository ??= new CreditNoteRepository(dbContext);
     public IStockMovementRepository StockMovements => _stockMovementRepository ??= new StockMovementRepository(dbContext);
     public IStockRepository Stock => _stockRepository ??= new StockRepository(dbContext);
     public IDdtDocumentRepository DdtDocuments => _ddtDocumentRepository ??= new DdtDocumentRepository(dbContext);

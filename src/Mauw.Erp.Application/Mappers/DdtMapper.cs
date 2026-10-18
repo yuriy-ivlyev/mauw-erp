@@ -32,8 +32,10 @@ public static class DdtMapper
             UnitNetPrice: item.UnitNetPrice,
             VatRate: item.VatRate,
             LineNetTotal: item.LineNetTotal,
-            LineVatTotal: item.LineVatTotal,
-            LineGrossTotal: item.LineGrossTotal
+            LineVatTotal: null,
+            LineGrossTotal: null,
+            NatureCode: item.NatureCode,
+            DiscountPercent: item.DiscountPercent
         );
     }
 

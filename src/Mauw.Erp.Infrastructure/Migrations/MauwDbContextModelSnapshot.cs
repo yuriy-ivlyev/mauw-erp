@@ -905,6 +905,71 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.CreditNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<DateTime>("CreditNoteDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("credit_note_date");
+
+                    b.Property<string>("CreditNoteNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("credit_note_number");
+
+                    b.Property<decimal>("GrossTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("gross_total");
+
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<decimal>("TaxableTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("taxable_total");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<decimal>("VatTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("vat_total");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_credit_notes");
+
+                    b.HasIndex("CreditNoteNumber")
+                        .IsUnique();
+
+                    b.HasIndex("InvoiceId")
+                        .HasDatabaseName("i_x_credit_notes_invoice_id");
+
+                    b.ToTable("credit_notes");
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.CustomerProfile", b =>
                 {
                     b.Property<Guid>("ContactId")
@@ -984,6 +1049,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("gross_total");
 
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
                     b.Property<decimal>("TaxableTotal")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -1009,6 +1078,8 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasIndex("DdtNumber")
                         .IsUnique();
 
+                    b.HasIndex("OrderId");
+
                     b.ToTable("ddt_documents");
                 });
 
@@ -1029,7 +1100,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("ddt_document_id");
 
-                    b.Property<decimal>("LineGrossTotal")
+                    b.Property<decimal>("DiscountPercent")
+                        .HasColumnType("numeric")
+                        .HasColumnName("discount_percent");
+
+                    b.Property<decimal?>("LineGrossTotal")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("line_gross_total");
@@ -1039,18 +1114,23 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("line_net_total");
 
-                    b.Property<decimal>("LineVatTotal")
+                    b.Property<decimal?>("LineVatTotal")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("line_vat_total");
+
+                    b.Property<string>("NatureCode")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("nature_code");
 
                     b.Property<int>("Quantity")
                         .HasColumnType("integer")
                         .HasColumnName("quantity");
 
                     b.Property<decimal>("UnitNetPrice")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)")
+                        .HasPrecision(22, 8)
+                        .HasColumnType("numeric(22,8)")
                         .HasColumnName("unit_net_price");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -1112,6 +1192,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("invoice_number");
 
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
                     b.Property<decimal>("PaidAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -1142,6 +1226,8 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasIndex("InvoiceNumber")
                         .IsUnique();
 
+                    b.HasIndex("OrderId");
+
                     b.ToTable("invoices");
                 });
 
@@ -1158,11 +1244,15 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<decimal>("DiscountPercent")
+                        .HasColumnType("numeric")
+                        .HasColumnName("discount_percent");
+
                     b.Property<Guid>("InvoiceId")
                         .HasColumnType("uuid")
                         .HasColumnName("invoice_id");
 
-                    b.Property<decimal>("LineGrossTotal")
+                    b.Property<decimal?>("LineGrossTotal")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("line_gross_total");
@@ -1172,18 +1262,23 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("line_net_total");
 
-                    b.Property<decimal>("LineVatTotal")
+                    b.Property<decimal?>("LineVatTotal")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("line_vat_total");
+
+                    b.Property<string>("NatureCode")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("nature_code");
 
                     b.Property<int>("Quantity")
                         .HasColumnType("integer")
                         .HasColumnName("quantity");
 
                     b.Property<decimal>("UnitNetPrice")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)")
+                        .HasPrecision(22, 8)
+                        .HasColumnType("numeric(22,8)")
                         .HasColumnName("unit_net_price");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -1356,6 +1451,12 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("order_number");
 
+                    b.Property<int>("OrderType")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("order_type");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer")
                         .HasColumnName("status");
@@ -1406,7 +1507,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<decimal>("LineGrossTotal")
+                    b.Property<decimal>("DiscountPercent")
+                        .HasColumnType("numeric")
+                        .HasColumnName("discount_percent");
+
+                    b.Property<decimal?>("LineGrossTotal")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("line_gross_total");
@@ -1416,7 +1521,7 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("line_net_total");
 
-                    b.Property<decimal>("LineVatTotal")
+                    b.Property<decimal?>("LineVatTotal")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("line_vat_total");
@@ -1427,6 +1532,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasDefaultValue(0)
                         .HasColumnName("max_quantity");
 
+                    b.Property<string>("NatureCode")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("nature_code");
+
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid")
                         .HasColumnName("order_id");
@@ -1436,8 +1546,8 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnName("quantity");
 
                     b.Property<decimal>("UnitNetPrice")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)")
+                        .HasPrecision(22, 8)
+                        .HasColumnType("numeric(22,8)")
                         .HasColumnName("unit_net_price");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -2065,6 +2175,18 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Navigation("Contact");
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.CreditNote", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.Invoice", "Invoice")
+                        .WithMany("CreditNotes")
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_credit_notes__invoices_invoice_id");
+
+                    b.Navigation("Invoice");
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.CustomerProfile", b =>
                 {
                     b.HasOne("Mauw.Erp.Domain.Entities.Contact", "Contact")
@@ -2357,6 +2479,8 @@ namespace Mauw.Erp.Infrastructure.Migrations
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Invoice", b =>
                 {
                     b.Navigation("Commissions");
+
+                    b.Navigation("CreditNotes");
 
                     b.Navigation("Items");
 

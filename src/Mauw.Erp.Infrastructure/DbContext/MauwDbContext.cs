@@ -34,6 +34,7 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
     public DbSet<DdtItem> DdtItems { get; set; }
     public DbSet<Invoice> Invoices { get; set; }
     public DbSet<InvoiceItem> InvoiceItems { get; set; }
+    public DbSet<CreditNote> CreditNotes { get; set; }
     public DbSet<Payment> Payments { get; set; }
     public DbSet<AgentCommission> AgentCommissions { get; set; }
     public DbSet<Warehouse> Warehouses { get; set; }
@@ -42,7 +43,6 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
     {
         base.OnModelCreating(modelBuilder);
 
-        // Apply snake_case naming conventions for PostgreSQL
         var converter = new SnakeCaseNameConverter();
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
         {
@@ -69,7 +69,6 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
             }
         }
 
-        // Apply entity configurations
         modelBuilder.ApplyConfiguration(new ContactConfiguration());
         modelBuilder.ApplyConfiguration(new CustomerProfileConfiguration());
         modelBuilder.ApplyConfiguration(new SupplierProfileConfiguration());
@@ -95,6 +94,7 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
         modelBuilder.ApplyConfiguration(new DdtItemConfiguration());
         modelBuilder.ApplyConfiguration(new InvoiceConfiguration());
         modelBuilder.ApplyConfiguration(new InvoiceItemConfiguration());
+        modelBuilder.ApplyConfiguration(new CreditNoteConfiguration());
         modelBuilder.ApplyConfiguration(new PaymentConfiguration());
         modelBuilder.ApplyConfiguration(new AgentCommissionConfiguration());
         modelBuilder.ApplyConfiguration(new WarehouseConfiguration());

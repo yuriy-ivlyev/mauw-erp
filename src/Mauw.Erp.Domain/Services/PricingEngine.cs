@@ -1,8 +1,8 @@
 namespace Mauw.Erp.Domain.Services;
 
 /// <summary>
-/// Italian Fiscal Pricing Engine implementing DPR 633/72 rules.
-/// All calculations use commercial rounding (MidpointRounding.AwayFromZero).
+/// Catalog price and margin estimates, not commercial-document accounting.
+/// Document lines and VAT summaries are calculated by ItalianAccountingCalculator.
 /// </summary>
 public class PricingEngine
 {
@@ -10,7 +10,7 @@ public class PricingEngine
     private const MidpointRounding RoundingMode = MidpointRounding.AwayFromZero;
 
     /// <summary>
-    /// Represents the complete pricing calculation for a product line.
+    /// Represents a catalog unit-price quotation, including indicative tax.
     /// </summary>
     public record PricingResult(
         decimal ListPrice,
@@ -22,7 +22,7 @@ public class PricingEngine
     );
 
     /// <summary>
-    /// Calculates pricing following Italian fiscal rules:
+    /// Calculates catalog unit-price estimates:
     /// 1. ListPrice = Round(PurchaseCost * (1 + MarkupRate / 100), 2)
     /// 2. FinalNetPrice = Round(ListPrice * (1 - DiscountRate / 100), 2)
     /// 3. VatAmount = Round(FinalNetPrice * (VatRate / 100), 2)
@@ -71,39 +71,6 @@ public class PricingEngine
             MarginAmount: marginAmount,
             MarginPercent: marginPercent
         );
-    }
-
-    /// <summary>
-    /// Represents VAT grouped by rate for Castelletto IVA calculation.
-    /// </summary>
-    public record VatBreakdown(
-        decimal VatRate,
-        decimal TaxableAmount,
-        decimal VatAmount
-    );
-
-    /// <summary>
-    /// Calculates VAT breakdown grouped by VAT rate (Castelletto IVA).
-    /// For each rate: round the sum of taxable amounts first, then apply the rate.
-    /// </summary>
-    public IEnumerable<VatBreakdown> CalculateVatBreakdown(IEnumerable<(decimal TaxableAmount, decimal VatRate)> items)
-    {
-        var grouped = items
-            .GroupBy(x => x.VatRate)
-            .OrderBy(g => g.Key);
-
-        foreach (var group in grouped)
-        {
-            var sumTaxableAmounts = group.Sum(x => x.TaxableAmount);
-            var roundedTaxableAmount = Round(sumTaxableAmounts, DecimalPlaces);
-            var vatAmount = Round(roundedTaxableAmount * (group.Key / 100), DecimalPlaces);
-
-            yield return new(
-                VatRate: group.Key,
-                TaxableAmount: roundedTaxableAmount,
-                VatAmount: vatAmount
-            );
-        }
     }
 
     /// <summary>

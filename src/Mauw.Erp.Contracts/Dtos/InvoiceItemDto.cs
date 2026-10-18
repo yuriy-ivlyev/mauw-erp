@@ -11,6 +11,8 @@ public record InvoiceItemDto(
     decimal UnitNetPrice,
     decimal VatRate,
     decimal LineNetTotal,
-    decimal LineVatTotal,
-    decimal LineGrossTotal
+    decimal? LineVatTotal,
+    decimal? LineGrossTotal,
+    string? NatureCode = null,
+    decimal DiscountPercent = 0m
 );

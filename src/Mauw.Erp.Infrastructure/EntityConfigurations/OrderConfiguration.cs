@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Domain.Enums;
 
 namespace Mauw.Erp.Infrastructure.DbContext;
 
@@ -40,6 +41,10 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.Property(o => o.DocumentReference)
             .HasMaxLength(100);
+
+        builder.Property(o => o.OrderType)
+            .IsRequired()
+            .HasDefaultValue(OrderType.Standard);
 
         builder.Property(o => o.CreatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");

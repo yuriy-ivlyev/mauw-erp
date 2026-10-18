@@ -5,7 +5,10 @@ public record CassaCartItemRequest(
     int Quantity,
     decimal UnitNetPrice,
     decimal VatRate,
-    int MaxQuantity
+    int MaxQuantity,
+    string? NatureCode = null,
+    decimal DiscountPercent = 0m,
+    decimal? UnitGrossPrice = null
 );
 
 public record CreateCassaSessionRequest(

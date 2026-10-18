@@ -17,7 +17,10 @@ public class OrderItemConfiguration : IEntityTypeConfiguration<OrderItem>
             .IsRequired();
 
         builder.Property(oi => oi.UnitNetPrice)
-            .HasPrecision(18, 4);
+            .HasPrecision(22, 8);
+
+        builder.Property(oi => oi.DiscountPercent).HasColumnType("numeric");
+        builder.Property(oi => oi.NatureCode).HasMaxLength(4);
 
         builder.Property(oi => oi.LineNetTotal)
             .HasPrecision(18, 2);

@@ -1,0 +1,166 @@
+<div class="p-6">
+  <div class="mb-6 flex items-center justify-between">
+    <h1 class="text-3xl font-bold">Elenco Ordini</h1>
+  </div>
+
+  <div *ngIf="errorMessage" class="mb-4 rounded border border-red-400 bg-red-100 p-4 text-red-700">
+    {{ errorMessage }}
+  </div>
+
+  <div *ngIf="pdfErrorMessage" role="alert" class="mb-4 rounded border border-red-400 bg-red-100 p-4 text-red-700">
+    {{ pdfErrorMessage }}
+  </div>
+
+  <div class="mb-4 flex flex-wrap gap-3">
+    <input
+      [(ngModel)]="searchTerm"
+      (ngModelChange)="onSearchChange()"
+      type="text"
+      placeholder="Cerca per numero ordine o cliente…"
+      class="min-w-[240px] flex-1 rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+
+    <select
+      [(ngModel)]="statusFilter"
+      (ngModelChange)="onFilterChange()"
+      class="rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <option value="">Tutti gli stati</option>
+      <option value="Draft">Bozza</option>
+      <option value="Confirmed">Confermato</option>
+      <option value="Suspended">Sospeso</option>
+      <option value="Terminated">Terminato</option>
+    </select>
+
+    <select
+      [(ngModel)]="typeFilter"
+      (ngModelChange)="onFilterChange()"
+      class="rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <option value="">Tutti i tipi</option>
+      <option value="Standard">Ordine</option>
+      <option value="CassaSession">Cassa</option>
+      <option value="Preventivo">Preventivo</option>
+      <option value="WebOrder">Web</option>
+    </select>
+  </div>
+
+  <div class="overflow-x-auto rounded-lg bg-white shadow">
+    <div *ngIf="loading && orders.length === 0" class="p-8 text-center text-gray-500">
+      Caricamento…
+    </div>
+
+    <table *ngIf="!loading || orders.length > 0" class="w-full">
+      <thead class="border-b bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Numero</th>
+          <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Cliente</th>
+          <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Data</th>
+          <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Stato</th>
+          <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Imponibile</th>
+          <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Totale</th>
+          <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Documenti</th>
+          <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">PDF</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let o of orders" class="border-b hover:bg-gray-50">
+          <td class="px-4 py-3 text-sm font-mono font-medium text-gray-900">
+            {{ o.orderNumber }}
+            <span [class]="'ml-1 rounded px-1.5 py-0.5 font-sans text-xs font-medium ' + orderTypeClass(o.orderType)">
+              {{ orderTypeLabel(o.orderType) }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-sm text-gray-700">{{ o.contactName }}</td>
+          <td class="px-4 py-3 text-sm text-gray-600">{{ o.orderDate | date:'dd/MM/yyyy' }}</td>
+          <td class="px-4 py-3 text-sm">
+            <span [class]="'rounded-full px-2 py-0.5 text-xs font-medium ' + statusClass(o.status)">
+              {{ statusLabel(o.status) }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-right text-sm text-gray-700">{{ o.taxableTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+          <td class="px-4 py-3 text-right text-sm font-semibold text-gray-900">{{ o.grossTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+          <td class="px-4 py-3 text-sm">
+            <div class="flex flex-col gap-1">
+              <span *ngIf="o.linkedDocuments?.invoiceNumber" class="font-mono text-xs text-blue-700">
+                FATT: {{ o.linkedDocuments!.invoiceNumber }}
+              </span>
+              <span *ngIf="o.linkedDocuments?.ddtNumber" class="font-mono text-xs text-green-700">
+                DDT: {{ o.linkedDocuments!.ddtNumber }}
+              </span>
+              <div *ngIf="o.linkedDocuments?.creditNotes?.length" class="flex flex-wrap gap-1">
+                <span
+                  *ngFor="let cn of o.linkedDocuments!.creditNotes"
+                  class="rounded bg-orange-50 px-1 font-mono text-xs text-orange-700"
+                  [title]="cn.reason ?? ''">
+                  NC: {{ cn.creditNoteNumber }}
+                </span>
+              </div>
+              <span *ngIf="!o.linkedDocuments" class="text-xs italic text-gray-400">—</span>
+            </div>
+          </td>
+          <td class="px-4 py-3 text-sm">
+            <div class="flex flex-wrap gap-1">
+              <button
+                (click)="downloadPdf('order', o.id, 'ordine-' + o.orderNumber + '.pdf')"
+                [disabled]="downloadingPdf !== null"
+                class="whitespace-nowrap rounded bg-gray-600 px-2 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50">
+                {{ downloadingPdf === 'order-' + o.id ? '…' : 'ORD PDF' }}
+              </button>
+
+              <button
+                *ngIf="o.linkedDocuments?.invoiceId"
+                (click)="downloadPdf('invoice', o.linkedDocuments!.invoiceId!, 'fattura-' + o.linkedDocuments!.invoiceNumber + '.pdf')"
+                [disabled]="downloadingPdf !== null"
+                class="whitespace-nowrap rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                {{ downloadingPdf === 'invoice-' + o.linkedDocuments!.invoiceId ? '…' : 'FATT PDF' }}
+              </button>
+
+              <button
+                *ngIf="o.linkedDocuments?.ddtId"
+                (click)="downloadPdf('ddt', o.linkedDocuments!.ddtId!, 'ddt-' + o.linkedDocuments!.ddtNumber + '.pdf')"
+                [disabled]="downloadingPdf !== null"
+                class="whitespace-nowrap rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50">
+                {{ downloadingPdf === 'ddt-' + o.linkedDocuments!.ddtId ? '…' : 'DDT PDF' }}
+              </button>
+
+              <ng-container *ngIf="o.linkedDocuments?.creditNotes?.length">
+                <button
+                  *ngFor="let cn of o.linkedDocuments!.creditNotes"
+                  (click)="downloadPdf('invoice', cn.id, 'nota-credito-' + cn.creditNoteNumber + '.pdf')"
+                  [disabled]="downloadingPdf !== null"
+                  class="whitespace-nowrap rounded bg-orange-500 px-2 py-1 text-xs font-medium text-white hover:bg-orange-600 disabled:opacity-50"
+                  [title]="'Nota credito: ' + cn.creditNoteNumber">
+                  {{ downloadingPdf === 'invoice-' + cn.id ? '…' : 'NC PDF' }}
+                </button>
+              </ng-container>
+            </div>
+          </td>
+        </tr>
+
+        <tr *ngIf="orders.length === 0 && !loading">
+          <td colspan="8" class="px-6 py-8 text-center text-gray-500">Nessun ordine trovato.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div *ngIf="totalPages > 1" class="mt-4 flex items-center justify-between">
+    <span class="text-sm text-gray-600">
+      {{ (currentPage - 1) * pageSize + 1 }}–{{ currentPage * pageSize < totalCount ? currentPage * pageSize : totalCount }} di {{ totalCount }}
+    </span>
+    <div class="flex gap-1">
+      <button
+        (click)="goToPage(currentPage - 1)"
+        [disabled]="currentPage === 1"
+        class="rounded border px-3 py-1 text-sm hover:bg-gray-100 disabled:opacity-40">‹</button>
+      <button
+        *ngFor="let p of pages()"
+        (click)="goToPage(p)"
+        [class]="'rounded border px-3 py-1 text-sm ' + (p === currentPage ? 'border-blue-600 bg-blue-600 text-white' : 'hover:bg-gray-100')">
+        {{ p }}
+      </button>
+      <button
+        (click)="goToPage(currentPage + 1)"
+        [disabled]="currentPage === totalPages"
+        class="rounded border px-3 py-1 text-sm hover:bg-gray-100 disabled:opacity-40">›</button>
+    </div>
+  </div>
+</div>

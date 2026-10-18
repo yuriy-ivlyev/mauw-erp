@@ -28,6 +28,10 @@ public static class DdtEndpoints
             .WithName("ListDdts")
             .WithSummary("List DDTs with pagination");
 
+        group.MapGet("/{id}/pdf", GetDdtPdf)
+            .WithName("GetDdtPdf")
+            .WithSummary("Generate and download DDT PDF");
+
         group.MapPost("/{id}/items", AddDdtItem)
             .WithName("AddDdtItem")
             .WithSummary("Add an item to a DDT");
@@ -42,7 +46,7 @@ public static class DdtEndpoints
         IDdtService ddtService)
     {
         var result = await ddtService.CreateDdtAsync(request);
-        
+
         if (!result.Success)
             return TypedResults.BadRequest(result.Error);
 
@@ -54,7 +58,7 @@ public static class DdtEndpoints
         IDdtService ddtService)
     {
         var result = await ddtService.GetDdtAsync(id);
-        
+
         if (!result.Success)
             return TypedResults.NotFound();
 
@@ -73,8 +77,20 @@ public static class DdtEndpoints
             return TypedResults.Ok(result.Data!.Items);
         }
 
-        // Return empty list for now (can implement GetAllDdts later)
         return TypedResults.Ok(new List<DdtDto>());
+    }
+
+    private static async Task<Results<FileContentHttpResult, NotFound, BadRequest<string>>> GetDdtPdf(
+        Guid id,
+        IDdtService ddtService)
+    {
+        var result = await ddtService.GetDdtPdfAsync(id);
+        if (!result.Success)
+            return result.Error?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true
+                ? TypedResults.NotFound()
+                : TypedResults.BadRequest(result.Error!);
+
+        return TypedResults.File(result.Data!, "application/pdf", $"ddt-{id}.pdf");
     }
 
     private static async Task<Results<Ok<DdtDto>, BadRequest<string>, NotFound>> AddDdtItem(
@@ -83,7 +99,7 @@ public static class DdtEndpoints
         IDdtService ddtService)
     {
         var result = await ddtService.AddItemAsync(id, request);
-        
+
         if (!result.Success)
         {
             if (result.Error != null && result.Error.Contains("not found"))
@@ -99,11 +115,10 @@ public static class DdtEndpoints
         IDdtService ddtService)
     {
         var result = await ddtService.DeleteDdtAsync(id);
-        
+
         if (!result.Success)
             return TypedResults.NotFound();
 
         return TypedResults.NoContent();
     }
 }
-

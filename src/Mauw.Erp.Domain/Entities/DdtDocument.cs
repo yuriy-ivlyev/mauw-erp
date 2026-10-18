@@ -1,3 +1,6 @@
+using Mauw.Erp.Domain.Accounting;
+using Mauw.Erp.Domain.Services;
+
 namespace Mauw.Erp.Domain.Entities;
 
 /// <summary>
@@ -7,6 +10,7 @@ namespace Mauw.Erp.Domain.Entities;
 public class DdtDocument : Entity<Guid>
 {
     public Guid ContactId { get; set; }
+    public Guid? OrderId { get; set; }
     public string DdtNumber { get; set; }
     public DateTime DdtDate { get; set; }
     public decimal TaxableTotal { get; set; }
@@ -33,20 +37,32 @@ public class DdtDocument : Entity<Guid>
     /// <summary>
     /// Adds an item to the DDT and updates totals.
     /// </summary>
-    public void AddItem(DdtItem item)
+    public AccountingResult<CalculatedDocument> AddItem(DdtItem item, ItalianAccountingCalculator calculator)
     {
+        var result = calculator.CalculateAndApply(Items.Append(item));
+        if (!result.Success)
+            return result;
         Items.Add(item);
-        UpdateTotals();
+        ApplyTotals(result.Data!);
+        return result;
     }
 
     /// <summary>
     /// Recalculates DDT totals from items.
     /// </summary>
-    public void UpdateTotals()
+    public AccountingResult<CalculatedDocument> UpdateTotals(ItalianAccountingCalculator calculator)
     {
-        TaxableTotal = Items.Sum(i => i.LineNetTotal);
-        VatTotal = Items.Sum(i => i.LineVatTotal);
-        GrossTotal = TaxableTotal + VatTotal;
+        var result = calculator.CalculateAndApply(Items);
+        if (result.Success)
+            ApplyTotals(result.Data!);
+        return result;
+    }
+
+    private void ApplyTotals(CalculatedDocument document)
+    {
+        TaxableTotal = document.TotalTaxable;
+        VatTotal = document.TotalVat;
+        GrossTotal = document.TotalGross;
         UpdateTimestamp();
     }
 }

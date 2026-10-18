@@ -1,5 +1,6 @@
 using Mauw.Erp.Application.Decorators;
 using Mauw.Erp.Application.Services;
+using Mauw.Erp.Domain.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Mauw.Erp.Application.Extensions;
@@ -8,6 +9,7 @@ public static class ApplicationServicesExtensions
 {
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
+    services.AddSingleton<ItalianAccountingCalculator>();
         services.AddScoped<OrderService>();
         services.AddScoped<IOrderService>(sp =>
             new TracingOrderService(sp.GetRequiredService<OrderService>()));

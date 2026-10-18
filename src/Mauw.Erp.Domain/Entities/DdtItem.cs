@@ -3,7 +3,7 @@
 /// <summary>
 /// DdtItem entity representing a line item in a DDT.
 /// </summary>
-public class DdtItem : Entity<Guid>
+public class DdtItem : Entity<Guid>, ICommercialDocumentLine
 {
     public Guid DdtDocumentId { get; set; }
     public Guid VariantId { get; set; }
@@ -11,8 +11,10 @@ public class DdtItem : Entity<Guid>
     public decimal UnitNetPrice { get; set; }
     public decimal LineNetTotal { get; set; }
     public decimal VatRate { get; set; }
-    public decimal LineVatTotal { get; set; }
-    public decimal LineGrossTotal { get; set; }
+    public decimal? LineVatTotal { get; set; }
+    public decimal? LineGrossTotal { get; set; }
+    public string? NatureCode { get; set; }
+    public decimal DiscountPercent { get; set; }
 
     // Navigation
     public DdtDocument DdtDocument { get; set; } = null!;
@@ -23,7 +25,9 @@ public class DdtItem : Entity<Guid>
         Guid variantId,
         int quantity,
         decimal unitNetPrice,
-        decimal vatRate
+        decimal vatRate,
+        string? natureCode = null,
+        decimal discountPercent = 0m
     ) : base()
     {
         DdtDocumentId = ddtDocumentId;
@@ -31,11 +35,8 @@ public class DdtItem : Entity<Guid>
         Quantity = quantity;
         UnitNetPrice = unitNetPrice;
         VatRate = vatRate;
-
-        // Calculate line totals
-        LineNetTotal = decimal.Round(unitNetPrice * quantity, 2, MidpointRounding.AwayFromZero);
-        LineVatTotal = decimal.Round(LineNetTotal * (vatRate / 100), 2, MidpointRounding.AwayFromZero);
-        LineGrossTotal = LineNetTotal + LineVatTotal;
+        NatureCode = natureCode;
+        DiscountPercent = discountPercent;
     }
 
     private DdtItem() { } // For EF Core

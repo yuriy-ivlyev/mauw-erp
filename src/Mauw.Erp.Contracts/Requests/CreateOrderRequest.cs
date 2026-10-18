@@ -7,4 +7,6 @@ public class CreateOrderRequest
 {
     public Guid ContactId { get; set; }
     public decimal? DiscountRate { get; set; }
+    /// <summary>Standard | Preventivo | WebOrder (default: Standard)</summary>
+    public string? OrderType { get; set; }
 }

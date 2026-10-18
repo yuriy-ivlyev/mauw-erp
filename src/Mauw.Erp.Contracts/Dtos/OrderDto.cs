@@ -1,17 +1,33 @@
 namespace Mauw.Erp.Contracts.Dtos;
 
-/// <summary>
-/// DTO for Order information (response).
-/// </summary>
 public record OrderDto(
     Guid Id,
     string OrderNumber,
     Guid ContactId,
+    string ContactName,
     DateTime OrderDate,
     decimal CustomerDiscountRate,
     string Status,
     decimal TaxableTotal,
     decimal VatTotal,
     decimal GrossTotal,
-    List<OrderItemDto> Items
+    string OrderType,
+    List<OrderItemDto> Items,
+    OrderLinkedDocumentsDto? LinkedDocuments
+);
+
+public record OrderLinkedDocumentsDto(
+    Guid? InvoiceId,
+    string? InvoiceNumber,
+    Guid? DdtId,
+    string? DdtNumber,
+    List<CreditNoteRefDto> CreditNotes
+);
+
+public record CreditNoteRefDto(
+    Guid Id,
+    string CreditNoteNumber,
+    DateTime CreditNoteDate,
+    decimal GrossTotal,
+    string? Reason
 );

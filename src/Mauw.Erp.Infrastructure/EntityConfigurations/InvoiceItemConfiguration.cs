@@ -17,7 +17,10 @@ public class InvoiceItemConfiguration : IEntityTypeConfiguration<InvoiceItem>
             .IsRequired();
 
         builder.Property(ii => ii.UnitNetPrice)
-            .HasPrecision(18, 4);
+            .HasPrecision(22, 8);
+
+        builder.Property(ii => ii.DiscountPercent).HasColumnType("numeric");
+        builder.Property(ii => ii.NatureCode).HasMaxLength(4);
 
         builder.Property(ii => ii.LineNetTotal)
             .HasPrecision(18, 2);

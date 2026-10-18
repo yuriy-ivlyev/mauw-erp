@@ -12,4 +12,6 @@ public interface IOrderRepository : IRepository<Order, Guid>
     Task<int> CountCassaSessionsAsync();
     Task<IEnumerable<Order>> GetSuspendedCassaSessionsAsync();
     Task<Order?> GetCassaSessionWithItemsAsync(Guid id);
+    Task<(IEnumerable<Order> Items, int Total)> GetAllPagedAsync(string? search, string? status, string? orderType, int page, int pageSize);
+    Task<int> CountOrdersByPrefixAsync(string prefix);
 }

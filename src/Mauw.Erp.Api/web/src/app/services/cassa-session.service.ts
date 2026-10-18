@@ -3,6 +3,9 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { ApiService } from './api.service';
 
 export interface CartItem {
+  natureCode?: string | null;
+  discountPercent?: number;
+  priceIncludesVat?: boolean;
   barcode: string;
   variantId: string;
   productId: string;
@@ -54,6 +57,8 @@ export interface SavedSessionDetail {
 }
 
 export interface SavedCartItemDto {
+  natureCode?: string | null;
+  discountPercent?: number;
   variantId: string;
   barcode: string;
   productId: string;
@@ -122,6 +127,9 @@ export class CassaSessionService {
       variantId: i.variantId,
       quantity: i.quantity,
       unitNetPrice: i.unitNetPrice,
+      unitGrossPrice: i.priceIncludesVat === false ? undefined : i.unitGrossPrice,
+      natureCode: i.natureCode,
+      discountPercent: i.discountPercent ?? 0,
       vatRate: i.vatRate,
       maxQuantity: i.maxQuantity
     }));
@@ -160,13 +168,16 @@ export class CassaSessionService {
       size: i.size,
       color: i.color,
       unitNetPrice: i.unitNetPrice,
+      natureCode: i.natureCode,
+      discountPercent: i.discountPercent ?? 0,
+      priceIncludesVat: false,
       unitGrossPrice: i.unitGrossPrice,
       vatRate: i.vatRate,
       quantityAvailable: i.maxQuantity,
       weightGrams: i.weightGrams,
       quantity: i.quantity,
-      lineNetTotal: i.unitNetPrice * i.quantity,
-      lineGrossTotal: i.unitGrossPrice * i.quantity,
+      lineNetTotal: i.unitNetPrice * i.quantity * (1 - (i.discountPercent ?? 0) / 100),
+      lineGrossTotal: i.unitGrossPrice * i.quantity * (1 - (i.discountPercent ?? 0) / 100),
       maxQuantity: i.maxQuantity
     }));
 

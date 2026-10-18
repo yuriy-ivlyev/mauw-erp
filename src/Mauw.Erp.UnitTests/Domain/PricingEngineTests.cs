@@ -1,24 +1,27 @@
 using Mauw.Erp.Domain.Services;
+using Mauw.Erp.Domain.Accounting;
 
 namespace Mauw.Erp.UnitTests.Domain;
 
 /// <summary>
-/// Unit tests for the Italian Fiscal Pricing Engine.
-/// Validates commercial rounding (MidpointRounding.AwayFromZero) compliance with DPR 633/72.
+/// Catalog quotation tests and migration coverage for the shared VAT calculator.
 /// </summary>
 public class PricingEngineTests
 {
     private readonly PricingEngine _pricingEngine = new();
+    private readonly ItalianAccountingCalculator _accountingCalculator = new();
 
     #region Commercial Rounding Tests
 
     [Theory]
-    [InlineData(12.455, 12.46)] // Should round up (away from zero)
-    [InlineData(12.454, 12.45)] // Should round down (towards zero)  
-    [InlineData(12.445, 12.45)] // Should round down at .5
-    [InlineData(12.465, 12.47)] // Should round up at .5
-    public void CalculatePrice_CommercialRounding_CorrectNetPriceRounding(decimal testValue, decimal expected)
+    [InlineData("12.455", "12.46")]
+    [InlineData("12.454", "12.45")]
+    [InlineData("12.445", "12.45")]
+    [InlineData("12.465", "12.47")]
+    public void CalculatePrice_CommercialRounding_CorrectNetPriceRounding(string valueText, string expectedText)
     {
+        var testValue = decimal.Parse(valueText, System.Globalization.CultureInfo.InvariantCulture);
+        var expected = decimal.Parse(expectedText, System.Globalization.CultureInfo.InvariantCulture);
         // Arrange
         // Use testValue directly as the net price (0% markup, 0% discount, 0% VAT)
         var purchaseCost = testValue;
@@ -230,7 +233,10 @@ public class PricingEngineTests
         };
 
         // Act
-        var breakdown = _pricingEngine.CalculateVatBreakdown(items).ToList();
+        var result = _accountingCalculator.Calculate(items.Select(item =>
+            new DocumentLineInput(1m, item.TaxableAmount, item.VatRate)));
+        Assert.True(result.Success, result.Error);
+        var breakdown = result.Data!.VatSummary.ToList();
 
         // Assert
         Assert.Single(breakdown);
@@ -252,7 +258,10 @@ public class PricingEngineTests
         };
 
         // Act
-        var breakdown = _pricingEngine.CalculateVatBreakdown(items).ToList();
+        var result = _accountingCalculator.Calculate(items.Select(item =>
+            new DocumentLineInput(1m, item.TaxableAmount, item.VatRate)));
+        Assert.True(result.Success, result.Error);
+        var breakdown = result.Data!.VatSummary.ToList();
 
         // Assert
         Assert.Equal(2, breakdown.Count);

@@ -28,6 +28,10 @@ public static class OrderEndpoints
             .WithName("ListOrders")
             .WithSummary("List orders with pagination");
 
+        group.MapGet("/{id}/pdf", GetOrderPdf)
+            .WithName("GetOrderPdf")
+            .WithSummary("Generate and download order PDF");
+
         group.MapPost("/{id}/items", AddOrderItem)
             .WithName("AddOrderItem")
             .WithSummary("Add an item to an order");
@@ -42,7 +46,7 @@ public static class OrderEndpoints
         IOrderService orderService)
     {
         var result = await orderService.CreateOrderAsync(request);
-        
+
         if (!result.Success)
             return TypedResults.BadRequest(result.Error);
 
@@ -54,20 +58,36 @@ public static class OrderEndpoints
         IOrderService orderService)
     {
         var result = await orderService.GetOrderAsync(id);
-        
+
         if (!result.Success)
             return TypedResults.NotFound();
 
         return TypedResults.Ok(result.Data!);
     }
 
-    private static async Task<Ok<List<OrderDto>>> ListOrders(
+    private static async Task<Ok<PagedResult<OrderDto>>> ListOrders(
         IOrderService orderService,
+        string? search = null,
+        string? status = null,
+        string? orderType = null,
         int page = 1,
         int pageSize = 20)
     {
-        // TODO: Implement pagination in service, for now return empty list
-        return TypedResults.Ok(new List<OrderDto>());
+        var result = await orderService.GetAllOrdersAsync(search, status, orderType, page, pageSize);
+        return TypedResults.Ok(result.Data!);
+    }
+
+    private static async Task<Results<FileContentHttpResult, NotFound, BadRequest<string>>> GetOrderPdf(
+        Guid id,
+        IOrderService orderService)
+    {
+        var result = await orderService.GetOrderPdfAsync(id);
+        if (!result.Success)
+            return result.Error?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true
+                ? TypedResults.NotFound()
+                : TypedResults.BadRequest(result.Error!);
+
+        return TypedResults.File(result.Data!, "application/pdf", $"ordine-{id}.pdf");
     }
 
     private static async Task<Results<Created<OrderItemDto>, BadRequest<string>, NotFound>> AddOrderItem(
@@ -76,7 +96,7 @@ public static class OrderEndpoints
         IOrderService orderService)
     {
         var result = await orderService.AddItemAsync(id, request);
-        
+
         if (!result.Success)
         {
             if (result.Error != null && result.Error.Contains("not found"))
@@ -84,12 +104,11 @@ public static class OrderEndpoints
             return TypedResults.BadRequest(result.Error);
         }
 
-        // Extract item DTO from OrderDto
         var orderDto = result.Data!;
         var itemDto = orderDto.Items.LastOrDefault();
         if (itemDto != null)
             return TypedResults.Created($"/api/v1/orders/{id}/items/{itemDto.Id}", itemDto);
-        
+
         return TypedResults.BadRequest("Item not created");
     }
 
@@ -103,6 +122,5 @@ public static class OrderEndpoints
         if (result.Error != null && result.Error.Contains("not found"))
             return TypedResults.NotFound();
         return TypedResults.BadRequest(result.Error);
-
     }
 }

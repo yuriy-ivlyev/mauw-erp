@@ -1,4 +1,4 @@
-﻿using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Domain.Entities;
 
 namespace Mauw.Erp.Domain.Repositories;
 
@@ -9,4 +9,6 @@ public interface IDdtDocumentRepository : IRepository<DdtDocument, Guid>
 {
     Task<IEnumerable<DdtDocument>> GetByContactIdAsync(Guid contactId);
     Task<DdtDocument?> GetByNumberAsync(string ddtNumber);
+    Task<IEnumerable<DdtDocument>> GetByOrderIdsAsync(IEnumerable<Guid> orderIds);
+    Task<int> CountDdtsByPrefixAsync(string prefix);
 }

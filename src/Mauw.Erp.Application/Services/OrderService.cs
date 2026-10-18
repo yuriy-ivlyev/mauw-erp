@@ -1,9 +1,14 @@
+using System.Globalization;
 using Mauw.Erp.Application.Diagnostics;
 using Mauw.Erp.Application.Mappers;
 using Mauw.Erp.Application.Validation;
 using Mauw.Erp.Contracts.Dtos;
+using Mauw.Erp.Contracts.Dtos.Pdf;
+using Mauw.Erp.Contracts.Interfaces;
 using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Domain.Accounting;
+using Mauw.Erp.Domain.Enums;
 using Mauw.Erp.Domain.Repositories;
 using Mauw.Erp.Domain.Services;
 using Microsoft.Extensions.Logging;
@@ -18,9 +23,14 @@ public partial class OrderService(
     IValidator<CreateOrderRequest> createValidator,
     IValidator<CreateOrderItemRequest> itemValidator,
     PricingEngine pricingEngine,
+    ItalianAccountingCalculator accountingCalculator,
+    ICompanySettingsService companySettingsService,
+    IInvoicePdfGenerator pdfGenerator,
     ILogger<OrderService> logger)
     : IOrderService
 {
+    private static readonly CultureInfo ItalianCulture = CultureInfo.GetCultureInfo("it-IT");
+
     public async Task<OperationResult<OrderDto>> CreateOrderAsync(CreateOrderRequest request)
     {
         var validationResult = createValidator.Validate(request);
@@ -37,11 +47,24 @@ public partial class OrderService(
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
+        var orderType = Enum.TryParse<OrderType>(request.OrderType, out var parsedType)
+            ? parsedType : OrderType.Standard;
+
+        var now = DateTime.UtcNow;
+        var prefix = orderType switch
+        {
+            OrderType.Preventivo => $"PRV-{now:MMyyyy}-",
+            OrderType.WebOrder   => $"WEB-{now:MMyyyy}-",
+            _                    => $"ORD-{now:MMyyyy}-",
+        };
+        var count = await unitOfWork.Orders.CountOrdersByPrefixAsync(prefix);
+        var orderNumber = $"{prefix}{(count + 1):D3}";
+
         var order = new Order(
             contactId: request.ContactId,
-            orderNumber: $"ORD-{DateTime.UtcNow:yyyyMMddHHmmss}",
+            orderNumber: orderNumber,
             customerDiscountRate: request.DiscountRate ?? 0
-        );
+        ) { OrderType = orderType };
 
         await unitOfWork.Orders.AddAsync(order);
         await unitOfWork.SaveChangesAsync();
@@ -62,6 +85,46 @@ public partial class OrderService(
             return OperationResult<OrderDto>.Fail("Order not found");
 
         return OperationResult<OrderDto>.Ok(OrderMapper.MapToDto(order));
+    }
+
+    public async Task<OperationResult<PagedResult<OrderDto>>> GetAllOrdersAsync(string? search, string? status, string? orderType, int page, int pageSize)
+    {
+        var (orders, total) = await unitOfWork.Orders.GetAllPagedAsync(search, status, orderType, page, pageSize);
+        var orderList = orders.ToList();
+        var orderIds = orderList.Select(o => o.Id).ToList();
+
+        var invoices = orderIds.Count > 0
+            ? (await unitOfWork.Invoices.GetByOrderIdsAsync(orderIds)).ToList()
+            : [];
+
+        var ddts = orderIds.Count > 0
+            ? (await unitOfWork.DdtDocuments.GetByOrderIdsAsync(orderIds)).ToList()
+            : [];
+
+        var invoiceIds = invoices.Select(i => i.Id).ToList();
+        var creditNotes = invoiceIds.Count > 0
+            ? (await unitOfWork.CreditNotes.GetByInvoiceIdsAsync(invoiceIds)).ToList()
+            : [];
+
+        var dtos = orderList.Select(o =>
+        {
+            var invoice = invoices.FirstOrDefault(i => i.OrderId == o.Id);
+            var ddt = ddts.FirstOrDefault(d => d.OrderId == o.Id);
+            var creditNoteRefs = invoice != null
+                ? creditNotes
+                    .Where(cn => cn.InvoiceId == invoice.Id)
+                    .Select(cn => new CreditNoteRefDto(cn.Id, cn.CreditNoteNumber, cn.CreditNoteDate, cn.GrossTotal, cn.Reason))
+                    .ToList()
+                : [];
+
+            OrderLinkedDocumentsDto? linked = invoice != null || ddt != null
+                ? new OrderLinkedDocumentsDto(invoice?.Id, invoice?.InvoiceNumber, ddt?.Id, ddt?.DdtNumber, creditNoteRefs)
+                : null;
+
+            return OrderMapper.MapToDto(o, linked);
+        }).ToList();
+
+        return OperationResult<PagedResult<OrderDto>>.Ok(new PagedResult<OrderDto>(dtos, page, pageSize, total));
     }
 
     public async Task<OperationResult<PagedResult<OrderDto>>> GetOrdersByContactAsync(Guid contactId, int page, int pageSize)
@@ -107,15 +170,26 @@ public partial class OrderService(
             product.VatRate
         );
 
+        var line = accountingCalculator.CalculateLine(new DocumentLineInput(request.Quantity,
+            request.UnitGrossPrice ?? request.UnitNetPrice ?? pricingResult.ListPrice,
+            request.VatRate ?? product.VatRate, request.NatureCode,
+            request.DiscountPercent ?? order.CustomerDiscountRate, PriceIncludesVat: request.UnitGrossPrice.HasValue));
+        if (!line.Success)
+            return OperationResult<OrderDto>.Fail(line.Error);
+
         var item = new OrderItem(
             orderId: orderId,
             variantId: request.VariantId,
             quantity: request.Quantity,
-            unitNetPrice: pricingResult.FinalNetPrice,
-            vatRate: product.VatRate
+            unitNetPrice: line.Data!.UnitNetPrice,
+            vatRate: line.Data.VatRate,
+            natureCode: line.Data.NatureCode,
+            discountPercent: line.Data.DiscountPercent
         );
 
-        order.AddItem(item);
+        var accounting = order.AddItem(item, accountingCalculator);
+        if (!accounting.Success)
+            return OperationResult<OrderDto>.Fail(accounting.Error);
         await unitOfWork.Orders.UpdateAsync(order);
         await unitOfWork.SaveChangesAsync();
 
@@ -162,7 +236,114 @@ public partial class OrderService(
         return OperationResult<bool>.Ok(true);
     }
 
-    // ── Cassa session operations ──────────────────────────────
+    public async Task<OperationResult<byte[]>> GetOrderPdfAsync(Guid orderId)
+    {
+        var order = await unitOfWork.Orders.GetCassaSessionWithItemsAsync(orderId);
+        if (order == null)
+            return OperationResult<byte[]>.Fail("Order not found");
+
+        var companyResult = await companySettingsService.GetCompanyAsync();
+        var company = companyResult.Success ? companyResult.Data : null;
+        var sellerAddress = company?.LegalHeadquarters
+            ?? company?.OperationalSites.FirstOrDefault(s => s.IsMainOperationalSite)
+            ?? company?.OperationalSites.FirstOrDefault();
+        var customerAddress = order.Contact?.LegalHeadquarters ?? order.Contact?.Addresses.FirstOrDefault();
+
+        var seller = new InvoicePdfSellerDetails(
+            BusinessName: company?.BusinessName ?? "Mauw S.r.l.",
+            VatNumber: company?.VatNumber ?? string.Empty,
+            FiscalCode: company?.TaxCode,
+            Address: sellerAddress?.Street ?? string.Empty,
+            City: sellerAddress?.City ?? string.Empty,
+            PostalCode: sellerAddress?.ZipCode ?? string.Empty,
+            Province: sellerAddress?.Province ?? string.Empty,
+            Rea: BuildRea(company),
+            ShareCapital: company?.ShareCapital?.ToString("N2", ItalianCulture),
+            TaxRegime: company?.FiscalRegime ?? "RF01 - Ordinario",
+            SdiCode: company?.SdiCode,
+            Pec: company?.PecEmail
+        );
+
+        var customer = new InvoicePdfCustomerDetails(
+            BusinessName: order.Contact?.BusinessName ?? string.Empty,
+            VatNumber: order.Contact?.VatNumber,
+            FiscalCode: order.Contact?.TaxCode,
+            Address: customerAddress?.Street ?? string.Empty,
+            City: customerAddress?.City ?? string.Empty,
+            PostalCode: customerAddress?.ZipCode ?? string.Empty,
+            Province: customerAddress?.Province ?? string.Empty,
+            SdiCode: order.Contact?.SdiCode,
+            Pec: order.Contact?.PecEmail
+        );
+
+        var lines = order.Items.Select(item => new InvoicePdfLineModel(
+            Sku: item.Variant?.Barcode ?? string.Empty,
+            Description: string.Join(" ",
+                    new[]
+                    {
+                        item.Variant?.Product?.Name,
+                        item.Variant?.Size?.Name,
+                        item.Variant?.Color?.Name
+                    }.Where(part => !string.IsNullOrWhiteSpace(part)))
+                .Trim(),
+            SeasonCollection: null,
+            Pieces: (int)item.Quantity,
+            UnitPrice: item.UnitNetPrice,
+            DiscountPercent: item.DiscountPercent,
+            VatRate: item.VatRate,
+            LineTotal: item.LineNetTotal,
+            NatureCode: item.NatureCode
+        )).ToList();
+
+        var accounting = accountingCalculator.Calculate(order.Items.Select(item => new DocumentLineInput(
+            item.Quantity, item.UnitNetPrice, item.VatRate, item.NatureCode, item.DiscountPercent)));
+        if (!accounting.Success)
+            return OperationResult<byte[]>.Fail(accounting.Error);
+        var calculated = accounting.Data!;
+        var vatSummary = calculated.VatSummary
+            .Select(group => new InvoiceVatBreakdownModel(group.VatRate, group.TaxableAmount, group.VatAmount, group.NatureCode))
+            .ToList();
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var line = calculated.Lines[i];
+            lines[i] = lines[i] with
+            {
+                UnitPrice = line.UnitNetPrice, DiscountPercent = line.DiscountPercent,
+                VatRate = line.VatRate, NatureCode = line.NatureCode, LineTotal = line.LineNetTotal
+            };
+        }
+
+        var totals = new InvoicePdfTotals(
+            TotalPieces: order.Items.Sum(i => (int)i.Quantity),
+            TotalNet: calculated.TotalTaxable,
+            TotalVat: calculated.TotalVat,
+            TotalGross: calculated.TotalGross,
+            ShippingCost: 0m
+        );
+
+        var model = new InvoicePdfModel(
+            DocumentNumber: order.OrderNumber,
+            DocumentType: "ORDINE",
+            IssueDate: DateOnly.FromDateTime(order.OrderDate),
+            Currency: "EUR",
+            Seller: seller,
+            Customer: customer,
+            Payment: new InvoicePdfPaymentInfo(
+                PaymentTerms: "A vista",
+                PaymentMethod: "MP01",
+                DueDate: null,
+                Iban: null,
+                Swift: null,
+                BankName: null),
+            Lines: lines,
+            VatSummary: vatSummary,
+            Totals: totals,
+            CustomerOrderRef: order.DocumentReference
+        );
+
+        var bytes = await pdfGenerator.GenerateInvoicePdfAsync(model);
+        return OperationResult<byte[]>.Ok(bytes);
+    }
 
     public async Task<OperationResult<CassaSessionDetailDto>> CreateCassaSessionAsync(CreateCassaSessionRequest request)
     {
@@ -170,22 +351,30 @@ public partial class OrderService(
         if (contact is null)
             return OperationResult<CassaSessionDetailDto>.Fail("Cliente non trovato");
 
-        var count = await unitOfWork.Orders.CountCassaSessionsAsync();
-        var sessionCode = $"CASSA-{(count + 1):D3}";
+        var accounting = CalculateCart(request.Items);
+        if (!accounting.Success)
+            return OperationResult<CassaSessionDetailDto>.Fail(accounting.Error);
 
-        var order = new Order(request.ContactId, sessionCode);
+        var now = DateTime.UtcNow;
+        var prefix = $"ORD-{now:MMyyyy}-";
+        var count = await unitOfWork.Orders.CountOrdersByPrefixAsync(prefix);
+        var sessionCode = $"{prefix}{(count + 1):D3}";
+
+        var order = new Order(request.ContactId, sessionCode) { OrderType = OrderType.CassaSession };
         order.SetDocumentReference(request.DocumentReference);
         order.Suspend(request.TerminalId);
 
-        await unitOfWork.Orders.AddAsync(order);
-        await unitOfWork.SaveChangesAsync();
-
-        foreach (var item in request.Items)
+        for (var i = 0; i < request.Items.Count; i++)
         {
-            var orderItem = new OrderItem(order.Id, item.VariantId, item.Quantity, item.UnitNetPrice, item.VatRate, item.MaxQuantity);
-            order.AddItem(orderItem);
+            var item = request.Items[i];
+            var line = accounting.Data!.Lines[i];
+            order.Items.Add(new OrderItem(order.Id, item.VariantId, item.Quantity, line.UnitNetPrice, item.VatRate,
+                item.MaxQuantity, line.NatureCode, line.DiscountPercent) { LineNetTotal = line.LineNetTotal });
         }
-        await unitOfWork.Orders.UpdateAsync(order);
+        order.TaxableTotal = accounting.Data!.TotalTaxable;
+        order.VatTotal = accounting.Data.TotalVat;
+        order.GrossTotal = accounting.Data.TotalGross;
+        await unitOfWork.Orders.AddAsync(order);
         await unitOfWork.SaveChangesAsync();
 
         logger.LogInformation("Cassa session {Code} created", sessionCode);
@@ -204,15 +393,25 @@ public partial class OrderService(
         if (contact is null)
             return OperationResult<CassaSessionDetailDto>.Fail("Cliente non trovato");
 
+        var accounting = CalculateCart(request.Items);
+        if (!accounting.Success)
+            return OperationResult<CassaSessionDetailDto>.Fail(accounting.Error);
+
         order.ContactId = request.ContactId;
         order.SetDocumentReference(request.DocumentReference);
         order.ClearItems();
 
-        foreach (var item in request.Items)
+        for (var i = 0; i < request.Items.Count; i++)
         {
-            var orderItem = new OrderItem(order.Id, item.VariantId, item.Quantity, item.UnitNetPrice, item.VatRate, item.MaxQuantity);
-            order.AddItem(orderItem);
+            var item = request.Items[i];
+            var line = accounting.Data!.Lines[i];
+            var orderItem = new OrderItem(order.Id, item.VariantId, item.Quantity, line.UnitNetPrice, item.VatRate,
+                item.MaxQuantity, line.NatureCode, line.DiscountPercent) { LineNetTotal = line.LineNetTotal };
+            order.Items.Add(orderItem);
         }
+        order.TaxableTotal = accounting.Data!.TotalTaxable;
+        order.VatTotal = accounting.Data.TotalVat;
+        order.GrossTotal = accounting.Data.TotalGross;
 
         order.Suspend(request.TerminalId);
         await unitOfWork.Orders.UpdateAsync(order);
@@ -273,6 +472,29 @@ public partial class OrderService(
         return OperationResult<CassaSessionDetailDto>.Ok(MapCassaDetail(order, contactName));
     }
 
+    private static string? BuildRea(CompanySettingsDto? company)
+    {
+        if (company == null)
+            return null;
+
+        if (string.IsNullOrWhiteSpace(company.ReaOffice))
+            return company.ReaNumber;
+
+        if (string.IsNullOrWhiteSpace(company.ReaNumber))
+            return company.ReaOffice;
+
+        return $"{company.ReaOffice}-{company.ReaNumber}";
+    }
+
+    private AccountingResult<CalculatedDocument> CalculateCart(List<CassaCartItemRequest>? items)
+    {
+        if (items is null || items.Any(item => item is null))
+            return AccountingResult<CalculatedDocument>.Fail("Il carrello e le sue righe non possono essere null.");
+        return accountingCalculator.Calculate(items.Select(item => new DocumentLineInput(
+            item.Quantity, item.UnitGrossPrice ?? item.UnitNetPrice, item.VatRate, item.NatureCode,
+            item.DiscountPercent, PriceIncludesVat: item.UnitGrossPrice.HasValue)));
+    }
+
     private static CassaSessionDetailDto MapCassaDetail(Order order, string contactName) =>
         new(
             order.Id,
@@ -293,11 +515,11 @@ public partial class OrderService(
                 i.VatRate,
                 i.Quantity,
                 i.MaxQuantity,
-                i.Variant?.WeightGrams
+                i.Variant?.WeightGrams,
+                i.NatureCode,
+                i.DiscountPercent
             )).ToList()
         );
-
-    // --- [LoggerMessage] source-generated log methods (zero-allocation hot path) ---
 
     [LoggerMessage(Level = LogLevel.Information,
         Message = "Order {OrderNumber} created for contact {ContactId}")]

@@ -17,7 +17,10 @@ public class DdtItemConfiguration : IEntityTypeConfiguration<DdtItem>
             .IsRequired();
 
         builder.Property(di => di.UnitNetPrice)
-            .HasPrecision(18, 4);
+            .HasPrecision(22, 8);
+
+        builder.Property(di => di.DiscountPercent).HasColumnType("numeric");
+        builder.Property(di => di.NatureCode).HasMaxLength(4);
 
         builder.Property(di => di.LineNetTotal)
             .HasPrecision(18, 2);

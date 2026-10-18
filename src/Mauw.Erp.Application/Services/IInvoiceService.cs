@@ -14,4 +14,5 @@ public interface IInvoiceService
     Task<OperationResult<InvoiceDto>> AddItemAsync(Guid invoiceId, CreateInvoiceItemRequest request);
     Task<OperationResult<InvoiceDto>> RecordPaymentAsync(Guid invoiceId, RecordPaymentRequest request);
     Task<OperationResult<bool>> DeleteInvoiceAsync(Guid id);
+    Task<OperationResult<byte[]>> GetInvoicePdfAsync(Guid id);
 }

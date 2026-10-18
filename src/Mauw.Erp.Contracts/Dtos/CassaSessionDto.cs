@@ -12,7 +12,9 @@ public record CassaCartItemDto(
     decimal VatRate,
     int Quantity,
     int MaxQuantity,
-    decimal? WeightGrams
+    decimal? WeightGrams,
+    string? NatureCode = null,
+    decimal DiscountPercent = 0m
 );
 
 public record CassaSessionDetailDto(

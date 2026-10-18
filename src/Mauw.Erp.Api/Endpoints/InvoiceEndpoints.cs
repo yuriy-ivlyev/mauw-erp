@@ -42,7 +42,7 @@ public static class InvoiceEndpoints
         IInvoiceService invoiceService)
     {
         var result = await invoiceService.CreateInvoiceAsync(request);
-        
+
         if (!result.Success)
             return TypedResults.BadRequest(result.Error);
 
@@ -54,7 +54,7 @@ public static class InvoiceEndpoints
         IInvoiceService invoiceService)
     {
         var result = await invoiceService.GetInvoiceAsync(id);
-        
+
         if (!result.Success)
             return TypedResults.NotFound();
 
@@ -66,7 +66,6 @@ public static class InvoiceEndpoints
         int page = 1,
         int pageSize = 20)
     {
-        // TODO: Implement pagination in service, for now return empty list
         return TypedResults.Ok(new List<InvoiceDto>());
     }
 
@@ -81,14 +80,18 @@ public static class InvoiceEndpoints
         if (result.Error != null && result.Error.Contains("not found"))
             return TypedResults.NotFound();
         return TypedResults.BadRequest(result.Error);
-
     }
 
-    private static async Task<Results<FileContentHttpResult, BadRequest<string>, NotFound>> GetInvoicePdf(
+    private static async Task<Results<FileContentHttpResult, NotFound, BadRequest<string>>> GetInvoicePdf(
         Guid id,
         IInvoiceService invoiceService)
     {
-        // TODO: Implement GetInvoicePdfAsync in IInvoiceService
-        return TypedResults.NotFound();
+        var result = await invoiceService.GetInvoicePdfAsync(id);
+        if (!result.Success)
+            return result.Error?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true
+                ? TypedResults.NotFound()
+                : TypedResults.BadRequest(result.Error!);
+
+        return TypedResults.File(result.Data!, "application/pdf", $"fattura-{id}.pdf");
     }
 }

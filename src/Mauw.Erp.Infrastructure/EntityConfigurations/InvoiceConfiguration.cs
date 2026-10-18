@@ -13,6 +13,8 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
     {
         builder.HasKey(i => i.Id);
 
+        builder.Property(i => i.OrderId);
+
         builder.Property(i => i.InvoiceNumber)
             .IsRequired()
             .HasMaxLength(50);
@@ -38,7 +40,6 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(i => i.UpdatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-        // Relationships
         builder.HasOne(i => i.Contact)
             .WithMany()
             .HasForeignKey(i => i.ContactId)
@@ -59,10 +60,8 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
             .HasForeignKey(ac => ac.InvoiceId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Index for invoice lookup by contact
         builder.HasIndex(i => i.ContactId);
-
-        // Unique index on InvoiceNumber
+        builder.HasIndex(i => i.OrderId);
         builder.HasIndex(i => i.InvoiceNumber)
             .IsUnique();
     }

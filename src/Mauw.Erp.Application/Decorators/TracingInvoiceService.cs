@@ -29,4 +29,8 @@ public sealed class TracingInvoiceService(IInvoiceService inner) : TracingDecora
     public Task<OperationResult<bool>> DeleteInvoiceAsync(Guid id) =>
         TraceAsync("Invoice.Delete", () => inner.DeleteInvoiceAsync(id),
             a => a?.SetTag("invoice.id", id));
+
+    public Task<OperationResult<byte[]>> GetInvoicePdfAsync(Guid id) =>
+        TraceAsync("Invoice.Pdf", () => inner.GetInvoicePdfAsync(id),
+            a => a?.SetTag("invoice.id", id));
 }

@@ -1,4 +1,4 @@
-﻿using Mauw.Erp.Application.Services;
+using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
 
@@ -13,6 +13,9 @@ public sealed class TracingOrderService(IOrderService inner) : TracingDecoratorB
     public Task<OperationResult<OrderDto>> GetOrderAsync(Guid id) =>
         TraceAsync("Order.Get", () => inner.GetOrderAsync(id),
             a => a?.SetTag("order.id", id));
+
+    public Task<OperationResult<PagedResult<OrderDto>>> GetAllOrdersAsync(string? search, string? status, string? orderType, int page, int pageSize) =>
+        inner.GetAllOrdersAsync(search, status, orderType, page, pageSize);
 
     public Task<OperationResult<PagedResult<OrderDto>>> GetOrdersByContactAsync(Guid contactId, int page, int pageSize) =>
         TraceAsync("Order.GetByContact", () => inner.GetOrdersByContactAsync(contactId, page, pageSize),
@@ -34,7 +37,9 @@ public sealed class TracingOrderService(IOrderService inner) : TracingDecoratorB
         TraceAsync("Order.Delete", () => inner.DeleteOrderAsync(id),
             a => a?.SetTag("order.id", id));
 
-    // ── Cassa session pass-throughs (no extra tracing needed) ──
+    public Task<OperationResult<byte[]>> GetOrderPdfAsync(Guid orderId) =>
+        inner.GetOrderPdfAsync(orderId);
+
     public Task<OperationResult<CassaSessionDetailDto>> CreateCassaSessionAsync(CreateCassaSessionRequest request) =>
         inner.CreateCassaSessionAsync(request);
 

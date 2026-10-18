@@ -1,4 +1,4 @@
-﻿using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -12,6 +12,8 @@ public class DdtDocumentConfiguration : IEntityTypeConfiguration<DdtDocument>
     public void Configure(EntityTypeBuilder<DdtDocument> builder)
     {
         builder.HasKey(d => d.Id);
+
+        builder.Property(d => d.OrderId);
 
         builder.Property(d => d.DdtNumber)
             .IsRequired()
@@ -35,7 +37,6 @@ public class DdtDocumentConfiguration : IEntityTypeConfiguration<DdtDocument>
         builder.Property(d => d.UpdatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-        // Relationships
         builder.HasOne(d => d.Contact)
             .WithMany()
             .HasForeignKey(d => d.ContactId)
@@ -46,7 +47,7 @@ public class DdtDocumentConfiguration : IEntityTypeConfiguration<DdtDocument>
             .HasForeignKey(di => di.DdtDocumentId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Unique index on DdtNumber
+        builder.HasIndex(d => d.OrderId);
         builder.HasIndex(d => d.DdtNumber)
             .IsUnique();
     }

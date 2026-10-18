@@ -1,3 +1,6 @@
+using Mauw.Erp.Domain.Accounting;
+using Mauw.Erp.Domain.Services;
+
 namespace Mauw.Erp.Domain.Entities;
 
 using Enums;
@@ -9,6 +12,7 @@ using Enums;
 public class Invoice : Entity<Guid>
 {
     public Guid ContactId { get; set; }
+    public Guid? OrderId { get; set; }
     public string InvoiceNumber { get; set; }
     public DateTime InvoiceDate { get; set; }
     public decimal TaxableTotal { get; set; }
@@ -21,6 +25,7 @@ public class Invoice : Entity<Guid>
     public ICollection<InvoiceItem> Items { get; set; } = [];
     public ICollection<Payment> Payments { get; set; } = [];
     public ICollection<AgentCommission> Commissions { get; set; } = [];
+    public ICollection<CreditNote> CreditNotes { get; set; } = [];
 
     public Invoice(
         Guid contactId,
@@ -38,20 +43,32 @@ public class Invoice : Entity<Guid>
     /// <summary>
     /// Adds an item to the invoice and updates totals.
     /// </summary>
-    public void AddItem(InvoiceItem item)
+    public AccountingResult<CalculatedDocument> AddItem(InvoiceItem item, ItalianAccountingCalculator calculator)
     {
+        var result = calculator.CalculateAndApply(Items.Append(item));
+        if (!result.Success)
+            return result;
         Items.Add(item);
-        UpdateTotals();
+        ApplyTotals(result.Data!);
+        return result;
     }
 
     /// <summary>
     /// Recalculates invoice totals from items.
     /// </summary>
-    public void UpdateTotals()
+    public AccountingResult<CalculatedDocument> UpdateTotals(ItalianAccountingCalculator calculator)
     {
-        TaxableTotal = Items.Sum(i => i.LineNetTotal);
-        VatTotal = Items.Sum(i => i.LineVatTotal);
-        GrossTotal = TaxableTotal + VatTotal;
+        var result = calculator.CalculateAndApply(Items);
+        if (result.Success)
+            ApplyTotals(result.Data!);
+        return result;
+    }
+
+    private void ApplyTotals(CalculatedDocument document)
+    {
+        TaxableTotal = document.TotalTaxable;
+        VatTotal = document.TotalVat;
+        GrossTotal = document.TotalGross;
         UpdateTimestamp();
     }
 

@@ -3,7 +3,7 @@
 /// <summary>
 /// OrderItem entity representing a line item in an order.
 /// </summary>
-public class OrderItem : Entity<Guid>
+public class OrderItem : Entity<Guid>, ICommercialDocumentLine
 {
     public Guid OrderId { get; set; }
     public Guid VariantId { get; set; }
@@ -11,8 +11,10 @@ public class OrderItem : Entity<Guid>
     public decimal UnitNetPrice { get; set; }
     public decimal LineNetTotal { get; set; }
     public decimal VatRate { get; set; }
-    public decimal LineVatTotal { get; set; }
-    public decimal LineGrossTotal { get; set; }
+    public decimal? LineVatTotal { get; set; }
+    public decimal? LineGrossTotal { get; set; }
+    public string? NatureCode { get; set; }
+    public decimal DiscountPercent { get; set; }
     public int MaxQuantity { get; set; }
 
     // Navigation
@@ -25,7 +27,9 @@ public class OrderItem : Entity<Guid>
         int quantity,
         decimal unitNetPrice,
         decimal vatRate,
-        int maxQuantity = 0
+        int maxQuantity = 0,
+        string? natureCode = null,
+        decimal discountPercent = 0m
     ) : base()
     {
         OrderId = orderId;
@@ -34,11 +38,8 @@ public class OrderItem : Entity<Guid>
         UnitNetPrice = unitNetPrice;
         VatRate = vatRate;
         MaxQuantity = maxQuantity > 0 ? maxQuantity : quantity;
-
-        // Calculate line totals
-        LineNetTotal = decimal.Round(unitNetPrice * quantity, 2, MidpointRounding.AwayFromZero);
-        LineVatTotal = decimal.Round(LineNetTotal * (vatRate / 100), 2, MidpointRounding.AwayFromZero);
-        LineGrossTotal = LineNetTotal + LineVatTotal;
+        NatureCode = natureCode;
+        DiscountPercent = discountPercent;
     }
 
     private OrderItem() { } // For EF Core

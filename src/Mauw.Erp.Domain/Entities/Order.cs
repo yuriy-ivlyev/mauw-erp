@@ -1,3 +1,6 @@
+using Mauw.Erp.Domain.Accounting;
+using Mauw.Erp.Domain.Services;
+
 namespace Mauw.Erp.Domain.Entities;
 
 using Enums;
@@ -17,6 +20,7 @@ public class Order : Entity<Guid>
     public decimal GrossTotal { get; set; }
     public string? TerminalId { get; set; }
     public string? DocumentReference { get; set; }
+    public OrderType OrderType { get; set; } = OrderType.Standard;
 
     // Navigation
     public Contact Contact { get; set; } = null!;
@@ -41,20 +45,32 @@ public class Order : Entity<Guid>
     /// <summary>
     /// Adds an item to the order and updates totals.
     /// </summary>
-    public void AddItem(OrderItem item)
+    public AccountingResult<CalculatedDocument> AddItem(OrderItem item, ItalianAccountingCalculator calculator)
     {
+        var result = calculator.CalculateAndApply(Items.Append(item));
+        if (!result.Success)
+            return result;
         Items.Add(item);
-        UpdateTotals();
+        ApplyTotals(result.Data!);
+        return result;
     }
 
     /// <summary>
     /// Recalculates order totals from items.
     /// </summary>
-    public void UpdateTotals()
+    public AccountingResult<CalculatedDocument> UpdateTotals(ItalianAccountingCalculator calculator)
     {
-        TaxableTotal = Items.Sum(i => i.LineNetTotal);
-        VatTotal = Items.Sum(i => i.LineVatTotal);
-        GrossTotal = TaxableTotal + VatTotal;
+        var result = calculator.CalculateAndApply(Items);
+        if (result.Success)
+            ApplyTotals(result.Data!);
+        return result;
+    }
+
+    private void ApplyTotals(CalculatedDocument document)
+    {
+        TaxableTotal = document.TotalTaxable;
+        VatTotal = document.TotalVat;
+        GrossTotal = document.TotalGross;
         UpdateTimestamp();
     }
 

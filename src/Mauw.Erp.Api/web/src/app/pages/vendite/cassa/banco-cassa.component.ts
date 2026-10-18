@@ -290,6 +290,12 @@ interface PageResponse<T> {
           </div>
 
           <!-- Unit price -->
+          <select *ngIf="item.vatRate === 0" [(ngModel)]="item.natureCode"
+            (ngModelChange)="syncToService()" aria-label="Natura IVA obbligatoria"
+            class="border rounded text-xs w-20">
+            <option [ngValue]="null">Natura IVA</option>
+            <option *ngFor="let code of natureCodes" [value]="code">{{ code }}</option>
+          </select>
           <div class="text-right w-24 flex-shrink-0">
             <div class="text-xs text-gray-400">Prezzo unitario</div>
             <div class="text-sm font-medium">{{ item.unitGrossPrice | number:'1.2-2' }} €</div>
@@ -311,7 +317,7 @@ interface PageResponse<T> {
 
           <!-- Line total -->
           <div class="text-right w-24 flex-shrink-0">
-            <div class="text-xs text-gray-400">Totale riga</div>
+            <div class="text-xs text-gray-400">Totale riga stimato</div>
             <div class="font-bold text-gray-800">{{ item.lineGrossTotal | number:'1.2-2' }} €</div>
           </div>
 
@@ -331,15 +337,15 @@ interface PageResponse<T> {
         <!-- Totals: compact inline -->
         <div class="flex items-center gap-5 divide-x divide-gray-200">
           <div class="text-right pr-5">
-            <div class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">Imponibile</div>
+            <div class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">Imponibile stimato</div>
             <div class="text-sm font-semibold text-gray-700">{{ totals.net | number:'1.2-2' }} €</div>
           </div>
           <div class="text-right pr-5">
-            <div class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">IVA</div>
+            <div class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">IVA stimata</div>
             <div class="text-sm font-semibold text-gray-500">{{ totals.vat | number:'1.2-2' }} €</div>
           </div>
           <div class="text-right pr-5">
-            <div class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">Totale Lordo</div>
+            <div class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">Totale Lordo stimato</div>
             <div class="text-base font-extrabold text-blue-700">{{ totals.gross | number:'1.2-2' }} €</div>
           </div>
           <div class="text-right">
@@ -374,6 +380,8 @@ interface PageResponse<T> {
   `
 })
 export class BancoCassaComponent implements OnInit {
+  readonly natureCodes = ['N1', 'N2.1', 'N2.2', 'N3.1', 'N3.2', 'N3.3', 'N3.4', 'N3.5', 'N3.6',
+    'N4', 'N5', 'N6.1', 'N6.2', 'N6.3', 'N6.4', 'N6.5', 'N6.6', 'N6.7', 'N6.8', 'N6.9', 'N7'];
   // Barcode
   barcodeInput_value = '';
   barcodeError: string | null = null;
@@ -444,7 +452,7 @@ export class BancoCassaComponent implements OnInit {
     this.loadDefaultWarehouse();
   }
 
-  private syncToService(): void {
+  syncToService(): void {
     this.sessionService.setCart(this.cart);
     this.sessionService.setContact(this.selectedContact);
     this.sessionService.setDocumentNumber(this.documentNumber);
@@ -663,8 +671,9 @@ export class BancoCassaComponent implements OnInit {
   }
 
   private recalcLine(item: CartItem): void {
-    item.lineNetTotal   = item.unitNetPrice   * item.quantity;
-    item.lineGrossTotal = item.unitGrossPrice * item.quantity;
+    const discountFactor = 1 - (item.discountPercent ?? 0) / 100;
+    item.lineNetTotal   = item.unitNetPrice   * item.quantity * discountFactor;
+    item.lineGrossTotal = item.unitGrossPrice * item.quantity * discountFactor;
   }
 
   // ── Document generation ───────────────────────────────────
@@ -694,7 +703,10 @@ export class BancoCassaComponent implements OnInit {
       variantId: item.variantId,
       quantity: item.quantity,
       unitNetPrice: item.unitNetPrice,
-      unitVatAmount: +(item.unitNetPrice * (item.vatRate / 100)).toFixed(4)
+      unitGrossPrice: item.priceIncludesVat === false ? undefined : item.unitGrossPrice,
+      vatRate: item.vatRate,
+      natureCode: item.natureCode,
+      discountPercent: item.discountPercent ?? 0
     }));
 
     const sendNext = (idx: number) => {
@@ -812,13 +824,19 @@ export class BancoCassaComponent implements OnInit {
       // Sessione tracciata attiva → sospendi sempre prima di passare ad un'altra
       this.sessionService.createOrPauseSession().subscribe({
         next: () => { this.sessionService.clearSession(); proceedResume(); },
-        error: () => { this.sessionService.clearSession(); proceedResume(); }
+        error: (error) => {
+          this.resumeLoading = false;
+          this.generateError = error?.error ?? 'Impossibile salvare la sessione corrente.';
+        }
       });
     } else if (hasNewCart && snap.selectedContact) {
       // Carrello nuovo (non salvato) con cliente → crea sessione prima di passare
       this.sessionService.createOrPauseSession().subscribe({
         next: () => { this.sessionService.clearSession(); proceedResume(); },
-        error: () => { this.sessionService.clearSession(); proceedResume(); }
+        error: (error) => {
+          this.resumeLoading = false;
+          this.generateError = error?.error ?? 'Impossibile salvare la sessione corrente.';
+        }
       });
     } else if (hasNewCart && !snap.selectedContact) {
       // Carrello nuovo senza cliente → impossibile sospendere
