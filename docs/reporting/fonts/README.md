@@ -7,7 +7,8 @@ to these embedded resources.
 
 Source: https://github.com/notofonts/noto-fonts/tree/main/hinted/ttf/NotoSans
 
-The font files are redistributed under the SIL Open Font License 1.1; see `LICENSE`.
+The font files are redistributed under the SIL Open Font License 1.1; see
+[LICENSE](../../../src/Mauw.Erp.Infrastructure/Reporting/MigraDoc/Fonts/LICENSE).
 Configure reporting with `AddInvoicePdfReporting()` before creating any PDF fonts.
 
 PDFsharp-MigraDoc is pinned to 6.2.4 (MIT). Version 6.5 introduces AGPL/commercial
