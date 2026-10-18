@@ -109,6 +109,58 @@ public class DocumentAccountingServiceTests
     private static decimal Parse(string value) => decimal.Parse(value, CultureInfo.InvariantCulture);
 
     [Fact]
+    public void CartPreviewUsesNetPricesAndGroupsVatByRateAndNature()
+    {
+        var result = _fixture.OrderService.PreviewCassaCart(new(
+        [
+            new(_fixture.Variant.Id, 5, 18.84m, 22m, 10),
+            new(_fixture.Variant.Id, 1, 30.00m, 10m, 10),
+            new(_fixture.Variant.Id, 1, 50.00m, 0m, 10, "N3.2")
+        ]));
+
+        Assert.True(result.Success, result.Error);
+        var preview = result.Data!;
+        Assert.Equal([94.20m, 30.00m, 50.00m], preview.Lines.Select(line => line.LineNetTotal));
+        Assert.Equal(3, preview.VatSummary.Count);
+        Assert.Equal(174.20m, preview.TotalTaxable);
+        Assert.Equal(23.72m, preview.TotalVat);
+        Assert.Equal(197.92m, preview.TotalGross);
+        _fixture.UnitOfWork.Verify(work => work.SaveChangesAsync(), Times.Never);
+    }
+
+    [Fact]
+    public void CartPreviewComputesVatOncePerGroupNotPerLine()
+    {
+        var result = _fixture.OrderService.PreviewCassaCart(new(
+            [new(_fixture.Variant.Id, 1, 0.03m, 22m, 10), new(_fixture.Variant.Id, 1, 0.03m, 22m, 10)]));
+
+        Assert.True(result.Success, result.Error);
+        Assert.Equal(0.06m, result.Data!.TotalTaxable);
+        Assert.Equal(0.01m, result.Data.TotalVat);
+        Assert.Equal(0.07m, result.Data.TotalGross);
+    }
+
+    [Fact]
+    public void CartPreviewOfEmptyCartIsZero()
+    {
+        var result = _fixture.OrderService.PreviewCassaCart(new([]));
+
+        Assert.True(result.Success, result.Error);
+        Assert.Empty(result.Data!.Lines);
+        Assert.Equal(0.00m, result.Data.TotalGross);
+    }
+
+    [Fact]
+    public void CartPreviewRejectsZeroRateLineWithoutNature()
+    {
+        var result = _fixture.OrderService.PreviewCassaCart(new(
+            [new(_fixture.Variant.Id, 1, 10m, 0m, 10)]));
+
+        Assert.False(result.Success);
+        Assert.False(string.IsNullOrWhiteSpace(result.Error));
+    }
+
+    [Fact]
     public async Task NullCartLineReturnsValidationErrorWithoutSaving()
     {
         var result = await _fixture.OrderService.CreateCassaSessionAsync(

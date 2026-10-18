@@ -28,6 +28,11 @@ export interface CompanySettings {
   reaNumber: string | null;
   reaOffice: string | null;
   shareCapital: number | null;
+  isShareCapitalFullyPaid: boolean;
+  bankName: string | null;
+  iban: string | null;
+  bicSwift: string | null;
+  invoiceNotes: string | null;
   isSoleShareholder: boolean | null;
   isInLiquidation: boolean;
   logoUrl: string | null;
@@ -46,6 +51,11 @@ export interface UpdateCompanySettingsRequest {
   reaNumber?: string | null;
   reaOffice?: string | null;
   shareCapital?: number | null;
+  isShareCapitalFullyPaid?: boolean;
+  bankName?: string | null;
+  iban?: string | null;
+  bicSwift?: string | null;
+  invoiceNotes?: string | null;
   isSoleShareholder?: boolean | null;
   isInLiquidation?: boolean;
   logoUrl?: string | null;

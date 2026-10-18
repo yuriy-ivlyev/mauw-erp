@@ -4,6 +4,7 @@ using MigraDoc.DocumentObjectModel.Tables;
 using MigraDoc.Rendering;
 using Mauw.Erp.Contracts.Dtos.Pdf;
 using Mauw.Erp.Contracts.Interfaces;
+using Mauw.Erp.Application.Services;
 
 namespace Mauw.Erp.Infrastructure.Reporting.MigraDoc;
 
@@ -12,7 +13,7 @@ namespace Mauw.Erp.Infrastructure.Reporting.MigraDoc;
 /// All MigraDoc types are strictly internal to this class; no MigraDoc type
 /// ever surfaces in the Application or Domain layers.
 /// </summary>
-public sealed class MigraDocInvoicePdfGenerator : IInvoicePdfGenerator
+public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos) : IInvoicePdfGenerator
 {
     // ─── Palette ─────────────────────────────────────────────────────────────
     private static readonly CultureInfo ItalianCulture = CultureInfo.GetCultureInfo("it-IT");
@@ -38,17 +39,20 @@ public sealed class MigraDocInvoicePdfGenerator : IInvoicePdfGenerator
 
     // ─── Public entry point ───────────────────────────────────────────────────
 
-    public Task<byte[]> GenerateInvoicePdfAsync(InvoicePdfModel model, CancellationToken ct = default)
+    public async Task<byte[]> GenerateInvoicePdfAsync(InvoicePdfModel model, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return Task.FromResult(RenderPdf(model));
+        var logo = await companyLogos.GetAsync("compact", ct);
+        if (!logo.Success)
+            throw new InvalidOperationException(logo.Error);
+        return RenderPdf(model, logo.Data!.PngData);
     }
 
     // ─── Document assembly ───────────────────────────────────────────────────
 
-    private static byte[] RenderPdf(InvoicePdfModel model)
+    private static byte[] RenderPdf(InvoicePdfModel model, byte[] logoPng)
     {
-        var doc = BuildDocument(model);
+        var doc = BuildDocument(model, logoPng);
         var renderer = new PdfDocumentRenderer { Document = doc };
         renderer.RenderDocument();
         using var ms = new MemoryStream();
@@ -56,7 +60,7 @@ public sealed class MigraDocInvoicePdfGenerator : IInvoicePdfGenerator
         return ms.ToArray();
     }
 
-    private static Document BuildDocument(InvoicePdfModel model)
+    private static Document BuildDocument(InvoicePdfModel model, byte[] logoPng)
     {
         var doc = new Document();
         doc.Info.Title = $"{GetDocumentTitle(model)} {model.DocumentNumber}";
@@ -72,7 +76,7 @@ public sealed class MigraDocInvoicePdfGenerator : IInvoicePdfGenerator
         BuildFooter(section.Footers.Primary, model);
         BuildFooter(section.Footers.FirstPage, model);
 
-        BuildFirstPageHeader(section, model);
+        BuildFirstPageHeader(section, model, logoPng);
         BuildLinesTable(section, model);
         BuildSummarySection(section, model);
 
@@ -106,14 +110,14 @@ public sealed class MigraDocInvoicePdfGenerator : IInvoicePdfGenerator
     // ─── FIRST PAGE HEADER ───────────────────────────────────────────────────
     // Contains: Seller info + Doc-info box (top), Customer + Commercial info (bottom).
 
-    private static void BuildFirstPageHeader(Section section, InvoicePdfModel model)
+    private static void BuildFirstPageHeader(Section section, InvoicePdfModel model, byte[] logoPng)
     {
-        BuildSellerDocInfoBlock(section, model);
-        AddVerticalSpacer(section, 8);
+        BuildSellerDocInfoBlock(section, model, logoPng);
+        AddVerticalSpacer(section, 5);
         BuildCustomerCommercialBlock(section, model);
     }
 
-    private static void BuildSellerDocInfoBlock(Section section, InvoicePdfModel model)
+    private static void BuildSellerDocInfoBlock(Section section, InvoicePdfModel model, byte[] logoPng)
     {
         var details = new List<(string Label, string Value)>
         {
@@ -127,23 +131,24 @@ public sealed class MigraDocInvoicePdfGenerator : IInvoicePdfGenerator
 
         var table = section.AddTable();
         table.Borders.Visible = false;
-        table.AddColumn(Unit.FromCentimeter(10.5));
+        table.AddColumn(Unit.FromCentimeter(1.3));
+        table.AddColumn(Unit.FromCentimeter(0.2));
+        table.AddColumn(Unit.FromCentimeter(9.0));
         table.AddColumn(Unit.FromCentimeter(0.3));
-        table.AddColumn(Unit.FromCentimeter(3.4));
-        table.AddColumn(Unit.FromCentimeter(3.8));
+        table.AddColumn(Unit.FromCentimeter(7.2));
         table.LeftPadding = Unit.FromPoint(0);
         table.RightPadding = Unit.FromPoint(0);
 
         var row = table.AddRow();
         row.VerticalAlignment = VerticalAlignment.Top;
-        row.KeepWith = details.Count;
-
-        var sc = row.Cells[0];
-        sc.MergeDown = details.Count;
-        row.Cells[1].MergeDown = details.Count;
-
+        using var stream = new MemoryStream(logoPng, writable: false);
+        using var image = PdfSharp.Drawing.XImage.FromStream(stream);
+        var logo = row.Cells[0].AddParagraph().AddImage($"base64:{Convert.ToBase64String(logoPng)}");
+        logo.LockAspectRatio = true;
+        logo.Width = Unit.FromCentimeter(Math.Min(1.2, 1.35 * image.PixelWidth / image.PixelHeight));
+        var sc = row.Cells[2];
         var nameP = sc.AddParagraph(model.Seller.BusinessName);
-        nameP.Format.Font.Size = Unit.FromPoint(16);
+        nameP.Format.Font.Size = Unit.FromPoint(12);
         nameP.Format.Font.Bold = true;
         nameP.Format.SpaceAfter = Unit.FromPoint(3);
 
@@ -154,21 +159,28 @@ public sealed class MigraDocInvoicePdfGenerator : IInvoicePdfGenerator
         var vatLine = $"C.F. / P.IVA: {model.Seller.VatNumber}";
         if (!string.IsNullOrWhiteSpace(model.Seller.Rea)) vatLine += $" | REA: {model.Seller.Rea}";
         if (!string.IsNullOrWhiteSpace(model.Seller.ShareCapital))
-            vatLine += $" | Cap. Soc. {model.Seller.ShareCapital}";
+            vatLine += $" | Cap. Soc. {model.Seller.ShareCapital}" +
+                (model.Seller.IsShareCapitalFullyPaid ? " I.V." : string.Empty);
         sc.AddParagraph(vatLine).Format.Font.Size = Unit.FromPoint(8.5);
 
         var regimeLine = $"Regime Fiscale: {model.Seller.TaxRegime}";
         if (!string.IsNullOrWhiteSpace(model.Seller.Pec)) regimeLine += $" | PEC: {model.Seller.Pec}";
         sc.AddParagraph(regimeLine).Format.Font.Size = Unit.FromPoint(8.5);
 
-        var dc = row.Cells[2];
-        dc.MergeRight = 1;
+        var dc = row.Cells[4];
         var title = IsInvoice(model)
             ? $"{GetDocumentHeader(model)} ({model.DocumentType})"
             : GetDocumentHeader(model);
         AddDocInfoTitle(dc, title);
+        // Independent cells let either side grow without overflowing a vertically merged range.
+        var detailsTable = new Table();
+        detailsTable.AddColumn(Unit.FromCentimeter(3.4));
+        detailsTable.AddColumn(Unit.FromCentimeter(3.8));
+        detailsTable.LeftPadding = Unit.FromPoint(0);
+        detailsTable.RightPadding = Unit.FromPoint(0);
+        dc.Elements.Add(detailsTable);
         foreach (var (label, value) in details)
-            AddDocInfoRow(table, label, value);
+            AddDocInfoRow(detailsTable, label, value);
     }
 
     private static void AddDocInfoTitle(Cell cell, string title)
@@ -184,9 +196,9 @@ public sealed class MigraDocInvoicePdfGenerator : IInvoicePdfGenerator
     private static void AddDocInfoRow(Table table, string label, string value)
     {
         var row = table.AddRow();
-        row.TopPadding = Unit.FromPoint(3);
-        row.BottomPadding = Unit.FromPoint(3);
-        for (var i = 2; i <= 3; i++)
+        row.TopPadding = Unit.FromPoint(2);
+        row.BottomPadding = Unit.FromPoint(2);
+        for (var i = 0; i <= 1; i++)
         {
             row.Cells[i].Borders.Width = Unit.FromPoint(0.5);
             row.Cells[i].Borders.Color = ClrBorder;
@@ -196,11 +208,11 @@ public sealed class MigraDocInvoicePdfGenerator : IInvoicePdfGenerator
             row.Cells[i].Format.Font.Size = Unit.FromPoint(8);
         }
 
-        row.Cells[2].Shading.Color = ClrBandBg;
-        row.Cells[2].Format.Font.Bold = true;
-        row.Cells[2].AddParagraph(label);
-        row.Cells[3].Format.Alignment = ParagraphAlignment.Right;
-        row.Cells[3].AddParagraph(value);
+        row.Cells[0].Shading.Color = ClrBandBg;
+        row.Cells[0].Format.Font.Bold = true;
+        row.Cells[0].AddParagraph(label);
+        row.Cells[1].Format.Alignment = ParagraphAlignment.Right;
+        row.Cells[1].AddParagraph(value);
     }
 
     private static void BuildCustomerCommercialBlock(Section section, InvoicePdfModel model)
@@ -291,7 +303,6 @@ public sealed class MigraDocInvoicePdfGenerator : IInvoicePdfGenerator
             ap.Format.Font.Size = Unit.FromPoint(8.5);
             ap.AddFormattedText("Agente di Zona: ");
             ap.AddFormattedText(agentLabel).Bold = true;
-            ap.AddFormattedText(" (se presente)").Italic = true;
         }
     }
 
@@ -421,7 +432,7 @@ public sealed class MigraDocInvoicePdfGenerator : IInvoicePdfGenerator
         SetLineCell(row, 1, line.Sku, ParagraphAlignment.Left);
         SetLineCell(row, 2, line.Description, ParagraphAlignment.Left);
         SetLineCell(row, 3, line.Pieces.ToString(), ParagraphAlignment.Center);
-        SetLineCell(row, 4, line.UnitPrice.ToString("0.00######", ItalianCulture), ParagraphAlignment.Right);
+        SetLineCell(row, 4, Math.Round(line.UnitPrice, 2, MidpointRounding.AwayFromZero).ToString("N2", ItalianCulture), ParagraphAlignment.Right);
         SetLineCell(row, 5, discText, ParagraphAlignment.Center);
         SetLineCell(row, 6, line.NatureCode is null
             ? $"{line.VatRate.ToString("0.##", ItalianCulture)}%"
@@ -501,9 +512,7 @@ public sealed class MigraDocInvoicePdfGenerator : IInvoicePdfGenerator
 
         if (model.Agent is not null)
         {
-            var detail = model.Agent.Code is not null
-                ? $"{model.Agent.Name} - Provvigione a ns. carico, nessun addebito al committente"
-                : model.Agent.Name;
+            var detail = $"{model.Agent.Name} - Provvigione a ns. carico, nessun addebito al committente";
             AddBoldLabelLine(cell, "Dati Agente: ", detail);
         }
 

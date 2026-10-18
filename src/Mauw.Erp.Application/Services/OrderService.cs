@@ -242,6 +242,9 @@ public partial class OrderService(
         if (order == null)
             return OperationResult<byte[]>.Fail("Order not found");
 
+        var agent = await DocumentPdfMapper.GetAgentAsync(unitOfWork, order.ContactId);
+        if (!agent.Success)
+            return OperationResult<byte[]>.Fail(agent.Error!);
         var companyResult = await companySettingsService.GetCompanyAsync();
         var company = companyResult.Success ? companyResult.Data : null;
         var sellerAddress = company?.LegalHeadquarters
@@ -261,7 +264,8 @@ public partial class OrderService(
             ShareCapital: company?.ShareCapital?.ToString("N2", ItalianCulture),
             TaxRegime: company?.FiscalRegime ?? "RF01 - Ordinario",
             SdiCode: company?.SdiCode,
-            Pec: company?.PecEmail
+            Pec: company?.PecEmail,
+            IsShareCapitalFullyPaid: company?.IsShareCapitalFullyPaid ?? false
         );
 
         var customer = new InvoicePdfCustomerDetails(
@@ -338,7 +342,8 @@ public partial class OrderService(
             Lines: lines,
             VatSummary: vatSummary,
             Totals: totals,
-            CustomerOrderRef: order.DocumentReference
+            CustomerOrderRef: order.DocumentReference,
+            Agent: agent.Data
         );
 
         var bytes = await pdfGenerator.GenerateInvoicePdfAsync(model);
@@ -486,13 +491,30 @@ public partial class OrderService(
         return $"{company.ReaOffice}-{company.ReaNumber}";
     }
 
+    public OperationResult<CassaPreviewDto> PreviewCassaCart(CassaPreviewRequest request)
+    {
+        var accounting = CalculateCart(request?.Items);
+        if (!accounting.Success)
+            return OperationResult<CassaPreviewDto>.Fail(accounting.Error);
+
+        var document = accounting.Data!;
+        return OperationResult<CassaPreviewDto>.Ok(new CassaPreviewDto(
+            document.Lines.Select(line => new CassaPreviewLineDto(
+                line.LineNumber, line.UnitNetPrice, line.DiscountPercent, line.VatRate,
+                line.NatureCode, line.LineNetTotal)).ToList(),
+            document.VatSummary.Select(group => new CassaPreviewVatDto(
+                group.VatRate, group.NatureCode, group.TaxableAmount, group.VatAmount)).ToList(),
+            document.TotalTaxable,
+            document.TotalVat,
+            document.TotalGross));
+    }
+
     private AccountingResult<CalculatedDocument> CalculateCart(List<CassaCartItemRequest>? items)
     {
         if (items is null || items.Any(item => item is null))
             return AccountingResult<CalculatedDocument>.Fail("Il carrello e le sue righe non possono essere null.");
         return accountingCalculator.Calculate(items.Select(item => new DocumentLineInput(
-            item.Quantity, item.UnitGrossPrice ?? item.UnitNetPrice, item.VatRate, item.NatureCode,
-            item.DiscountPercent, PriceIncludesVat: item.UnitGrossPrice.HasValue)));
+            item.Quantity, item.UnitNetPrice, item.VatRate, item.NatureCode, item.DiscountPercent)));
     }
 
     private static CassaSessionDetailDto MapCassaDetail(Order order, string contactName) =>
@@ -511,7 +533,6 @@ public partial class OrderService(
                 i.Variant?.Size?.Name ?? "",
                 i.Variant?.Color?.Name ?? "",
                 i.UnitNetPrice,
-                i.UnitNetPrice * (1 + i.VatRate / 100),
                 i.VatRate,
                 i.Quantity,
                 i.MaxQuantity,

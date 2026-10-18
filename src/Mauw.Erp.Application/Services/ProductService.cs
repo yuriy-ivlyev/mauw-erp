@@ -426,7 +426,8 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
                 ColorId: variant.ColorId,
                 SizeId: variant.SizeId,
                 Barcode: variant.Barcode,
-                UnitPrice: pricingResult.FinalGrossPrice,
+                UnitNetPrice: pricingResult.FinalNetPrice,
+                VatRate: product.VatRate,
                 AvailableStock: stock,
                 WeightGrams: variant.WeightGrams
             ));

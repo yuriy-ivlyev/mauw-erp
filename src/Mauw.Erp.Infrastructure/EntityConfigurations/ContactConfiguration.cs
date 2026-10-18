@@ -29,7 +29,13 @@ public class ContactConfiguration : IEntityTypeConfiguration<Contact>
         builder.Property(c => c.ReaNumber).HasMaxLength(20);
         builder.Property(c => c.ReaOffice).HasMaxLength(5);
         builder.Property(c => c.ShareCapital).HasPrecision(18, 2);
+        builder.Property(c => c.BankName).HasMaxLength(250);
+        builder.Property(c => c.Iban).HasMaxLength(34);
+        builder.Property(c => c.BicSwift).HasMaxLength(11);
+        builder.Property(c => c.InvoiceNotes).HasMaxLength(4000);
         builder.Property(c => c.LogoUrl).HasMaxLength(1000);
+        builder.Property(c => c.HorizontalLogoPng).HasColumnName("horizontal_logo_png");
+        builder.Property(c => c.CompactLogoPng).HasColumnName("compact_logo_png");
 
         builder.Property(c => c.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         builder.Property(c => c.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");

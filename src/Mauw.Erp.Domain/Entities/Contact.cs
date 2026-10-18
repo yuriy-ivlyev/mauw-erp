@@ -30,9 +30,16 @@ public class Contact : Entity<Guid>
     /// <summary>Ufficio REA (sigla provincia, es. MI).</summary>
     public string? ReaOffice { get; set; }
     public decimal? ShareCapital { get; set; }
+    public bool IsShareCapitalFullyPaid { get; set; }
+    public string? BankName { get; set; }
+    public string? Iban { get; set; }
+    public string? BicSwift { get; set; }
+    public string? InvoiceNotes { get; set; }
     public bool? IsSoleShareholder { get; set; }
     public bool IsInLiquidation { get; set; }
     public string? LogoUrl { get; set; }
+    public byte[]? HorizontalLogoPng { get; set; }
+    public byte[]? CompactLogoPng { get; set; }
 
     // ── Stato e soft delete ───────────────────────────────────────────────────
     public ContactStatus Status { get; set; } = ContactStatus.Draft;

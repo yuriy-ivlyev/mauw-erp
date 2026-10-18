@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../../services/auth.service';
+import { CompanyBrandingService } from '../../../services/company-branding.service';
 
 @Component({
   selector: 'app-header',
@@ -10,7 +11,7 @@ import { AuthService } from '../../../services/auth.service';
   styleUrl: './header.component.scss'
 })
 export class HeaderComponent {
-  constructor(readonly auth: AuthService) {}
+  constructor(readonly auth: AuthService, readonly branding: CompanyBrandingService) {}
 
   get initials(): string {
     const name = this.auth.user().fullName ?? this.auth.user().email ?? 'U';

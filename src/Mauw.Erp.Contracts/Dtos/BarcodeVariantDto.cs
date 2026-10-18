@@ -11,7 +11,6 @@ public record BarcodeVariantDto(
     string Size,
     string Color,
     decimal UnitNetPrice,
-    decimal UnitGrossPrice,
     decimal VatRate,
     decimal QuantityAvailable = 0,
     decimal? WeightGrams = null

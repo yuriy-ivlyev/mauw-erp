@@ -11,7 +11,7 @@ public static class AppConstants
     
     public static class Assets
     {
-        public const string LogoPath = "assets/logo/mauw.svg";
+        public const string LogoPath = "/api/v1/settings/company/logos/horizontal";
         public const string LogoWidth = "200px";
         public const string LogoHeight = "auto";
     }

@@ -198,6 +198,9 @@ public class InvoiceService(
 
     private async Task<OperationResult<InvoicePdfModel>> BuildInvoicePdfModelAsync(Invoice invoice)
     {
+        var agent = await DocumentPdfMapper.GetAgentAsync(unitOfWork, invoice.ContactId);
+        if (!agent.Success)
+            return OperationResult<InvoicePdfModel>.Fail(agent.Error!);
         var companyResult = await companySettingsService.GetCompanyAsync();
         var company = companyResult.Success ? companyResult.Data : null;
         var sellerAddress = company?.LegalHeadquarters
@@ -249,7 +252,7 @@ public class InvoiceService(
             Currency: "EUR",
             Seller: BuildSeller(company, sellerAddress),
             Customer: BuildCustomer(invoice.Contact, customerAddress),
-            Payment: new InvoicePdfPaymentInfo("A vista", "MP01", null, null, null, null),
+            Payment: new InvoicePdfPaymentInfo("A vista", "MP01", null, company?.Iban, company?.BicSwift, company?.BankName),
             Lines: lines,
             VatSummary: vatSummary,
             Totals: new InvoicePdfTotals(
@@ -257,12 +260,17 @@ public class InvoiceService(
                 TotalNet: calculated.TotalTaxable,
                 TotalVat: calculated.TotalVat,
                 TotalGross: calculated.TotalGross,
-                ShippingCost: 0m)
+                ShippingCost: 0m),
+            Agent: agent.Data,
+            FiscalNotes: company?.InvoiceNotes
         ));
     }
 
     private async Task<OperationResult<InvoicePdfModel>> BuildCreditNotePdfModelAsync(CreditNote creditNote, Invoice relatedInvoice)
     {
+        var agent = await DocumentPdfMapper.GetAgentAsync(unitOfWork, relatedInvoice.ContactId);
+        if (!agent.Success)
+            return OperationResult<InvoicePdfModel>.Fail(agent.Error!);
         var companyResult = await companySettingsService.GetCompanyAsync();
         var company = companyResult.Success ? companyResult.Data : null;
         var sellerAddress = company?.LegalHeadquarters
@@ -319,7 +327,8 @@ public class InvoiceService(
                 TotalGross: creditNote.GrossTotal,
                 ShippingCost: 0m),
             FiscalNotes: creditNote.Reason,
-            CustomerOrderRef: relatedInvoice.InvoiceNumber
+            CustomerOrderRef: relatedInvoice.InvoiceNumber,
+            Agent: agent.Data
         ));
     }
 
@@ -336,7 +345,8 @@ public class InvoiceService(
             ShareCapital: company?.ShareCapital?.ToString("N2", ItalianCulture),
             TaxRegime: company?.FiscalRegime ?? "RF01 - Ordinario",
             SdiCode: company?.SdiCode,
-            Pec: company?.PecEmail
+            Pec: company?.PecEmail,
+            IsShareCapitalFullyPaid: company?.IsShareCapitalFullyPaid ?? false
         );
 
     private static InvoicePdfCustomerDetails BuildCustomer(Contact? contact, ContactAddress? customerAddress) =>

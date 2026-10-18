@@ -7,8 +7,7 @@ public record CassaCartItemRequest(
     decimal VatRate,
     int MaxQuantity,
     string? NatureCode = null,
-    decimal DiscountPercent = 0m,
-    decimal? UnitGrossPrice = null
+    decimal DiscountPercent = 0m
 );
 
 public record CreateCassaSessionRequest(
@@ -26,3 +25,5 @@ public record UpdateCassaSessionRequest(
 );
 
 public record ResumeCassaSessionRequest(string? TerminalId);
+
+public record CassaPreviewRequest(List<CassaCartItemRequest> Items);

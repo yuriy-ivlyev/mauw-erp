@@ -81,6 +81,10 @@
 
         <div class="flex flex-col gap-3 justify-center">
           <label class="flex items-center gap-2">
+            <input type="checkbox" formControlName="isShareCapitalFullyPaid" class="w-4 h-4" />
+            <span class="text-sm text-gray-700">Capitale sociale interamente versato (I.V. nelle stampe)</span>
+          </label>
+          <label class="flex items-center gap-2">
             <input type="checkbox" formControlName="isSoleShareholder" class="w-4 h-4" />
             <span class="text-sm text-gray-700">Socio unico</span>
           </label>
@@ -91,11 +95,65 @@
         </div>
 
         <div class="md:col-span-2">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
-          <input formControlName="logoUrl" type="url" placeholder="https://…"
-            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+          <p class="block text-sm font-medium text-gray-700 mb-2">Logo aziendale</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <label class="block text-sm text-gray-700">
+              Orizzontale (intestazione applicativo)
+              <img [src]="branding.logoUrl('horizontal')" alt="Logo orizzontale"
+                class="h-24 w-full object-contain bg-white my-2">
+              <input type="file" accept=".svg,.png,image/svg+xml,image/png" [disabled]="savingLogo"
+                (change)="replaceLogo('horizontal', $event)" class="block w-full">
+            </label>
+            <label class="block text-sm text-gray-700">
+              Compatto (menu, icona e stampe)
+              <img [src]="branding.logoUrl('compact')" alt="Logo compatto"
+                class="h-24 w-full object-contain bg-white my-2">
+              <input type="file" accept=".svg,.png,image/svg+xml,image/png" [disabled]="savingLogo"
+                (change)="replaceLogo('compact', $event)" class="block w-full">
+            </label>
+          </div>
+          <p class="text-sm text-gray-500 mt-2">
+            SVG o PNG, massimo 2 MiB. Salvati subito nell'anagrafica aziendale, senza URL esterni o redeploy.
+            Gli SVG vengono convertiti in PNG ad alta risoluzione per compatibilit&agrave; con le stampe.
+          </p>
         </div>
       </div>
+    </section>
+
+    <section class="bg-white rounded-lg shadow p-6">
+      <h2 class="text-xl font-semibold mb-4 text-gray-800">Coordinate bancarie e note fatture</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <label class="block text-sm font-medium text-gray-700">
+          Banca di appoggio
+          <input formControlName="bankName" type="text" maxlength="250"
+            class="w-full px-4 py-2 border rounded-lg" />
+        </label>
+        <label class="block text-sm font-medium text-gray-700">
+          IBAN
+          <input formControlName="iban" type="text" maxlength="42"
+            class="w-full px-4 py-2 border rounded-lg uppercase" />
+        </label>
+        <label class="block text-sm font-medium text-gray-700">
+          BIC / SWIFT
+          <input formControlName="bicSwift" type="text" maxlength="11"
+            class="w-full px-4 py-2 border rounded-lg uppercase" />
+        </label>
+        <label class="block text-sm font-medium text-gray-700 md:col-span-2">
+          Note fiscali / SdI e trasporto (solo fatture)
+          <textarea formControlName="invoiceNotes" rows="6" maxlength="4000"
+            placeholder="La merce viaggia con regolare imballaggio originale e identificativi barcode/SKU per showroom/negozio. Trascorsi 8 giorni dalla ricezione merce non si accettano resi o contestazioni su differenze taglia o capo non conforme."
+            class="w-full px-4 py-2 border rounded-lg"></textarea>
+        </label>
+      </div>
+      <button type="button" [disabled]="!!form.get('invoiceNotes')?.value"
+        (click)="form.patchValue({ invoiceNotes: suggestedInvoiceNotes })"
+        class="text-sm text-blue-600 mt-2 disabled:opacity-50">
+        Inserisci le condizioni di trasporto proposte
+      </button>
+      <p class="text-sm text-gray-500 mt-2">
+        Questi dati sono stampati solo nelle fatture rigenerate. La trasmissione a SdI non viene dichiarata
+        automaticamente: inserire solo informazioni verificate. L'agente viene letto dal cliente del documento.
+      </p>
     </section>
 
     <!-- ── Sede Legale ─────────────────────────────────────────────────── -->

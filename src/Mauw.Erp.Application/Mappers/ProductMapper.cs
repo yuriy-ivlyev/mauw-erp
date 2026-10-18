@@ -91,7 +91,6 @@ public static class ProductMapper
             Size: variant.Size?.Name ?? "N/A",
             Color: variant.Color?.Name ?? "N/A",
             UnitNetPrice: pricingResult.FinalNetPrice,
-            UnitGrossPrice: pricingResult.FinalGrossPrice,
             VatRate: product.VatRate,
             WeightGrams: variant.WeightGrams
         );

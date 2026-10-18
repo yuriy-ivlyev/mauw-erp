@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Reporting\MigraDoc\Fonts\*.ttf" />
+    <EmbeddedResource Include="Reporting\MigraDoc\Images\*.png" />
   </ItemGroup>
 
 </Project>

@@ -57,4 +57,7 @@ public sealed class TracingOrderService(IOrderService inner) : TracingDecoratorB
 
     public Task<OperationResult<CassaSessionDetailDto>> GetCassaSessionAsync(Guid orderId) =>
         inner.GetCassaSessionAsync(orderId);
+
+    public OperationResult<CassaPreviewDto> PreviewCassaCart(CassaPreviewRequest request) =>
+        inner.PreviewCassaCart(request);
 }

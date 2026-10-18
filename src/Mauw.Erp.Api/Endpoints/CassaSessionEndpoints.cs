@@ -16,6 +16,10 @@ public static class CassaSessionEndpoints
             .WithName("CreateCassaSession")
             .WithSummary("Crea e sospende una nuova sessione cassa");
 
+        group.MapPost("/preview", PreviewCart)
+            .WithName("PreviewCassaCart")
+            .WithSummary("Calcola righe, castelletto IVA e totali del carrello senza salvare");
+
         group.MapGet("/paused", GetPausedSessions)
             .WithName("GetPausedCassaSessions")
             .WithSummary("Elenca le sessioni cassa sospese");
@@ -42,6 +46,14 @@ public static class CassaSessionEndpoints
         IOrderService orderService)
     {
         var result = await orderService.CreateCassaSessionAsync(request);
+        return result.Success ? TypedResults.Ok(result.Data!) : TypedResults.BadRequest(result.Error);
+    }
+
+    private static Results<Ok<CassaPreviewDto>, BadRequest<string>> PreviewCart(
+        CassaPreviewRequest request,
+        IOrderService orderService)
+    {
+        var result = orderService.PreviewCassaCart(request);
         return result.Success ? TypedResults.Ok(result.Data!) : TypedResults.BadRequest(result.Error);
     }
 

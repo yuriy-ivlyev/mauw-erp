@@ -8,7 +8,7 @@ export interface MatrixSelection {
   productName: string;
   colorName: string | null;
   sizeName: string | null;
-  unitPrice: number;
+  unitNetPrice: number;
   quantity: number;
   availableStock: number;
   vatRate: number;
@@ -44,7 +44,7 @@ export interface MatrixSelection {
             <p class="text-gray-500 mb-4">Prodotto senza varianti taglia/colore</p>
             <div class="inline-flex items-center gap-3 bg-gray-50 border rounded-xl px-6 py-4">
               <span class="text-sm font-mono text-gray-600">{{ matrix.cells[0].barcode }}</span>
-              <span class="text-lg font-bold text-blue-700">{{ matrix.cells[0].unitPrice | number:'1.2-2' }} €</span>
+              <span class="text-lg font-bold text-blue-700">{{ matrix.cells[0].unitNetPrice | number:'1.2-2' }} € + IVA</span>
               <span [class]="stockBadgeClass(matrix.cells[0].availableStock)">
                 {{ matrix.cells[0].availableStock }} pz
               </span>
@@ -142,7 +142,6 @@ export interface MatrixSelection {
 })
 export class ProductMatrixModalComponent implements OnInit {
   @Input() matrix!: ProductMatrixDto;
-  @Input() vatRate: number = 22;
   @Output() cancel = new EventEmitter<void>();
   @Output() confirmed = new EventEmitter<MatrixSelection[]>();
 
@@ -229,10 +228,10 @@ export class ProductMatrixModalComponent implements OnInit {
         productName: this.matrix.productName,
         colorName,
         sizeName,
-        unitPrice: cell.unitPrice,
+        unitNetPrice: cell.unitNetPrice,
         quantity: qty,
         availableStock: cell.availableStock,
-        vatRate: this.vatRate,
+        vatRate: cell.vatRate,
         weightGrams: cell.weightGrams
       });
     });

@@ -8,11 +8,25 @@ using Mauw.Erp.Domain.Services;
 using Microsoft.Extensions.DependencyInjection;
 using PdfSharp.Fonts;
 using PdfSharp.Pdf.IO;
+using Mauw.Erp.Application.Services;
+using Mauw.Erp.Contracts.Dtos;
+using Mauw.Erp.Infrastructure.Branding;
+using Moq;
 
 namespace Mauw.Erp.UnitTests.Reporting;
 
 public class InvoicePdfGeneratorTests
 {
+    private static ServiceCollection CreateServices()
+    {
+        var services = new ServiceCollection();
+        var logos = new Mock<ICompanyLogoService>();
+        logos.Setup(service => service.GetAsync("compact", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult<CompanyLogoDto>.Ok(new(DefaultCompanyLogos.ReadPng("compact"))));
+        services.AddSingleton(logos.Object);
+        return services;
+    }
+
     [Theory]
     [InlineData("ORDINE")]
     [InlineData("TD01")]
@@ -20,7 +34,7 @@ public class InvoicePdfGeneratorTests
     [InlineData("NOTA CREDITO")]
     public async Task GeneratesReadablePdfUsingEmbeddedFonts(string documentType)
     {
-        var services = new ServiceCollection();
+        var services = CreateServices();
         services.AddInvoicePdfReporting();
         // Repeated registration must not reset PDFsharp's process-wide font settings.
         services.AddInvoicePdfReporting();
@@ -43,6 +57,25 @@ public class InvoicePdfGeneratorTests
         using var stream = new MemoryStream(bytes);
         using var document = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
         Assert.True(document.PageCount > 0);
+        using var readablePdf = UglyToad.PdfPig.PdfDocument.Open(bytes);
+        var firstPage = readablePdf.GetPage(1);
+        var logo = Assert.Single(firstPage.GetImages());
+        Assert.InRange(logo.BoundingBox.Width, 1, 35);
+        Assert.InRange(logo.BoundingBox.Height, 1, 39);
+        var seller = firstPage.GetWords().Where(word => word.Text == "Venditore")
+            .OrderByDescending(word => word.BoundingBox.Top).First();
+        Assert.InRange(Math.Abs(seller.BoundingBox.Top - logo.BoundingBox.Top), 0, 6);
+        Assert.True(seller.BoundingBox.Left > logo.BoundingBox.Right);
+        foreach (var word in firstPage.GetWords())
+        {
+            var overlapX = Math.Min(word.BoundingBox.Right, logo.BoundingBox.Right) -
+                Math.Max(word.BoundingBox.Left, logo.BoundingBox.Left);
+            var overlapY = Math.Min(word.BoundingBox.Top, logo.BoundingBox.Top) -
+                Math.Max(word.BoundingBox.Bottom, logo.BoundingBox.Bottom);
+            Assert.False(overlapX > 1 && overlapY > 1, $"Logo overlaps '{word.Text}'.");
+        }
+        var customerHeading = Assert.Single(firstPage.GetWords(), word => word.Text == "CESSIONARIO");
+        Assert.InRange(firstPage.Height - customerHeading.BoundingBox.Top, 0, 160);
         if (documentType == "ORDINE")
             Assert.Equal("Ordine DOC-001", document.Info.Title);
         var resolver = Assert.IsAssignableFrom<IFontResolver>(GlobalFontSettings.FontResolver);
@@ -65,7 +98,7 @@ public class InvoicePdfGeneratorTests
     [InlineData("TD01", 0, false)]
     public async Task RendersShortAndMultipageDocuments(string documentType, int lineCount, bool longDetails)
     {
-        var services = new ServiceCollection();
+        var services = CreateServices();
         services.AddInvoicePdfReporting();
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
@@ -147,7 +180,7 @@ public class InvoicePdfGeneratorTests
             new DocumentLineInput(1m, 5m, 0m, "N3.2")]);
         Assert.True(result.Success, result.Error);
         var calculated = result.Data!;
-        var services = new ServiceCollection();
+        var services = CreateServices();
         services.AddInvoicePdfReporting();
         using var provider = services.BuildServiceProvider();
         var generator = provider.GetRequiredService<IInvoicePdfGenerator>();
@@ -168,7 +201,8 @@ public class InvoicePdfGeneratorTests
 
         using var pdf = UglyToad.PdfPig.PdfDocument.Open(bytes);
         var words = pdf.GetPages().SelectMany(page => page.GetWords()).Select(word => word.Text).ToArray();
-        Assert.Contains("18,85245902", words);
+        Assert.Contains("18,85", words);
+        Assert.DoesNotContain("18,85245902", words);
         Assert.Contains("94,26", words);
         Assert.Contains("20,74", words);
         Assert.Contains("120,00", words);

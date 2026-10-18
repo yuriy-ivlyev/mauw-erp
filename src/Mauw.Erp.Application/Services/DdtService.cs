@@ -139,6 +139,9 @@ public class DdtService(
         if (ddt == null)
             return OperationResult<byte[]>.Fail("DDT not found");
 
+        var agent = await DocumentPdfMapper.GetAgentAsync(unitOfWork, ddt.ContactId);
+        if (!agent.Success)
+            return OperationResult<byte[]>.Fail(agent.Error!);
         var companyResult = await companySettingsService.GetCompanyAsync();
         var company = companyResult.Success ? companyResult.Data : null;
         var sellerAddress = company?.LegalHeadquarters
@@ -200,7 +203,8 @@ public class DdtService(
                 ShareCapital: company?.ShareCapital?.ToString("N2", ItalianCulture),
                 TaxRegime: company?.FiscalRegime ?? "RF01 - Ordinario",
                 SdiCode: company?.SdiCode,
-                Pec: company?.PecEmail),
+                Pec: company?.PecEmail,
+                IsShareCapitalFullyPaid: company?.IsShareCapitalFullyPaid ?? false),
             Customer: new InvoicePdfCustomerDetails(
                 BusinessName: ddt.Contact?.BusinessName ?? string.Empty,
                 VatNumber: ddt.Contact?.VatNumber,
@@ -219,7 +223,8 @@ public class DdtService(
                 TotalNet: calculated.TotalTaxable,
                 TotalVat: calculated.TotalVat,
                 TotalGross: calculated.TotalGross,
-                ShippingCost: 0m)
+                ShippingCost: 0m),
+            Agent: agent.Data
         );
 
         return OperationResult<byte[]>.Ok(await pdfGenerator.GenerateInvoicePdfAsync(model));

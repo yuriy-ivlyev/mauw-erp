@@ -14,5 +14,6 @@ public sealed record InvoicePdfSellerDetails(
     /// <summary>E.g. "RF01 - Ordinario"</summary>
     string  TaxRegime,
     string? SdiCode,
-    string? Pec
+    string? Pec,
+    bool IsShareCapitalFullyPaid = false
 );

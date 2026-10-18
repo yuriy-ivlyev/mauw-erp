@@ -216,11 +216,25 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("BankName")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("bank_name");
+
+                    b.Property<string>("BicSwift")
+                        .HasMaxLength(11)
+                        .HasColumnType("character varying(11)")
+                        .HasColumnName("bic_swift");
+
                     b.Property<string>("BusinessName")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("business_name");
+
+                    b.Property<byte[]>("CompactLogoPng")
+                        .HasColumnType("bytea")
+                        .HasColumnName("compact_logo_png");
 
                     b.Property<string>("CountryCode")
                         .IsRequired()
@@ -250,6 +264,20 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("character varying(10)")
                         .HasColumnName("fiscal_regime");
 
+                    b.Property<byte[]>("HorizontalLogoPng")
+                        .HasColumnType("bytea")
+                        .HasColumnName("horizontal_logo_png");
+
+                    b.Property<string>("Iban")
+                        .HasMaxLength(34)
+                        .HasColumnType("character varying(34)")
+                        .HasColumnName("iban");
+
+                    b.Property<string>("InvoiceNotes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("invoice_notes");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
@@ -261,6 +289,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Property<bool>("IsInternalCompany")
                         .HasColumnType("boolean")
                         .HasColumnName("is_internal_company");
+
+                    b.Property<bool>("IsShareCapitalFullyPaid")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_share_capital_fully_paid");
 
                     b.Property<bool?>("IsSoleShareholder")
                         .HasColumnType("boolean")

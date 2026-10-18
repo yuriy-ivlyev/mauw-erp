@@ -1,7 +1,8 @@
 <nav class="flex items-center justify-between w-full bg-white dark:bg-gray-800 shadow-md px-6 py-4">
   <div class="flex items-center gap-4">
-    <img src="assets/logo/mauw.svg" alt="Mauw Logo" class="h-12 w-auto">
-    <h1 class="text-xl font-semibold text-gray-800 dark:text-white">Mauw ERP</h1>
+    <img [src]="branding.logoUrl('horizontal')" alt="Mauw" width="187" height="63"
+      class="h-12 w-auto rounded bg-white p-1">
+    <h1 class="hidden sm:block text-xl font-semibold text-gray-800 dark:text-white">ERP</h1>
   </div>
 
   <div class="flex items-center gap-4">

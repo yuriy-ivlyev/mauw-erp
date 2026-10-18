@@ -19,7 +19,12 @@ public record CompanySettingsDto(
     bool IsInLiquidation,
     string? LogoUrl,
     CompanyAddressSiteDto? LegalHeadquarters,
-    List<CompanyAddressSiteDto> OperationalSites
+    List<CompanyAddressSiteDto> OperationalSites,
+    bool IsShareCapitalFullyPaid = false,
+    string? BankName = null,
+    string? Iban = null,
+    string? BicSwift = null,
+    string? InvoiceNotes = null
 );
 
 public record CompanyAddressSiteDto(

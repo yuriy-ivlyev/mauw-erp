@@ -1,6 +1,7 @@
 using Mauw.Erp.Domain.Entities;
 using Mauw.Erp.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Mauw.Erp.Infrastructure.Branding;
 
 namespace Mauw.Erp.Infrastructure.DbContext;
 
@@ -30,7 +31,6 @@ public static class DbInitializer
             await context.Colors.AddRangeAsync(colors);
             await context.SaveChangesAsync();
         }
-
         // Seed Sizes if empty
         if (!await context.Sizes.AnyAsync())
         {
@@ -81,6 +81,8 @@ public static class DbInitializer
             await context.SaveChangesAsync();
         }
 
+        await SeedCompanyLogosAsync(context);
+
         if (!await context.Warehouses.IgnoreQueryFilters().AnyAsync())
         {
             var internalCompany = await context.Contacts
@@ -99,6 +101,15 @@ public static class DbInitializer
                 await context.Warehouses.AddRangeAsync(warehouses);
                 await context.SaveChangesAsync();
             }
+
         }
+    }
+
+    public static async Task SeedCompanyLogosAsync(MauwDbContext context, CancellationToken ct = default)
+    {
+        var company = await context.Contacts.SingleAsync(contact => contact.IsInternalCompany, ct);
+        company.HorizontalLogoPng ??= DefaultCompanyLogos.ReadPng("horizontal");
+        company.CompactLogoPng ??= DefaultCompanyLogos.ReadPng("compact");
+        await context.SaveChangesAsync(ct);
     }
 }

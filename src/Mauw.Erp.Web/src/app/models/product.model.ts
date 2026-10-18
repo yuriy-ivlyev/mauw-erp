@@ -146,7 +146,8 @@ export interface MatrixCellDto {
   colorId: string | null;
   sizeId: string | null;
   barcode: string;
-  unitPrice: number;
+  unitNetPrice: number;
+  vatRate: number;
   availableStock: number;
   weightGrams?: number | null;
 }

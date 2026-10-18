@@ -1,9 +1,11 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { MenuService } from '../../../services/menu.service';
 import { AuthService } from '../../../services/auth.service';
 import { MenuItem } from '../../../models/menu.model';
+import { CompanyBrandingService } from '../../../services/company-branding.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-sidebar',
@@ -13,22 +15,22 @@ import { MenuItem } from '../../../models/menu.model';
   styleUrl: './sidebar.component.scss'
 })
 export class SidebarComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
   sidebarOpen = true;
   menuItems: MenuItem[] = [];
 
   constructor(
     private menuService: MenuService,
-    private auth: AuthService
+    private auth: AuthService,
+    readonly branding: CompanyBrandingService
   ) {}
 
   ngOnInit(): void {
-    this.menuService.menu$.subscribe(items => {
+    this.menuService.menu$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(items => {
       this.menuItems = items
         .filter(item => this.canSee(item))
-        .map(item => ({
-          ...item,
-          children: item.children?.filter(child => this.canSee(child))
-        }));
+        .filter(item => !item.children?.length ||
+          item.children.some(child => !child.isSeparator && this.canSee(child)));
     });
   }
 

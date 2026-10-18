@@ -1,0 +1,19 @@
+@baseUrl = http://localhost:5020
+
+### Logo orizzontale PNG (lettura pubblica, senza cache persistente)
+GET {{baseUrl}}/api/v1/settings/company/logos/horizontal
+
+### Logo compatto PNG
+GET {{baseUrl}}/api/v1/settings/company/logos/compact
+
+### Tipo sconosciuto: 404
+GET {{baseUrl}}/api/v1/settings/company/logos/unknown
+
+### Sostituzione: richiede cookie di sessione con ruolo Admin.
+### Esempio di PNG incompleto: atteso 400 per un Admin, 401/403 senza autorizzazione.
+PUT {{baseUrl}}/api/v1/settings/company/logos/horizontal
+Content-Type: application/json
+
+{
+  "pngData": "iVBORw0KGgo="
+}

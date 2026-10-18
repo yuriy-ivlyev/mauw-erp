@@ -1,11 +1,11 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject, Observable, Subject, of } from 'rxjs';
+import { catchError, map, switchMap } from 'rxjs/operators';
 import { ApiService } from './api.service';
 
 export interface CartItem {
   natureCode?: string | null;
   discountPercent?: number;
-  priceIncludesVat?: boolean;
   barcode: string;
   variantId: string;
   productId: string;
@@ -13,13 +13,50 @@ export interface CartItem {
   size: string;
   color: string;
   unitNetPrice: number;
-  unitGrossPrice: number;
   vatRate: number;
   quantityAvailable: number;
   weightGrams?: number | null;
   quantity: number;
+  maxQuantity: number;
+}
+
+export interface CassaPreviewLine {
+  lineNumber: number;
+  unitNetPrice: number;
+  discountPercent: number;
+  vatRate: number;
+  natureCode: string | null;
   lineNetTotal: number;
-  lineGrossTotal: number;
+}
+
+export interface CassaPreviewVat {
+  vatRate: number;
+  natureCode: string | null;
+  taxableAmount: number;
+  vatAmount: number;
+}
+
+/** Fiscal result computed by the backend calculator; the POS only displays it. */
+export interface CassaPreview {
+  lines: CassaPreviewLine[];
+  vatSummary: CassaPreviewVat[];
+  totalTaxable: number;
+  totalVat: number;
+  totalGross: number;
+}
+
+export interface CassaPreviewState {
+  data: CassaPreview | null;
+  error: string | null;
+}
+
+export interface CassaCartRequestItem {
+  variantId: string;
+  quantity: number;
+  unitNetPrice: number;
+  natureCode?: string | null;
+  discountPercent: number;
+  vatRate: number;
   maxQuantity: number;
 }
 
@@ -66,7 +103,6 @@ export interface SavedCartItemDto {
   size: string;
   color: string;
   unitNetPrice: number;
-  unitGrossPrice: number;
   vatRate: number;
   quantity: number;
   maxQuantity: number;
@@ -88,7 +124,22 @@ export class CassaSessionService {
   private stateSubject = new BehaviorSubject<CassaSessionState>(this.state);
   state$: Observable<CassaSessionState> = this.stateSubject.asObservable();
 
+  private previewTrigger = new Subject<CassaCartRequestItem[]>();
+  private previewSubject = new BehaviorSubject<CassaPreviewState>({ data: null, error: null });
+  preview$: Observable<CassaPreviewState> = this.previewSubject.asObservable();
+
   constructor(private api: ApiService) {
+    this.previewTrigger.pipe(
+      switchMap(items => items.length === 0
+        ? of<CassaPreviewState>({ data: null, error: null })
+        : this.api.post<CassaPreview>('v1/cassa/sessions/preview', { items }).pipe(
+          map((data): CassaPreviewState => ({ data, error: null })),
+          catchError(e => of<CassaPreviewState>({
+            data: null,
+            error: typeof e?.error === 'string' ? e.error : 'Calcolo del documento non disponibile'
+          }))
+        ))
+    ).subscribe(state => this.previewSubject.next(state));
     this.restoreFromStorage();
   }
 
@@ -99,6 +150,7 @@ export class CassaSessionService {
   setCart(cart: CartItem[]): void {
     this.state = { ...this.state, cart };
     this.persist();
+    this.refreshPreview();
   }
 
   setContact(contact: CassaContact | null): void {
@@ -120,19 +172,11 @@ export class CassaSessionService {
     this.state = { sessionId: null, sessionCode: null, cart: [], selectedContact: null, documentNumber: '' };
     localStorage.removeItem(STORAGE_KEY);
     this.stateSubject.next({ ...this.state });
+    this.refreshPreview();
   }
 
   createOrPauseSession() {
-    const items = this.state.cart.map(i => ({
-      variantId: i.variantId,
-      quantity: i.quantity,
-      unitNetPrice: i.unitNetPrice,
-      unitGrossPrice: i.priceIncludesVat === false ? undefined : i.unitGrossPrice,
-      natureCode: i.natureCode,
-      discountPercent: i.discountPercent ?? 0,
-      vatRate: i.vatRate,
-      maxQuantity: i.maxQuantity
-    }));
+    const items = this.cartRequestItems();
     const contactId = this.state.selectedContact!.id;
 
     if (this.state.sessionId) {
@@ -170,14 +214,10 @@ export class CassaSessionService {
       unitNetPrice: i.unitNetPrice,
       natureCode: i.natureCode,
       discountPercent: i.discountPercent ?? 0,
-      priceIncludesVat: false,
-      unitGrossPrice: i.unitGrossPrice,
       vatRate: i.vatRate,
       quantityAvailable: i.maxQuantity,
       weightGrams: i.weightGrams,
       quantity: i.quantity,
-      lineNetTotal: i.unitNetPrice * i.quantity * (1 - (i.discountPercent ?? 0) / 100),
-      lineGrossTotal: i.unitGrossPrice * i.quantity * (1 - (i.discountPercent ?? 0) / 100),
       maxQuantity: i.maxQuantity
     }));
 
@@ -193,6 +233,23 @@ export class CassaSessionService {
       documentNumber: detail.documentReference ?? ''
     };
     this.persist();
+    this.refreshPreview();
+  }
+
+  private cartRequestItems(): CassaCartRequestItem[] {
+    return this.state.cart.map(i => ({
+      variantId: i.variantId,
+      quantity: i.quantity,
+      unitNetPrice: i.unitNetPrice,
+      natureCode: i.natureCode,
+      discountPercent: i.discountPercent ?? 0,
+      vatRate: i.vatRate,
+      maxQuantity: i.maxQuantity
+    }));
+  }
+
+  private refreshPreview(): void {
+    this.previewTrigger.next(this.cartRequestItems());
   }
 
   private persist(): void {
@@ -206,6 +263,7 @@ export class CassaSessionService {
       if (raw) {
         this.state = JSON.parse(raw) as CassaSessionState;
         this.stateSubject.next({ ...this.state });
+        this.refreshPreview();
       }
     } catch { /* ignore */ }
   }

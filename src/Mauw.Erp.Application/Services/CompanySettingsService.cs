@@ -37,6 +37,9 @@ public class CompanySettingsService(
 
     public async Task<OperationResult<CompanySettingsDto>> UpsertCompanyAsync(UpdateCompanySettingsRequest request)
     {
+        var error = ValidateCompanyFields(request);
+        if (error is not null)
+            return OperationResult<CompanySettingsDto>.Fail(error);
         var contact = await unitOfWork.Contacts.GetInternalCompanyAsync();
 
         var vatNumber = Normalize(request.VatNumber);
@@ -170,9 +173,46 @@ public class CompanySettingsService(
         c.ReaNumber         = r.ReaNumber;
         c.ReaOffice         = r.ReaOffice;
         c.ShareCapital      = r.ShareCapital;
+        c.IsShareCapitalFullyPaid = r.IsShareCapitalFullyPaid;
+        c.BankName          = Normalize(r.BankName);
+        c.Iban              = NormalizeBankCode(r.Iban);
+        c.BicSwift          = NormalizeBankCode(r.BicSwift);
+        c.InvoiceNotes      = Normalize(r.InvoiceNotes);
         c.IsSoleShareholder = r.IsSoleShareholder;
         c.IsInLiquidation   = r.IsInLiquidation;
         c.LogoUrl           = r.LogoUrl;
+    }
+
+    private static string? NormalizeBankCode(string? value) =>
+        Normalize(value) is { } code
+            ? string.Concat(code.Where(c => !char.IsWhiteSpace(c))).ToUpperInvariant()
+            : null;
+
+    private static string? ValidateCompanyFields(UpdateCompanySettingsRequest request)
+    {
+        if (request.ShareCapital < 0m ||
+            request.IsShareCapitalFullyPaid && !(request.ShareCapital > 0m))
+            return "Indicare un capitale sociale positivo prima di dichiararlo interamente versato.";
+        if (Normalize(request.BankName)?.Length > 250)
+            return "Il nome della banca non puo superare 250 caratteri.";
+        if (Normalize(request.InvoiceNotes)?.Length > 4000)
+            return "Le note fattura non possono superare 4000 caratteri.";
+        var bic = NormalizeBankCode(request.BicSwift);
+        if (bic is not null && !System.Text.RegularExpressions.Regex.IsMatch(
+            bic, "^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$", System.Text.RegularExpressions.RegexOptions.CultureInvariant))
+            return "BIC / SWIFT non valido: indicare 8 o 11 caratteri.";
+        var iban = NormalizeBankCode(request.Iban);
+        if (iban is null)
+            return null;
+        if (iban.Length is < 15 or > 34 || iban[0] is < 'A' or > 'Z' ||
+            iban[1] is < 'A' or > 'Z' || iban[2] is < '0' or > '9' || iban[3] is < '0' or > '9' ||
+            iban.Any(c => c is not (>= 'A' and <= 'Z') and not (>= '0' and <= '9')))
+            return "IBAN non valido.";
+        var remainder = 0;
+        foreach (var c in iban[4..] + iban[..4])
+            remainder = c >= 'A' ? (remainder * 100 + c - 'A' + 10) % 97
+                : (remainder * 10 + c - '0') % 97;
+        return remainder == 1 ? null : "IBAN non valido: codice di controllo errato.";
     }
 
     private static CompanyAddressSiteDto MapSite(ContactAddress a) => new(

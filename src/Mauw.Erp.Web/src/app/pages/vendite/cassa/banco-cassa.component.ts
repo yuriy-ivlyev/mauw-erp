@@ -1,4 +1,5 @@
-import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -6,7 +7,7 @@ import { ApiService } from '../../../services/api.service';
 import { ProductService } from '../../../services/product.service';
 import { ProductMatrixModalComponent, MatrixSelection } from './product-matrix-modal.component';
 import { ProductParentDto, ProductMatrixDto } from '../../../models/product.model';
-import { CassaSessionService, CartItem, CassaContact, PausedSessionSummary } from '../../../services/cassa-session.service';
+import { CassaSessionService, CartItem, CassaContact, CassaPreviewState, PausedSessionSummary } from '../../../services/cassa-session.service';
 
 interface BarcodeVariant {
   barcode: string;
@@ -16,7 +17,6 @@ interface BarcodeVariant {
   size: string;
   color: string;
   unitNetPrice: number;
-  unitGrossPrice: number;
   vatRate: number;
   quantityAvailable: number;
   weightGrams?: number | null;
@@ -38,7 +38,6 @@ interface PageResponse<T> {
 <app-product-matrix-modal
   *ngIf="matrixProduct"
   [matrix]="matrixProduct"
-  [vatRate]="selectedVatRate"
   (cancel)="closeMatrix()"
   (confirmed)="onMatrixConfirmed($event)">
 </app-product-matrix-modal>
@@ -297,8 +296,8 @@ interface PageResponse<T> {
             <option *ngFor="let code of natureCodes" [value]="code">{{ code }}</option>
           </select>
           <div class="text-right w-24 flex-shrink-0">
-            <div class="text-xs text-gray-400">Prezzo unitario</div>
-            <div class="text-sm font-medium">{{ item.unitGrossPrice | number:'1.2-2' }} €</div>
+            <div class="text-xs text-gray-400">Prezzo netto</div>
+            <div class="text-sm font-medium">{{ item.unitNetPrice | number:'1.2-2' }} €</div>
           </div>
 
           <!-- Quantity controls -->
@@ -315,10 +314,12 @@ interface PageResponse<T> {
             </button>
           </div>
 
-          <!-- Line total -->
+          <!-- Line total (calculated by the backend) -->
           <div class="text-right w-24 flex-shrink-0">
-            <div class="text-xs text-gray-400">Totale riga stimato</div>
-            <div class="font-bold text-gray-800">{{ item.lineGrossTotal | number:'1.2-2' }} €</div>
+            <div class="text-xs text-gray-400">Imponibile riga</div>
+            <div class="font-bold text-gray-800">
+              {{ lineNetTotal(i) !== null ? ((lineNetTotal(i) | number:'1.2-2') + ' €') : '–' }}
+            </div>
           </div>
 
           <!-- Remove -->
@@ -334,25 +335,26 @@ interface PageResponse<T> {
     <div *ngIf="cart.length > 0" class="bg-white border-t px-4 py-2.5 flex-shrink-0">
       <div class="flex items-center justify-between gap-4">
 
-        <!-- Totals: compact inline -->
+        <!-- Totals: calculated by the backend -->
         <div class="flex items-center gap-5 divide-x divide-gray-200">
           <div class="text-right pr-5">
-            <div class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">Imponibile stimato</div>
-            <div class="text-sm font-semibold text-gray-700">{{ totals.net | number:'1.2-2' }} €</div>
+            <div class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">Imponibile</div>
+            <div class="text-sm font-semibold text-gray-700">{{ preview.data ? ((preview.data.totalTaxable | number:'1.2-2') + ' €') : '–' }}</div>
           </div>
           <div class="text-right pr-5">
-            <div class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">IVA stimata</div>
-            <div class="text-sm font-semibold text-gray-500">{{ totals.vat | number:'1.2-2' }} €</div>
+            <div class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">IVA</div>
+            <div class="text-sm font-semibold text-gray-500">{{ preview.data ? ((preview.data.totalVat | number:'1.2-2') + ' €') : '–' }}</div>
           </div>
           <div class="text-right pr-5">
-            <div class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">Totale Lordo stimato</div>
-            <div class="text-base font-extrabold text-blue-700">{{ totals.gross | number:'1.2-2' }} €</div>
+            <div class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">Totale documento</div>
+            <div class="text-base font-extrabold text-blue-700">{{ preview.data ? ((preview.data.totalGross | number:'1.2-2') + ' €') : '–' }}</div>
           </div>
           <div class="text-right">
             <div class="text-[10px] text-gray-400 uppercase tracking-wide font-medium">Peso</div>
-            <div class="text-sm font-medium text-gray-400">{{ totals.weightKg | number:'1.2-2' }} kg</div>
+            <div class="text-sm font-medium text-gray-400">{{ weightKg | number:'1.2-2' }} kg</div>
           </div>
         </div>
+        <div *ngIf="preview.error" class="text-xs text-red-600 max-w-xs">{{ preview.error }}</div>
 
         <!-- Action buttons: aligned right -->
         <div class="flex gap-2 flex-shrink-0 ml-auto">
@@ -379,7 +381,7 @@ interface PageResponse<T> {
 </div><!-- /flex-col outer -->
   `
 })
-export class BancoCassaComponent implements OnInit {
+export class BancoCassaComponent implements OnInit, OnDestroy {
   readonly natureCodes = ['N1', 'N2.1', 'N2.2', 'N3.1', 'N3.2', 'N3.3', 'N3.4', 'N3.5', 'N3.6',
     'N4', 'N5', 'N6.1', 'N6.2', 'N6.3', 'N6.4', 'N6.5', 'N6.6', 'N6.7', 'N6.8', 'N6.9', 'N7'];
   // Barcode
@@ -395,7 +397,6 @@ export class BancoCassaComponent implements OnInit {
 
   // Matrix modal
   matrixProduct: ProductMatrixDto | null = null;
-  selectedVatRate = 22;
   matrixLoading = false;
 
   // Contact
@@ -429,11 +430,17 @@ export class BancoCassaComponent implements OnInit {
   terminateLoading = false;
   resumeLoading = false;
 
-  get totals() {
-    const net   = this.cart.reduce((s, i) => s + i.lineNetTotal, 0);
-    const gross = this.cart.reduce((s, i) => s + i.lineGrossTotal, 0);
+  preview: CassaPreviewState = { data: null, error: null };
+  private previewSub?: Subscription;
+
+  get weightKg(): number {
     const weightG = this.cart.reduce((s, i) => s + (i.weightGrams ?? 0) * i.quantity, 0);
-    return { net, vat: gross - net, gross, weightKg: weightG / 1000 };
+    return weightG / 1000;
+  }
+
+  lineNetTotal(index: number): number | null {
+    const lines = this.preview.data?.lines;
+    return lines && lines.length === this.cart.length ? lines[index].lineNetTotal : null;
   }
 
   constructor(
@@ -449,7 +456,12 @@ export class BancoCassaComponent implements OnInit {
     this.selectedContact = snap.selectedContact;
     this.documentNumber = snap.documentNumber;
     this.currentSessionCode = snap.sessionCode;
+    this.previewSub = this.sessionService.preview$.subscribe(state => this.preview = state);
     this.loadDefaultWarehouse();
+  }
+
+  ngOnDestroy(): void {
+    this.previewSub?.unsubscribe();
   }
 
   syncToService(): void {
@@ -531,9 +543,8 @@ export class BancoCassaComponent implements OnInit {
               productName: p.name,
               size: '',
               color: '',
-              unitNetPrice: cell.unitPrice / 1.22,
-              unitGrossPrice: cell.unitPrice,
-              vatRate: 22,
+              unitNetPrice: cell.unitNetPrice,
+              vatRate: cell.vatRate,
               quantityAvailable: cell.availableStock
             });
           }
@@ -547,7 +558,6 @@ export class BancoCassaComponent implements OnInit {
         next: (matrix) => {
           this.matrixLoading = false;
           this.matrixProduct = matrix;
-          this.selectedVatRate = 22;
         },
         error: () => { this.matrixLoading = false; }
       });
@@ -568,8 +578,7 @@ export class BancoCassaComponent implements OnInit {
         productName: s.productName,
         size: s.sizeName ?? '',
         color: s.colorName ?? '',
-        unitNetPrice: s.unitPrice / (1 + s.vatRate / 100),
-        unitGrossPrice: s.unitPrice,
+        unitNetPrice: s.unitNetPrice,
         vatRate: s.vatRate,
         quantityAvailable: s.availableStock,
         weightGrams: s.weightGrams
@@ -613,7 +622,6 @@ export class BancoCassaComponent implements OnInit {
       const newQty = existing.quantity + qty;
       if (newQty <= existing.maxQuantity) {
         existing.quantity = newQty;
-        this.recalcLine(existing);
       } else {
         this.barcodeError = `Giacenza esaurita (max ${existing.maxQuantity} pz disponibili)`;
       }
@@ -625,8 +633,6 @@ export class BancoCassaComponent implements OnInit {
       const item: CartItem = {
         ...v,
         quantity: qty,
-        lineNetTotal: v.unitNetPrice * qty,
-        lineGrossTotal: v.unitGrossPrice * qty,
         maxQuantity: Math.max(available, qty)
       };
       this.cart.push(item);
@@ -648,14 +654,12 @@ export class BancoCassaComponent implements OnInit {
       return;
     }
     item.quantity++;
-    this.recalcLine(item);
     this.syncToService();
   }
 
   decreaseQty(i: number): void {
     if (this.cart[i].quantity <= 1) { this.removeItem(i); return; }
     this.cart[i].quantity--;
-    this.recalcLine(this.cart[i]);
     this.syncToService();
   }
 
@@ -668,12 +672,6 @@ export class BancoCassaComponent implements OnInit {
     this.cart = [];
     this.showClearCartConfirm = false;
     this.syncToService();
-  }
-
-  private recalcLine(item: CartItem): void {
-    const discountFactor = 1 - (item.discountPercent ?? 0) / 100;
-    item.lineNetTotal   = item.unitNetPrice   * item.quantity * discountFactor;
-    item.lineGrossTotal = item.unitGrossPrice * item.quantity * discountFactor;
   }
 
   // ── Document generation ───────────────────────────────────
@@ -703,7 +701,6 @@ export class BancoCassaComponent implements OnInit {
       variantId: item.variantId,
       quantity: item.quantity,
       unitNetPrice: item.unitNetPrice,
-      unitGrossPrice: item.priceIncludesVat === false ? undefined : item.unitGrossPrice,
       vatRate: item.vatRate,
       natureCode: item.natureCode,
       discountPercent: item.discountPercent ?? 0

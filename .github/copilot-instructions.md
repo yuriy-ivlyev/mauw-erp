@@ -97,8 +97,14 @@ split payment, esigibilita IVA o altri regimi speciali.
 Il campo `ImportoTotaleDocumento` e **2.1.1.9**, NON 2.4.2.2.
 Le API, i totali persistiti e i PDF devono usare il medesimo risultato fiscale.
 Il frontend puo mostrare stime, chiaramente indicate, ma non costituisce
-fonte contabile. Il PDF deve mostrare la precisione utile del prezzo unitario
-(`0.00######`), importi a 2 decimali, sconto, aliquota e Natura.
+fonte contabile. UI e PDF mostrano il prezzo unitario arrotondato ai centesimi
+(`N2`, `MidpointRounding.AwayFromZero`) solo per presentazione; la precisione
+a 8 decimali resta in database, API e calcoli. Il PDF stampa soltanto i valori
+gia calcolati (nessuno scorporo). La cassa invia sempre prezzo netto, sconto,
+aliquota e Natura, mai il lordo; imponibile, IVA e totali mostrati in cassa
+arrivano dall'endpoint `POST /api/v1/cassa/sessions/preview`, che usa il
+calcolatore: il frontend non ricalcola nulla. Il PDF mostra inoltre importi a
+2 decimali, sconto, aliquota e Natura.
 Non ricavare un'aliquota media da una nota di credito multialiquota:
 occorrono righe e classificazioni esplicite.
 

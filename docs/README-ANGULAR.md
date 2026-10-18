@@ -13,6 +13,67 @@ La parte web è stata implementata come **sito amministrativo** usando **Angular
 - ✅ Componenti standalone Angular
 - ✅ Styling con Tailwind CSS
 
+## Loghi aziendali
+
+In **Impostazioni → Azienda** si possono sostituire separatamente il logo
+orizzontale (intestazione applicativo) e quello compatto (menu, favicon e PDF), senza
+redeploy. Il caricamento richiede il ruolo **Admin** e accetta SVG o PNG fino a
+2 MiB. Gli SVG vengono normalizzati nel browser in PNG trasparenti fino a
+1600 pixel sul lato maggiore: nel database vengono memorizzati solo i pixel,
+non markup SVG eseguibile. Il backend valida formato, dimensioni e leggibilità.
+
+I due loghi sono campi binari dell'anagrafica **Nostra Azienda**
+(`contacts`, record `IsInternalCompany`), non URL e non una tabella separata.
+Il seed inizializza esclusivamente i campi mancanti con i loghi forniti in
+[`media/`](../media/); non sovrascrive le sostituzioni ai riavvii.
+I PNG iniziali sono incorporati nell'assembly Infrastructure, così sono
+disponibili anche nel container senza accesso al filesystem sorgente.
+Le risorse iniziali sono state esportate con Inkscape, area del disegno,
+larghezza 1200 px (orizzontale) e 800 px (compatto).
+Il compatto usa il simbolo senza testo di
+[`mauw-separated-logo-only.svg`](../media/mauw-separated-logo-only.svg);
+la variante quadrata con scritta resta disponibile come sorgente alternativa.
+
+La lettura usa `GET /api/v1/settings/company/logos/{horizontal|compact}` e la
+sostituzione `PUT` sullo stesso percorso, con JSON `{ "pngData": "<base64>" }`.
+Sono risorse locali all'applicativo: non occorrono servizi immagini esterni.
+I PDF leggono direttamente i byte dal database tramite DI, senza richieste HTTP.
+I PDF già scaricati non vengono modificati; quelli rigenerati usano il logo corrente.
+Nelle stampe il logo compatto occupa una colonna a sinistra, entro 1,2 cm di
+larghezza e 1,35 cm di altezza. Il blocco aziendale e allineato in alto nella
+colonna accanto, senza immagini sulla baseline del testo; i dati documento restano a destra.
+Il campo legacy `LogoUrl` resta per compatibilità, ma non viene usato per i loghi.
+
+La migrazione `AddCompanyLogos` aggiunge soltanto le due colonne nullable.
+All'avvio l'API applica le migrazioni e poi il seed. Per applicarle manualmente:
+
+```powershell
+dotnet ef database update --project src\Mauw.Erp.Infrastructure
+```
+
+## Dati aziendali nelle stampe
+
+In **Impostazioni → Azienda** il flag **Capitale sociale interamente versato**
+aggiunge `I.V.` al capitale nell'intestazione di ordini, fatture, DDT e note di
+credito. Richiede un capitale positivo; non modifica importi o calcoli fiscali.
+
+La sezione **Coordinate bancarie e note fatture** salva banca, IBAN, BIC/SWIFT
+e note modificabili nell'anagrafica aziendale. IBAN e BIC vengono normalizzati
+e validati prima del salvataggio. I dati sono riportati solo nelle fatture,
+non in ordini, DDT o note di credito. Il pulsante per le condizioni proposte
+compila il testo di trasporto, che va verificato e salvato dall'utente.
+Non viene dichiarata automaticamente emissione XML o trasmissione a SdI.
+
+Il riquadro agente usa l'agente predefinito associato al cliente del documento
+(`DefaultAgentId`), non un nome aziendale fisso. Non esiste attualmente una
+selezione agente distinta sul singolo ordine. Se assegnato, viene stampata anche
+la dicitura sulla provvigione a carico del venditore; un collegamento agente
+non valido restituisce un errore esplicito.
+
+La migrazione `AddCompanyInvoiceDetails` e solo additiva: nuovi campi facoltativi
+e flag inizialmente disattivato, senza riscrivere documenti o inventare dati bancari.
+Le modifiche si vedono nei PDF rigenerati; quelli gia scaricati restano invariati.
+
 ## 📁 Struttura
 
 ```
@@ -75,6 +136,8 @@ docker-compose up  # Tutto insieme (API + Web su Nginx)
 - Menu con link ai moduli
 - Highlight del route attivo
 - Icon SVG per ogni voce
+- Sezioni espandibili con stato mantenuto dal `MenuService`; il filtro dei ruoli
+  nasconde le voci senza clonare le sezioni, per non perdere lo stato al clic.
 
 ### Header
 - Search bar (hidden su mobile)
@@ -148,4 +211,3 @@ export class UsersComponent {}
 - [ ] Implementare autenticazione
 - [ ] Aggiungere notifiche/toast
 - [ ] Responsive mobile menu per sidebar
-

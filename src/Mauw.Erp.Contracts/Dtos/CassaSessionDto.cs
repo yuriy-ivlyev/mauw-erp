@@ -8,7 +8,6 @@ public record CassaCartItemDto(
     string Size,
     string Color,
     decimal UnitNetPrice,
-    decimal UnitGrossPrice,
     decimal VatRate,
     int Quantity,
     int MaxQuantity,
@@ -33,4 +32,31 @@ public record CassaSessionSummaryDto(
     string? ContactName,
     int CartItemCount,
     DateTime UpdatedAt
+);
+
+public record CassaPreviewLineDto(
+    int LineNumber,
+    decimal UnitNetPrice,
+    decimal DiscountPercent,
+    decimal VatRate,
+    string? NatureCode,
+    decimal LineNetTotal
+);
+
+public record CassaPreviewVatDto(
+    decimal VatRate,
+    string? NatureCode,
+    decimal TaxableAmount,
+    decimal VatAmount
+);
+
+/// <summary>
+/// Fiscal result computed by ItalianAccountingCalculator; the POS only displays it.
+/// </summary>
+public record CassaPreviewDto(
+    List<CassaPreviewLineDto> Lines,
+    List<CassaPreviewVatDto> VatSummary,
+    decimal TotalTaxable,
+    decimal TotalVat,
+    decimal TotalGross
 );

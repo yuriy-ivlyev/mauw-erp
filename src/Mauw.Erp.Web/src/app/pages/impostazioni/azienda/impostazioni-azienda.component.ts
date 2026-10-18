@@ -4,6 +4,7 @@ import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } 
 import { CompanySettingsService } from '../../../services/company-settings.service';
 import { CompanySettings, CompanyAddressSite, CompanyAddressSiteRequest } from '../../../models/company-settings.model';
 import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
+import { CompanyBrandingService, CompanyLogoKind } from '../../../services/company-branding.service';
 
 @Component({
   selector: 'app-impostazioni-azienda',
@@ -18,6 +19,10 @@ export class ImpostazioniAziendaComponent implements OnInit {
   saving  = false;
   successMessage = '';
   errorMessage   = '';
+  savingLogo = false;
+  readonly suggestedInvoiceNotes = 'La merce viaggia con regolare imballaggio originale e identificativi ' +
+    'barcode/SKU per showroom/negozio. Trascorsi 8 giorni dalla ricezione merce non si accettano resi o ' +
+    'contestazioni su differenze taglia o capo non conforme.';
 
   // Operational sites state
   showSiteModal = false;
@@ -27,8 +32,28 @@ export class ImpostazioniAziendaComponent implements OnInit {
 
   constructor(
     private fb: FormBuilder,
-    private service: CompanySettingsService
+    private service: CompanySettingsService,
+    readonly branding: CompanyBrandingService
   ) {}
+
+  async replaceLogo(kind: CompanyLogoKind, event: Event): Promise<void> {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || !input.files?.length) return;
+    this.savingLogo = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+    try {
+      await this.branding.replaceLogo(kind, input.files[0]);
+      this.successMessage = 'Logo aggiornato per interfaccia e nuove stampe.';
+    } catch (error: unknown) {
+      const response = error as { error?: unknown };
+      this.errorMessage = typeof response?.error === 'string' ? response.error
+        : error instanceof Error ? error.message : 'Errore durante il salvataggio del logo.';
+    } finally {
+      this.savingLogo = false;
+      input.value = '';
+    }
+  }
 
   ngOnInit(): void {
     this.buildForm();
@@ -48,6 +73,11 @@ export class ImpostazioniAziendaComponent implements OnInit {
       reaNumber:         [''],
       reaOffice:         [''],
       shareCapital:      [null],
+      isShareCapitalFullyPaid: [false],
+      bankName:          ['', Validators.maxLength(250)],
+      iban:              ['', Validators.maxLength(42)],
+      bicSwift:          ['', Validators.maxLength(11)],
+      invoiceNotes:      ['', Validators.maxLength(4000)],
       isSoleShareholder: [null],
       isInLiquidation:   [false],
       logoUrl:           [''],
@@ -102,6 +132,11 @@ export class ImpostazioniAziendaComponent implements OnInit {
       reaNumber:         c.reaNumber,
       reaOffice:         c.reaOffice,
       shareCapital:      c.shareCapital,
+      isShareCapitalFullyPaid: c.isShareCapitalFullyPaid,
+      bankName:          c.bankName,
+      iban:              c.iban,
+      bicSwift:          c.bicSwift,
+      invoiceNotes:      c.invoiceNotes,
       isSoleShareholder: c.isSoleShareholder,
       isInLiquidation:   c.isInLiquidation,
       logoUrl:           c.logoUrl,
@@ -131,6 +166,11 @@ export class ImpostazioniAziendaComponent implements OnInit {
       reaNumber:    v.reaNumber  || null,
       reaOffice:    v.reaOffice  || null,
       shareCapital: v.shareCapital ?? null,
+      isShareCapitalFullyPaid: v.isShareCapitalFullyPaid ?? false,
+      bankName:     v.bankName || null,
+      iban:         v.iban || null,
+      bicSwift:     v.bicSwift || null,
+      invoiceNotes: v.invoiceNotes || null,
       isSoleShareholder: v.isSoleShareholder ?? null,
       isInLiquidation:   v.isInLiquidation ?? false,
       logoUrl:      v.logoUrl    || null,
@@ -148,12 +188,13 @@ export class ImpostazioniAziendaComponent implements OnInit {
     this.service.upsertCompany(request).subscribe({
       next: (c) => {
         this.company = c;
+        this.patchFormFromCompany(c);
         this.successMessage = 'Dati aziendali salvati.';
         this.saving = false;
         setTimeout(() => (this.successMessage = ''), 3000);
       },
-      error: () => {
-        this.errorMessage = 'Errore durante il salvataggio.';
+      error: (error: { error?: unknown }) => {
+        this.errorMessage = typeof error.error === 'string' ? error.error : 'Errore durante il salvataggio.';
         this.saving = false;
       }
     });

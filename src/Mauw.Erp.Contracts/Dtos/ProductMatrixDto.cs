@@ -18,7 +18,8 @@ public record MatrixCellDto(
     string? ColorId,
     string? SizeId,
     string Barcode,
-    decimal UnitPrice,
+    decimal UnitNetPrice,
+    decimal VatRate,
     decimal AvailableStock,
     decimal? WeightGrams = null
 );

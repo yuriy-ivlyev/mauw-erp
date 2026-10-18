@@ -12,6 +12,11 @@ public class UpdateCompanySettingsRequest
     public string? ReaNumber { get; set; }
     public string? ReaOffice { get; set; }
     public decimal? ShareCapital { get; set; }
+    public bool IsShareCapitalFullyPaid { get; set; }
+    public string? BankName { get; set; }
+    public string? Iban { get; set; }
+    public string? BicSwift { get; set; }
+    public string? InvoiceNotes { get; set; }
     public bool? IsSoleShareholder { get; set; }
     public bool IsInLiquidation { get; set; }
     public string? LogoUrl { get; set; }
