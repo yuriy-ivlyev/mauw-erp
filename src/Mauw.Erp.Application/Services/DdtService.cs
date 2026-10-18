@@ -24,9 +24,14 @@ public class DdtService(
         if (contact == null)
             return OperationResult<DdtDto>.Fail("Contact not found");
 
+        // Guard: unique DDT number
+        var existing = await unitOfWork.DdtDocuments.GetByNumberAsync(request.DdtNumber);
+        if (existing is not null)
+            return OperationResult<DdtDto>.Fail($"Un DDT con numero '{request.DdtNumber}' esiste già.");
+
         // Create DDT
         var ddt = new DdtDocument(request.ContactId, request.DdtNumber);
-        
+
         await unitOfWork.DdtDocuments.AddAsync(ddt);
         await unitOfWork.SaveChangesAsync();
 

@@ -6,7 +6,8 @@ using Mauw.Erp.Application.Settings;
 using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Api.Endpoints;
 using Mauw.Erp.Api.Extensions;
-using Mauw.Erp.Infrastructure.Reporting;
+using Mauw.Erp.Contracts.Interfaces;
+using Mauw.Erp.Infrastructure.Reporting.MigraDoc;
 using Mauw.Erp.Domain.Repositories;
 using Mauw.Erp.Infrastructure.Repositories;
 
@@ -43,7 +44,7 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 // Register domain services
 builder.Services.AddScoped<Mauw.Erp.Domain.Services.PricingEngine>();
-builder.Services.AddScoped<IPdfGenerator, QuestPdfGenerator>();
+builder.Services.AddScoped<IInvoicePdfGenerator, MigraDocInvoicePdfGenerator>();
 
 // Register application services with tracing decorators
 builder.Services.AddApplicationServices();
