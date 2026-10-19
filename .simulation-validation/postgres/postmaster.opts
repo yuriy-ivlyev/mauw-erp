@@ -1,1 +1,0 @@
-/usr/lib/postgresql/16/bin/postgres "-D" ".simulation-validation/postgres" "-p" "55439" "-k" "/home/runner/work/mauw-erp/mauw-erp/.simulation-validation/socket" "-c" "listen_addresses=127.0.0.1"
