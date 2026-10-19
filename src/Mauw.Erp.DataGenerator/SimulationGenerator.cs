@@ -28,8 +28,8 @@ public sealed class SimulationGenerator(
             return AccountingResult<SimulationSummary>.Fail(validation.Error);
         if (db.ChangeTracker.HasChanges())
             return Fail("The generator requires a context without pending changes.");
-        if (await db.Contacts.AnyAsync(token) || await db.Products.AnyAsync(token) ||
-            await db.Warehouses.AnyAsync(token) || await db.StockMovements.AnyAsync(token) ||
+        if (await db.Contacts.IgnoreQueryFilters().AnyAsync(token) || await db.Products.AnyAsync(token) ||
+            await db.Warehouses.IgnoreQueryFilters().AnyAsync(token) || await db.StockMovements.AnyAsync(token) ||
             await db.Orders.AnyAsync(token) || await db.Invoices.AnyAsync(token) ||
             await db.DdtDocuments.AnyAsync(token) || await db.StockItems.AnyAsync(token))
             return Fail("The generator requires an empty business database; lookup data may already exist.");
@@ -41,7 +41,7 @@ public sealed class SimulationGenerator(
             return Fail("The horizon supplies too few units to give every active customer movements.");
 
         var faker = new Faker("it") { Random = new Randomizer(options.Seed) };
-        var dominantCount = Math.Min(50, Math.Max(1, options.Suppliers / 10));
+        var dominantCount = Math.Max(1, options.Suppliers / 10);
         var state = new RunState(options, faker, dominantCount, totalPurchased);
         var originalDetectChanges = db.ChangeTracker.AutoDetectChangesEnabled;
         db.ChangeTracker.AutoDetectChangesEnabled = false;

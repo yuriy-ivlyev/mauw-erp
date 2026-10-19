@@ -131,6 +131,34 @@ public class SimulationTests
         Assert.False(await db.Contacts.AnyAsync());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SoftDeletedBusinessDataStillPreventsGeneration(bool warehouse)
+    {
+        await using var db = Context();
+        if (warehouse)
+        {
+            var existing = new Mauw.Erp.Domain.Entities.Warehouse("DELETED", "Deleted",
+                WarehouseType.Standard, Guid.NewGuid(), true);
+            existing.SoftDelete(null);
+            db.Warehouses.Add(existing);
+        }
+        else
+        {
+            db.Contacts.Add(new Mauw.Erp.Domain.Entities.Contact("Deleted") { IsDeleted = true });
+        }
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var result = await Generator(db).GenerateAsync(FixtureOptions(), CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Empty(db.ChangeTracker.Entries());
+        Assert.False(await db.Products.AnyAsync());
+        Assert.False(await db.Invoices.AnyAsync());
+    }
+
     [Fact]
     public async Task FiveYearFixtureHonorsReceiptCalendarAndClearsOnlyCompletedYears()
     {
@@ -138,13 +166,14 @@ public class SimulationTests
         var options = FixtureOptions() with
         {
             Years = 5, EndDate = new DateOnly(2026, 10, 19),
-            Products = 5, InitialProducts = 5, BatchSize = 1000
+            Suppliers = 600, Products = 600, InitialProducts = 5, BatchSize = 1000
         };
         var result = await Generator(db).GenerateAsync(options, CancellationToken.None);
         Assert.True(result.Success, result.Error);
         var summary = result.Data!;
         Assert.Equal(new DateOnly(2021, 10, 19), summary.StartDate);
         Assert.Equal(options.Products, summary.IntroducedProducts);
+        Assert.Equal(60, summary.DominantSuppliers);
         Assert.Equal(summary.PurchasedUnits * 4 / 5, summary.DominantSupplierUnits);
         Assert.Equal(options.ActiveCustomers, summary.ActiveCustomers);
         Assert.True(summary.StockReconciled);

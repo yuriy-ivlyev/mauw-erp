@@ -19,7 +19,9 @@ Usare un ruolo PostgreSQL dedicato, proprietario SOLO del database loadtest,
 senza privilegi sui database applicativi. Il reset richiede di poterlo eliminare;
 la creazione tramite EF richiede CREATEDB o un database vuoto creato dal DBA.
 Il ruolo deve poter connettersi anche al database di manutenzione postgres:
-vi mantiene soltanto un advisory lock, senza modificare tabelle o dati.
+da quella connessione mantiene l'advisory lock ed esegue DROP DATABASE sul
+solo database loadtest di cui e proprietario, senza modificare tabelle o dati
+del database di manutenzione.
 Un suffisso non sostituisce l'isolamento dei permessi.
 Non collegare questo strumento a produzione, neppure rinominandone il database.
 
@@ -36,6 +38,17 @@ Preparazione (Bash; dalla radice del repository)
 ----------------------------------------------
 Richiesti SDK .NET 10, PostgreSQL e strumento dotnet-ef compatibile con la
 versione EF di Directory.Packages.props. Non sono richieste nuove migrazioni.
+ATTENZIONE: in questo checkout la catena di migrazioni applicativa non riparte
+da un database vuoto. La migrazione 20261017204302_RefactorCassaSessionToOrder
+elimina cassa_sessions, ma le migrazioni precedenti non creano quella tabella.
+dotnet ef database update si interrompe su quel DROP. Il generatore non
+corregge migrazioni applicative, non crea tabelle legacy fittizie e non aggira
+la catena con EnsureCreated, per rispettare l'isolamento richiesto.
+Prima di seguire la creazione da zero o il ciclo reset/ricreazione serve una
+correzione separatamente approvata di questa migrazione. Nel frattempo seed
+richiede un database dedicato vuoto nei dati operativi, ma gia correttamente
+migrato. NON eliminare un database che non si e ancora in grado di ricreare.
+
 Non conservare password nel repository o nella cronologia della shell.
 Impostare MAUW_LOADTEST_CONNECTION nel proprio secret manager/ambiente:
   Host=localhost;Port=5432;Database=mauw_erp_loadtest;Username=<ruolo dedicato>;******
@@ -77,6 +90,7 @@ reset anziche essere disconnesse. Sono necessarie due conferme:
 Poi ripetere dotnet ef database update e seed come sopra.
 Il generatore non usa EnsureCreated, non modifica migrazioni e non applica
 automaticamente migrazioni: la ricreazione dello schema resta affidata a EF CLI.
+Vale il blocco della catena di migrazioni descritto in Preparazione.
 Ctrl+C interrompe il caricamento; i batch gia salvati rimangono. Non e prevista
 la ripresa automatica: dopo errori o cancellazione ricreare il database.
 Codici uscita: 0 successo, 2 input/precondizioni/generazione non validi,
