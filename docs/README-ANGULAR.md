@@ -77,7 +77,7 @@ Le modifiche si vedono nei PDF rigenerati; quelli gia scaricati restano invariat
 ## 📁 Struttura
 
 ```
-src/web/
+src/Mauw.Erp.Web/
 ├── src/
 │   ├── app/
 │   │   ├── pages/
@@ -105,7 +105,7 @@ src/web/
 ### Sviluppo locale
 
 ```bash
-cd src/web
+cd src/Mauw.Erp.Web
 npm install
 npm start  # Dev server http://localhost:4200
 ```
@@ -113,15 +113,23 @@ npm start  # Dev server http://localhost:4200
 ### Build per produzione
 
 ```bash
-cd src/web
+cd src/Mauw.Erp.Web
 npm run build  # Output in dist/web/browser
 ```
 
 ### Docker
 
-```bash
-docker-compose up  # Tutto insieme (API + Web su Nginx)
+Da PowerShell, genera prima il certificato HTTPS locale (una volta per
+macchina; richiede .NET SDK e PowerShell come amministratore):
+
+```powershell
+.\generate-dev-cert.ps1
+docker compose up --build -d
 ```
+
+L'applicazione è disponibile su `https://localhost:5019` (o sulla porta
+configurata con `HTTPS_PORT`). Il Compose espone il sito tramite il reverse
+proxy HTTPS; API e frontend restano sulla rete Docker.
 
 ## 🎯 Layout
 
@@ -165,8 +173,8 @@ this.api.get<Order[]>('orders').subscribe(orders => {
 ```
 
 **URLs:**
-- **Dev**: `http://localhost:5019/api` (from `environment.ts`)
-- **Prod**: `/api` (from `environment.prod.ts`)
+- **Dev e prod**: `/api` (da `environment.ts` e `environment.prod.ts`; il
+  reverse proxy Docker inoltra le richieste all'API).
 
 ## 🎨 Styling
 
