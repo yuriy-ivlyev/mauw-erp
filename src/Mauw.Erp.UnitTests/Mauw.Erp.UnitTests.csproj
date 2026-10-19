@@ -25,6 +25,7 @@
     <ProjectReference Include="..\Mauw.Erp.Domain\Mauw.Erp.Domain.csproj" />
     <ProjectReference Include="..\Mauw.Erp.Infrastructure\Mauw.Erp.Infrastructure.csproj" />
     <ProjectReference Include="..\Mauw.Erp.Api\Mauw.Erp.Api.csproj" />
+    <ProjectReference Include="..\Mauw.Erp.DataGenerator\Mauw.Erp.DataGenerator.csproj" />
   </ItemGroup>
 
 </Project>
