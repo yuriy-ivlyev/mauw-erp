@@ -12,6 +12,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
     public void Configure(EntityTypeBuilder<Product> builder)
     {
         builder.HasKey(p => p.Id);
+        builder.Property(p => p.SellingPrice).HasPrecision(22, 8);
 
         builder.Property(p => p.SupplierCode)
             .IsRequired()
@@ -26,7 +27,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasMaxLength(255);
 
         builder.Property(p => p.DefaultMarkupRate)
-            .HasPrecision(5, 2);
+            .HasPrecision(6, 2);
 
         builder.Property(p => p.VatRate)
             .HasPrecision(5, 2);

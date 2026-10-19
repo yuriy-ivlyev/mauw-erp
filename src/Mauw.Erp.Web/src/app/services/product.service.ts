@@ -7,6 +7,7 @@ import {
   UpdateProductRequest,
   AddProductImageRequest,
   CreateProductVariantRequest,
+  UpdateProductVariantRequest,
   ProductVariantDto,
   ColorDto,
   SizeDto,
@@ -16,6 +17,7 @@ import {
   MacroCategoryDto,
   PageResponse,
   ProductParentDto,
+  VariantSearchDto,
   ProductMatrixDto
 } from '../models/product.model';
 import { Observable } from 'rxjs';
@@ -30,6 +32,10 @@ export class ProductService {
   constructor(private apiService: ApiService) { }
 
   // Products CRUD
+  calculateSellingPrice(purchaseCost: number, markupRate: number): Observable<number> {
+    return this.apiService.post<number>(`${this.endpoint}/calculate-selling-price`, { purchaseCost, markupRate });
+  }
+
   getProducts(page: number = 1, pageSize: number = 20, search?: string): Observable<PageResponse<ProductDto>> {
     let url = `${this.endpoint}?page=${page}&pageSize=${pageSize}`;
     if (search) {
@@ -63,7 +69,7 @@ export class ProductService {
     return this.apiService.post<ProductVariantDto>(`${this.endpoint}/${request.productId}/variants`, request);
   }
 
-  updateProductVariant(productId: string, variantId: string, request: any): Observable<ProductVariantDto> {
+  updateProductVariant(productId: string, variantId: string, request: UpdateProductVariantRequest): Observable<ProductVariantDto> {
     return this.apiService.patch<ProductVariantDto>(`${this.endpoint}/${productId}/variants/${variantId}`, request);
   }
 
@@ -78,6 +84,12 @@ export class ProductService {
   searchParents(q: string, limit = 20): Observable<ProductParentDto[]> {
     return this.apiService.get<ProductParentDto[]>(
       `${this.endpoint}/search-parents?q=${encodeURIComponent(q)}&limit=${limit}`
+    );
+  }
+
+  searchVariants(q: string, limit = 30): Observable<VariantSearchDto[]> {
+    return this.apiService.get<VariantSearchDto[]>(
+      `${this.endpoint}/variants/search?q=${encodeURIComponent(q)}&limit=${limit}`
     );
   }
 
@@ -129,4 +141,3 @@ export class ProductService {
     return this.apiService.get<MacroCategoryDto[]>(`${this.supportEndpoint}/macro-categories`);
   }
 }
-

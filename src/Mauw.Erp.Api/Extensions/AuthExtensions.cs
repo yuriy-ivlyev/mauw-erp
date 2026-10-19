@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Mauw.Erp.Api.Services;
 using Mauw.Erp.Application.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -62,6 +63,7 @@ public static class AuthExtensions
                 options.CallbackPath         = azureAd["CallbackPath"]         ?? "/signin-oidc";
                 options.SignedOutCallbackPath = azureAd["SignedOutCallbackPath"] ?? "/signout-callback-oidc";
                 options.SaveTokens           = false;
+                options.MapInboundClaims     = true;
 
                 // Confidential client (Web platform): send secret for server-side token exchange
                 if (isConfidential)
@@ -75,7 +77,7 @@ public static class AuthExtensions
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     NameClaimType = "name",
-                    RoleClaimType = "roles",
+                    RoleClaimType = ClaimTypes.Role,
                     ValidateIssuer = true
                 };
             });

@@ -17,7 +17,9 @@ public sealed class CurrentUserService(IHttpContextAccessor httpContextAccessor)
         User?.FindFirstValue("name") ?? User?.FindFirstValue(ClaimTypes.Name);
 
     public IReadOnlyList<string> Roles =>
-        User?.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList() ?? [];
+        User?.Identities.Where(identity => identity.IsAuthenticated)
+            .SelectMany(identity => identity.FindAll(identity.RoleClaimType))
+            .Select(claim => claim.Value).Distinct().ToList() ?? [];
 
     public bool HasRole(string role) => User?.IsInRole(role) ?? false;
 }

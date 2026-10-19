@@ -10,6 +10,9 @@ public class ProductVariant : Entity<Guid>
     public string? SizeId { get; set; }
     public string Barcode { get; set; }
     public decimal PurchaseCost { get; set; }
+    public decimal? SellingPrice { get; set; }
+    // Legacy data only; never used to resolve or update selling prices.
+    public decimal? MarkupRate { get; set; }
     public decimal? WeightGrams { get; set; }
 
     // Navigation

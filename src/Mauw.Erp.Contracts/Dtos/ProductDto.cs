@@ -9,7 +9,7 @@ public record ProductDto(
     string SupplierCode,
     string InternalCode,
     string Name,
-    decimal DefaultMarkupRate,
+    decimal? SellingPrice,
     decimal VatRate,
     decimal BasePurchaseCost,
     List<ProductImageDto> Images,

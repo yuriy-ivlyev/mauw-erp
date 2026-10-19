@@ -41,6 +41,7 @@ builder.Services.AddScoped<IValidator<CreateInvoiceRequest>, CreateInvoiceReques
 
 // Register repositories
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddPricingApi();
 
 // Register domain services
 builder.Services.AddScoped<Mauw.Erp.Domain.Services.PricingEngine>();
@@ -148,6 +149,7 @@ app.MapOrderEndpoints();
 app.MapInvoiceEndpoints();
 app.MapDdtEndpoints();
 app.MapCassaSessionEndpoints();
+app.MapPriceListEndpoints();
 
 // Migrate database on startup and initialize seed data
 using (var scope = app.Services.CreateScope())

@@ -2,6 +2,7 @@ using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Domain.Repositories;
+using Mauw.Erp.Domain.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Mauw.Erp.Api.Endpoints;
@@ -16,6 +17,10 @@ public static class ProductEndpoints
     {
         var group = app.MapGroup("/api/v1/products")
             .WithTags("Products");
+
+        group.MapPost("/calculate-selling-price", CalculateSellingPrice)
+            .WithName("CalculateSellingPrice")
+            .WithSummary("Calculate a net selling price for entry only; does not save a pricing policy");
 
         group.MapPost("/", CreateProduct)
             .WithName("CreateProduct")
@@ -84,6 +89,17 @@ public static class ProductEndpoints
             .WithSummary("Set an image as the main product image");
     }
 
+    private static Results<Ok<decimal>, BadRequest<string>> CalculateSellingPrice(
+        CalculateSellingPriceRequest request, CatalogPriceCalculator calculator)
+    {
+        if (!request.PurchaseCost.HasValue || !request.MarkupRate.HasValue)
+            return TypedResults.BadRequest("Specificare costo di acquisto e ricarico percentuale.");
+        var result = calculator.FromMarkup(request.PurchaseCost.Value, request.MarkupRate.Value);
+        if (!result.Success)
+            return TypedResults.BadRequest(result.Error);
+        return TypedResults.Ok(result.Data!.Value);
+    }
+
     private static async Task<Results<Created<ProductDto>, BadRequest<string>>> CreateProduct(
         CreateProductRequest request,
         IProductService productService)
@@ -96,24 +112,28 @@ public static class ProductEndpoints
         return TypedResults.Created($"/api/v1/products/{result.Data!.Id}", result.Data);
     }
 
-    private static async Task<Ok<PagedResult<ProductDto>>> GetProducts(
+    private static async Task<Results<Ok<PagedResult<ProductDto>>, BadRequest<string>>> GetProducts(
         IProductService productService,
         int page = 1,
         int pageSize = 20,
         string? search = null)
     {
         var result = await productService.GetProductsAsync(page, pageSize, search);
+        if (!result.Success)
+            return TypedResults.BadRequest(result.Error);
         return TypedResults.Ok(result.Data!);
     }
 
-    private static async Task<Results<Ok<ProductDto>, NotFound>> GetProduct(
+    private static async Task<Results<Ok<ProductDto>, BadRequest<string>, NotFound>> GetProduct(
         Guid id,
         IProductService productService)
     {
         var result = await productService.GetProductAsync(id);
         
         if (!result.Success)
-            return TypedResults.NotFound();
+            return result.Error == "Product not found"
+                ? TypedResults.NotFound()
+                : TypedResults.BadRequest(result.Error);
 
         return TypedResults.Ok(result.Data!);
     }
@@ -151,14 +171,16 @@ public static class ProductEndpoints
         return TypedResults.Ok(results);
     }
 
-    private static async Task<Results<Ok<BarcodeVariantDto>, NotFound>> GetVariantByBarcode(
+    private static async Task<Results<Ok<BarcodeVariantDto>, BadRequest<string>, NotFound>> GetVariantByBarcode(
         string barcode,
         IProductService productService)
     {
         var result = await productService.GetVariantByBarcodeAsync(barcode);
         
         if (!result.Success)
-            return TypedResults.NotFound();
+            return result.Error == "Variant not found"
+                ? TypedResults.NotFound()
+                : TypedResults.BadRequest(result.Error);
 
         return TypedResults.Ok(result.Data!);
     }
@@ -262,14 +284,16 @@ public static class ProductEndpoints
             result.Data);
     }
 
-    private static async Task<Results<Ok<List<ProductVariantDto>>, NotFound>> GetProductVariants(
+    private static async Task<Results<Ok<List<ProductVariantDto>>, BadRequest<string>, NotFound>> GetProductVariants(
         Guid productId,
         IProductService productService)
     {
         var result = await productService.GetProductVariantsAsync(productId);
 
         if (!result.Success)
-            return TypedResults.NotFound();
+            return result.Error == "Product not found"
+                ? TypedResults.NotFound()
+                : TypedResults.BadRequest(result.Error);
 
         return TypedResults.Ok(result.Data!);
     }
@@ -321,7 +345,7 @@ public static class ProductEndpoints
         return TypedResults.Ok(result.Data ?? []);
     }
 
-    private static async Task<Results<Ok<ProductMatrixDto>, NotFound>> GetProductMatrix(
+    private static async Task<Results<Ok<ProductMatrixDto>, BadRequest<string>, NotFound>> GetProductMatrix(
         Guid productId,
         IProductService productService,
         Guid? warehouseId = null)
@@ -330,7 +354,9 @@ public static class ProductEndpoints
         var result = await productService.GetProductMatrixAsync(productId, wh);
 
         if (!result.Success)
-            return TypedResults.NotFound();
+            return result.Error == "Product not found"
+                ? TypedResults.NotFound()
+                : TypedResults.BadRequest(result.Error);
 
         return TypedResults.Ok(result.Data!);
     }

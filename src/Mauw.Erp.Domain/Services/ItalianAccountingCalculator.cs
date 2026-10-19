@@ -59,16 +59,13 @@ public sealed class ItalianAccountingCalculator
             return AccountingResult<CalculatedDocumentLine>.Fail("Line number must be positive.");
         if (line.Quantity == 0m)
             return Invalid("Quantity must not be zero.");
-        if (line.UnitPrice < 0m)
-            return Invalid("Unit price must not be negative.");
-        if (decimal.Round(line.UnitPrice, 8, MidpointRounding.AwayFromZero) != line.UnitPrice)
-            return Invalid("Unit price must have at most eight fractional decimal places.");
+        var priceError = ValidatePrice(line.UnitPrice, line.DiscountPercent);
+        if (priceError is not null)
+            return Invalid(priceError);
         if (line.VatRate is < 0m or > 100m)
             return Invalid("VAT rate must be between zero and 100.");
         if (decimal.Round(line.VatRate, 2, MidpointRounding.AwayFromZero) != line.VatRate)
             return Invalid("VAT rate must have at most two fractional decimal places.");
-        if (line.DiscountPercent is < 0m or > 100m)
-            return Invalid("Discount must be between zero and 100.");
         if (line.VatRate == 0m && (line.NatureCode is null || !NatureCodes.Contains(line.NatureCode)))
             return Invalid("A supported detailed SDI nature code is required for zero VAT.");
         if (line.VatRate > 0m && line.NatureCode is not null)
@@ -97,6 +94,32 @@ public sealed class ItalianAccountingCalculator
 
     private static decimal Money(decimal value) =>
         RequireScale(decimal.Round(value, 2, MidpointRounding.AwayFromZero) + 0.00m, 2);
+
+    public AccountingResult<DiscountedUnitPrice> CalculateDiscountedUnitPrice(
+        decimal unitPrice, decimal discountPercent)
+    {
+        var error = ValidatePrice(unitPrice, discountPercent);
+        if (error is not null)
+            return AccountingResult<DiscountedUnitPrice>.Fail(error);
+        try
+        {
+            return AccountingResult<DiscountedUnitPrice>.Ok(new DiscountedUnitPrice(
+                decimal.Round(unitPrice * (1m - discountPercent / 100m), 8, MidpointRounding.AwayFromZero)));
+        }
+        catch (OverflowException)
+        {
+            return AccountingResult<DiscountedUnitPrice>.Fail("Unit price calculation exceeds decimal capacity.");
+        }
+    }
+
+    private static string? ValidatePrice(decimal unitPrice, decimal discountPercent)
+    {
+        if (unitPrice < 0m)
+            return "Unit price must not be negative.";
+        if (decimal.Round(unitPrice, 8, MidpointRounding.AwayFromZero) != unitPrice)
+            return "Unit price must have at most eight fractional decimal places.";
+        return discountPercent is < 0m or > 100m ? "Discount must be between zero and 100." : null;
+    }
 
     private static decimal RequireScale(decimal value, int minimumScale)
     {

@@ -12,10 +12,10 @@ namespace Mauw.Erp.Application.Services;
 /// <summary>
 /// Product service implementation.
 /// </summary>
-public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequest> validator)
+public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequest> validator,
+    CatalogPriceCalculator catalogPrices)
     : IProductService
 {
-    private static readonly PricingEngine PricingEngine = new();
     public async Task<OperationResult<ProductDto>> CreateProductAsync(CreateProductRequest request)
     {
         var validationResult = validator.Validate(request);
@@ -24,39 +24,44 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             var errors = string.Join("; ", validationResult.Errors.Select(e => $"{e.PropertyName}: {e.Message}"));
             return OperationResult<ProductDto>.Fail(errors);
         }
+        if (!request.HasVariants)
+        {
+            var pricing = catalogPrices.Validate(request.SellingPrice);
+            if (!pricing.Success)
+                return OperationResult<ProductDto>.Fail(pricing.Error);
+        }
 
         var product = new Product(
             supplierId: request.SupplierId,
             supplierCode: request.SupplierCode,
             internalCode: request.InternalCode,
             name: request.Name,
-            defaultMarkupRate: request.DefaultMarkupRate,
+            defaultMarkupRate: 0m,
             vatRate: request.VatRate,
             basePurchaseCost: request.BasePurchaseCost,
             categoryId: request.CategoryId,
             collectionId: request.CollectionId,
             materialId: request.MaterialId,
             hasVariants: request.HasVariants
-        );
+        ) { SellingPrice = request.HasVariants ? null : request.SellingPrice };
 
         await unitOfWork.Products.AddAsync(product);
 
         // For products without variants, auto-create a single default variant
         if (!product.HasVariants)
         {
-            var defaultBarcode = $"MNVR-{product.InternalCode}-{Guid.NewGuid():N[..8]}";
             var defaultVariant = new ProductVariant(
                 productId: product.Id,
                 barcode: $"MNVR-{product.InternalCode.ToUpper()}-{Guid.NewGuid().ToString("N")[..8].ToUpper()}",
                 purchaseCost: product.BasePurchaseCost,
                 colorId: null,
                 sizeId: null
-            );
+            ) { SellingPrice = request.SellingPrice };
             await unitOfWork.ProductVariants.AddAsync(defaultVariant);
         }
         await unitOfWork.SaveChangesAsync();
 
-        return OperationResult<ProductDto>.Ok(ProductMapper.MapToDto(product));
+        return ProductMapper.MapToDto(product);
     }
 
     public async Task<OperationResult<ProductDto>> GetProductAsync(Guid id)
@@ -65,7 +70,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         if (product == null)
             return OperationResult<ProductDto>.Fail("Product not found");
 
-        return OperationResult<ProductDto>.Ok(ProductMapper.MapToDto(product));
+        return ProductMapper.MapToDto(product);
     }
 
     public async Task<OperationResult<PagedResult<ProductDto>>> GetProductsAsync(int page, int pageSize, string? search = null)
@@ -74,7 +79,9 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         var total = await unitOfWork.Products.GetTotalCountAsync(search);
 
         var dtos = ProductMapper.MapToListDto(products);
-        var result = new PagedResult<ProductDto>(dtos, page, pageSize, total);
+        if (!dtos.Success)
+            return OperationResult<PagedResult<ProductDto>>.Fail(dtos.Error!);
+        var result = new PagedResult<ProductDto>(dtos.Data!, page, pageSize, total);
 
         return OperationResult<PagedResult<ProductDto>>.Ok(result);
     }
@@ -92,12 +99,20 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         if (product == null)
             return OperationResult<ProductDto>.Fail("Product not found");
 
+        if (product.HasVariants != request.HasVariants && product.Variants.Count > 0)
+            return OperationResult<ProductDto>.Fail("Non e possibile cambiare tipologia a un prodotto con SKU gia presenti.");
+        if (!request.HasVariants)
+        {
+            var pricing = catalogPrices.Validate(request.SellingPrice);
+            if (!pricing.Success)
+                return OperationResult<ProductDto>.Fail(pricing.Error);
+        }
         product.Update(
             supplierId: request.SupplierId,
             supplierCode: request.SupplierCode,
             internalCode: request.InternalCode,
             name: request.Name,
-            defaultMarkupRate: request.DefaultMarkupRate,
+            defaultMarkupRate: product.DefaultMarkupRate,
             vatRate: request.VatRate,
             basePurchaseCost: request.BasePurchaseCost,
             categoryId: request.CategoryId,
@@ -105,6 +120,20 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             materialId: request.MaterialId,
             hasVariants: request.HasVariants
         );
+        product.SellingPrice = request.HasVariants ? null : request.SellingPrice;
+        if (!product.HasVariants && product.Variants.Count == 0)
+        {
+            var defaultVariant = new ProductVariant(product.Id,
+                $"MNVR-{product.InternalCode.ToUpper()}-{Guid.NewGuid().ToString("N")[..8].ToUpper()}",
+                request.BasePurchaseCost) { SellingPrice = request.SellingPrice };
+            await unitOfWork.ProductVariants.AddAsync(defaultVariant);
+        }
+        if (!product.HasVariants)
+            foreach (var variant in product.Variants)
+            {
+                variant.PurchaseCost = request.BasePurchaseCost;
+                variant.SellingPrice = request.SellingPrice;
+            }
 
         await unitOfWork.Products.UpdateAsync(product);
 
@@ -118,7 +147,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         }
 
         var updated = await unitOfWork.Products.GetByIdAsync(id);
-        return OperationResult<ProductDto>.Ok(ProductMapper.MapToDto(updated!));
+        return ProductMapper.MapToDto(updated!);
     }
 
     public async Task<OperationResult<bool>> DeleteProductAsync(Guid id)
@@ -146,8 +175,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         if (variant?.Product == null)
             return OperationResult<BarcodeVariantDto>.Fail("Variant not found");
 
-        var dto = ProductMapper.MapBarcodeVariantToDto(variant, variant.Product);
-        return OperationResult<BarcodeVariantDto>.Ok(dto);
+        return ProductMapper.MapBarcodeVariantToDto(variant, variant.Product);
     }
 
     public async Task<OperationResult<ProductImageDto>> AddImageAsync(Guid productId, AddProductImageRequest request)
@@ -250,6 +278,13 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         var product = await unitOfWork.Products.GetByIdAsync(productId);
         if (product == null)
             return OperationResult<ProductVariantDto>.Fail("Product not found");
+        if (!product.HasVariants)
+            return OperationResult<ProductVariantDto>.Fail("Il prodotto semplice ha gia una SKU unica; non aggiungere varianti.");
+        if (request.PurchaseCost < 0m)
+            return OperationResult<ProductVariantDto>.Fail("Il costo di acquisto deve essere non negativo.");
+        var pricing = catalogPrices.Validate(request.SellingPrice);
+        if (!pricing.Success)
+            return OperationResult<ProductVariantDto>.Fail(pricing.Error);
 
         if (!string.IsNullOrWhiteSpace(request.ColorId))
         {
@@ -272,7 +307,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             barcode: request.Barcode,
             purchaseCost: request.PurchaseCost,
             weightGrams: request.WeightGrams
-        );
+        ) { SellingPrice = request.SellingPrice };
 
         await unitOfWork.ProductVariants.AddAsync(variant);
         
@@ -285,7 +320,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             return OperationResult<ProductVariantDto>.Fail($"Failed to create variant: {ex.Message}");
         }
 
-        return OperationResult<ProductVariantDto>.Ok(ProductMapper.MapVariantToDto(variant, product.DefaultMarkupRate));
+        return ProductMapper.MapVariantToDto(variant, product);
     }
 
     public async Task<OperationResult<List<ProductVariantDto>>> GetProductVariantsAsync(Guid productId)
@@ -294,7 +329,14 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         if (product == null)
             return OperationResult<List<ProductVariantDto>>.Fail("Product not found");
 
-        var variants = product.Variants.Select(v => ProductMapper.MapVariantToDto(v, product.DefaultMarkupRate)).ToList();
+        var variants = new List<ProductVariantDto>();
+        foreach (var variant in product.Variants)
+        {
+            var result = ProductMapper.MapVariantToDto(variant, product);
+            if (!result.Success)
+                return OperationResult<List<ProductVariantDto>>.Fail(result.Error!);
+            variants.Add(result.Data!);
+        }
         return OperationResult<List<ProductVariantDto>>.Ok(variants);
     }
 
@@ -310,6 +352,11 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         var variant = product.Variants.FirstOrDefault(v => v.Id == variantId);
         if (variant == null)
             return OperationResult<ProductVariantDto>.Fail("Variant not found");
+        if (request.PurchaseCost < 0m)
+            return OperationResult<ProductVariantDto>.Fail("Il costo di acquisto deve essere non negativo.");
+        var pricing = catalogPrices.Validate(request.SellingPrice);
+        if (!pricing.Success)
+            return OperationResult<ProductVariantDto>.Fail(pricing.Error);
 
         // Validate Color if provided
         if (!string.IsNullOrWhiteSpace(request.ColorId))
@@ -334,6 +381,12 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             purchaseCost: request.PurchaseCost,
             weightGrams: request.WeightGrams
         );
+        variant.SellingPrice = request.SellingPrice;
+        if (!product.HasVariants)
+        {
+            product.SellingPrice = request.SellingPrice;
+            product.BasePurchaseCost = request.PurchaseCost;
+        }
 
         await unitOfWork.ProductVariants.UpdateAsync(variant);
 
@@ -347,7 +400,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         }
 
         var updated = await unitOfWork.ProductVariants.GetByIdAsync(variantId);
-        return OperationResult<ProductVariantDto>.Ok(ProductMapper.MapVariantToDto(updated!, product.DefaultMarkupRate));
+        return ProductMapper.MapVariantToDto(updated!, product);
     }
 
     public async Task<OperationResult<bool>> DeleteProductVariantAsync(Guid productId, Guid variantId)
@@ -355,6 +408,8 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         var product = await unitOfWork.Products.GetByIdAsync(productId);
         if (product == null)
             return OperationResult<bool>.Fail("Product not found");
+        if (!product.HasVariants)
+            return OperationResult<bool>.Fail("La SKU unica del prodotto semplice non puo essere eliminata separatamente.");
 
         var variant = product.Variants.FirstOrDefault(v => v.Id == variantId);
         if (variant == null)
@@ -418,15 +473,16 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         foreach (var variant in product.Variants)
         {
             var stock = await unitOfWork.Stock.GetAvailableQtyAsync(warehouseId, variant.Id);
-            var pricingResult = PricingEngine.CalculatePrice(
-                variant.PurchaseCost, product.DefaultMarkupRate, 0, product.VatRate);
+            var pricing = catalogPrices.GetStoredPrice(variant);
+            if (!pricing.Success)
+                return OperationResult<ProductMatrixDto>.Fail(pricing.Error);
 
             cells.Add(new MatrixCellDto(
                 VariantId: variant.Id,
                 ColorId: variant.ColorId,
                 SizeId: variant.SizeId,
                 Barcode: variant.Barcode,
-                UnitNetPrice: pricingResult.FinalNetPrice,
+                UnitNetPrice: pricing.Data!.Value,
                 VatRate: product.VatRate,
                 AvailableStock: stock,
                 WeightGrams: variant.WeightGrams

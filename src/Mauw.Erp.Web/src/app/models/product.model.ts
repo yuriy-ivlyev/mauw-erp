@@ -40,6 +40,7 @@ export interface MacroCategoryDto {
 }
 
 export interface ProductVariantDto {
+  sellingPrice: number | null;
   id: string;
   productId: string;
   colorId?: string;
@@ -49,10 +50,10 @@ export interface ProductVariantDto {
   barcode: string;
   purchaseCost: number;
   stockQuantity: number;
-  listPrice: number;
-  finalNetPrice: number;
+  listPrice: number | null;
+  finalNetPrice: number | null;
   vatAmount: number;
-  finalGrossPrice: number;
+  finalGrossPrice: number | null;
   weightGrams?: number | null;
 }
 
@@ -72,12 +73,12 @@ export interface AddProductImageRequest {
 }
 
 export interface ProductDto {
+  sellingPrice: number | null;
   id: string;
   supplierId: string;
   supplierCode: string;
   internalCode: string;
   name: string;
-  defaultMarkupRate: number;
   vatRate: number;
   basePurchaseCost: number;
   hasVariants: boolean;
@@ -93,11 +94,11 @@ export interface ProductDto {
 }
 
 export interface CreateProductRequest {
+  sellingPrice: number | null;
   supplierId: string;
   supplierCode: string;
   internalCode: string;
   name: string;
-  defaultMarkupRate: number;
   vatRate: number;
   basePurchaseCost: number;
   hasVariants: boolean;
@@ -107,11 +108,11 @@ export interface CreateProductRequest {
 }
 
 export interface UpdateProductRequest {
+  sellingPrice: number | null;
   supplierId: string;
   supplierCode: string;
   internalCode: string;
   name: string;
-  defaultMarkupRate: number;
   vatRate: number;
   basePurchaseCost: number;
   hasVariants: boolean;
@@ -127,6 +128,17 @@ export interface ProductParentDto {
   name: string;
   hasVariants: boolean;
   variantCount: number;
+}
+
+export interface VariantSearchDto {
+  variantId: string;
+  productId: string;
+  productName: string;
+  sku: string | null;
+  barcode: string;
+  colorName: string | null;
+  sizeName: string | null;
+  currentStock: number;
 }
 
 export interface MatrixSizeDto {
@@ -163,12 +175,22 @@ export interface ProductMatrixDto {
 }
 
 export interface CreateProductVariantRequest {
+  sellingPrice: number | null;
   productId: string;
   colorId: string;
   sizeId: string;
   barcode: string;
   purchaseCost: number;
   weightGrams?: number | null;
+}
+
+export interface UpdateProductVariantRequest {
+  colorId: string | null;
+  sizeId: string | null;
+  barcode: string;
+  purchaseCost: number;
+  weightGrams?: number | null;
+  sellingPrice: number | null;
 }
 
 export interface PageResponse<T> {

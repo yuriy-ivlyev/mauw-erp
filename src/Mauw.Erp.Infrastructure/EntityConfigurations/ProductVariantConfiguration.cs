@@ -12,6 +12,8 @@ public class ProductVariantConfiguration : IEntityTypeConfiguration<ProductVaria
     public void Configure(EntityTypeBuilder<ProductVariant> builder)
     {
         builder.HasKey(v => v.Id);
+        builder.Property(v => v.SellingPrice).HasPrecision(22, 8);
+        builder.Property(v => v.MarkupRate).HasPrecision(6, 2);
 
         builder.Property(v => v.Barcode)
             .IsRequired()

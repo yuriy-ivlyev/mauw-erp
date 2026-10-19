@@ -17,4 +17,5 @@ public class CustomerProfile
 
     // Navigation
     public Contact Contact { get; set; } = null!;
+    public PriceList? PriceList { get; set; }
 }

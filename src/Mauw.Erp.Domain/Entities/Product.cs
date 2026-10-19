@@ -9,7 +9,9 @@ public class Product : Entity<Guid>
     public string SupplierCode { get; set; }
     public string InternalCode { get; set; }
     public string Name { get; set; }
+    // Legacy data only; never used to resolve or update selling prices.
     public decimal DefaultMarkupRate { get; set; }
+    public decimal? SellingPrice { get; set; }
     public decimal VatRate { get; set; }
     public decimal BasePurchaseCost { get; set; }
     public Guid? CategoryId { get; set; }

@@ -8,7 +8,7 @@ public record UpdateProductRequest(
     string SupplierCode,
     string InternalCode,
     string Name,
-    decimal DefaultMarkupRate,
+    decimal? SellingPrice,
     decimal VatRate,
     decimal BasePurchaseCost,
     Guid? CategoryId = null,

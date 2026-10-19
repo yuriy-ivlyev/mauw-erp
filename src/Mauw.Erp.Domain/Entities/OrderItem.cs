@@ -16,6 +16,7 @@ public class OrderItem : Entity<Guid>, ICommercialDocumentLine
     public string? NatureCode { get; set; }
     public decimal DiscountPercent { get; set; }
     public int MaxQuantity { get; set; }
+    public Mauw.Erp.Domain.Pricing.PricingSnapshot? PricingSnapshot { get; init; }
 
     // Navigation
     public Order Order { get; set; } = null!;

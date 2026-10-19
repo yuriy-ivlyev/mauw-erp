@@ -13,7 +13,9 @@ public record CassaCartItemDto(
     int MaxQuantity,
     decimal? WeightGrams,
     string? NatureCode = null,
-    decimal DiscountPercent = 0m
+    decimal DiscountPercent = 0m,
+    Mauw.Erp.Contracts.Pricing.PricingSnapshotDto? PricingSnapshot = null,
+    Guid? OrderItemId = null
 );
 
 public record CassaSessionDetailDto(

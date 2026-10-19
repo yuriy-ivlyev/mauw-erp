@@ -18,10 +18,10 @@ namespace Mauw.Erp.Application.Services;
 public class DdtService(
     IUnitOfWork unitOfWork,
     IValidator<CreateOrderItemRequest> itemValidator,
-    PricingEngine pricingEngine,
     ItalianAccountingCalculator accountingCalculator,
     ICompanySettingsService companySettingsService,
-    IInvoicePdfGenerator pdfGenerator)
+    IInvoicePdfGenerator pdfGenerator,
+    IDocumentPricingService documentPricing)
     : IDdtService
 {
     private static readonly CultureInfo ItalianCulture = CultureInfo.GetCultureInfo("it-IT");
@@ -89,27 +89,26 @@ public class DdtService(
         if (product == null)
             return OperationResult<DdtDto>.Fail("Product not found");
 
-        var pricingResult = pricingEngine.CalculatePrice(
-            purchaseCost: variant.PurchaseCost,
-            markupRate: product.DefaultMarkupRate,
-            discountRate: 0,
-            vatRate: product.VatRate);
-
-        var line = accountingCalculator.CalculateLine(new DocumentLineInput(request.Quantity,
-            request.UnitGrossPrice ?? request.UnitNetPrice ?? pricingResult.ListPrice,
-            request.VatRate ?? product.VatRate, request.NatureCode, request.DiscountPercent ?? 0m,
-            PriceIncludesVat: request.UnitGrossPrice.HasValue));
-        if (!line.Success)
-            return OperationResult<DdtDto>.Fail(line.Error);
+        var pricing = await documentPricing.PrepareAsync(ddt.ContactId,
+            [new(request.VariantId, request.Quantity, request.UnitNetPrice, request.UnitGrossPrice,
+                request.SourceOrderItemId.HasValue || request.SourceLineId.HasValue ? request.VatRate : request.VatRate ?? product.VatRate,
+                request.NatureCode, request.DiscountPercent,
+                request.PriceListId, request.OverrideReason, request.IsCustomerReturn, request.SourceLineId,
+                SourceOrderItemId: request.SourceOrderItemId)],
+            DateTimeOffset.UtcNow);
+        if (!pricing.Success)
+            return OperationResult<DdtDto>.Fail(pricing.Error);
+        var prepared = pricing.Data!.Lines[0];
+        var line = prepared.FiscalLine;
 
         var item = new DdtItem(
             ddtDocumentId: ddtId,
             variantId: request.VariantId,
             quantity: request.Quantity,
-            unitNetPrice: line.Data!.UnitNetPrice,
-            vatRate: line.Data.VatRate,
-            natureCode: line.Data.NatureCode,
-            discountPercent: line.Data.DiscountPercent);
+            unitNetPrice: line.UnitNetPrice,
+            vatRate: line.VatRate,
+            natureCode: line.NatureCode,
+            discountPercent: line.DiscountPercent) { PricingSnapshot = prepared.Snapshot };
 
         var accounting = ddt.AddItem(item, accountingCalculator);
         if (!accounting.Success)

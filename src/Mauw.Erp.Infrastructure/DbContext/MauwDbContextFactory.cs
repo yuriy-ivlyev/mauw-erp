@@ -12,6 +12,8 @@ public class MauwDbContextFactory : IDesignTimeDbContextFactory<MauwDbContext>
     {
         var optionsBuilder = new DbContextOptionsBuilder<MauwDbContext>();
         optionsBuilder.UseNpgsql("Host=localhost;Database=mauw_erp;Username=postgres;Password=postgres;Port=5432");
+        if (Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection") is { Length: > 0 } connectionString)
+            optionsBuilder.UseNpgsql(connectionString);
         return new(optionsBuilder.Options);
     }
 }

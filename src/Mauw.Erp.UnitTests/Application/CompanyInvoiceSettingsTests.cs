@@ -180,13 +180,14 @@ public class CompanyInvoiceSettingsTests
         using var provider = services.BuildServiceProvider();
         var pdf = provider.GetRequiredService<IInvoicePdfGenerator>();
         var calculator = new ItalianAccountingCalculator();
+        var pricing = new DocumentPricingService(Mock.Of<Mauw.Erp.Domain.Repositories.IPriceListRepository>(), Mock.Of<IPriceListService>(), calculator);
         var invoices = new InvoiceService(work, Mock.Of<IValidator<CreateInvoiceRequest>>(),
-            calculator, settings, pdf);
+            calculator, settings, pdf, pricing);
         var orders = new OrderService(work, Mock.Of<IValidator<CreateOrderRequest>>(),
-            new CreateOrderItemRequestValidator(), new PricingEngine(), calculator, settings, pdf,
-            NullLogger<OrderService>.Instance);
-        var ddts = new DdtService(work, new CreateOrderItemRequestValidator(), new PricingEngine(),
-            calculator, settings, pdf);
+            new CreateOrderItemRequestValidator(), calculator, settings, pdf,
+            NullLogger<OrderService>.Instance, pricing);
+        var ddts = new DdtService(work, new CreateOrderItemRequestValidator(),
+            calculator, settings, pdf, pricing);
         var result = type switch
         {
             "ORDINE" => await orders.GetOrderPdfAsync(order.Id),
@@ -225,7 +226,8 @@ public class CompanyInvoiceSettingsTests
         var pdf = new Mock<IInvoicePdfGenerator>(MockBehavior.Strict);
         var service = new InvoiceService(new UnitOfWork(db, cache),
             Mock.Of<IValidator<CreateInvoiceRequest>>(), new ItalianAccountingCalculator(),
-            Mock.Of<ICompanySettingsService>(), pdf.Object);
+            Mock.Of<ICompanySettingsService>(), pdf.Object,
+            new DocumentPricingService(Mock.Of<Mauw.Erp.Domain.Repositories.IPriceListRepository>(), Mock.Of<IPriceListService>(), new ItalianAccountingCalculator()));
 
         var result = await service.GetInvoicePdfAsync(invoice.Id);
 

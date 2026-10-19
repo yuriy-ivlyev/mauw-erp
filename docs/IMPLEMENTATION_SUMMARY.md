@@ -1,5 +1,128 @@
 # Product Variant Management Implementation Summary
 
+## Listini prezzi EUR
+
+Il modulo usa un aggregato `PriceList`, regole condizionali e un risolutore puro
+registrato tramite DI. La cascata e SKU, prodotto, categoria, globale, prezzo
+base del catalogo. Il prezzo base del catalogo e il prezzo di vendita salvato
+sulla variante, mai ricalcolato dal costo. Le regole possono fissare un
+prezzo, scontare il prezzo base oppure applicare un ricarico al costo variante.
+Non si cumulano regole: entro il livello piu specifico vince la priorita numerica
+maggiore; una parita applicabile restituisce un errore esplicito. Le soglie
+quantita si applicano alla singola riga quotata, non alla somma del documento.
+Le finestre temporali sono inclusive e memorizzate in UTC.
+
+- [API e richieste di esempio](../src/Mauw.Erp.Api/PriceLists.http):
+  CRUD `/api/v1/price-lists`, azione `/activation` e quotazione batch `/resolve`.
+  La configurazione richiede Admin/Sales; lettura e quotazione sono disponibili
+  anche ai ruoli operativi Accounting/Cashier/Warehouse.
+  Il mapping OIDC Entra usa `MapInboundClaims=true` e `ClaimTypes.Role` sia per
+  l'autorizzazione API sia per i ruoli restituiti da `/api/auth/user`.
+  Dopo aggiornamenti del mapping o delle assegnazioni Entra occorre uscire e
+  rientrare per rinnovare il cookie BFF; un utente senza ruolo ammesso resta 403.
+- La pagina **Catalogo > Listini** gestisce listini e regole con ricerca bersagli,
+  date, soglie e priorita; il profilo cliente ha il listino predefinito.
+  Per un bersaglio SKU ricerca direttamente le varianti per barcode, nome prodotto,
+  colore o taglia, mostrando barcode/colore/taglia e salvando l'ID della variante.
+  Usa il lookup anagrafico, non la matrice prezzi: anche SKU con prezzo catalogo
+  ancora da completare possono essere selezionate per configurare una regola.
+  La cassa carica quotazioni batch e distingue gli override motivati.
+- Il riferimento cliente usa `ON DELETE SET NULL`. Le regole hanno indici
+  separati `(listino, variante)`, `(listino, prodotto)`, `(listino, categoria)`.
+  I listini inattivi o inesistenti generano errori; non si ripiega silenziosamente
+  su un prezzo diverso.
+- Prezzi e soglie sono `decimal`, con precisione persistita `(22,8)`.
+  La quotazione non calcola IVA di riga. `ItalianAccountingCalculator` resta
+  l'unica fonte fiscale: sconto applicato una volta, totali riga a due decimali,
+  IVA per gruppo aliquota/Natura e arrotondamento `AwayFromZero`.
+- Ordini/sessioni cassa, fatture e DDT conservano scalari fiscali e uno snapshot
+  immutabile della quotazione. Gli ID listino/regola nello snapshot sono solo
+  informativi, senza FK: modifiche o cancellazioni non riprezzano lo storico.
+  Il prezzo unitario fiscale e pre-sconto; `AgreedUnitNetPrice` nello snapshot
+  e un dato informativo scontato a otto decimali, non la base da moltiplicare per
+  ricalcolare i totali. I PDF usano i valori fiscali persistiti della riga.
+- Le richieste item accettano `priceListId`, `overrideReason`,
+  `isCustomerReturn`, `sourceLineId` e `sourceOrderItemId`.
+  Il reso deve partire dalla riga della fattura originale: copia prezzo unitario,
+  sconto, aliquota e Natura gia persistiti, verificando cliente e variante,
+  senza invocare il motore listini e senza ricalcolare il prezzo.
+  Non sono ammessi resi senza fattura o prezzi forzati. Lo snapshot informativo
+  del prezzo scontato viene copiato se presente; sulle vecchie fatture che ne
+  sono prive resta null, senza ricostruire un prezzo storico. Solo gli importi
+  fiscali del reso vengono calcolati sulle quantita restituite.
+  `sourceOrderItemId` copia invece lo snapshot dell'ordine salvato per emettere
+  fattura/DDT senza riquotare. Non sono accettati prezzi/sconti alternativi.
+  I documenti storici privi di snapshot richiedono revisione esplicita.
+- In cassa `isManualPriceOverride=false` con un listino fa ricalcolare al server
+  i prezzi del lotto; con `true` richiede una motivazione. Senza listino rimangono
+  compatibili i prezzi espliciti del flusso preesistente. La cassa autosalva prima
+  dell'emissione e usa gli ID delle righe salvate. Il flusso preesistente di
+  emissione documento e movimentazione magazzino resta multi-richiesta, non una
+  nuova transazione distribuita. Le schermate autonome ordine/preventivo restano
+  i segnaposto preesistenti: la compilazione operativa e nella cassa.
+
+### Migrazione e verifiche
+
+La migrazione `AddPriceListsAndPricingSnapshots` e generata con
+`dotnet ef migrations add`; aggiunge colonne snapshot nullable senza riscrivere
+importi o classificazioni storiche. Per applicarla usare `dotnet ef database update`.
+La factory EF accetta `ConnectionStrings__DefaultConnection`, anche per database
+di test isolati. Eventuali vecchi riferimenti cliente a listini inesistenti devono
+essere revisionati prima di introdurre la FK: non vengono corretti automaticamente.
+
+Il bootstrap di un database completamente vuoto incontra un problema precedente
+al modulo: `RefactorCassaSessionToOrder` elimina `cassa_sessions`, che non viene
+creata dalla catena di migrazioni presente. La verifica PostgreSQL del modulo usa
+un database isolato con tale tabella legacy vuota come fixture; nessuna migrazione
+storica e stata modificata.
+
+I test xUnit coprono cascata, priorita/ambiguita, soglie e date, formule/precisione,
+immutabilita, caricamento batch di 1000 righe, override, resi e copia degli
+snapshot all'emissione, oltre alle regressioni fiscali e ai contratti HTTP.
+Il test PostgreSQL esegue una transazione con rollback su un database gia migrato:
+impostare `MAUW_TEST_POSTGRES_CONNECTION` per abilitarlo; altrimenti e
+esplicitamente ignorato dal runner.
+
+### Prezzo di vendita prodotto e variante
+
+L'unico dato commerciale corrente e `SellingPrice`, un prezzo **unitario netto,
+IVA esclusa e prima degli sconti**, persistito a otto decimali sulla SKU e,
+solo per prodotti semplici, anche sul prodotto. Le API ricevono questo valore, non una formula,
+una modalita o una percentuale. Anche zero e un prezzo esplicito valido.
+
+- Il form permette l'inserimento diretto oppure l'azione **Applica ricarico al
+  prezzo**. Quest'ultima usa `POST /api/v1/products/calculate-selling-price` con
+  `purchaseCost` e `markupRate`, calcolati in `decimal` dal backend e arrotondati
+  a otto decimali `AwayFromZero`. E un aiuto transitorio: non salva nulla.
+  Successivamente si salva solo `sellingPrice`; il ricarico non viene ricordato.
+- `HasVariants` distingue prodotti con colore/taglia (default) e articoli semplici.
+  Anche colore singolo e taglia unica sono un prodotto con varianti.
+  Sul padre con varianti il prezzo non e richiesto ne mostrato: le scritture
+  salvano null, senza riprezzare le SKU e senza migrazioni dei dati storici.
+  Ogni nuova variante richiede un proprio prezzo, senza copiarlo dal padre.
+  Gli articoli semplici richiedono un prezzo e hanno una sola SKU tecnica,
+  sincronizzata sul valore esplicitamente inserito. Non e consentito aggiungerne
+  altre o cancellarla separatamente. Con SKU gia presenti non si puo cambiare
+  tipologia per evitare conversioni e riprezzamenti impliciti.
+- Nell'elenco prodotti la vendita netta mostra il prezzo comune alle varianti
+  oppure **Da ... a ...** se differiscono; zero e valido. Le varianti mancanti
+  sono segnalate come prezzi da completare, senza trasformarle in zero;
+  in assenza di SKU si mostra **Nessuna variante**. Non viene usato un prezzo padre.
+  Cambiare costo non ricalcola mai il prezzo di vendita salvato.
+- Catalogo, barcode, matrice e fallback listini leggono il valore salvato.
+  Le regole condizionali dei listini rimangono separate: sconti sul prezzo
+  salvato, prezzi di listino espliciti o ricarichi di listino sul costo.
+- Le colonne percentuali legacy restano solo per preservare dati preesistenti:
+  non sono esposte nei contratti, applicate o aggiornate dal form. Il costo di
+  acquisto non modifica mai automaticamente `SellingPrice`.
+- La migrazione `PersistDefinitiveSellingPrices`, generata con `dotnet ef`,
+  rinomina `fixed_selling_price` in `selling_price` preservando i valori.
+  Non ricostruisce automaticamente prezzi mancanti da ricarichi legacy:
+  i null sono visibili nel catalogo come **Prezzo da completare**, modificabili
+  e bloccano la quotazione/vendita con errore esplicito fino alla revisione.
+  I salvataggi delle SKU e dei prodotti semplici richiedono un prezzo valido.
+- Documenti gia emessi, snapshot e resi da fattura restano invariati.
+
 ## Changes Made
 
 ### 1. **Component Updates** (`prodotti.component.ts`)

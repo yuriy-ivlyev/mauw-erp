@@ -1046,6 +1046,9 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
                     b.HasKey("ContactId");
 
+                    b.HasIndex("PriceListId")
+                        .HasDatabaseName("i_x_customer_profiles_price_list_id");
+
                     b.ToTable("customer_profiles", (string)null);
                 });
 
@@ -1650,6 +1653,119 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.ToTable("payments");
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.PriceList", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_price_lists");
+
+                    b.ToTable("price_lists", (string)null);
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.PriceListRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CalculationType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("calculation_type");
+
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("category_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<decimal>("MinimumQuantity")
+                        .HasPrecision(22, 8)
+                        .HasColumnType("numeric(22,8)")
+                        .HasColumnName("minimum_quantity");
+
+                    b.Property<Guid>("PriceListId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("price_list_id");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer")
+                        .HasColumnName("priority");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateTimeOffset?>("ValidFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("valid_from");
+
+                    b.Property<DateTimeOffset?>("ValidTo")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("valid_to");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(22, 8)
+                        .HasColumnType("numeric(22,8)")
+                        .HasColumnName("value");
+
+                    b.Property<Guid?>("VariantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("variant_id");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_price_list_rules");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("VariantId");
+
+                    b.HasIndex("PriceListId", "CategoryId");
+
+                    b.HasIndex("PriceListId", "ProductId");
+
+                    b.HasIndex("PriceListId", "VariantId");
+
+                    b.ToTable("price_list_rules", (string)null);
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Product", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1676,8 +1792,8 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<decimal>("DefaultMarkupRate")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("numeric(6,2)")
                         .HasColumnName("default_markup_rate");
 
                     b.Property<bool>("HasVariants")
@@ -1701,6 +1817,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("name");
+
+                    b.Property<decimal?>("SellingPrice")
+                        .HasPrecision(22, 8)
+                        .HasColumnType("numeric(22,8)")
+                        .HasColumnName("selling_price");
 
                     b.Property<string>("SupplierCode")
                         .IsRequired()
@@ -1824,6 +1945,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<decimal?>("MarkupRate")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("numeric(6,2)")
+                        .HasColumnName("markup_rate");
+
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid")
                         .HasColumnName("product_id");
@@ -1832,6 +1958,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("purchase_cost");
+
+                    b.Property<decimal?>("SellingPrice")
+                        .HasPrecision(22, 8)
+                        .HasColumnType("numeric(22,8)")
+                        .HasColumnName("selling_price");
 
                     b.Property<string>("SizeId")
                         .HasColumnType("character varying(5)")
@@ -2228,7 +2359,15 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("f_k_customer_profiles_contacts_contact_id");
 
+                    b.HasOne("Mauw.Erp.Domain.Entities.PriceList", "PriceList")
+                        .WithMany()
+                        .HasForeignKey("PriceListId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("f_k_customer_profiles__price_lists_price_list_id");
+
                     b.Navigation("Contact");
+
+                    b.Navigation("PriceList");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.DdtDocument", b =>
@@ -2259,7 +2398,57 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("f_k_ddt_items__product_variants_variant_id");
 
+                    b.OwnsOne("Mauw.Erp.Domain.Pricing.PricingSnapshot", "PricingSnapshot", b1 =>
+                        {
+                            b1.Property<Guid>("DdtItemId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<decimal?>("AgreedUnitNetPrice")
+                                .HasPrecision(22, 8)
+                                .HasColumnType("numeric(22,8)")
+                                .HasColumnName("pricing_agreed_unit_net_price");
+
+                            b1.Property<bool>("IsCustomerReturn")
+                                .HasColumnType("boolean")
+                                .HasColumnName("pricing_is_customer_return");
+
+                            b1.Property<bool>("IsManualOverride")
+                                .HasColumnType("boolean")
+                                .HasColumnName("pricing_is_manual_override");
+
+                            b1.Property<decimal>("ListUnitPrice")
+                                .HasPrecision(22, 8)
+                                .HasColumnType("numeric(22,8)")
+                                .HasColumnName("pricing_list_unit_price");
+
+                            b1.Property<string>("OverrideReason")
+                                .HasMaxLength(500)
+                                .HasColumnType("character varying(500)")
+                                .HasColumnName("pricing_override_reason");
+
+                            b1.Property<Guid?>("PriceListId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("pricing_price_list_id");
+
+                            b1.Property<Guid?>("RuleId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("pricing_rule_id");
+
+                            b1.Property<Guid?>("SourceLineId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("pricing_source_line_id");
+
+                            b1.HasKey("DdtItemId");
+
+                            b1.ToTable("ddt_items", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("DdtItemId");
+                        });
+
                     b.Navigation("DdtDocument");
+
+                    b.Navigation("PricingSnapshot");
 
                     b.Navigation("Variant");
                 });
@@ -2292,7 +2481,57 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("f_k_invoice_items__product_variants_variant_id");
 
+                    b.OwnsOne("Mauw.Erp.Domain.Pricing.PricingSnapshot", "PricingSnapshot", b1 =>
+                        {
+                            b1.Property<Guid>("InvoiceItemId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<decimal?>("AgreedUnitNetPrice")
+                                .HasPrecision(22, 8)
+                                .HasColumnType("numeric(22,8)")
+                                .HasColumnName("pricing_agreed_unit_net_price");
+
+                            b1.Property<bool>("IsCustomerReturn")
+                                .HasColumnType("boolean")
+                                .HasColumnName("pricing_is_customer_return");
+
+                            b1.Property<bool>("IsManualOverride")
+                                .HasColumnType("boolean")
+                                .HasColumnName("pricing_is_manual_override");
+
+                            b1.Property<decimal>("ListUnitPrice")
+                                .HasPrecision(22, 8)
+                                .HasColumnType("numeric(22,8)")
+                                .HasColumnName("pricing_list_unit_price");
+
+                            b1.Property<string>("OverrideReason")
+                                .HasMaxLength(500)
+                                .HasColumnType("character varying(500)")
+                                .HasColumnName("pricing_override_reason");
+
+                            b1.Property<Guid?>("PriceListId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("pricing_price_list_id");
+
+                            b1.Property<Guid?>("RuleId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("pricing_rule_id");
+
+                            b1.Property<Guid?>("SourceLineId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("pricing_source_line_id");
+
+                            b1.HasKey("InvoiceItemId");
+
+                            b1.ToTable("invoice_items", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("InvoiceItemId");
+                        });
+
                     b.Navigation("Invoice");
+
+                    b.Navigation("PricingSnapshot");
 
                     b.Navigation("Variant");
                 });
@@ -2337,7 +2576,57 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("f_k_order_items__product_variants_variant_id");
 
+                    b.OwnsOne("Mauw.Erp.Domain.Pricing.PricingSnapshot", "PricingSnapshot", b1 =>
+                        {
+                            b1.Property<Guid>("OrderItemId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<decimal?>("AgreedUnitNetPrice")
+                                .HasPrecision(22, 8)
+                                .HasColumnType("numeric(22,8)")
+                                .HasColumnName("pricing_agreed_unit_net_price");
+
+                            b1.Property<bool>("IsCustomerReturn")
+                                .HasColumnType("boolean")
+                                .HasColumnName("pricing_is_customer_return");
+
+                            b1.Property<bool>("IsManualOverride")
+                                .HasColumnType("boolean")
+                                .HasColumnName("pricing_is_manual_override");
+
+                            b1.Property<decimal>("ListUnitPrice")
+                                .HasPrecision(22, 8)
+                                .HasColumnType("numeric(22,8)")
+                                .HasColumnName("pricing_list_unit_price");
+
+                            b1.Property<string>("OverrideReason")
+                                .HasMaxLength(500)
+                                .HasColumnType("character varying(500)")
+                                .HasColumnName("pricing_override_reason");
+
+                            b1.Property<Guid?>("PriceListId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("pricing_price_list_id");
+
+                            b1.Property<Guid?>("RuleId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("pricing_rule_id");
+
+                            b1.Property<Guid?>("SourceLineId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("pricing_source_line_id");
+
+                            b1.HasKey("OrderItemId");
+
+                            b1.ToTable("order_items", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("OrderItemId");
+                        });
+
                     b.Navigation("Order");
+
+                    b.Navigation("PricingSnapshot");
 
                     b.Navigation("Variant");
                 });
@@ -2352,6 +2641,31 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasConstraintName("f_k_payments_invoices_invoice_id");
 
                     b.Navigation("Invoice");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.PriceListRule", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.Category", null)
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.PriceList", null)
+                        .WithMany("Rules")
+                        .HasForeignKey("PriceListId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_price_list_rules_price_lists_price_list_id");
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.ProductVariant", null)
+                        .WithMany()
+                        .HasForeignKey("VariantId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Product", b =>
@@ -2527,6 +2841,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Order", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.PriceList", b =>
+                {
+                    b.Navigation("Rules");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Product", b =>

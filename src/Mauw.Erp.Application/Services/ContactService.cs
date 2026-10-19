@@ -17,7 +17,8 @@ public class ContactService(
     IUnitOfWork unitOfWork,
     IValidator<CreateContactRequest> createValidator,
     IValidator<UpdateContactRequest> updateValidator,
-    ILogger<ContactService> logger)
+    ILogger<ContactService> logger,
+    IPriceListRepository priceLists)
     : IContactService
 {
     public async Task<OperationResult<PagedResult<ContactSummaryDto>>> GetPagedAsync(ContactFilterRequest request)
@@ -52,6 +53,9 @@ public class ContactService(
         var validation = createValidator.Validate(request);
         if (!validation.IsValid)
             return OperationResult<ContactDetailDto>.Fail(JoinErrors(validation));
+        if (request.CustomerProfile?.PriceListId is Guid priceListId &&
+            await priceLists.GetAsync(priceListId, CancellationToken.None) is null)
+            return OperationResult<ContactDetailDto>.Fail("Listino cliente non trovato.");
 
         var contact = new Contact(request.BusinessName, Normalize(request.VatNumber), Normalize(request.TaxCode))
         {
@@ -99,6 +103,9 @@ public class ContactService(
         var validation = updateValidator.Validate(request);
         if (!validation.IsValid)
             return OperationResult<ContactDetailDto>.Fail(JoinErrors(validation));
+        if (!request.DisableCustomer && request.CustomerProfile?.PriceListId is Guid priceListId &&
+            await priceLists.GetAsync(priceListId, CancellationToken.None) is null)
+            return OperationResult<ContactDetailDto>.Fail("Listino cliente non trovato.");
 
         var contact = await unitOfWork.Contacts.GetByIdWithDetailsAsync(id);
         if (contact is null)

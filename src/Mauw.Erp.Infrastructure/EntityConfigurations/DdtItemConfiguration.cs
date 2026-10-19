@@ -12,6 +12,7 @@ public class DdtItemConfiguration : IEntityTypeConfiguration<DdtItem>
     public void Configure(EntityTypeBuilder<DdtItem> builder)
     {
         builder.HasKey(di => di.Id);
+        builder.OwnsOne(item => item.PricingSnapshot, snapshot => PricingSnapshotConfiguration.Configure(snapshot, "ddt_items"));
 
         builder.Property(di => di.Quantity)
             .IsRequired();

@@ -8,5 +8,6 @@ public record UpdateProductVariantRequest(
     string? SizeId,
     string Barcode,
     decimal PurchaseCost,
-    decimal? WeightGrams = null
+    decimal? WeightGrams = null,
+    decimal? SellingPrice = null
 );

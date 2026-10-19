@@ -12,4 +12,9 @@ public class CreateOrderItemRequest
     public decimal? UnitGrossPrice { get; set; }
     public decimal? VatRate { get; set; }
     public decimal? DiscountPercent { get; set; }
+    public Guid? PriceListId { get; set; }
+    public string? OverrideReason { get; set; }
+    public bool IsCustomerReturn { get; set; }
+    public Guid? SourceLineId { get; set; }
+    public Guid? SourceOrderItemId { get; set; }
 }

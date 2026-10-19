@@ -193,11 +193,16 @@ public class DocumentAccountingServiceTests
             UnitOfWork.Setup(work => work.SaveChangesAsync()).Returns(Task.CompletedTask);
             var settings = Mock.Of<ICompanySettingsService>();
             var pdf = Mock.Of<IInvoicePdfGenerator>();
+            var pricingRepository = new Mock<IPriceListRepository>();
+            pricingRepository.Setup(repository => repository.GetVariantsAsync(
+                    It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new[] { Variant });
+            var pricing = new DocumentPricingService(pricingRepository.Object, Mock.Of<IPriceListService>(), Calculator);
             InvoiceService = new(UnitOfWork.Object, Mock.Of<IValidator<CreateInvoiceRequest>>(),
-                Calculator, settings, pdf);
+                Calculator, settings, pdf, pricing);
             OrderService = new(UnitOfWork.Object, Mock.Of<IValidator<CreateOrderRequest>>(),
-                new CreateOrderItemRequestValidator(), new PricingEngine(), Calculator, settings, pdf,
-                NullLogger<OrderService>.Instance);
+                new CreateOrderItemRequestValidator(), Calculator, settings, pdf,
+                NullLogger<OrderService>.Instance, pricing);
         }
     }
 }

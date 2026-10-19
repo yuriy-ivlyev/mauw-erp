@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { Subscription } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -7,7 +8,9 @@ import { ApiService } from '../../../services/api.service';
 import { ProductService } from '../../../services/product.service';
 import { ProductMatrixModalComponent, MatrixSelection } from './product-matrix-modal.component';
 import { ProductParentDto, ProductMatrixDto } from '../../../models/product.model';
-import { CassaSessionService, CartItem, CassaContact, CassaPreviewState, PausedSessionSummary } from '../../../services/cassa-session.service';
+import { CassaSessionService, CartItem, CassaContact, CassaPreviewState, PausedSessionSummary, CassaEmissionItem } from '../../../services/cassa-session.service';
+import { PriceList } from '../../../models/price-list.model';
+import { PriceListService, priceError } from '../../../services/price-list.service';
 
 interface BarcodeVariant {
   barcode: string;
@@ -121,7 +124,8 @@ interface PageResponse<T> {
 </div>
 
 <!-- ===== LAYOUT PRINCIPALE ===== -->
-<div class="flex flex-col h-[calc(100vh-7rem)] bg-gray-100 overflow-hidden">
+<div [attr.inert]="generating ? '' : null" [attr.aria-busy]="!!generating"
+  class="flex flex-col h-[calc(100vh-7rem)] bg-gray-100 overflow-hidden">
 
   <!-- Barra sessione -->
   <div class="bg-white border-b px-4 py-2 flex items-center justify-between flex-shrink-0">
@@ -129,6 +133,16 @@ interface PageResponse<T> {
       <span class="text-xs text-gray-400 font-medium uppercase tracking-wide">Sessione:</span>
       <span *ngIf="currentSessionCode" class="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">{{ currentSessionCode }}</span>
       <span *ngIf="!currentSessionCode" class="text-xs text-gray-400 italic">non salvata</span>
+    </div>
+    <div class="bg-blue-50 px-4 py-2 text-sm flex flex-wrap gap-3 items-center">
+      <label>Listino <select aria-label="Listino vendita" [ngModel]="selectedPriceListId"
+        (ngModelChange)="sessionService.setPriceList($event)" class="border rounded p-1">
+        <option [ngValue]="null">Predefinito cliente / prezzo base</option>
+        <option *ngFor="let list of priceLists" [value]="list.id" [disabled]="!list.isActive">{{ list.name }}{{ list.isActive ? '' : ' (inattivo)' }}</option>
+      </select></label>
+      <span>Prezzi fino a 8 decimali · risoluzione commerciale, non fiscale</span>
+      <span *ngIf="pricingPending">Aggiornamento prezzi…</span>
+      <span *ngIf="pricingError" role="alert" class="text-red-700">{{ pricingError }}</span>
     </div>
     <div class="flex items-center gap-2">
       <button (click)="openResumeModal()"
@@ -273,7 +287,7 @@ interface PageResponse<T> {
       </div>
 
       <div *ngIf="cart.length > 0" class="space-y-2">
-        <div *ngFor="let item of cart; let i = index"
+        <div *ngFor="let item of cart; let i = index; trackBy: trackCartItem"
           class="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-4">
           <!-- Product info -->
           <div class="flex-1 min-w-0">
@@ -297,7 +311,19 @@ interface PageResponse<T> {
           </select>
           <div class="text-right w-24 flex-shrink-0">
             <div class="text-xs text-gray-400">Prezzo netto</div>
-            <div class="text-sm font-medium">{{ item.unitNetPrice | number:'1.2-2' }} €</div>
+            <div *ngIf="!item.isPriceOverride" class="text-sm font-medium">{{ item.unitNetPrice | number:'1.2-8' }} €</div>
+            <div class="text-xs" *ngIf="item.discountPercent">Sconto {{ item.discountPercent }}%</div>
+            <div class="text-xs text-blue-600" *ngIf="item.ruleId">Regola applicata</div>
+            <label class="text-xs"><input type="checkbox" [ngModel]="item.isPriceOverride"
+              (ngModelChange)="togglePriceOverride(item, $event)"> Override</label>
+            <div *ngIf="item.isPriceOverride" class="bg-amber-50 border border-amber-300 p-1 rounded">
+              <input type="number" min="0" step="0.00000001" aria-label="Prezzo netto override"
+                [(ngModel)]="item.unitNetPrice" (ngModelChange)="syncToService()" class="border w-full">
+              <input type="number" min="0" max="100" step="0.01" aria-label="Sconto percentuale override"
+                [(ngModel)]="item.discountPercent" (ngModelChange)="syncToService()" class="border w-full">
+              <input aria-label="Motivo override" placeholder="Motivo obbligatorio" [(ngModel)]="item.overrideReason"
+                (ngModelChange)="syncToService()" class="border w-full">
+            </div>
           </div>
 
           <!-- Quantity controls -->
@@ -359,13 +385,13 @@ interface PageResponse<T> {
         <!-- Action buttons: aligned right -->
         <div class="flex gap-2 flex-shrink-0 ml-auto">
           <button (click)="generateDocument('ddt')"
-            [disabled]="!selectedContact || generating"
+            [disabled]="!selectedContact || generating || !sessionService.canSubmit"
             class="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white text-sm font-semibold rounded-lg shadow transition flex items-center gap-1.5">
             <span>🚚</span>
             <span>{{ generating === 'ddt' ? '...' : 'DDT' }}</span>
           </button>
           <button (click)="generateDocument('invoice')"
-            [disabled]="!selectedContact || generating"
+            [disabled]="!selectedContact || generating || !sessionService.canSubmit"
             class="px-4 py-2 bg-blue-700 hover:bg-blue-800 disabled:opacity-40 text-white text-sm font-semibold rounded-lg shadow transition flex items-center gap-1.5">
             <span>🧾</span>
             <span>{{ generating === 'invoice' ? '...' : 'Fattura' }}</span>
@@ -432,6 +458,12 @@ export class BancoCassaComponent implements OnInit, OnDestroy {
 
   preview: CassaPreviewState = { data: null, error: null };
   private previewSub?: Subscription;
+  private stateSub?: Subscription;
+  private pricingSub?: Subscription;
+  priceLists: PriceList[] = [];
+  selectedPriceListId: string | null = null;
+  pricingPending = false;
+  pricingError: string | null = null;
 
   get weightKg(): number {
     const weightG = this.cart.reduce((s, i) => s + (i.weightGrams ?? 0) * i.quantity, 0);
@@ -447,6 +479,7 @@ export class BancoCassaComponent implements OnInit, OnDestroy {
     private api: ApiService,
     private productService: ProductService,
     private router: Router,
+    private prices: PriceListService,
     protected sessionService: CassaSessionService
   ) {}
 
@@ -457,18 +490,42 @@ export class BancoCassaComponent implements OnInit, OnDestroy {
     this.documentNumber = snap.documentNumber;
     this.currentSessionCode = snap.sessionCode;
     this.previewSub = this.sessionService.preview$.subscribe(state => this.preview = state);
+    this.stateSub = this.sessionService.state$.subscribe(state => {
+      this.cart = state.cart;
+      this.selectedContact = state.selectedContact;
+      this.selectedPriceListId = state.priceListId ?? null;
+    });
+    this.pricingSub = this.sessionService.pricing$.subscribe(state => {
+      this.pricingPending = state.pending;
+      this.pricingError = state.error;
+    });
+    this.prices.getAll().subscribe({
+      next: lists => this.priceLists = lists,
+      error: error => this.pricingError = priceError(error)
+    });
     this.loadDefaultWarehouse();
   }
 
   ngOnDestroy(): void {
     this.previewSub?.unsubscribe();
+    this.stateSub?.unsubscribe();
+    this.pricingSub?.unsubscribe();
   }
 
   syncToService(): void {
-    this.sessionService.setCart(this.cart);
-    this.sessionService.setContact(this.selectedContact);
-    this.sessionService.setDocumentNumber(this.documentNumber);
+    const { cart, selectedContact, documentNumber } = this;
+    this.sessionService.setCart(cart);
+    this.sessionService.setContact(selectedContact);
+    this.sessionService.setDocumentNumber(documentNumber);
   }
+
+  togglePriceOverride(item: CartItem, enabled: boolean): void {
+    item.isPriceOverride = enabled;
+    if (!enabled) item.overrideReason = null;
+    this.syncToService();
+  }
+
+  trackCartItem(_index: number, item: CartItem): string { return item.variantId; }
 
   private loadDefaultWarehouse(): void {
     this.api.get<any>('v1/warehouses?page=1&pageSize=100&isActive=true').subscribe({
@@ -676,35 +733,37 @@ export class BancoCassaComponent implements OnInit, OnDestroy {
 
   // ── Document generation ───────────────────────────────────
   generateDocument(type: 'ddt' | 'invoice'): void {
-    if (!this.selectedContact || this.cart.length === 0) return;
+    if (this.generating || !this.selectedContact || this.cart.length === 0) return;
+    if (!this.sessionService.canSubmit) {
+      this.generateError = this.pricingError ?? 'Attendere prezzi e anteprima fiscale validi.';
+      return;
+    }
     this.generating = type;
     this.generateError = null;
 
-    if (type === 'ddt') {
-      const body = { contactId: this.selectedContact.id, ddtNumber: this.documentNumber || undefined };
-      this.api.post<any>('v1/ddts', body).subscribe({
-        next: (ddt) => this.addItemsAndNavigate('ddt', ddt.id),
-        error: (e) => { this.generateError = e?.error ?? 'Errore creazione DDT'; this.generating = null; }
-      });
-    } else {
-      const body = { contactId: this.selectedContact.id };
-      this.api.post<any>('v1/invoices', body).subscribe({
-        next: (inv) => this.addItemsAndNavigate('invoice', inv.id),
-        error: (e) => { this.generateError = e?.error ?? 'Errore creazione fattura'; this.generating = null; }
-      });
-    }
+    this.sessionService.prepareEmission().subscribe({
+      next: saved => {
+        this.currentSessionCode = this.sessionService.snapshot.sessionCode;
+        const endpoint = type === 'ddt' ? 'v1/ddts' : 'v1/invoices';
+        const body = {
+          contactId: saved.contactId,
+          ...(type === 'ddt' ? { ddtNumber: saved.documentNumber || undefined } : {})
+        };
+        this.api.post<{ id: string }>(endpoint, body).subscribe({
+          next: document => this.addItemsAndNavigate(type, document.id, saved.items),
+          error: error => { this.generateError = priceError(error); this.generating = null; }
+        });
+      },
+      error: (error: unknown) => {
+        this.generateError = error instanceof Error && !(error instanceof HttpErrorResponse)
+          ? error.message : priceError(error);
+        this.generating = null;
+      }
+    });
   }
 
-  private addItemsAndNavigate(type: 'ddt' | 'invoice', docId: string): void {
+  private addItemsAndNavigate(type: 'ddt' | 'invoice', docId: string, requests: CassaEmissionItem[]): void {
     const endpoint = type === 'ddt' ? `v1/ddts/${docId}/items` : `v1/invoices/${docId}/items`;
-    const requests = this.cart.map(item => ({
-      variantId: item.variantId,
-      quantity: item.quantity,
-      unitNetPrice: item.unitNetPrice,
-      vatRate: item.vatRate,
-      natureCode: item.natureCode,
-      discountPercent: item.discountPercent ?? 0
-    }));
 
     const sendNext = (idx: number) => {
       if (idx >= requests.length) {
@@ -760,10 +819,11 @@ export class BancoCassaComponent implements OnInit, OnDestroy {
   // ── Session management ─────────────────────────────────────
   suspendSession(): void {
     if (this.cart.length === 0 || !this.selectedContact) return;
+    if (!this.sessionService.canSubmit) {
+      this.generateError = this.pricingError ?? 'Attendere prezzi e anteprima fiscale validi.';
+      return;
+    }
     this.suspendLoading = true;
-    this.sessionService.setCart(this.cart);
-    this.sessionService.setContact(this.selectedContact);
-    this.sessionService.setDocumentNumber(this.documentNumber);
 
     this.sessionService.createOrPauseSession().subscribe({
       next: (dto) => {

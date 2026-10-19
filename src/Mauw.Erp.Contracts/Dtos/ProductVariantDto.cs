@@ -13,9 +13,10 @@ public record ProductVariantDto(
     string Barcode,
     decimal PurchaseCost,
     int StockQuantity,
-    decimal ListPrice,
-    decimal FinalNetPrice,
+    decimal? ListPrice,
+    decimal? FinalNetPrice,
     decimal VatAmount,
-    decimal FinalGrossPrice,
-    decimal? WeightGrams = null
+    decimal? FinalGrossPrice,
+    decimal? WeightGrams = null,
+    decimal? SellingPrice = null
 );

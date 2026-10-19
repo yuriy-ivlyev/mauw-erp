@@ -40,7 +40,8 @@ public static class OrderMapper
             LineVatTotal: null,
             LineGrossTotal: null,
             NatureCode: item.NatureCode,
-            DiscountPercent: item.DiscountPercent
+            DiscountPercent: item.DiscountPercent,
+            PricingSnapshot: PricingSnapshotMapper.Map(item.PricingSnapshot)
         );
     }
 

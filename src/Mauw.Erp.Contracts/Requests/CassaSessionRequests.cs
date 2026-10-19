@@ -7,7 +7,12 @@ public record CassaCartItemRequest(
     decimal VatRate,
     int MaxQuantity,
     string? NatureCode = null,
-    decimal DiscountPercent = 0m
+    decimal DiscountPercent = 0m,
+    Guid? PriceListId = null,
+    bool IsManualPriceOverride = false,
+    string? OverrideReason = null,
+    bool IsCustomerReturn = false,
+    Guid? SourceLineId = null
 );
 
 public record CreateCassaSessionRequest(

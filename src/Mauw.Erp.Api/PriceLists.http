@@ -1,0 +1,78 @@
+@baseUrl = http://localhost:5020/api/v1
+@priceListId = 00000000-0000-0000-0000-000000000001
+@variantId = 00000000-0000-0000-0000-000000000002
+@contactId = 00000000-0000-0000-0000-000000000003
+# Authenticate through the existing BFF login before using these requests.
+
+### List all price lists
+GET {{baseUrl}}/price-lists
+
+### Read a price list (404 for an unknown ID)
+GET {{baseUrl}}/price-lists/{{priceListId}}
+
+### Create a EUR price list (replace priceListId with the returned ID)
+POST {{baseUrl}}/price-lists
+Content-Type: application/json
+
+{
+  "name": "Ingrosso moda",
+  "currency": "EUR",
+  "isActive": true,
+  "rules": [
+    {
+      "calculationType": "PercentageDiscount",
+      "value": 10,
+      "minimumQuantity": 5,
+      "priority": 10,
+      "validFrom": "2026-10-01T00:00:00Z",
+      "validTo": "2026-12-31T23:59:59Z"
+    }
+  ]
+}
+
+### Replace configuration (include existing rule IDs to preserve them)
+PUT {{baseUrl}}/price-lists/{{priceListId}}
+Content-Type: application/json
+
+{
+  "name": "Ingrosso moda",
+  "currency": "EUR",
+  "isActive": true,
+  "rules": [
+    {
+      "calculationType": "FixedPrice",
+      "value": 18.83606557,
+      "minimumQuantity": 1,
+      "priority": 20
+    }
+  ]
+}
+
+### Activate or deactivate without replacing rules
+PATCH {{baseUrl}}/price-lists/{{priceListId}}/activation
+Content-Type: application/json
+
+{ "isActive": true }
+
+### Resolve multiple lines with one loaded rule tree
+POST {{baseUrl}}/price-lists/resolve
+Content-Type: application/json
+
+{
+  "contactId": "{{contactId}}",
+  "priceListId": "{{priceListId}}",
+  "at": "2026-10-18T12:00:00Z",
+  "lines": [
+    { "variantId": "{{variantId}}", "quantity": 1 },
+    { "variantId": "{{variantId}}", "quantity": 5 }
+  ]
+}
+
+### Reject unsupported currency (400 Problem Details)
+POST {{baseUrl}}/price-lists
+Content-Type: application/json
+
+{ "name": "Non valido", "currency": "USD", "rules": [] }
+
+### Delete: customer default becomes null, document snapshots remain unchanged
+DELETE {{baseUrl}}/price-lists/{{priceListId}}

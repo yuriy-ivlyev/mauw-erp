@@ -14,5 +14,6 @@ public record InvoiceItemDto(
     decimal? LineVatTotal,
     decimal? LineGrossTotal,
     string? NatureCode = null,
-    decimal DiscountPercent = 0m
+    decimal DiscountPercent = 0m,
+    Mauw.Erp.Contracts.Pricing.PricingSnapshotDto? PricingSnapshot = null
 );

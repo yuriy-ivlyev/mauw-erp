@@ -22,11 +22,11 @@ public partial class OrderService(
     IUnitOfWork unitOfWork,
     IValidator<CreateOrderRequest> createValidator,
     IValidator<CreateOrderItemRequest> itemValidator,
-    PricingEngine pricingEngine,
     ItalianAccountingCalculator accountingCalculator,
     ICompanySettingsService companySettingsService,
     IInvoicePdfGenerator pdfGenerator,
-    ILogger<OrderService> logger)
+    ILogger<OrderService> logger,
+    IDocumentPricingService documentPricing)
     : IOrderService
 {
     private static readonly CultureInfo ItalianCulture = CultureInfo.GetCultureInfo("it-IT");
@@ -154,6 +154,8 @@ public partial class OrderService(
         var order = await unitOfWork.Orders.GetByIdAsync(orderId);
         if (order == null)
             return OperationResult<OrderDto>.Fail("Order not found");
+        if (order.Status is OrderStatus.Confirmed or OrderStatus.Terminated)
+            return OperationResult<OrderDto>.Fail("Non e possibile modificare le righe di un ordine confermato o terminato.");
 
         var variant = await unitOfWork.ProductVariants.GetByIdAsync(request.VariantId);
         if (variant == null)
@@ -163,29 +165,27 @@ public partial class OrderService(
         if (product == null)
             return OperationResult<OrderDto>.Fail("Product not found");
 
-        var pricingResult = pricingEngine.CalculatePrice(
-            variant.PurchaseCost,
-            product.DefaultMarkupRate,
-            order.CustomerDiscountRate,
-            product.VatRate
-        );
-
-        var line = accountingCalculator.CalculateLine(new DocumentLineInput(request.Quantity,
-            request.UnitGrossPrice ?? request.UnitNetPrice ?? pricingResult.ListPrice,
-            request.VatRate ?? product.VatRate, request.NatureCode,
-            request.DiscountPercent ?? order.CustomerDiscountRate, PriceIncludesVat: request.UnitGrossPrice.HasValue));
-        if (!line.Success)
-            return OperationResult<OrderDto>.Fail(line.Error);
+        var pricing = await documentPricing.PrepareAsync(order.ContactId,
+            [new(request.VariantId, request.Quantity, request.UnitNetPrice, request.UnitGrossPrice,
+                request.SourceOrderItemId.HasValue || request.SourceLineId.HasValue ? request.VatRate : request.VatRate ?? product.VatRate,
+                request.NatureCode, request.DiscountPercent,
+                request.PriceListId, request.OverrideReason, request.IsCustomerReturn, request.SourceLineId,
+                DefaultDiscountPercent: order.CustomerDiscountRate, SourceOrderItemId: request.SourceOrderItemId)],
+            DateTimeOffset.UtcNow);
+        if (!pricing.Success)
+            return OperationResult<OrderDto>.Fail(pricing.Error);
+        var prepared = pricing.Data!.Lines[0];
+        var line = prepared.FiscalLine;
 
         var item = new OrderItem(
             orderId: orderId,
             variantId: request.VariantId,
             quantity: request.Quantity,
-            unitNetPrice: line.Data!.UnitNetPrice,
-            vatRate: line.Data.VatRate,
-            natureCode: line.Data.NatureCode,
-            discountPercent: line.Data.DiscountPercent
-        );
+            unitNetPrice: line.UnitNetPrice,
+            vatRate: line.VatRate,
+            natureCode: line.NatureCode,
+            discountPercent: line.DiscountPercent
+        ) { PricingSnapshot = prepared.Snapshot };
 
         var accounting = order.AddItem(item, accountingCalculator);
         if (!accounting.Success)
@@ -356,9 +356,10 @@ public partial class OrderService(
         if (contact is null)
             return OperationResult<CassaSessionDetailDto>.Fail("Cliente non trovato");
 
-        var accounting = CalculateCart(request.Items);
-        if (!accounting.Success)
-            return OperationResult<CassaSessionDetailDto>.Fail(accounting.Error);
+        var pricing = await PrepareCartAsync(request.ContactId, request.Items);
+        if (!pricing.Success)
+            return OperationResult<CassaSessionDetailDto>.Fail(pricing.Error);
+        var accounting = pricing.Data!.FiscalDocument;
 
         var now = DateTime.UtcNow;
         var prefix = $"ORD-{now:MMyyyy}-";
@@ -372,13 +373,14 @@ public partial class OrderService(
         for (var i = 0; i < request.Items.Count; i++)
         {
             var item = request.Items[i];
-            var line = accounting.Data!.Lines[i];
+            var line = accounting.Lines[i];
             order.Items.Add(new OrderItem(order.Id, item.VariantId, item.Quantity, line.UnitNetPrice, item.VatRate,
-                item.MaxQuantity, line.NatureCode, line.DiscountPercent) { LineNetTotal = line.LineNetTotal });
+                item.MaxQuantity, line.NatureCode, line.DiscountPercent)
+                { LineNetTotal = line.LineNetTotal, PricingSnapshot = pricing.Data.Lines[i].Snapshot });
         }
-        order.TaxableTotal = accounting.Data!.TotalTaxable;
-        order.VatTotal = accounting.Data.TotalVat;
-        order.GrossTotal = accounting.Data.TotalGross;
+        order.TaxableTotal = accounting.TotalTaxable;
+        order.VatTotal = accounting.TotalVat;
+        order.GrossTotal = accounting.TotalGross;
         await unitOfWork.Orders.AddAsync(order);
         await unitOfWork.SaveChangesAsync();
 
@@ -393,14 +395,17 @@ public partial class OrderService(
         var order = await unitOfWork.Orders.GetCassaSessionWithItemsAsync(orderId);
         if (order is null)
             return OperationResult<CassaSessionDetailDto>.Fail("Sessione non trovata");
+        if (order.Status is OrderStatus.Confirmed or OrderStatus.Terminated)
+            return OperationResult<CassaSessionDetailDto>.Fail("Non e possibile modificare una sessione confermata o terminata.");
 
         var contact = await unitOfWork.Contacts.GetByIdAsync(request.ContactId);
         if (contact is null)
             return OperationResult<CassaSessionDetailDto>.Fail("Cliente non trovato");
 
-        var accounting = CalculateCart(request.Items);
-        if (!accounting.Success)
-            return OperationResult<CassaSessionDetailDto>.Fail(accounting.Error);
+        var pricing = await PrepareCartAsync(request.ContactId, request.Items);
+        if (!pricing.Success)
+            return OperationResult<CassaSessionDetailDto>.Fail(pricing.Error);
+        var accounting = pricing.Data!.FiscalDocument;
 
         order.ContactId = request.ContactId;
         order.SetDocumentReference(request.DocumentReference);
@@ -409,14 +414,15 @@ public partial class OrderService(
         for (var i = 0; i < request.Items.Count; i++)
         {
             var item = request.Items[i];
-            var line = accounting.Data!.Lines[i];
+            var line = accounting.Lines[i];
             var orderItem = new OrderItem(order.Id, item.VariantId, item.Quantity, line.UnitNetPrice, item.VatRate,
-                item.MaxQuantity, line.NatureCode, line.DiscountPercent) { LineNetTotal = line.LineNetTotal };
+                item.MaxQuantity, line.NatureCode, line.DiscountPercent)
+                { LineNetTotal = line.LineNetTotal, PricingSnapshot = pricing.Data.Lines[i].Snapshot };
             order.Items.Add(orderItem);
         }
-        order.TaxableTotal = accounting.Data!.TotalTaxable;
-        order.VatTotal = accounting.Data.TotalVat;
-        order.GrossTotal = accounting.Data.TotalGross;
+        order.TaxableTotal = accounting.TotalTaxable;
+        order.VatTotal = accounting.TotalVat;
+        order.GrossTotal = accounting.TotalGross;
 
         order.Suspend(request.TerminalId);
         await unitOfWork.Orders.UpdateAsync(order);
@@ -517,6 +523,25 @@ public partial class OrderService(
             item.Quantity, item.UnitNetPrice, item.VatRate, item.NatureCode, item.DiscountPercent)));
     }
 
+    private Task<AccountingResult<PreparedDocumentPricing>> PrepareCartAsync(
+        Guid contactId, List<CassaCartItemRequest>? items)
+    {
+        if (items is null || items.Any(item => item is null))
+            return Task.FromResult(AccountingResult<PreparedDocumentPricing>.Fail("Il carrello e le righe non possono essere null."));
+        if (items.Any(item => item.IsCustomerReturn &&
+            (item.IsManualPriceOverride || !string.IsNullOrWhiteSpace(item.OverrideReason))))
+            return Task.FromResult(AccountingResult<PreparedDocumentPricing>.Fail("Il prezzo del reso proviene dalla fattura e non ammette override."));
+        return documentPricing.PrepareAsync(contactId, items.Select(item => new DocumentPricingRequest(
+            item.VariantId, item.Quantity,
+            item.IsCustomerReturn && item.SourceLineId.HasValue ? null : item.UnitNetPrice, null,
+            item.IsCustomerReturn ? null : item.VatRate,
+            item.IsCustomerReturn ? null : item.NatureCode,
+            item.IsCustomerReturn ? null : item.DiscountPercent,
+            item.IsCustomerReturn ? null : item.PriceListId,
+            item.IsCustomerReturn ? null : item.OverrideReason, item.IsCustomerReturn, item.SourceLineId,
+            PreserveLegacyPrice: !item.IsManualPriceOverride)).ToList(), DateTimeOffset.UtcNow);
+    }
+
     private static CassaSessionDetailDto MapCassaDetail(Order order, string contactName) =>
         new(
             order.Id,
@@ -538,7 +563,9 @@ public partial class OrderService(
                 i.MaxQuantity,
                 i.Variant?.WeightGrams,
                 i.NatureCode,
-                i.DiscountPercent
+                i.DiscountPercent,
+                PricingSnapshotMapper.Map(i.PricingSnapshot),
+                i.Id
             )).ToList()
         );
 

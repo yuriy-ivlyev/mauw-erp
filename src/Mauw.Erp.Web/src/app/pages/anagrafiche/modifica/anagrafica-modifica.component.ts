@@ -5,6 +5,8 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { ContactService } from '../../../services/contact.service';
 import { CountryService } from '../../../services/country.service';
 import { ContactDetail } from '../../../models/contact.model';
+import { PriceList } from '../../../models/price-list.model';
+import { PriceListService, priceError } from '../../../services/price-list.service';
 import { CountryDto, VatValidationResult } from '../../../models/country.model';
 import { VatLookupComponent } from '../../../components/vat-lookup/vat-lookup.component';
 import { AddressAutocompleteComponent, ParsedAddress } from '../../../components/address-autocomplete/address-autocomplete.component';
@@ -34,6 +36,8 @@ export class AnagraficaModificaComponent implements OnInit {
   hasAgent    = false;
 
   countries: CountryDto[] = [];
+  priceLists: PriceList[] = [];
+  priceListsError = '';
   get selectedCountry(): string { return this.form?.get('countryCode')?.value ?? 'IT'; }
   get selectedVatNumber(): string { return this.form?.get('vatNumber')?.value ?? ''; }
   get isExtraEu(): boolean {
@@ -45,12 +49,17 @@ export class AnagraficaModificaComponent implements OnInit {
     private fb: FormBuilder,
     private contactService: ContactService,
     private countryService: CountryService,
+    private priceListService: PriceListService,
     private router: Router,
     private route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
     this.buildForm();
+    this.priceListService.getAll().subscribe({
+      next: lists => this.priceLists = lists,
+      error: e => this.priceListsError = priceError(e)
+    });
     this.countryService.getCountries().subscribe(c => {
       this.countries = c;
       this.countryService.preload(); // popola cache per VatLookup

@@ -1,8 +1,9 @@
-﻿import { Component, OnInit } from '@angular/core';
+﻿import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
 import { FormsModule } from '@angular/forms';
 import { ProductService } from '../../../services/product.service';
+import { hasDecimal8Precision } from '../../../services/price-list.validators';
 import {
   ProductDto, ProductImageDto, PageResponse, ColorDto, SizeDto, CategoryDto, CollectionDto, MaterialDto,
   CreateProductRequest, CreateProductVariantRequest, AddProductImageRequest, ProductVariantDto
@@ -38,6 +39,7 @@ import {
               <th class="px-6 py-3 text-left text-sm font-semibold">Fornitore Codice</th>
               <th class="px-6 py-3 text-left text-sm font-semibold">Varianti</th>
               <th class="px-6 py-3 text-left text-sm font-semibold">Prezzo Acquisto</th>
+              <th class="px-6 py-3 text-left text-sm font-semibold">Vendita netta (EUR)</th>
               <th class="px-6 py-3 text-left text-sm font-semibold">Azioni</th>
             </tr>
           </thead>
@@ -72,12 +74,20 @@ import {
                 </span>
               </td>
               <td class="px-6 py-3 text-sm space-x-2">
+                <ng-container *ngIf="sellingPriceRange(product) as range">
+                  <span *ngIf="range.min != null && range.min === range.max">&euro;{{ range.min | number:'1.2-8' }}</span>
+                  <span *ngIf="range.min != null && range.min !== range.max">Da &euro;{{ range.min | number:'1.2-8' }} a &euro;{{ range.max | number:'1.2-8' }}</span>
+                  <span *ngIf="range.missing" class="block text-red-700 text-xs">Prezzi da completare</span>
+                  <span *ngIf="range.empty" class="text-gray-500">Nessuna variante</span>
+                </ng-container>
+              </td>
+              <td class="px-6 py-3 text-sm space-x-2">
                 <button (click)="editProduct(product)" class="text-blue-600 hover:text-blue-800 underline">Modifica</button>
                 <button (click)="deleteProduct(product.id)" class="text-red-600 hover:text-red-800 underline">Elimina</button>
               </td>
             </tr>
             <tr *ngIf="products.length === 0">
-              <td colspan="7" class="px-6 py-8 text-center text-gray-500">Nessun prodotto trovato</td>
+              <td colspan="8" class="px-6 py-8 text-center text-gray-500">Nessun prodotto trovato</td>
             </tr>
           </tbody>
         </table>
@@ -133,6 +143,14 @@ import {
           <div class="flex-1 overflow-y-auto p-6">
             <!-- TAB: Details -->
             <div *ngIf="activeTab === 'details'" class="space-y-4">
+              <label class="block">
+                <input type="checkbox" aria-label="Prodotto con varianti" [(ngModel)]="formData.hasVariants"
+                  [disabled]="loadingVariants || productVariants.length > 0" />
+                Prodotto con varianti di colore e taglia
+              </label>
+              <p class="text-sm text-gray-500" *ngIf="formData.hasVariants">
+                Il prezzo si imposta sulle singole varianti, anche per colore singolo e taglia unica.
+              </p>
               <div class="grid grid-cols-2 gap-4">
                 <div>
                   <label class="block text-sm font-medium mb-1">Codice Interno *</label>
@@ -149,10 +167,17 @@ import {
                   <input [(ngModel)]="formData.supplierCode" type="text"
                     class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
-                <div>
-                  <label class="block text-sm font-medium mb-1">Markup Rate (%)</label>
-                  <input [(ngModel)]="formData.defaultMarkupRate" type="number" step="0.01"
+                <div *ngIf="!formData.hasVariants">
+                  <label class="block text-sm font-medium mb-1">Prezzo di vendita (IVA esclusa)</label>
+                  <input aria-label="Prezzo vendita prodotto netto" [disabled]="calculatingPrice"
+                    [(ngModel)]="formData.sellingPrice" type="number" step="0.00000001" min="0"
                     class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <label class="block text-xs mt-2">Aiuto al calcolo: ricarico sul costo (%)</label>
+                  <input aria-label="Ricarico prodotto (%)" [(ngModel)]="productMarkupRate"
+                    type="number" step="0.01" min="0" max="9999" class="w-full px-3 py-2 border rounded" />
+                  <button type="button" (click)="applyMarkup('product')" [disabled]="calculatingPrice"
+                    class="text-blue-600 text-sm">Applica ricarico al prezzo</button>
+                  <p class="text-xs text-gray-500">Si salva solo il prezzo netto, non il ricarico.</p>
                 </div>
                 <div>
                   <label class="block text-sm font-medium mb-1">Prezzo Base Fornitore *</label>
@@ -232,7 +257,11 @@ import {
                           </td>
                           <td class="px-4 py-3">{{ getSizeName(variant.sizeId) }}</td>
                           <td class="px-4 py-3">{{ variant.barcode }}</td>
-                          <td class="px-4 py-3">&euro;{{ variant.purchaseCost.toFixed(2) }}</td>
+                          <td class="px-4 py-3">
+                            <div>Acquisto: &euro;{{ variant.purchaseCost.toFixed(2) }}</div>
+                            <div class="text-blue-700" *ngIf="variant.sellingPrice != null">Vendita netta: &euro;{{ variant.sellingPrice | number:'1.2-8' }}</div>
+                            <div class="text-red-700" *ngIf="variant.sellingPrice == null">Prezzo da completare</div>
+                          </td>
                           <td class="px-4 py-3 text-gray-500">{{ variant.weightGrams != null ? (variant.weightGrams + ' g') : '—' }}</td>
                           <td class="px-4 py-3 text-center space-x-2">
                             <button
@@ -241,6 +270,7 @@ import {
                               Modifica
                             </button>
                             <button
+                              *ngIf="formData.hasVariants"
                               (click)="askDelete(variant.id, 'variant')"
                               [disabled]="deletingVariantId === variant.id"
                               class="text-red-600 hover:text-red-800 text-sm disabled:opacity-50">
@@ -276,6 +306,16 @@ import {
                           <td class="px-4 py-3">
                             <input [(ngModel)]="editingVariantForm.purchaseCost" type="number" step="0.01"
                               class="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            <label class="block text-xs mt-2">Prezzo vendita netto</label>
+                            <input aria-label="Prezzo vendita variante netto" [disabled]="calculatingPrice"
+                              [(ngModel)]="editingVariantForm.sellingPrice" type="number" min="0" step="0.00000001"
+                              class="w-full border rounded" />
+                            <label class="block text-xs mt-2">Aiuto: ricarico (%)</label>
+                            <input aria-label="Ricarico variante (%)"
+                              [(ngModel)]="editingVariantForm.markupRate" type="number" min="0" max="9999" step="0.01"
+                              class="w-full border rounded" />
+                            <button type="button" (click)="applyMarkup('editVariant')" [disabled]="calculatingPrice"
+                              class="text-blue-600 text-xs">Applica ricarico al prezzo</button>
                           </td>
                           <td class="px-4 py-3">
                             <input [(ngModel)]="editingVariantForm.weightGrams" type="number" step="1" min="0" placeholder="g"
@@ -284,7 +324,7 @@ import {
                           <td class="px-4 py-3 text-center space-x-2">
                             <button
                               (click)="saveVariantEdit()"
-                              [disabled]="savingVariantEdit"
+                              [disabled]="savingVariantEdit || calculatingPrice"
                               class="text-green-600 hover:text-green-800 text-sm font-semibold disabled:opacity-50">
                               {{ savingVariantEdit ? '...' : 'Salva' }}
                             </button>
@@ -302,7 +342,7 @@ import {
               </div>
 
               <!-- Add Variant Form -->
-              <div class="border-t pt-6">
+              <div *ngIf="formData.hasVariants" class="border-t pt-6">
                 <h3 class="text-lg font-semibold mb-4">Aggiungi Nuova Variante</h3>
                 <div class="bg-gray-50 rounded p-4 space-y-4">
                   <div class="grid grid-cols-2 gap-4">
@@ -340,6 +380,18 @@ import {
                         class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div>
+                      <label class="block text-sm font-medium mb-1">Prezzo vendita variante (IVA esclusa)</label>
+                      <input aria-label="Nuovo prezzo vendita variante netto" [disabled]="calculatingPrice"
+                        [(ngModel)]="newVariantForm.sellingPrice" type="number" min="0" step="0.00000001"
+                        class="w-full px-3 py-2 border rounded" />
+                      <label class="block text-xs mt-2">Aiuto: ricarico (%)</label>
+                      <input aria-label="Nuovo ricarico variante (%)"
+                        [(ngModel)]="newVariantForm.markupRate" type="number" min="0" max="9999" step="0.01"
+                        class="w-full px-3 py-2 border rounded" />
+                      <button type="button" (click)="applyMarkup('newVariant')" [disabled]="calculatingPrice"
+                        class="text-blue-600 text-sm">Applica ricarico al prezzo</button>
+                    </div>
+                    <div>
                       <label class="block text-sm font-medium mb-1">Peso (grammi)</label>
                       <input [(ngModel)]="newVariantForm.weightGrams" type="number" step="1" min="0" placeholder="es. 350"
                         class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -348,7 +400,7 @@ import {
                   <div *ngIf="variantError" class="bg-red-100 text-red-800 p-3 rounded text-sm">{{ variantError }}</div>
                   <button
                     (click)="addVariant()"
-                    [disabled]="savingVariant"
+                    [disabled]="savingVariant || calculatingPrice"
                     class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded disabled:opacity-50">
                     {{ savingVariant ? 'Aggiunta...' : '+ Aggiungi Variante' }}
                   </button>
@@ -426,7 +478,7 @@ import {
 
           <div class="flex gap-3 justify-end border-t p-6 flex-shrink-0">
             <button (click)="closeModal()" class="px-4 py-2 border rounded hover:bg-gray-50">Annulla</button>
-            <button (click)="saveProduct()" [disabled]="savingProduct"
+            <button (click)="saveProduct()" [disabled]="savingProduct || calculatingPrice"
               class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded disabled:opacity-50">
               {{ savingProduct ? 'Salvataggio...' : (editingProductId ? 'Salva' : 'Crea Prodotto') }}
             </button>
@@ -446,7 +498,7 @@ import {
     </div>
   `
 })
-export class ProdottiComponent implements OnInit {
+export class ProdottiComponent implements OnInit, OnDestroy {
   // Product list
   products: ProductDto[] = [];
   currentPage = 1;
@@ -472,6 +524,9 @@ export class ProdottiComponent implements OnInit {
   savingProduct = false;
   formError: string | null = null;
   formData: CreateProductRequest = this.initializeProductForm();
+  productMarkupRate = 0;
+  calculatingPrice = false;
+  private priceCalculation?: import('rxjs').Subscription;
 
   confirmDeleteId: string | null = null;
   confirmDeleteType: 'product' | 'variant' | 'image' | null = null;
@@ -522,6 +577,10 @@ export class ProdottiComponent implements OnInit {
     this.loadProducts();
   }
 
+  ngOnDestroy(): void {
+    this.cancelPriceCalculation();
+  }
+
   private loadSupportData(): void {
     this.loadingSupportData = true;
     Promise.all([
@@ -549,19 +608,21 @@ export class ProdottiComponent implements OnInit {
       supplierCode: '',
       internalCode: '',
       name: '',
-      defaultMarkupRate: 0,
+      sellingPrice: null,
       vatRate: 0,
       basePurchaseCost: 0,
       hasVariants: true
     };
   }
 
-  private initializeVariantForm(defaultPurchaseCost = 0) {
+  private initializeVariantForm(defaultPurchaseCost = 0, sellingPrice: number | null = null) {
     return {
       colorId: '',
       sizeId: '',
       barcode: '',
       purchaseCost: defaultPurchaseCost,
+      sellingPrice,
+      markupRate: 0,
       weightGrams: null as number | null
     };
   }
@@ -604,8 +665,10 @@ export class ProdottiComponent implements OnInit {
   }
 
   openNewProductModal(): void {
+    this.cancelPriceCalculation();
     this.editingProductId = null;
     this.formData = this.initializeProductForm();
+    this.productMarkupRate = 0;
     this.newVariantForm = this.initializeVariantForm();
     this.productVariants = [];
     this.activeTab = 'details';
@@ -617,13 +680,15 @@ export class ProdottiComponent implements OnInit {
   }
 
   editProduct(product: ProductDto): void {
+    this.cancelPriceCalculation();
     this.editingProductId = product.id;
+    this.productMarkupRate = 0;
     this.formData = {
       supplierId: product.supplierId,
       supplierCode: product.supplierCode,
       internalCode: product.internalCode,
       name: product.name,
-      defaultMarkupRate: product.defaultMarkupRate,
+      sellingPrice: product.hasVariants ? null : product.sellingPrice,
       vatRate: product.vatRate,
       basePurchaseCost: product.basePurchaseCost,
       hasVariants: product.hasVariants ?? true,
@@ -632,13 +697,7 @@ export class ProdottiComponent implements OnInit {
       materialId: product.materialId
     };
     
-    this.newVariantForm = {
-      colorId: '',
-      sizeId: '',
-      barcode: '',
-      purchaseCost: product.basePurchaseCost,
-      weightGrams: null
-    };
+    this.newVariantForm = this.initializeVariantForm(product.basePurchaseCost);
     
     this.activeTab = 'details';
     this.formError = null;
@@ -654,6 +713,8 @@ export class ProdottiComponent implements OnInit {
     this.showModal = false;
     this.editingProductId = null;
     this.formData = this.initializeProductForm();
+    this.cancelPriceCalculation();
+    this.productMarkupRate = 0;
     this.newVariantForm = this.initializeVariantForm();
     this.productVariants = [];
     this.galleryProduct = null;
@@ -675,6 +736,7 @@ export class ProdottiComponent implements OnInit {
   }
 
   saveProduct(): void {
+    if (this.calculatingPrice) return;
     this.formError = null;
     if (!this.formData.name || !this.formData.internalCode) {
       this.formError = 'Completa i campi obbligatori (Nome e Codice Interno)';
@@ -684,14 +746,19 @@ export class ProdottiComponent implements OnInit {
       this.formError = 'Il Prezzo Base Fornitore è obbligatorio';
       return;
     }
+    if (!this.formData.hasVariants && !this.validSellingPrice(this.formData.sellingPrice)) {
+      this.formError = 'Specificare il prezzo di vendita netto, non negativo e con massimo 8 decimali.';
+      return;
+    }
     if (!this.formData.supplierId?.trim()) {
       this.formData.supplierId = this.generateUUID();
     }
 
     this.savingProduct = true;
+    const request = { ...this.formData, sellingPrice: this.formData.hasVariants ? null : this.formData.sellingPrice };
     const operation = this.editingProductId
-      ? this.productService.updateProduct(this.editingProductId, this.formData)
-      : this.productService.createProduct(this.formData);
+      ? this.productService.updateProduct(this.editingProductId, request)
+      : this.productService.createProduct(request);
 
     operation.subscribe({
       next: (product) => {
@@ -700,7 +767,8 @@ export class ProdottiComponent implements OnInit {
           this.editingProductId = product.id;
           this.galleryProduct = { ...product, images: [...(product.images ?? [])] };
           this.newVariantForm = this.initializeVariantForm(product.basePurchaseCost);
-          this.activeTab = 'variants';
+          if (product.hasVariants) this.activeTab = 'variants';
+          else this.closeModal();
         } else {
           // Prodotto aggiornato: chiudi modale
           this.closeModal();
@@ -719,6 +787,7 @@ export class ProdottiComponent implements OnInit {
   }
 
   addVariant(): void {
+    if (this.calculatingPrice) return;
     this.variantError = null;
     if (!this.newVariantForm.colorId || !this.newVariantForm.sizeId || !this.newVariantForm.barcode || this.newVariantForm.purchaseCost === null || this.newVariantForm.purchaseCost === undefined) {
       this.variantError = 'Completa tutti i campi obbligatori';
@@ -728,6 +797,7 @@ export class ProdottiComponent implements OnInit {
       this.variantError = 'Barcode già esistente';
       return;
     }
+    if (!this.validVariantPricing(this.newVariantForm)) return;
 
     const request: CreateProductVariantRequest = {
       productId: this.editingProductId!,
@@ -735,6 +805,7 @@ export class ProdottiComponent implements OnInit {
       sizeId: this.newVariantForm.sizeId,
       barcode: this.newVariantForm.barcode,
       purchaseCost: this.newVariantForm.purchaseCost,
+      sellingPrice: this.newVariantForm.sellingPrice,
       weightGrams: this.newVariantForm.weightGrams || null
     };
 
@@ -773,19 +844,24 @@ export class ProdottiComponent implements OnInit {
   }
 
   startEditVariant(variant: ProductVariantDto): void {
+    this.cancelPriceCalculation();
     this.editingVariantId = variant.id;
     this.editingVariantForm = {
       colorId: variant.colorId || '',
       sizeId: variant.sizeId || '',
       barcode: variant.barcode,
       purchaseCost: variant.purchaseCost,
+      sellingPrice: variant.sellingPrice,
+      markupRate: 0,
       weightGrams: variant.weightGrams ?? null
     };
     this.variantError = null;
   }
 
   saveVariantEdit(): void {
+    if (this.calculatingPrice) return;
     if (!this.editingProductId || !this.editingVariantId) return;
+    if (!this.validVariantPricing(this.editingVariantForm)) return;
 
     this.savingVariantEdit = true;
     const request = {
@@ -793,6 +869,7 @@ export class ProdottiComponent implements OnInit {
       sizeId: this.editingVariantForm.sizeId || null,
       barcode: this.editingVariantForm.barcode,
       purchaseCost: this.editingVariantForm.purchaseCost,
+      sellingPrice: this.editingVariantForm.sellingPrice,
       weightGrams: this.editingVariantForm.weightGrams || null
     };
 
@@ -815,10 +892,67 @@ export class ProdottiComponent implements OnInit {
     });
   }
 
+  private validSellingPrice(price: number | null | undefined): boolean {
+    return price != null && Number.isFinite(price) && price >= 0 && price < 1e14 && hasDecimal8Precision(price);
+  }
+
+  sellingPriceRange(product: ProductDto): { min: number | null; max: number | null; missing: boolean; empty: boolean } {
+    const prices = product.hasVariants ? product.variants.map(variant => variant.sellingPrice) : [product.sellingPrice];
+    const available = prices.filter((price): price is number => price != null);
+    return {
+      min: available.length ? Math.min(...available) : null,
+      max: available.length ? Math.max(...available) : null,
+      missing: available.length !== prices.length,
+      empty: prices.length === 0
+    };
+  }
+
+  private validVariantPricing(form: ReturnType<ProdottiComponent['initializeVariantForm']>): boolean {
+    if (!this.validSellingPrice(form.sellingPrice)) {
+      this.variantError = 'Specificare il prezzo di vendita netto, non negativo e con massimo 8 decimali.';
+      return false;
+    }
+    return true;
+  }
+
   cancelVariantEdit(): void {
+    this.cancelPriceCalculation();
     this.editingVariantId = null;
     this.editingVariantForm = this.initializeVariantForm();
     this.variantError = null;
+  }
+
+  applyMarkup(target: 'product' | 'newVariant' | 'editVariant'): void {
+    this.cancelPriceCalculation();
+    const form = target === 'product' ? null : target === 'newVariant' ? this.newVariantForm : this.editingVariantForm;
+    const cost = form ? form.purchaseCost : this.formData.basePurchaseCost;
+    const markup = form ? form.markupRate : this.productMarkupRate;
+    if (!Number.isFinite(cost) || cost == null || cost < 0 ||
+      !Number.isFinite(markup) || markup == null || markup < 0 || markup > 9999 ||
+      !/^\d+(?:\.\d{1,2})?$/.test(String(markup))) {
+      if (form) this.variantError = 'Specificare costo e ricarico validi (0-9999, massimo 2 decimali).';
+      else this.formError = 'Specificare costo e ricarico validi (0-9999, massimo 2 decimali).';
+      return;
+    }
+    this.calculatingPrice = true;
+    this.priceCalculation = this.productService.calculateSellingPrice(cost, markup).subscribe({
+      next: price => {
+        if (form) { form.sellingPrice = price; this.variantError = null; }
+        else { this.formData.sellingPrice = price; this.formError = null; }
+        this.calculatingPrice = false;
+      },
+      error: (err) => {
+        const message = typeof err?.error === 'string' ? err.error : 'Errore nel calcolo del prezzo di vendita.';
+        if (form) this.variantError = message;
+        else this.formError = message;
+        this.calculatingPrice = false;
+      }
+    });
+  }
+
+  private cancelPriceCalculation(): void {
+    this.priceCalculation?.unsubscribe();
+    this.calculatingPrice = false;
   }
 
   deleteProduct(productId: string): void {
@@ -940,5 +1074,3 @@ export class ProdottiComponent implements OnInit {
     });
   }
 }
-
-

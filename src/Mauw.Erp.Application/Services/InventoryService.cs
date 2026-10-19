@@ -91,8 +91,7 @@ public class InventoryService(
         if (variant?.Product == null)
             return OperationResult<BarcodeVariantDto>.Fail("Variant not found");
 
-        var dto = ProductMapper.MapBarcodeVariantToDto(variant, variant.Product);
-        return OperationResult<BarcodeVariantDto>.Ok(dto);
+        return ProductMapper.MapBarcodeVariantToDto(variant, variant.Product);
     }
 
     public async Task<OperationResult<BarcodeVariantDto>> GetVariantByBarcodeWithStockAsync(string barcode, Guid warehouseId)
@@ -102,7 +101,10 @@ public class InventoryService(
             return OperationResult<BarcodeVariantDto>.Fail("Variant not found");
 
         var quantityAvailable = await unitOfWork.Stock.GetAvailableQtyAsync(warehouseId, variant.Id);
-        var dto = ProductMapper.MapBarcodeVariantToDto(variant, variant.Product) with
+        var pricing = ProductMapper.MapBarcodeVariantToDto(variant, variant.Product);
+        if (!pricing.Success)
+            return pricing;
+        var dto = pricing.Data! with
         {
             QuantityAvailable = quantityAvailable
         };

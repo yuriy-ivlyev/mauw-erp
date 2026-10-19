@@ -29,13 +29,18 @@ public class CreateProductRequestValidator : IValidator<CreateProductRequest>
         else if (request.Name.Length > 255)
             errors.Add(new(nameof(request.Name), "Product name must not exceed 255 characters"));
 
-        // DefaultMarkupRate validation
-        if (request.DefaultMarkupRate is < 0 or > 9999)
-            errors.Add(new(nameof(request.DefaultMarkupRate), "Markup rate must be between 0 and 9999"));
+        if (request.BasePurchaseCost < 0m)
+            errors.Add(new(nameof(request.BasePurchaseCost), "Purchase cost must be non-negative"));
 
         // VatRate validation
         if (request.VatRate is < 0 or > 100)
             errors.Add(new(nameof(request.VatRate), "VAT rate must be between 0 and 100"));
+        if (!request.HasVariants)
+        {
+            var pricing = new Mauw.Erp.Domain.Services.CatalogPriceCalculator().Validate(request.SellingPrice);
+            if (!pricing.Success)
+                errors.Add(new(nameof(request.SellingPrice), pricing.Error));
+        }
 
         return errors.Count == 0 ? ValidationResult.Success() : ValidationResult.Failure(errors);
     }

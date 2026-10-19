@@ -137,7 +137,7 @@ public static class InventoryEndpoints
         return TypedResults.Ok(result.Data!);
     }
 
-    private static async Task<Results<Ok<BarcodeVariantDto>, NotFound>> GetVariantByBarcodeWithStock(
+    private static async Task<Results<Ok<BarcodeVariantDto>, BadRequest<string>, NotFound>> GetVariantByBarcodeWithStock(
         string barcode,
         Guid warehouseId,
         IInventoryService inventoryService)
@@ -145,7 +145,9 @@ public static class InventoryEndpoints
         var result = await inventoryService.GetVariantByBarcodeWithStockAsync(barcode, warehouseId);
 
         if (!result.Success)
-            return TypedResults.NotFound();
+            return result.Error == "Variant not found"
+                ? TypedResults.NotFound()
+                : TypedResults.BadRequest(result.Error);
 
         return TypedResults.Ok(result.Data!);
     }

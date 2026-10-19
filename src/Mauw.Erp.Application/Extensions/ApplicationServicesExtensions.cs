@@ -9,7 +9,11 @@ public static class ApplicationServicesExtensions
 {
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
-    services.AddSingleton<ItalianAccountingCalculator>();
+        services.AddSingleton<ItalianAccountingCalculator>();
+        services.AddSingleton<PriceListResolver>();
+        services.AddSingleton<CatalogPriceCalculator>();
+        services.AddScoped<IPriceListService, PriceListService>();
+        services.AddScoped<IDocumentPricingService, DocumentPricingService>();
         services.AddScoped<OrderService>();
         services.AddScoped<IOrderService>(sp =>
             new TracingOrderService(sp.GetRequiredService<OrderService>()));

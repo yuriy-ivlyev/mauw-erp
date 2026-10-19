@@ -12,6 +12,7 @@ public class OrderItemConfiguration : IEntityTypeConfiguration<OrderItem>
     public void Configure(EntityTypeBuilder<OrderItem> builder)
     {
         builder.HasKey(oi => oi.Id);
+        builder.OwnsOne(item => item.PricingSnapshot, snapshot => PricingSnapshotConfiguration.Configure(snapshot, "order_items"));
 
         builder.Property(oi => oi.Quantity)
             .IsRequired();

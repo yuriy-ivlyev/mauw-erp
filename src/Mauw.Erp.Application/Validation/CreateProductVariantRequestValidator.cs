@@ -32,6 +32,10 @@ public class CreateProductVariantRequestValidator : IValidator<CreateProductVari
         // PurchaseCost validation
         if (request.PurchaseCost < 0)
             errors.Add(new(nameof(request.PurchaseCost), "Purchase cost must be greater than or equal to 0"));
+        var pricing = new Mauw.Erp.Domain.Services.CatalogPriceCalculator()
+            .Validate(request.SellingPrice);
+        if (!pricing.Success)
+            errors.Add(new(nameof(request.SellingPrice), pricing.Error));
 
         return errors.Count == 0 ? ValidationResult.Success() : ValidationResult.Failure(errors);
     }

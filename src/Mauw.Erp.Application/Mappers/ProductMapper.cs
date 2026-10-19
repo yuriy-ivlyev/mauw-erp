@@ -1,6 +1,7 @@
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Domain.Entities;
 using Mauw.Erp.Domain.Services;
+using Mauw.Erp.Application.Services;
 
 namespace Mauw.Erp.Application.Mappers;
 
@@ -9,21 +10,29 @@ namespace Mauw.Erp.Application.Mappers;
 /// </summary>
 public static class ProductMapper
 {
-    private static readonly PricingEngine PricingEngine = new();
+    private static readonly CatalogPriceCalculator CatalogPrices = new();
 
-    public static ProductDto MapToDto(Product product)
+    public static OperationResult<ProductDto> MapToDto(Product product)
     {
-        return new ProductDto(
+        var variants = new List<ProductVariantDto>();
+        foreach (var variant in product.Variants)
+        {
+            var result = MapVariantToDto(variant, product);
+            if (!result.Success)
+                return OperationResult<ProductDto>.Fail(result.Error!);
+            variants.Add(result.Data!);
+        }
+        return OperationResult<ProductDto>.Ok(new ProductDto(
             Id: product.Id,
             SupplierId: product.SupplierId,
             SupplierCode: product.SupplierCode,
             InternalCode: product.InternalCode,
             Name: product.Name,
-            DefaultMarkupRate: product.DefaultMarkupRate,
+            SellingPrice: product.HasVariants ? null : product.SellingPrice,
             VatRate: product.VatRate,
             BasePurchaseCost: product.BasePurchaseCost,
             Images: product.Images.OrderBy(i => i.DisplayOrder).Select(MapImageToDto).ToList(),
-            Variants: product.Variants.Select(v => MapVariantToDto(v, product.DefaultMarkupRate)).ToList(),
+            Variants: variants,
             HasVariants: product.HasVariants,
             CategoryId: product.CategoryId,
             CategoryName: product.Category?.Name,
@@ -31,7 +40,7 @@ public static class ProductMapper
             CollectionName: product.Collection?.Name,
             MaterialId: product.MaterialId,
             MaterialName: product.Material?.Name
-        );
+        ));
     }
 
     public static ProductImageDto MapImageToDto(ProductImage image)
@@ -47,16 +56,17 @@ public static class ProductMapper
         );
     }
 
-    public static ProductVariantDto MapVariantToDto(ProductVariant variant, decimal defaultMarkupRate)
+    public static OperationResult<ProductVariantDto> MapVariantToDto(ProductVariant variant, Product product)
     {
-        var pricingResult = PricingEngine.CalculatePrice(
-            variant.PurchaseCost,
-            defaultMarkupRate,
-            0,
-            0
-        );
+        if (variant.SellingPrice.HasValue)
+        {
+            var validation = CatalogPrices.Validate(variant.SellingPrice);
+            if (!validation.Success)
+                return OperationResult<ProductVariantDto>.Fail(validation.Error);
+        }
+        var price = variant.SellingPrice;
 
-        return new(
+        return OperationResult<ProductVariantDto>.Ok(new(
             Id: variant.Id,
             ProductId: variant.ProductId,
             ColorId: variant.ColorId,
@@ -66,38 +76,45 @@ public static class ProductMapper
             Barcode: variant.Barcode,
             PurchaseCost: variant.PurchaseCost,
             StockQuantity: 0,
-            ListPrice: pricingResult.ListPrice,
-            FinalNetPrice: pricingResult.FinalNetPrice,
+            ListPrice: price,
+            FinalNetPrice: price,
             VatAmount: 0,
-            FinalGrossPrice: pricingResult.FinalNetPrice,
-            WeightGrams: variant.WeightGrams
-        );
+            FinalGrossPrice: price,
+            WeightGrams: variant.WeightGrams,
+            SellingPrice: variant.SellingPrice
+        ));
     }
 
-    public static BarcodeVariantDto MapBarcodeVariantToDto(ProductVariant variant, Product product)
+    public static OperationResult<BarcodeVariantDto> MapBarcodeVariantToDto(ProductVariant variant, Product product)
     {
-        var pricingResult = PricingEngine.CalculatePrice(
-            variant.PurchaseCost,
-            product.DefaultMarkupRate,
-            0,
-            product.VatRate
-        );
+        var pricing = CatalogPrices.GetStoredPrice(variant);
+        if (!pricing.Success)
+            return OperationResult<BarcodeVariantDto>.Fail(pricing.Error);
+        var price = pricing.Data!.Value;
 
-        return new(
+        return OperationResult<BarcodeVariantDto>.Ok(new(
             Barcode: variant.Barcode,
             VariantId: variant.Id,
             ProductId: variant.ProductId,
             ProductName: product.Name,
             Size: variant.Size?.Name ?? "N/A",
             Color: variant.Color?.Name ?? "N/A",
-            UnitNetPrice: pricingResult.FinalNetPrice,
+            UnitNetPrice: price,
             VatRate: product.VatRate,
             WeightGrams: variant.WeightGrams
-        );
+        ));
     }
 
-    public static List<ProductDto> MapToListDto(IEnumerable<Product> products)
+    public static OperationResult<List<ProductDto>> MapToListDto(IEnumerable<Product> products)
     {
-        return products.Select(MapToDto).ToList();
+        var dtos = new List<ProductDto>();
+        foreach (var product in products)
+        {
+            var result = MapToDto(product);
+            if (!result.Success)
+                return OperationResult<List<ProductDto>>.Fail(result.Error!);
+            dtos.Add(result.Data!);
+        }
+        return OperationResult<List<ProductDto>>.Ok(dtos);
     }
 }

@@ -4,3 +4,71 @@ GET {{Mauw.Erp.Api_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
+
+@baseUrl = http://localhost:5020/api/v1
+@productId = 00000000-0000-0000-0000-000000000001
+@variantId = 00000000-0000-0000-0000-000000000002
+
+### Optional entry aid only: calculate a price using decimal, without saving markup
+POST {{baseUrl}}/products/calculate-selling-price
+Content-Type: application/json
+
+{
+  "purchaseCost": 10,
+  "markupRate": 30
+}
+
+### Create a variant parent: prices belong to its SKUs, not the parent
+POST {{baseUrl}}/products
+Content-Type: application/json
+
+{
+  "supplierId": "00000000-0000-0000-0000-000000000003",
+  "supplierCode": "SUP-001",
+  "internalCode": "ART-001",
+  "name": "Camicia",
+  "sellingPrice": null,
+  "vatRate": 22,
+  "basePurchaseCost": 10,
+  "hasVariants": true
+}
+
+### Update variant parent without repricing its SKUs
+PUT {{baseUrl}}/products/{{productId}}
+Content-Type: application/json
+
+{
+  "supplierId": "00000000-0000-0000-0000-000000000003",
+  "supplierCode": "SUP-001",
+  "internalCode": "ART-001",
+  "name": "Camicia",
+  "sellingPrice": null,
+  "vatRate": 22,
+  "basePurchaseCost": 99,
+  "hasVariants": true
+}
+
+### Create a variant with its definitive selling price
+POST {{baseUrl}}/products/{{productId}}/variants
+Content-Type: application/json
+
+{
+  "productId": "{{productId}}",
+  "colorId": null,
+  "sizeId": null,
+  "barcode": "TEST-SKU-001",
+  "purchaseCost": 10,
+  "sellingPrice": 18.83606557
+}
+
+### Update variant: send the definitive selling price, not a markup or policy
+PATCH {{baseUrl}}/products/{{productId}}/variants/{{variantId}}
+Content-Type: application/json
+
+{
+  "colorId": null,
+  "sizeId": null,
+  "barcode": "TEST-SKU-001",
+  "purchaseCost": 10,
+  "sellingPrice": 30
+}

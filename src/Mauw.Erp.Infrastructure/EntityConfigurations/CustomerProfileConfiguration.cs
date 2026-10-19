@@ -15,6 +15,8 @@ public class CustomerProfileConfiguration : IEntityTypeConfiguration<CustomerPro
         builder.Property(cp => cp.CreditLimit).HasPrecision(18, 2);
         builder.Property(cp => cp.BlockReason).HasMaxLength(500);
         builder.Property(cp => cp.DeliveryNotes).HasMaxLength(1000);
+        builder.HasOne(cp => cp.PriceList).WithMany().HasForeignKey(cp => cp.PriceListId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasOne(cp => cp.Contact)
             .WithOne(c => c.CustomerProfile)

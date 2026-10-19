@@ -12,6 +12,7 @@ public class InvoiceItemConfiguration : IEntityTypeConfiguration<InvoiceItem>
     public void Configure(EntityTypeBuilder<InvoiceItem> builder)
     {
         builder.HasKey(ii => ii.Id);
+        builder.OwnsOne(item => item.PricingSnapshot, snapshot => PricingSnapshotConfiguration.Configure(snapshot, "invoice_items"));
 
         builder.Property(ii => ii.Quantity)
             .IsRequired();

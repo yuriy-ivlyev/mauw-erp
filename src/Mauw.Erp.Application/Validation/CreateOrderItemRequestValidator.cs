@@ -16,8 +16,8 @@ public class CreateOrderItemRequestValidator : IValidator<CreateOrderItemRequest
             errors.Add(new(nameof(request.VariantId), "Variant ID is required"));
 
         // Quantity validation
-        if (request.Quantity <= 0)
-            errors.Add(new(nameof(request.Quantity), "Quantity must be greater than 0"));
+        if (request.Quantity == 0 || (!request.IsCustomerReturn && request.Quantity < 0))
+            errors.Add(new(nameof(request.Quantity), "Quantity must be positive (nonzero for customer returns)"));
 
         return errors.Count == 0 ? ValidationResult.Success() : ValidationResult.Failure(errors);
     }

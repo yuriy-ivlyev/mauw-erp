@@ -25,5 +25,12 @@ public class CreateProductVariantRequestValidator : AbstractValidator<CreateProd
 
         RuleFor(x => x.PurchaseCost)
             .GreaterThanOrEqualTo(0).WithMessage("Purchase cost must be 0 or greater");
+        RuleFor(x => x).Custom((request, context) =>
+        {
+            var pricing = new Mauw.Erp.Domain.Services.CatalogPriceCalculator()
+                .Validate(request.SellingPrice);
+            if (!pricing.Success)
+                context.AddFailure(nameof(request.SellingPrice), pricing.Error);
+        });
     }
 }
