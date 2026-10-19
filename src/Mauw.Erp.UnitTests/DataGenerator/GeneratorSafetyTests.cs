@@ -1,10 +1,24 @@
 using Mauw.Erp.DataGenerator;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 
 namespace Mauw.Erp.UnitTests.DataGenerator;
 
 public class GeneratorSafetyTests
 {
+    [Fact]
+    public void ResolvesGeneratorWithoutConnectingToDatabase()
+    {
+        var safe = DatabaseSafety.Validate("Host=localhost;Database=mauw_erp_loadtest", "mauw_erp_loadtest");
+        using var services = new ServiceCollection().AddDataGenerator()
+            .AddSimulationDatabase(safe.Data!)
+            .BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+        using var scope = services.CreateScope();
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<GeneratorRunner>());
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<SimulationGenerator>());
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<DatabaseCoordinator>());
+    }
+
     [Theory]
     [InlineData(null, null)]
     [InlineData("", "mauw_erp_loadtest")]

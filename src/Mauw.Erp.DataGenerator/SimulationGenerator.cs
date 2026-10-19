@@ -189,8 +189,8 @@ public sealed class SimulationGenerator(
     {
         var colors = await db.Colors.AsNoTracking().Select(color => color.Id).ToListAsync(token);
         for (var i = 0; i < ColorNames.Length; i++)
-            if (!colors.Contains($"SIM-C{i}"))
-                db.Colors.Add(new Color($"SIM-C{i}", ColorNames[i], $"#{i + 1:X6}"));
+            if (!colors.Contains($"G{i:D2}"))
+                db.Colors.Add(new Color($"G{i:D2}", ColorNames[i], $"#{i + 1:X6}"));
         var sizes = await db.Sizes.AsNoTracking().Select(size => size.Id).ToListAsync(token);
         foreach (var size in SizeCodes)
             if (!sizes.Contains(size))
@@ -229,7 +229,7 @@ public sealed class SimulationGenerator(
                 foreach (var size in SizeCodes)
                 {
                     var variant = new ProductVariant(product.Id, $"SIM{i + 1:D6}C{color}{size}",
-                        cost, $"SIM-C{color}", size) { SellingPrice = selling, MarkupRate = 40m };
+                        cost, $"G{color:D2}", size) { SellingPrice = selling, MarkupRate = 40m };
                     Track(variant, date);
                     variantIds.Add(variant.Id);
                     state.Variants++;
@@ -321,7 +321,7 @@ public sealed class SimulationGenerator(
             : state.SaleNumber++ % (state.Options.ActiveCustomers - state.Stockists);
         var customer = state.Customers[customerIndex];
         var number = ++state.Documents;
-        var documentDate = Utc(date).AddTicks(++state.EventSequence);
+        var documentDate = Utc(date).AddTicks(++state.EventSequence * 10);
         var order = new Order(customer, $"SIM-ORD-{number:D8}") { OrderDate = documentDate };
         Track(order, date);
         var ddt = new DdtDocument(customer, $"SIM-DDT-{number:D8}") { DdtDate = documentDate, OrderId = order.Id };
@@ -370,7 +370,7 @@ public sealed class SimulationGenerator(
         };
         Track(movement, date);
         db.Entry(movement).Property(item => item.MovementDateUtc).CurrentValue =
-            Utc(date).AddTicks(++state.EventSequence);
+            Utc(date).AddTicks(++state.EventSequence * 10);
         state.Movements++;
     }
 
@@ -444,7 +444,8 @@ public sealed class SimulationGenerator(
         public SimulationOptions Options { get; } = options;
         public Faker Faker { get; } = faker;
         public int DominantCount { get; } = dominantCount;
-        public int Stockists { get; } = Math.Min(10, Math.Max(1, options.ActiveCustomers / 100));
+        public int Stockists { get; } = Math.Min(10, Math.Max(1,
+            Math.Min(options.ActiveCustomers / 100, options.InitialProducts * 7 / 100)));
         public int LinesPerDocument { get; } = (int)Math.Min(10, Math.Max(1, purchased * 9 / 100 / options.ActiveCustomers));
         public List<Guid> Agents { get; } = [];
         public List<Guid> Suppliers { get; } = [];

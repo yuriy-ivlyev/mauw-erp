@@ -41,6 +41,7 @@ public class SimulationTests
 
         var products = await db.Products.AsNoTracking().OrderBy(item => item.InternalCode).ToListAsync();
         var variants = await db.ProductVariants.AsNoTracking().ToListAsync();
+        Assert.All(variants, item => Assert.InRange(item.ColorId!.Length, 1, 3));
         Assert.Equal(options.Products, products.Count);
         foreach (var product in products)
         {
@@ -128,6 +129,54 @@ public class SimulationTests
         Assert.False(result.Success);
         Assert.Empty(db.ChangeTracker.Entries());
         Assert.False(await db.Contacts.AnyAsync());
+    }
+
+    [Fact]
+    public async Task FiveYearFixtureHonorsReceiptCalendarAndClearsOnlyCompletedYears()
+    {
+        await using var db = Context();
+        var options = FixtureOptions() with
+        {
+            Years = 5, EndDate = new DateOnly(2026, 10, 19),
+            Products = 5, InitialProducts = 5, BatchSize = 1000
+        };
+        var result = await Generator(db).GenerateAsync(options, CancellationToken.None);
+        Assert.True(result.Success, result.Error);
+        var summary = result.Data!;
+        Assert.Equal(new DateOnly(2021, 10, 19), summary.StartDate);
+        Assert.Equal(options.Products, summary.IntroducedProducts);
+        Assert.Equal(summary.PurchasedUnits * 4 / 5, summary.DominantSupplierUnits);
+        Assert.Equal(options.ActiveCustomers, summary.ActiveCustomers);
+        Assert.True(summary.StockReconciled);
+        Assert.True(summary.CommercialStockUnits > 0);
+
+        var movements = await db.StockMovements.AsNoTracking().ToListAsync();
+        Assert.All(movements, movement => Assert.InRange(DateOnly.FromDateTime(movement.MovementDateUtc),
+            summary.StartDate, options.EndDate));
+        var receipts = movements.Where(item => item.Type == StockMovementType.PurchaseReceipt).ToList();
+        var opening = receipts.Where(item => DateOnly.FromDateTime(item.MovementDateUtc) == summary.StartDate).ToList();
+        Assert.Equal(options.InitialProducts, opening.Count);
+        var firstWeek = summary.StartDate.DayNumber + 1;
+        var weekly = receipts.Except(opening)
+            .GroupBy(item => (DateOnly.FromDateTime(item.MovementDateUtc).DayNumber - firstWeek) / 7);
+        foreach (var week in weekly)
+        {
+            Assert.InRange(week.Sum(item => item.Quantity), 300, 600);
+            var days = Math.Min(7, options.EndDate.DayNumber - firstWeek - week.Key * 7 + 1);
+            Assert.InRange(week.Select(item => item.ReferenceDoc).Distinct().Count(), Math.Min(2, days), Math.Min(3, days));
+        }
+        var commercial = await db.Warehouses.AsNoTracking().SingleAsync(item => item.IsSellable);
+        foreach (var year in Enumerable.Range(summary.StartDate.Year, options.EndDate.Year - summary.StartDate.Year))
+            Assert.Equal(0, movements.Where(item => item.WarehouseId == commercial.Id &&
+                item.MovementDateUtc.Year == year).Sum(item => item.Quantity));
+        var variants = await db.ProductVariants.AsNoTracking().ToDictionaryAsync(item => item.Id);
+        var products = await db.Products.AsNoTracking().ToListAsync();
+        foreach (var product in products)
+        {
+            var firstReceipt = receipts.Where(item => variants[item.VariantId].ProductId == product.Id)
+                .Min(item => item.MovementDateUtc);
+            Assert.Equal(DateOnly.FromDateTime(firstReceipt), DateOnly.FromDateTime(product.CreatedAt));
+        }
     }
 
     private static SimulationOptions FixtureOptions() => new()

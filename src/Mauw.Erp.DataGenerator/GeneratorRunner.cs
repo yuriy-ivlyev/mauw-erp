@@ -8,8 +8,6 @@ namespace Mauw.Erp.DataGenerator;
 
 public sealed class GeneratorRunner(ILogger<GeneratorRunner> logger)
 {
-    private const long LockId = 749283105;
-
     public async Task<int> RunAsync(string[] args, CancellationToken token)
     {
         var parsed = GeneratorCommand.Parse(args);
@@ -40,30 +38,31 @@ public sealed class GeneratorRunner(ILogger<GeneratorRunner> logger)
         var db = scope.ServiceProvider.GetRequiredService<MauwDbContext>();
         try
         {
-            await db.Database.OpenConnectionAsync(token);
-            await using var connectionLock = db.Database.GetDbConnection().CreateCommand();
-            connectionLock.CommandText = $"SELECT pg_try_advisory_lock({LockId})";
-            if (await connectionLock.ExecuteScalarAsync(token) is not true)
+            var coordinator = scope.ServiceProvider.GetRequiredService<DatabaseCoordinator>();
+            var acquired = await coordinator.AcquireAsync(token);
+            if (!acquired.Success)
             {
-                logger.LogError("Un altro generatore sta usando questo database.");
+                logger.LogError("{Error}", acquired.Error);
                 return 2;
             }
+            await using var lease = acquired.Data!;
 
             if (command.Action == "reset")
             {
-                // FORCE is deliberately not used: stop active application sessions first.
-                await db.Database.CloseConnectionAsync();
-                await db.Database.EnsureDeletedAsync(token);
+                await coordinator.ResetAsync(lease, token);
                 logger.LogInformation("Database eliminato. Ricrearlo con dotnet ef database update, poi eseguire seed (vedere README.txt).");
                 return 0;
             }
+            await db.Database.OpenConnectionAsync(token);
             if ((await db.Database.GetPendingMigrationsAsync(token)).Any())
             {
                 logger.LogError("Migrazioni mancanti: eseguire prima dotnet ef database update sul database dedicato.");
                 return 2;
             }
             if (await db.Contacts.IgnoreQueryFilters().AnyAsync(token) ||
+                await db.Warehouses.IgnoreQueryFilters().AnyAsync(token) ||
                 await db.Products.AnyAsync(token) ||
+                await db.StockItems.AnyAsync(token) ||
                 await db.StockMovements.AnyAsync(token) ||
                 await db.Orders.AnyAsync(token) ||
                 await db.Invoices.AnyAsync(token) ||

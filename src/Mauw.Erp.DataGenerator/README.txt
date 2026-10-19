@@ -18,6 +18,8 @@ il popolamento consuma comunque CPU, memoria e disco del server.
 Usare un ruolo PostgreSQL dedicato, proprietario SOLO del database loadtest,
 senza privilegi sui database applicativi. Il reset richiede di poterlo eliminare;
 la creazione tramite EF richiede CREATEDB o un database vuoto creato dal DBA.
+Il ruolo deve poter connettersi anche al database di manutenzione postgres:
+vi mantiene soltanto un advisory lock, senza modificare tabelle o dati.
 Un suffisso non sostituisce l'isolamento dei permessi.
 Non collegare questo strumento a produzione, neppure rinominandone il database.
 
@@ -26,7 +28,8 @@ appsettings dell'API o .env. Richiede host esplicito, nome terminante in
 _loadtest e --confirm-database con il nome esatto. Non stampa credenziali.
 seed rifiuta database con anagrafiche/documenti/movimenti gia presenti,
 anche se sono stati inseriti da una generazione interrotta. Non e un upsert.
-Un advisory lock PostgreSQL impedisce due seed simultanei.
+Un advisory lock PostgreSQL nel database di manutenzione coordina seed e reset
+per il medesimo database, anche durante l'eliminazione del database stesso.
 Fermare API e altri generatori prima del reset.
 
 Preparazione (Bash; dalla radice del repository)
@@ -66,8 +69,9 @@ Per gli esempi, ROOT e il percorso assoluto del clone:
 
 Ricreare e ripopolare
 --------------------
-Il reset e distruttivo e non fa backup. Fermare prima l'API; il provider puo
-rifiutare il DROP se rimangono sessioni aperte. Sono necessarie due conferme:
+Il reset e distruttivo e non fa backup. Fermare prima l'API: viene eseguito
+DROP DATABASE senza FORCE, quindi sessioni ancora aperte fanno fallire il
+reset anziche essere disconnesse. Sono necessarie due conferme:
   dotnet run --project "$ROOT/src/Mauw.Erp.DataGenerator" -- \
     reset --confirm-database mauw_erp_loadtest --allow-reset
 Poi ripetere dotnet ef database update e seed come sopra.
@@ -113,6 +117,13 @@ di 0,10: non e stata inventata una soglia commerciale diversa sotto 20 EUR.
 Prezzi persistiti con precisione a 8 decimali; importi documenti a 2 decimali.
 Le imposte e i totali sono calcolati solo dal calcolatore fiscale condiviso.
 
+Sono previsti 2–3 carichi per settimana (salvo l'ultima settimana incompleta),
+oltre al carico iniziale, per un totale settimanale di 300–600 pezzi.
+La vendita ordinaria punta al 90% dei pezzi acquistati (nel range 85–95%);
+il 2% e reso al fornitore e l'1% e trasferito nel magazzino fallati.
+Le quote sono applicate a pezzi interi; arrotondamenti e ultimo centinaio
+incompleto possono produrre piccoli scostamenti, riportati nel riepilogo.
+Il fallato non viene rivenduto come merce commerciale e resta separato.
 I movimenti distinguono carichi, vendite, resi al fornitore e fallati.
 Ogni vendita genera ordine, DDT e fattura con le stesse righe e totali.
 L'IVA ordinaria dello scenario e il 22%; non simula tutti i regimi fiscali,
@@ -139,5 +150,15 @@ Compilazione e test esistenti:
 
 Prima di una nuova prova completa, verificare il piano e la connessione,
 fare una prova ridotta con parametri coerenti, quindi ricreare il database.
+Esempio ridotto (stesso orizzonte, meno anagrafiche e SKU):
+  dotnet run --configuration Release --project "$ROOT/src/Mauw.Erp.DataGenerator" -- \
+    seed --confirm-database mauw_erp_loadtest \
+    --customers 100 --active-customers 20 --suppliers 10 \
+    --agents 10 --active-agents 5 --products 100 --initial-products 20 \
+    --end-date 2026-10-19 --seed 42
+I clienti (totali e attivi) devono essere multipli di 10; i modelli e il
+carico iniziale multipli di 5. Gli agenti attivi non possono superare il
+numero di clienti attivi rappresentati. Usare plan con le stesse opzioni
+per verificare questi vincoli senza scrivere.
 Conservare seed, data finale, anni, commit e parametri insieme ai risultati
 dei benchmark; dopo un cambio schema ricreare il dataset.
