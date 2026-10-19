@@ -115,6 +115,15 @@ storici o classificazioni fiscali; serve una revisione esplicita.
 Usare gli strumenti .NET deterministici per migrazioni:
 `dotnet ef migrations add` e `dotnet ef database update`.
 
+### Generatore dati di volume
+
+Quando cambiano entita, vincoli, contabilita o flussi documentali, adeguare anche
+`src/Mauw.Erp.DataGenerator`, i suoi test e `README.txt`. Il generatore rimane un
+eseguibile opzionale: nessun riferimento dai progetti applicativi, nessun hook
+di avvio e nessun seed automatico nell'API. Usare esclusivamente un database
+dedicato `_loadtest`, credenziali con privilegi limitati e conferme esplicite
+prima di scritture o reset; non ereditare la connessione dell'applicazione.
+
 ### Test obbligatori per modifiche contabili
 
 Usare xUnit con valori `decimal`, mai dati monetari `double` in `InlineData`.
