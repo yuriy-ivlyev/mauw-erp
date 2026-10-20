@@ -8,6 +8,7 @@ using Mauw.Erp.Api.Endpoints;
 using Mauw.Erp.Api.Extensions;
 using Mauw.Erp.Infrastructure.Reporting;
 using Mauw.Erp.Infrastructure.Branding;
+using Mauw.Erp.Infrastructure.Storage;
 using Mauw.Erp.Domain.Repositories;
 using Mauw.Erp.Infrastructure.Repositories;
 
@@ -47,6 +48,7 @@ builder.Services.AddPricingApi();
 builder.Services.AddScoped<Mauw.Erp.Domain.Services.PricingEngine>();
 builder.Services.AddInvoicePdfReporting();
 builder.Services.AddCompanyBranding();
+builder.Services.AddImageStorage(builder.Configuration);
 
 // Register application services with tracing decorators
 builder.Services.AddApplicationServices();

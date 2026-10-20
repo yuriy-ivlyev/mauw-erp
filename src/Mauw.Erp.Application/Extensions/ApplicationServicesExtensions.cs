@@ -43,6 +43,8 @@ public static class ApplicationServicesExtensions
         // Company settings (singleton-ish via IMemoryCache)
         services.AddScoped<ICompanySettingsService, CompanySettingsService>();
 
+        services.AddScoped<IImageApplicationService, ImageApplicationService>();
+
         // Contact address CRUD
         services.AddScoped<IContactAddressService, ContactAddressService>();
         services.AddScoped<IWarehouseService, WarehouseService>();
