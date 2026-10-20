@@ -9,6 +9,7 @@ namespace Mauw.Erp.Domain.Repositories;
 public interface IOrderRepository : IRepository<Order, Guid>
 {
     Task<IEnumerable<Order>> GetByContactIdAsync(Guid contactId);
+    Task<(IEnumerable<Order> Items, int Total)> GetByContactIdPagedAsync(Guid contactId, int page, int pageSize);
     Task<int> CountCassaSessionsAsync();
     Task<IEnumerable<Order>> GetSuspendedCassaSessionsAsync();
     Task<Order?> GetCassaSessionWithItemsAsync(Guid id);

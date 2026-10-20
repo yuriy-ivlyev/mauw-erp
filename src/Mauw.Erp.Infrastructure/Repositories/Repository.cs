@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Mauw.Erp.Domain.Entities;
 using Mauw.Erp.Domain.Repositories;
 using Mauw.Erp.Infrastructure.DbContext;
+using System.Linq.Expressions;
 
 namespace Mauw.Erp.Infrastructure.Repositories;
 
@@ -25,10 +26,12 @@ public class Repository<TEntity, TId>(MauwDbContext dbContext) : IRepository<TEn
         return await _dbSet.AsNoTracking().ToListAsync();
     }
 
-    public virtual async Task<IEnumerable<TEntity>> FindAsync(Func<TEntity, bool> predicate)
+    public virtual async Task<IEnumerable<TEntity>> FindAsync(Expression<Func<TEntity, bool>> predicate)
     {
-        var all = await _dbSet.AsNoTracking().ToListAsync();
-        return all.Where(predicate);
+        return await _dbSet
+            .AsNoTracking()
+            .Where(predicate)
+            .ToListAsync();
     }
 
     public virtual async Task AddAsync(TEntity entity)

@@ -135,10 +135,14 @@ public sealed class SimulationGenerator(
         var options = state.Options;
         for (var i = 0; i < options.Agents; i++)
         {
-            var contact = new Contact($"Agente SIM {i + 1:D4} {state.Faker.Name.FullName()}");
+            var first = state.Faker.Name.FirstName();
+            var last = state.Faker.Name.LastName();
+            var contact = new Contact($"Agente SIM {i + 1:D4} {first} {last}");
             contact.EnableAsAgent();
             if (i < options.ActiveAgents) contact.Activate();
+            ContactDataFactory.Fill(contact, state.Faker, i + 1, person: true, first, last);
             Track(contact, date);
+            TrackRegistry(contact, state.Faker, 1, date);
             state.Agents.Add(contact.Id);
             await FlushIfNeededAsync(options.BatchSize, token);
         }
@@ -148,7 +152,9 @@ public sealed class SimulationGenerator(
             var contact = new Contact($"Fornitore SIM {i + 1:D4} {state.Faker.Company.CompanyName()}");
             contact.EnableAsSupplier();
             contact.Activate();
+            ContactDataFactory.Fill(contact, state.Faker, options.Agents + i + 1, person: false);
             Track(contact, date);
+            TrackRegistry(contact, state.Faker, state.Faker.Random.Int(1, 3), date);
             state.Suppliers.Add(contact.Id);
             await FlushIfNeededAsync(options.BatchSize, token);
         }
@@ -164,7 +170,9 @@ public sealed class SimulationGenerator(
                 (i >= options.ActiveCustomers && i - options.ActiveCustomers < (options.Customers - options.ActiveCustomers) * 3 / 10);
             if (assigned)
                 contact.CustomerProfile!.DefaultAgentId = state.Agents[i % options.ActiveAgents];
+            ContactDataFactory.Fill(contact, state.Faker, options.Agents + options.Suppliers + i + 1, person: false);
             Track(contact, date);
+            TrackRegistry(contact, state.Faker, state.Faker.Random.Int(1, 3), date);
             state.Customers.Add(contact.Id);
             if (i == 0)
             {
@@ -183,6 +191,13 @@ public sealed class SimulationGenerator(
             await FlushIfNeededAsync(options.BatchSize, token);
         }
         await FlushAsync(token);
+    }
+
+    private void TrackRegistry(Contact contact, Faker faker, int persons, DateOnly date)
+    {
+        Track(ContactDataFactory.LegalHeadquarters(contact, faker), date);
+        foreach (var person in ContactDataFactory.Persons(contact, faker, persons))
+            Track(person, date);
     }
 
     private async Task CreateLookupsAsync(CancellationToken token)
@@ -420,7 +435,7 @@ public sealed class SimulationGenerator(
         {
             var remainingDays = Math.Min(7, options.EndDate.DayNumber - day + 1);
             var receipts = Math.Min(remainingDays, random.Int(2, 3));
-            var units = random.Int(3, 6) * 100;
+            var units = random.Int(3, 6) * 100 * options.WeeklyPiecesFactor;
             for (var i = 0; i < receipts; i++)
                 result.Add(new Receipt(DateOnly.FromDayNumber(day + i * remainingDays / receipts),
                     units / receipts + (i < units % receipts ? 1 : 0)));

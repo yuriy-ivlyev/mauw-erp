@@ -8,6 +8,7 @@ namespace Mauw.Erp.Domain.Repositories;
 public interface IDdtDocumentRepository : IRepository<DdtDocument, Guid>
 {
     Task<IEnumerable<DdtDocument>> GetByContactIdAsync(Guid contactId);
+    Task<(IEnumerable<DdtDocument> Items, int Total)> GetByContactIdPagedAsync(Guid contactId, int page, int pageSize);
     Task<DdtDocument?> GetByNumberAsync(string ddtNumber);
     Task<IEnumerable<DdtDocument>> GetByOrderIdsAsync(IEnumerable<Guid> orderIds);
     Task<int> CountDdtsByPrefixAsync(string prefix);

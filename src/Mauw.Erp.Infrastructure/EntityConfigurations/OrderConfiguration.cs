@@ -64,7 +64,8 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             .OnDelete(DeleteBehavior.Cascade);
 
         // Index for order lookup by contact
-        builder.HasIndex(o => o.ContactId);
+        builder.HasIndex(o => new { o.ContactId, o.OrderDate })
+            .IsDescending(false, true);
 
         // Unique index on OrderNumber
         builder.HasIndex(o => o.OrderNumber)

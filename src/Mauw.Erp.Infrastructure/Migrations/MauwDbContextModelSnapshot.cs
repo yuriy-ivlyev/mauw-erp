@@ -1107,13 +1107,13 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("p_k_ddt_documents");
 
-                    b.HasIndex("ContactId")
-                        .HasDatabaseName("i_x_ddt_documents_contact_id");
-
                     b.HasIndex("DdtNumber")
                         .IsUnique();
 
                     b.HasIndex("OrderId");
+
+                    b.HasIndex("ContactId", "DdtDate")
+                        .IsDescending(false, true);
 
                     b.ToTable("ddt_documents");
                 });
@@ -1255,13 +1255,13 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("p_k_invoices");
 
-                    b.HasIndex("ContactId")
-                        .HasDatabaseName("i_x_invoices_contact_id");
-
                     b.HasIndex("InvoiceNumber")
                         .IsUnique();
 
                     b.HasIndex("OrderId");
+
+                    b.HasIndex("ContactId", "InvoiceDate")
+                        .IsDescending(false, true);
 
                     b.ToTable("invoices");
                 });
@@ -1520,11 +1520,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("p_k_orders");
 
-                    b.HasIndex("ContactId")
-                        .HasDatabaseName("i_x_orders_contact_id");
-
                     b.HasIndex("OrderNumber")
                         .IsUnique();
+
+                    b.HasIndex("ContactId", "OrderDate")
+                        .IsDescending(false, true);
 
                     b.ToTable("orders");
                 });
@@ -2155,10 +2155,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
                     b.HasIndex("MovementDateUtc");
 
-                    b.HasIndex("VariantId")
-                        .HasDatabaseName("i_x_stock_movements_variant_id");
-
                     b.HasIndex("WarehouseId", "VariantId");
+
+                    b.HasIndex("VariantId", "CreatedAt", "Id")
+                        .IsDescending(false, true, true);
 
                     b.ToTable("stock_movements");
                 });

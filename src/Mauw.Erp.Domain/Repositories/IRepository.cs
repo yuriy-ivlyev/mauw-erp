@@ -1,4 +1,5 @@
 using Mauw.Erp.Domain.Entities;
+using System.Linq.Expressions;
 
 namespace Mauw.Erp.Domain.Repositories;
 
@@ -9,7 +10,7 @@ public interface IRepository<TEntity, TId> where TEntity : Entity<TId> where TId
 {
     Task<TEntity?> GetByIdAsync(TId id);
     Task<IEnumerable<TEntity>> GetAllAsync();
-    Task<IEnumerable<TEntity>> FindAsync(Func<TEntity, bool> predicate);
+    Task<IEnumerable<TEntity>> FindAsync(Expression<Func<TEntity, bool>> predicate);
     Task AddAsync(TEntity entity);
     Task UpdateAsync(TEntity entity);
     Task DeleteAsync(TEntity entity);

@@ -60,7 +60,8 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
             .HasForeignKey(ac => ac.InvoiceId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasIndex(i => i.ContactId);
+        builder.HasIndex(i => new { i.ContactId, i.InvoiceDate })
+            .IsDescending(false, true);
         builder.HasIndex(i => i.OrderId);
         builder.HasIndex(i => i.InvoiceNumber)
             .IsUnique();

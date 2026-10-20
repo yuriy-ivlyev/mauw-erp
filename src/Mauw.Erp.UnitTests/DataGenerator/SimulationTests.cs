@@ -18,6 +18,8 @@ public class SimulationTests
         Assert.False((new SimulationOptions { ActiveAgents = 301 }).Validate().Success);
         Assert.False((new SimulationOptions { InitialProducts = 20005 }).Validate().Success);
         Assert.False((new SimulationOptions { BatchSize = 0 }).Validate().Success);
+        Assert.False((new SimulationOptions { WeeklyPiecesFactor = 0 }).Validate().Success);
+        Assert.Equal(4, new SimulationOptions().WeeklyPiecesFactor);
     }
 
     [Fact]
@@ -38,6 +40,22 @@ public class SimulationTests
         Assert.True(summary.CommercialStockUnits > 0);
         Assert.True(summary.LiquidatedUnits > 0);
         Assert.Empty(db.ChangeTracker.Entries());
+
+        var registry = await db.Contacts.AsNoTracking().ToListAsync();
+        var addresses = await db.ContactAddresses.AsNoTracking().ToListAsync();
+        var persons = await db.ContactPersons.AsNoTracking().ToListAsync();
+        Assert.All(registry, contact =>
+        {
+            Assert.Matches("^[0-9]{11}$", contact.VatNumber!);
+            Assert.True(ContactDataFactory.IsValidVatNumber(contact.VatNumber!));
+            Assert.False(string.IsNullOrEmpty(contact.TaxCode));
+            Assert.Contains(addresses, a => a.ContactId == contact.Id && a.Purpose == AddressPurpose.LegalHeadquarters);
+            Assert.Contains(persons, p => p.ContactId == contact.Id && p.IsPrimary);
+        });
+        Assert.Equal(registry.Count, registry.Select(item => item.VatNumber).Distinct().Count());
+        Assert.All(registry.Where(item => item.TaxCode!.Length == 16), contact =>
+            Assert.Equal(ContactDataFactory.TaxCodeCheckCharacter(contact.TaxCode![..15]), contact.TaxCode![15]));
+        Assert.All(registry.Where(item => item.SdiCode is not null), contact => Assert.Equal(7, contact.SdiCode!.Length));
 
         var products = await db.Products.AsNoTracking().OrderBy(item => item.InternalCode).ToListAsync();
         var variants = await db.ProductVariants.AsNoTracking().ToListAsync();
@@ -211,8 +229,9 @@ public class SimulationTests
     private static SimulationOptions FixtureOptions() => new()
     {
         EndDate = new DateOnly(2026, 2, 1), Years = 1, Customers = 20, ActiveCustomers = 10,
-        Suppliers = 10, Agents = 4, ActiveAgents = 2, Products = 10, InitialProducts = 10, BatchSize = 100
-    };
+        Suppliers = 10, Agents = 4, ActiveAgents = 2,         Products = 10, InitialProducts = 10, BatchSize = 100,
+                WeeklyPiecesFactor = 1
+            };
 
     private static MauwDbContext Context() => new(new DbContextOptionsBuilder<MauwDbContext>()
         .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);

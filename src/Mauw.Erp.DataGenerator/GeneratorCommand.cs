@@ -53,6 +53,7 @@ public sealed record GeneratorCommand(string Action, string? Confirmation, bool 
                 case "--products": options = options with { Products = number }; break;
                 case "--initial-products": options = options with { InitialProducts = number }; break;
                 case "--batch-size": options = options with { BatchSize = number }; break;
+                case "--weekly-pieces-factor": options = options with { WeeklyPiecesFactor = number }; break;
                 default: return AccountingResult<GeneratorCommand>.Fail($"Opzione sconosciuta: {key}.");
             }
         }

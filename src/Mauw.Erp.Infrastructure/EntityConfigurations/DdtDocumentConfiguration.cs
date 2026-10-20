@@ -48,6 +48,8 @@ public class DdtDocumentConfiguration : IEntityTypeConfiguration<DdtDocument>
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(d => d.OrderId);
+        builder.HasIndex(d => new { d.ContactId, d.DdtDate })
+            .IsDescending(false, true);
         builder.HasIndex(d => d.DdtNumber)
             .IsUnique();
     }

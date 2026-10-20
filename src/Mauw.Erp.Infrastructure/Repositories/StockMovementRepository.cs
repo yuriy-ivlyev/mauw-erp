@@ -19,4 +19,24 @@ public class StockMovementRepository(MauwDbContext dbContext)
             .OrderByDescending(sm => sm.CreatedAt)
             .ToListAsync();
     }
+
+    public async Task<(IEnumerable<StockMovement> Items, int Total)> GetByVariantIdPagedAsync(
+        Guid variantId,
+        int page,
+        int pageSize)
+    {
+        var query = _dbSet
+            .AsNoTracking()
+            .Where(sm => sm.VariantId == variantId);
+
+        var total = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(sm => sm.CreatedAt)
+            .ThenByDescending(sm => sm.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (items, total);
+    }
 }

@@ -57,7 +57,8 @@ public class StockMovementConfiguration : IEntityTypeConfiguration<StockMovement
             .OnDelete(DeleteBehavior.SetNull);
 
         // Index for faster variant lookups
-        builder.HasIndex(sm => sm.VariantId);
+        builder.HasIndex(sm => new { sm.VariantId, sm.CreatedAt, sm.Id })
+            .IsDescending(false, true, true);
         builder.HasIndex(sm => new { sm.WarehouseId, sm.VariantId });
         builder.HasIndex(sm => sm.MovementDateUtc);
     }

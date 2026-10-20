@@ -15,6 +15,8 @@ public sealed record SimulationOptions
     public int Products { get; init; } = 20000;
     public int InitialProducts { get; init; } = 4000;
     public int BatchSize { get; init; } = 1000;
+    /// <summary>Multiplies the 300-600 weekly received pieces; 4 gives about one million movements in five years.</summary>
+    public int WeeklyPiecesFactor { get; init; } = 4;
 
     public AccountingResult<SimulationOptions> Validate()
     {
@@ -31,6 +33,8 @@ public sealed record SimulationOptions
             return Invalid("Product and opening model counts must be positive multiples of five; opening models cannot exceed products.");
         if (BatchSize < 1 || BatchSize > 100000)
             return Invalid("BatchSize must be between one and 100000.");
+        if (WeeklyPiecesFactor < 1 || WeeklyPiecesFactor > 20)
+            return Invalid("WeeklyPiecesFactor must be between one and 20.");
         return AccountingResult<SimulationOptions>.Ok(this);
 
         static AccountingResult<SimulationOptions> Invalid(string error) =>

@@ -8,4 +8,5 @@ namespace Mauw.Erp.Domain.Repositories;
 public interface IStockMovementRepository : IRepository<StockMovement, Guid>
 {
     Task<IEnumerable<StockMovement>> GetByVariantIdAsync(Guid variantId);
+    Task<(IEnumerable<StockMovement> Items, int Total)> GetByVariantIdPagedAsync(Guid variantId, int page, int pageSize);
 }

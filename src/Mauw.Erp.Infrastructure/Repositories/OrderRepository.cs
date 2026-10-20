@@ -27,6 +27,26 @@ public class OrderRepository(MauwDbContext dbContext) : Repository<Order, Guid>(
             .ToListAsync();
     }
 
+    public async Task<(IEnumerable<Order> Items, int Total)> GetByContactIdPagedAsync(
+        Guid contactId,
+        int page,
+        int pageSize)
+    {
+        var query = _dbSet.Where(o => o.ContactId == contactId);
+        var total = await query.CountAsync();
+        var items = await query
+            .Include(o => o.Contact)
+            .Include(o => o.Items)
+            .AsNoTracking()
+            .OrderByDescending(o => o.OrderDate)
+            .ThenByDescending(o => o.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (items, total);
+    }
+
     public async Task<int> CountCassaSessionsAsync() =>
         await _dbSet.CountAsync(o => o.OrderType == OrderType.CassaSession);
 

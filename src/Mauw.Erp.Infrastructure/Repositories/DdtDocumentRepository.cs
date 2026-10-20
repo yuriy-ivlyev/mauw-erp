@@ -21,6 +21,26 @@ public class DdtDocumentRepository(MauwDbContext dbContext) : Repository<DdtDocu
             .ToListAsync();
     }
 
+    public async Task<(IEnumerable<DdtDocument> Items, int Total)> GetByContactIdPagedAsync(
+        Guid contactId,
+        int page,
+        int pageSize)
+    {
+        var query = _dbSet.Where(d => d.ContactId == contactId);
+        var total = await query.CountAsync();
+        var items = await query
+            .Include(d => d.Contact)
+            .Include(d => d.Items)
+            .AsNoTracking()
+            .OrderByDescending(d => d.DdtDate)
+            .ThenByDescending(d => d.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (items, total);
+    }
+
     public async Task<DdtDocument?> GetByNumberAsync(string ddtNumber)
     {
         return await _dbSet

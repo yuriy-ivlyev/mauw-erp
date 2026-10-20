@@ -64,14 +64,8 @@ public class InventoryService(
 
     public async Task<OperationResult<PagedResult<StockMovementDto>>> GetMovementsAsync(Guid variantId, int page, int pageSize)
     {
-        var movements = await unitOfWork.StockMovements.GetByVariantIdAsync(variantId);
-        var paginated = movements
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToList();
-
-        var total = movements.Count();
-        var dtos = paginated.Select(m => new StockMovementDto(
+        var (movements, total) = await unitOfWork.StockMovements.GetByVariantIdPagedAsync(variantId, page, pageSize);
+        var dtos = movements.Select(m => new StockMovementDto(
             Id: m.Id,
             VariantId: m.VariantId,
             Type: m.Type.ToString(),
@@ -81,7 +75,7 @@ public class InventoryService(
             CreatedAt: m.CreatedAt
         )).ToList();
 
-        var result = new PagedResult<StockMovementDto>(dtos, page, pageSize, total);
+        var result = new PagedResult<StockMovementDto>(dtos.ToList(), page, pageSize, total);
         return OperationResult<PagedResult<StockMovementDto>>.Ok(result);
     }
 

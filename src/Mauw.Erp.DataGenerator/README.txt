@@ -110,6 +110,7 @@ Default:
   --active-agents 50           --products 20000
   --initial-products 4000      --years 5
   --seed 42                   --batch-size 1000
+  --weekly-pieces-factor 4
   --end-date <oggi UTC>
 
 Il 30% dei clienti e assegnato agli agenti attivi; il primo 10% dei fornitori
@@ -117,9 +118,18 @@ rappresenta l'80% dei pezzi ricevuti, non necessariamente l'80% del valore.
 I clienti senza operazioni e gli agenti inattivi restano nelle anagrafiche.
 Gli stocchisti fanno parte dei clienti operativi, non aumentano il totale.
 
+Ogni contatto (cliente, fornitore, agente) ha dati anagrafici sintetici:
+partita IVA di 11 cifre con cifra di controllo valida (univoca), codice fiscale
+(= partita IVA per le societa; 16 caratteri con carattere di controllo per gli
+agenti, persone fisiche), sede legale, 1-3 referenti (1 per gli agenti), PEC e
+codice SDI (solo clienti). Valori fittizi, mai reali: email su example.com,
+numeri non assegnati. IBAN, REA e regime fiscale non sono popolati.
+
 20.000 prodotti significa MODELLI, non singole SKU: ogni modello ha 5 o 6
 colori per 7 taglie (XXS, XS, S, M, L, XL, XXL), circa 770.000 varianti.
-300–600 articoli settimanali significa PEZZI ricevuti, non nuovi modelli
+300–600 articoli settimanali (x --weekly-pieces-factor, default 4 = 1.200–2.400,
+circa 490.000 pezzi e 1.000.000 di movimenti in cinque anni; 1 = 300–600)
+significa PEZZI ricevuti, non nuovi modelli
 moltiplicati per tutte le varianti: molte SKU avranno stock zero.
 Il caricamento iniziale introduce 4.000 modelli; i successivi introducono
 progressivamente gli altri e riassortiscono quelli gia introdotti.
@@ -132,7 +142,8 @@ Prezzi persistiti con precisione a 8 decimali; importi documenti a 2 decimali.
 Le imposte e i totali sono calcolati solo dal calcolatore fiscale condiviso.
 
 Sono previsti 2–3 carichi per settimana (salvo l'ultima settimana incompleta),
-oltre al carico iniziale, per un totale settimanale di 300–600 pezzi.
+oltre al carico iniziale, per un totale settimanale di 300–600 pezzi per il
+fattore (--weekly-pieces-factor, default 4).
 La vendita ordinaria punta al 90% dei pezzi acquistati (nel range 85–95%);
 il 2% e reso al fornitore e l'1% e trasferito nel magazzino fallati.
 Le quote sono applicate a pezzi interi; arrotondamenti e ultimo centinaio

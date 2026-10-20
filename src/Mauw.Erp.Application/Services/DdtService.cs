@@ -55,15 +55,8 @@ public class DdtService(
 
     public async Task<OperationResult<PagedResult<DdtDto>>> GetDdtsByContactAsync(Guid contactId, int page, int pageSize)
     {
-        var ddts = await unitOfWork.DdtDocuments.GetByContactIdAsync(contactId);
-        var paginated = ddts
-            .OrderByDescending(d => d.DdtDate)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToList();
-
-        var total = ddts.Count();
-        var dtos = DdtMapper.MapToListDto(paginated);
+        var (ddts, total) = await unitOfWork.DdtDocuments.GetByContactIdPagedAsync(contactId, page, pageSize);
+        var dtos = DdtMapper.MapToListDto(ddts);
         var result = new PagedResult<DdtDto>(dtos, page, pageSize, total);
 
         return OperationResult<PagedResult<DdtDto>>.Ok(result);

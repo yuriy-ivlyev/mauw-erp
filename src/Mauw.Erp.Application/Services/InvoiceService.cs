@@ -66,14 +66,8 @@ public class InvoiceService(
 
     public async Task<OperationResult<PagedResult<InvoiceDto>>> GetInvoicesByContactAsync(Guid contactId, int page, int pageSize)
     {
-        var invoices = await unitOfWork.Invoices.GetByContactIdAsync(contactId);
-        var paginated = invoices
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToList();
-
-        var total = invoices.Count();
-        var dtos = InvoiceMapper.MapToListDto(paginated);
+        var (invoices, total) = await unitOfWork.Invoices.GetByContactIdPagedAsync(contactId, page, pageSize);
+        var dtos = InvoiceMapper.MapToListDto(invoices);
         var result = new PagedResult<InvoiceDto>(dtos, page, pageSize, total);
 
         return OperationResult<PagedResult<InvoiceDto>>.Ok(result);

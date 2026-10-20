@@ -129,14 +129,8 @@ public partial class OrderService(
 
     public async Task<OperationResult<PagedResult<OrderDto>>> GetOrdersByContactAsync(Guid contactId, int page, int pageSize)
     {
-        var orders = await unitOfWork.Orders.GetByContactIdAsync(contactId);
-        var paginated = orders
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToList();
-
-        var total = orders.Count();
-        var dtos = OrderMapper.MapToListDto(paginated);
+        var (orders, total) = await unitOfWork.Orders.GetByContactIdPagedAsync(contactId, page, pageSize);
+        var dtos = OrderMapper.MapToListDto(orders);
         var result = new PagedResult<OrderDto>(dtos, page, pageSize, total);
 
         return OperationResult<PagedResult<OrderDto>>.Ok(result);
