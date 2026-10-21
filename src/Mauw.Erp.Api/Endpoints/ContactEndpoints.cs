@@ -98,9 +98,10 @@ public static class ContactEndpoints
             SortBy = sortBy,
             SortDescending = sortDescending,
             Page = page,
-            PageSize = Math.Min(pageSize, 100)
+            PageSize = pageSize
         };
-
+        request.Page = Math.Max(request.Page, 1);
+        request.PageSize = request.PageSize <= 0 ? 20 : Math.Min(request.PageSize, 100);
         var result = await contactService.GetPagedAsync(request);
         logger.LogInformation("Listed contacts – total: {Total}", result.Data?.TotalCount);
         return TypedResults.Ok(result.Data!);

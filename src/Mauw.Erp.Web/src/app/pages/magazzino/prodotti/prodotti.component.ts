@@ -5,6 +5,9 @@ import { ProductImageGalleryComponent } from '../../../components/product-image-
 import { FormsModule } from '@angular/forms';
 import { ProductService } from '../../../services/product.service';
 import { hasDecimal8Precision } from '../../../services/price-list.validators';
+import { PaginationComponent } from '../../../shared/pagination/pagination.component';
+import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
+import { SortChange } from '../../../models/pagination.model';
 import {
   ProductDto, PageResponse, ColorDto, SizeDto, CategoryDto, CollectionDto, MaterialDto,
   CreateProductRequest, CreateProductVariantRequest, ProductVariantDto
@@ -13,7 +16,7 @@ import {
 @Component({
   selector: 'app-prodotti',
   standalone: true,
-  imports: [CommonModule, FormsModule, ConfirmDeleteModalComponent, ProductImageGalleryComponent],
+  imports: [CommonModule, FormsModule, ConfirmDeleteModalComponent, ProductImageGalleryComponent, PaginationComponent, SortHeaderDirective],
   template: `
     <div class="p-6">
       <div class="flex justify-between items-center mb-6">
@@ -35,12 +38,12 @@ import {
           <thead class="bg-gray-100 border-b">
             <tr>
               <th class="px-4 py-3 text-left text-sm font-semibold w-20">Img</th>
-              <th class="px-6 py-3 text-left text-sm font-semibold">Codice</th>
-              <th class="px-6 py-3 text-left text-sm font-semibold">Nome Prodotto</th>
-              <th class="px-6 py-3 text-left text-sm font-semibold">Fornitore Codice</th>
-              <th class="px-6 py-3 text-left text-sm font-semibold">Varianti</th>
-              <th class="px-6 py-3 text-left text-sm font-semibold">Prezzo Acquisto</th>
-              <th class="px-6 py-3 text-left text-sm font-semibold">Vendita netta (EUR)</th>
+              <th appSortHeader="internalCode" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold">Codice</th>
+              <th appSortHeader="name" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold">Nome Prodotto</th>
+              <th appSortHeader="supplierCode" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold">Fornitore Codice</th>
+              <th appSortHeader="variants" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold">Varianti</th>
+              <th appSortHeader="purchaseCost" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold">Prezzo Acquisto</th>
+              <th appSortHeader="sellingPrice" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold">Vendita netta (EUR)</th>
               <th class="px-6 py-3 text-left text-sm font-semibold">Azioni</th>
             </tr>
           </thead>
@@ -94,17 +97,9 @@ import {
         </table>
       </div>
 
-      <div class="mt-6 flex justify-between items-center">
-        <div class="text-sm text-gray-600">
-          Pagina {{ currentPage }} di {{ totalPages }} ({{ totalCount }} prodotti totali)
-        </div>
-        <div class="flex gap-2">
-          <button [disabled]="currentPage === 1" (click)="previousPage()"
-            class="px-4 py-2 border rounded hover:bg-gray-50 disabled:opacity-50">Precedente</button>
-          <button [disabled]="currentPage === totalPages" (click)="nextPage()"
-            class="px-4 py-2 border rounded hover:bg-gray-50 disabled:opacity-50">Successiva</button>
-        </div>
-      </div>
+      <app-pagination [page]="currentPage" [pageSize]="pageSize" [totalCount]="totalCount"
+        (pageChange)="goToPage($event)" (pageSizeChange)="onPageSizeChange($event)">
+      </app-pagination>
 
       <div *ngIf="loading" class="text-center text-gray-500 mt-4">Caricamento...</div>
       <div *ngIf="error" class="bg-red-100 text-red-800 p-4 rounded mt-4">{{ error }}</div>
@@ -450,6 +445,8 @@ export class ProdottiComponent implements OnInit, OnDestroy {
   products: ProductDto[] = [];
   currentPage = 1;
   pageSize = 20;
+  sortBy = 'name';
+  sortDescending = false;
   totalCount = 0;
   totalPages = 0;
   loading = false;
@@ -572,11 +569,18 @@ export class ProdottiComponent implements OnInit, OnDestroy {
   loadProducts(): void {
     this.loading = true;
     this.error = null;
-    this.productService.getProducts(this.currentPage, this.pageSize, this.searchTerm || undefined).subscribe({
+    this.productService.getProducts(
+      this.currentPage, this.pageSize, this.searchTerm || undefined, this.sortBy, this.sortDescending
+    ).subscribe({
       next: (response: PageResponse<ProductDto>) => {
         this.products = response.items;
         this.totalCount = response.totalCount;
         this.totalPages = response.totalPages;
+        if (this.totalPages > 0 && this.currentPage > this.totalPages) {
+          this.currentPage = this.totalPages;
+          this.loadProducts();
+          return;
+        }
         this.loading = false;
       },
       error: (err) => {
@@ -592,18 +596,24 @@ export class ProdottiComponent implements OnInit, OnDestroy {
     this.loadProducts();
   }
 
-  nextPage(): void {
-    if (this.currentPage < this.totalPages) {
-      this.currentPage++;
+  goToPage(page: number): void {
+    if (page >= 1 && page <= this.totalPages && page !== this.currentPage) {
+      this.currentPage = page;
       this.loadProducts();
     }
   }
 
-  previousPage(): void {
-    if (this.currentPage > 1) {
-      this.currentPage--;
-      this.loadProducts();
-    }
+  onPageSizeChange(pageSize: number): void {
+    this.pageSize = pageSize;
+    this.currentPage = 1;
+    this.loadProducts();
+  }
+
+  onSortChange(sort: SortChange): void {
+    this.sortBy = sort.sortBy;
+    this.sortDescending = sort.sortDescending;
+    this.currentPage = 1;
+    this.loadProducts();
   }
 
   openNewProductModal(): void {

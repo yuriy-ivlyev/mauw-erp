@@ -34,11 +34,19 @@ export class ProductService {
     return this.apiService.post<number>(`${this.endpoint}/calculate-selling-price`, { purchaseCost, markupRate });
   }
 
-  getProducts(page: number = 1, pageSize: number = 20, search?: string): Observable<PageResponse<ProductDto>> {
+  getProducts(
+    page: number = 1,
+    pageSize: number = 20,
+    search?: string,
+    sortBy?: string,
+    sortDescending = false
+  ): Observable<PageResponse<ProductDto>> {
     let url = `${this.endpoint}?page=${page}&pageSize=${pageSize}`;
     if (search) {
       url += `&search=${encodeURIComponent(search)}`;
     }
+    if (sortBy) url += `&sortBy=${encodeURIComponent(sortBy)}`;
+    if (sortDescending) url += '&sortDescending=true';
     return this.apiService.get<PageResponse<ProductDto>>(url);
   }
 

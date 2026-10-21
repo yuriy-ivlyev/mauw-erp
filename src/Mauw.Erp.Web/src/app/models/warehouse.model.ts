@@ -48,7 +48,7 @@ export interface WarehouseDetail {
   updatedAt: string;
 }
 
-export interface WarehouseFilterParams {
+export interface WarehouseFilterParams extends PageSortParams {
   search?: string;
   type?: number;
   isActive?: boolean;
@@ -75,10 +75,5 @@ export interface UpdateWarehouseRequest {
   description?: string | null;
 }
 
-export interface PagedResult<T> {
-  items: T[];
-  pageNumber: number;
-  pageSize: number;
-  totalCount: number;
-  totalPages: number;
-}
+import { PageSortParams, PagedResult } from './pagination.model';
+export type { PagedResult } from './pagination.model';

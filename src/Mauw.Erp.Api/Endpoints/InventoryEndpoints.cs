@@ -78,9 +78,11 @@ public static class InventoryEndpoints
         Guid? warehouseId,
         string? search,
         int page = 1,
-        int pageSize = 30)
+        int pageSize = 30,
+        string? sortBy = null,
+        bool sortDescending = false)
     {
-        var result = await stockService.GetStockSummaryPagedAsync(new StockFilterRequest(warehouseId, search, page, pageSize));
+        var result = await stockService.GetStockSummaryPagedAsync(new StockFilterRequest(warehouseId, search, page, pageSize, sortBy, sortDescending));
         return TypedResults.Ok(result.Data!);
     }
 
@@ -131,9 +133,11 @@ public static class InventoryEndpoints
         IStockService stockService,
         Guid? warehouseId = null,
         int page = 1,
-        int pageSize = 30)
+        int pageSize = 30,
+        string? sortBy = null,
+        bool sortDescending = false)
     {
-        var result = await stockService.GetMovementsPagedAsync(warehouseId, page, Math.Min(pageSize, 100));
+        var result = await stockService.GetMovementsPagedAsync(warehouseId, page, Math.Min(pageSize, 100), sortBy, sortDescending);
         return TypedResults.Ok(result.Data!);
     }
 

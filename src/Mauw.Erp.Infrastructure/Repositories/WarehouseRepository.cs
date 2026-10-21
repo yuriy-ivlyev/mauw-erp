@@ -13,7 +13,9 @@ public class WarehouseRepository(MauwDbContext dbContext) : Repository<Warehouse
         int pageSize,
         string? search,
         WarehouseType? type,
-        bool? isActive)
+        bool? isActive,
+        string? sortBy = null,
+        bool sortDescending = false)
     {
         var query = _dbSet
             .Include(w => w.Address)
@@ -36,8 +38,17 @@ public class WarehouseRepository(MauwDbContext dbContext) : Repository<Warehouse
 
         var total = await query.CountAsync();
 
-        var items = await query
-            .OrderBy(w => w.Code)
+        var orderedQuery = sortBy?.ToLowerInvariant() switch
+        {
+            "name" => sortDescending ? query.OrderByDescending(w => w.Name) : query.OrderBy(w => w.Name),
+            "type" => sortDescending ? query.OrderByDescending(w => w.Type) : query.OrderBy(w => w.Type),
+            "isactive" => sortDescending ? query.OrderByDescending(w => w.IsActive) : query.OrderBy(w => w.IsActive),
+            "isdefault" => sortDescending ? query.OrderByDescending(w => w.IsDefault) : query.OrderBy(w => w.IsDefault),
+            "city" => sortDescending ? query.OrderByDescending(w => w.Address.City) : query.OrderBy(w => w.Address.City),
+            _ => sortDescending ? query.OrderByDescending(w => w.Code) : query.OrderBy(w => w.Code)
+        };
+        var items = await orderedQuery
+            .ThenBy(w => w.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();

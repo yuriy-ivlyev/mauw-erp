@@ -36,13 +36,23 @@ public record CassaSessionSummaryDto(
     DateTime UpdatedAt
 );
 
+public record CassaPreviewDiscountDto(
+    string Source,
+    string Reason,
+    decimal? Percent,
+    decimal? Amount,
+    decimal SavedAmount
+);
+
 public record CassaPreviewLineDto(
     int LineNumber,
     decimal UnitNetPrice,
     decimal DiscountPercent,
     decimal VatRate,
     string? NatureCode,
-    decimal LineNetTotal
+    decimal LineNetTotal,
+    decimal DiscountedUnitPrice = 0m,
+    List<CassaPreviewDiscountDto>? Discounts = null
 );
 
 public record CassaPreviewVatDto(

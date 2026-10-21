@@ -95,15 +95,15 @@
     <table *ngIf="!loading || materials.length > 0" class="w-full">
       <thead class="bg-gray-50 border-b">
         <tr>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">ID</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nome</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Composizione</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">VisibilitÃ </th>
+          <th appSortHeader="id" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold text-gray-700">ID</th>
+          <th appSortHeader="name" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nome</th>
+          <th appSortHeader="composition" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Composizione</th>
+          <th appSortHeader="visibility" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold text-gray-700">VisibilitÃ </th>
           <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Azioni</th>
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let material of materials" class="border-b hover:bg-gray-50">
+        <tr *ngFor="let material of pageItems" class="border-b hover:bg-gray-50">
           <td class="px-6 py-4 text-sm font-mono text-gray-600">{{ material.id }}</td>
           <td class="px-6 py-4 text-sm text-gray-900">{{ material.name }}</td>
           <td class="px-6 py-4 text-sm text-gray-600">
@@ -140,6 +140,9 @@
       </tbody>
     </table>
   </div>
+  <app-pagination [page]="page" [pageSize]="pageSize" [totalCount]="materials.length"
+    (pageChange)="goToPage($event)" (pageSizeChange)="onPageSizeChange($event)">
+  </app-pagination>
 
   <!-- Delete message -->
   <div *ngIf="deleteMessage" class="mt-4 p-4 bg-yellow-100 border border-yellow-400 text-yellow-800 rounded">
@@ -154,6 +157,5 @@
     (cancelled)="onDeleteCancelled()">
   </app-confirm-delete-modal>
 </div>
-
 
 

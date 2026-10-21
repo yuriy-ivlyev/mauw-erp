@@ -9,3 +9,20 @@
 body {
   @apply bg-gray-50 dark:bg-gray-900;
 }
+th.sortable-column {
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+th.sortable-column:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
+th.sortable-column::after {
+  content: attr(data-sort-indicator);
+  display: inline-block;
+  margin-left: 0.4rem;
+  color: #6b7280;
+  font-size: 0.75rem;
+}

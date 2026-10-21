@@ -4,6 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../services/api.service';
 import { WarehouseService } from '../../../services/warehouse.service';
 import { WarehouseSummary } from '../../../models/warehouse.model';
+import { PagedResult, SortChange } from '../../../models/pagination.model';
+import { PaginationComponent } from '../../../shared/pagination/pagination.component';
+import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
 
 interface StockItemDto {
   id: string;
@@ -22,18 +25,10 @@ interface StockItemDto {
   estimatedValue: number | null;
 }
 
-interface PagedResult<T> {
-  items: T[];
-  totalCount: number;
-  totalPages: number;
-  pageNumber: number;
-  pageSize: number;
-}
-
 @Component({
   selector: 'app-inventario',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, PaginationComponent, SortHeaderDirective],
   templateUrl: './inventario.component.html'
 })
 export class InventarioComponent implements OnInit {
@@ -43,7 +38,9 @@ export class InventarioComponent implements OnInit {
   filterWarehouseId = '';
   search = '';
   page = 1;
-  pageSize = 30;
+  pageSize = 20;
+  sortBy = 'warehouseCode';
+  sortDescending = false;
   totalCount = 0;
   totalPages = 0;
 
@@ -66,7 +63,7 @@ export class InventarioComponent implements OnInit {
 
   load(): void {
     this.loading = true;
-    let url = `v1/inventory/stock?page=${this.page}&pageSize=${this.pageSize}`;
+    let url = `v1/inventory/stock?page=${this.page}&pageSize=${this.pageSize}&sortBy=${this.sortBy}&sortDescending=${this.sortDescending}`;
     if (this.filterWarehouseId) url += `&warehouseId=${this.filterWarehouseId}`;
     if (this.search.trim()) url += `&search=${encodeURIComponent(this.search.trim())}`;
 
@@ -75,6 +72,11 @@ export class InventarioComponent implements OnInit {
         this.stockItems = r.items;
         this.totalCount = r.totalCount;
         this.totalPages = r.totalPages;
+        if (this.totalPages > 0 && this.page > this.totalPages) {
+          this.page = this.totalPages;
+          this.load();
+          return;
+        }
         this.loading = false;
       },
       error: () => {
@@ -86,8 +88,25 @@ export class InventarioComponent implements OnInit {
 
   onFilterChange(): void { this.page = 1; this.load(); }
   onSearch(): void { this.page = 1; this.load(); }
-  prevPage(): void { if (this.page > 1) { this.page--; this.load(); } }
-  nextPage(): void { if (this.page < this.totalPages) { this.page++; this.load(); } }
+  goToPage(page: number): void {
+    if (page >= 1 && page <= this.totalPages && page !== this.page) {
+      this.page = page;
+      this.load();
+    }
+  }
+
+  onPageSizeChange(pageSize: number): void {
+    this.pageSize = pageSize;
+    this.page = 1;
+    this.load();
+  }
+
+  onSortChange(sort: SortChange): void {
+    this.sortBy = sort.sortBy;
+    this.sortDescending = sort.sortDescending;
+    this.page = 1;
+    this.load();
+  }
 
   totalEstimatedValue(): number {
     return this.stockItems.reduce((s, i) => s + (i.estimatedValue ?? 0), 0);

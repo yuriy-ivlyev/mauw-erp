@@ -337,6 +337,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("character varying(16)")
                         .HasColumnName("tax_code");
 
+                    b.Property<string>("TradeName")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("trade_name");
+
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1710,6 +1715,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
                     b.Property<decimal>("MinimumQuantity")
                         .HasPrecision(22, 8)
                         .HasColumnType("numeric(22,8)")
@@ -2406,6 +2416,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                                 .HasColumnType("numeric(22,8)")
                                 .HasColumnName("pricing_agreed_unit_net_price");
 
+                            b1.Property<string>("Discounts")
+                                .HasColumnType("jsonb")
+                                .HasColumnName("pricing_discounts");
+
                             b1.Property<bool>("IsCustomerReturn")
                                 .HasColumnType("boolean")
                                 .HasColumnName("pricing_is_customer_return");
@@ -2488,6 +2502,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                                 .HasPrecision(22, 8)
                                 .HasColumnType("numeric(22,8)")
                                 .HasColumnName("pricing_agreed_unit_net_price");
+
+                            b1.Property<string>("Discounts")
+                                .HasColumnType("jsonb")
+                                .HasColumnName("pricing_discounts");
 
                             b1.Property<bool>("IsCustomerReturn")
                                 .HasColumnType("boolean")
@@ -2583,6 +2601,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                                 .HasPrecision(22, 8)
                                 .HasColumnType("numeric(22,8)")
                                 .HasColumnName("pricing_agreed_unit_net_price");
+
+                            b1.Property<string>("Discounts")
+                                .HasColumnType("jsonb")
+                                .HasColumnName("pricing_discounts");
 
                             b1.Property<bool>("IsCustomerReturn")
                                 .HasColumnType("boolean")

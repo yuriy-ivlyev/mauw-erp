@@ -65,7 +65,7 @@ public sealed class DocumentPricingService(
             if (line.SourceOrderItemId.HasValue)
             {
                 if (line.UnitNetPrice.HasValue || line.UnitGrossPrice.HasValue || line.SourceLineId.HasValue ||
-                    line.DiscountPercent.HasValue ||
+                    line.DiscountPercent.HasValue || line.CashDiscount is not null ||
                     line.PriceListId.HasValue || line.OverrideReason is not null)
                     return Fail("L'emissione da ordine eredita i valori fiscali senza modifiche manuali.");
                 if (!sourceOrders.TryGetValue(line.SourceOrderItemId.Value, out var source) ||
@@ -89,6 +89,8 @@ public sealed class DocumentPricingService(
 
             if (line.IsCustomerReturn && line.SourceLineId.HasValue)
             {
+                if (line.CashDiscount is not null)
+                    return Fail("Il reso da fattura non ammette sconti di cassa.");
                 if (line.UnitNetPrice.HasValue || line.UnitGrossPrice.HasValue)
                     return Fail("Il prezzo del reso proviene dalla riga fattura e non puo essere modificato.");
                 if (line.PriceListId.HasValue || line.OverrideReason is not null)
@@ -114,15 +116,51 @@ public sealed class DocumentPricingService(
             quotes.TryGetValue(index, out var quote);
             var legacyAuto = line.PreserveLegacyPrice && quote?.PriceListId is not null;
             var hasManualPrice = !legacyAuto && (line.UnitNetPrice.HasValue || line.UnitGrossPrice.HasValue);
-            var manual = hasManualPrice || (quote is not null && !legacyAuto &&
+            if (line.CashDiscount is not null && (hasManualPrice || quote is null))
+                return Fail("Lo sconto di cassa si applica al prezzo di listino, non a un prezzo manuale.");
+            var manual = hasManualPrice || (quote is not null && !legacyAuto && line.CashDiscount is null &&
                 line.DiscountPercent.HasValue && line.DiscountPercent != quote.DiscountPercent);
-            if (manual && quote?.PriceListId is not null && string.IsNullOrWhiteSpace(line.OverrideReason))
+            var discountOnly = manual && !hasManualPrice;
+            if (manual && (quote?.PriceListId is not null || discountOnly) && string.IsNullOrWhiteSpace(line.OverrideReason))
                 return Fail("Specificare il motivo della modifica manuale del prezzo o dello sconto.");
             var unitPrice = hasManualPrice ? line.UnitGrossPrice ?? line.UnitNetPrice!.Value : quote?.ListUnitPrice;
             if (!unitPrice.HasValue)
                 return Fail("Prezzo della riga non disponibile.");
             var discount = legacyAuto ? quote!.DiscountPercent :
                 line.DiscountPercent ?? (quote?.PriceListId.HasValue == true ? quote.DiscountPercent : line.DefaultDiscountPercent);
+            var discounts = new List<AppliedDiscount>();
+            var cashReason = line.CashDiscount?.Reason?.Trim();
+            if (line.CashDiscount is not null)
+            {
+                if (string.IsNullOrWhiteSpace(cashReason))
+                    return Fail("Specificare la causale dello sconto di cassa.");
+                if (cashReason.Length > 500)
+                    return Fail("La causale dello sconto non puo superare 500 caratteri.");
+                var inputs = new List<DiscountInput>();
+                if (quote!.DiscountPercent > 0m)
+                {
+                    var listReason = string.IsNullOrWhiteSpace(quote.DiscountReason) ? "Sconto listino" : quote.DiscountReason.Trim();
+                    discounts.Add(new AppliedDiscount(DiscountSource.PriceList, listReason, quote.DiscountPercent, null));
+                    inputs.Add(new DiscountInput(quote.DiscountPercent, null));
+                }
+                discounts.Add(new AppliedDiscount(
+                    DiscountSource.Cashier, cashReason, line.CashDiscount.Percent, line.CashDiscount.Amount));
+                inputs.Add(new DiscountInput(line.CashDiscount.Percent, line.CashDiscount.Amount));
+                var combined = calculator.CombineDiscounts(line.Quantity, unitPrice.Value, inputs);
+                if (!combined.Success)
+                    return Fail($"Riga {index + 1}: {combined.Error}");
+                discount = combined.Data!.EffectivePercent;
+            }
+            else if (discount > 0m && quote?.PriceListId.HasValue == true && !manual)
+            {
+                var listReason = string.IsNullOrWhiteSpace(quote.DiscountReason) ? "Sconto listino" : quote.DiscountReason.Trim();
+                discounts.Add(new AppliedDiscount(DiscountSource.PriceList, listReason, discount, null));
+            }
+            else if (manual && discount > 0m)
+            {
+                discounts.Add(new AppliedDiscount(
+                    DiscountSource.Cashier, line.OverrideReason?.Trim() is { Length: > 0 } reason ? reason : "Sconto manuale", discount, null));
+            }
             var vatRate = line.VatRate ?? quote?.VatRate;
             if (!vatRate.HasValue)
                 return Fail("Specificare l'aliquota IVA della riga.");
@@ -141,7 +179,8 @@ public sealed class DocumentPricingService(
                 calculated.VatRate, calculated.NatureCode, calculated.DiscountPercent));
             snapshots.Add(new PricingSnapshot(quote?.PriceListId, quote?.RuleId,
                 quote?.ListUnitPrice ?? calculated.UnitNetPrice, agreedPrice.Data!.Value,
-                manual, line.OverrideReason?.Trim(), line.IsCustomerReturn, null));
+                manual || line.CashDiscount is not null, line.CashDiscount is not null ? cashReason : line.OverrideReason?.Trim(),
+                line.IsCustomerReturn, null, discounts.Count == 0 ? null : discounts));
         }
         var document = calculator.Calculate(fiscalInputs);
         if (!document.Success)

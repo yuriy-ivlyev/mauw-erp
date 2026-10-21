@@ -28,6 +28,7 @@ public sealed class PriceListRuleConfiguration : IEntityTypeConfiguration<PriceL
         builder.Property(rule => rule.CalculationType).HasConversion<string>().HasMaxLength(30);
         builder.Property(rule => rule.Value).HasPrecision(22, 8);
         builder.Property(rule => rule.MinimumQuantity).HasPrecision(22, 8);
+        builder.Property(rule => rule.Description).HasMaxLength(200);
         builder.HasIndex(rule => new { rule.PriceListId, rule.VariantId });
         builder.HasIndex(rule => new { rule.PriceListId, rule.ProductId });
         builder.HasIndex(rule => new { rule.PriceListId, rule.CategoryId });

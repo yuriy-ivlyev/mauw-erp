@@ -47,6 +47,8 @@ public sealed class PriceList : Entity<Guid>
                 return AccountingResult<PriceList>.Fail("La fine validita non puo precedere l'inizio.");
             if (rule.Id == Guid.Empty || (rule.Id.HasValue && !ids.Add(rule.Id.Value)))
                 return AccountingResult<PriceList>.Fail("Identificativo regola vuoto o duplicato.");
+            if (rule.Description?.Trim().Length > 200)
+                return AccountingResult<PriceList>.Fail("La causale della regola non puo superare 200 caratteri.");
         }
 
         var existing = _rules.ToDictionary(rule => rule.Id);

@@ -14,6 +14,7 @@ public sealed class PriceListRule : Entity<Guid>
     public DateTimeOffset? ValidFrom { get; private set; }
     public DateTimeOffset? ValidTo { get; private set; }
     public int Priority { get; private set; }
+    public string? Description { get; private set; }
 
     private PriceListRule() { }
 
@@ -35,5 +36,6 @@ public sealed class PriceListRule : Entity<Guid>
         ValidFrom = definition.ValidFrom?.ToUniversalTime();
         ValidTo = definition.ValidTo?.ToUniversalTime();
         Priority = definition.Priority;
+        Description = string.IsNullOrWhiteSpace(definition.Description) ? null : definition.Description.Trim();
     }
 }

@@ -13,6 +13,7 @@ public class Contact : Entity<Guid>
 {
     // ── Anagrafica fiscale ────────────────────────────────────────────────────
     public string BusinessName { get; set; } = "";
+    public string? TradeName { get; set; }
     public string? VatNumber { get; set; }
     public string? TaxCode { get; set; }
     /// <summary>Codice Destinatario SDI (max 7 chars).</summary>

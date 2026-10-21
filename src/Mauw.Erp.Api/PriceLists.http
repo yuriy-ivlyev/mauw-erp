@@ -24,6 +24,7 @@ Content-Type: application/json
       "value": 10,
       "minimumQuantity": 5,
       "priority": 10,
+      "description": "Sconto ingrosso moda",
       "validFrom": "2026-10-01T00:00:00Z",
       "validTo": "2026-12-31T23:59:59Z"
     }

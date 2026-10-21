@@ -17,6 +17,8 @@ public sealed record PriceRuleRequest
     public DateTimeOffset? ValidFrom { get; init; }
     public DateTimeOffset? ValidTo { get; init; }
     public int Priority { get; init; }
+    /// <summary>Causale mostrata in cassa e sui documenti quando la regola applica uno sconto.</summary>
+    public string? Description { get; init; }
 }
 
 /// <summary>Configurazione completa di un listino e delle sue regole.</summary>
@@ -50,12 +52,20 @@ public sealed record ResolvePricesRequest
 /// <summary>Prezzo unitario quotato; non contiene imposte di riga.</summary>
 public sealed record ResolvedPriceLineResponse(
     Guid VariantId, Guid? PriceListId, Guid? RuleId,
-    decimal ListUnitPrice, decimal DiscountPercent, decimal AgreedUnitNetPrice, decimal VatRate);
+    decimal ListUnitPrice, decimal DiscountPercent, decimal AgreedUnitNetPrice, decimal VatRate,
+    string? DiscountReason = null);
 
 /// <summary>Quotazione ordinata come le righe della richiesta.</summary>
 public sealed record ResolvedPricesResponse(Guid? PriceListId, IReadOnlyList<ResolvedPriceLineResponse> Lines);
 
+/// <summary>Sconto di riga con la propria causale; Source e PriceList oppure Cashier.</summary>
+public sealed record AppliedDiscountDto(string Source, string Reason, decimal? Percent, decimal? Amount);
+
+/// <summary>Sconto deciso alla cassa: esattamente uno tra percentuale e importo, con causale obbligatoria.</summary>
+public sealed record CashDiscountRequest(decimal? Percent, decimal? Amount, string? Reason);
+
 /// <summary>Snapshot informativo congelato della politica di prezzo applicata alla riga.</summary>
 public sealed record PricingSnapshotDto(
     Guid? PriceListId, Guid? RuleId, decimal ListUnitPrice, decimal? AgreedUnitNetPrice,
-    bool IsManualOverride, string? OverrideReason, bool IsCustomerReturn, Guid? SourceLineId);
+    bool IsManualOverride, string? OverrideReason, bool IsCustomerReturn, Guid? SourceLineId,
+    IReadOnlyList<AppliedDiscountDto>? Discounts = null);

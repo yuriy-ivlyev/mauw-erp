@@ -103,9 +103,19 @@ public static class ProductEndpoints
         IProductService productService,
         int page = 1,
         int pageSize = 20,
-        string? search = null)
+        string? search = null,
+        string? sortBy = null,
+        bool sortDescending = false)
     {
-        var result = await productService.GetProductsAsync(page, pageSize, search);
+        var paging = new PageSortRequest
+        {
+            Page = page,
+            PageSize = pageSize,
+            SortBy = sortBy,
+            SortDescending = sortDescending
+        };
+        var result = await productService.GetProductsAsync(
+            paging.Page, paging.PageSize, search, paging.SortBy, paging.SortDescending);
         if (!result.Success)
             return TypedResults.BadRequest(result.Error);
         return TypedResults.Ok(result.Data!);

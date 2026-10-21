@@ -13,11 +13,14 @@ import {
   UpdateWarehouseRequest
 } from '../../../models/warehouse.model';
 import { CompanyAddressSite } from '../../../models/company-settings.model';
+import { PaginationComponent } from '../../../shared/pagination/pagination.component';
+import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
+import { SortChange } from '../../../models/pagination.model';
 
 @Component({
   selector: 'app-magazzini',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, ConfirmDeleteModalComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, ConfirmDeleteModalComponent, PaginationComponent, SortHeaderDirective],
   templateUrl: './magazzini.component.html',
   styleUrl: './magazzini.component.scss'
 })
@@ -28,6 +31,8 @@ export class MagazziniComponent implements OnInit {
   // Pagination & filters
   page = 1;
   pageSize = 20;
+  sortBy = 'code';
+  sortDescending = false;
   totalCount = 0;
   totalPages = 0;
   searchTerm = '';
@@ -112,11 +117,18 @@ export class MagazziniComponent implements OnInit {
       search: this.searchTerm || undefined,
       type: this.filterType !== '' ? Number(this.filterType) : undefined,
       isActive: this.filterActive !== '' ? this.filterActive === 'true' : undefined,
+      sortBy: this.sortBy,
+      sortDescending: this.sortDescending
     }).subscribe({
       next: result => {
         this.warehouses = result.items;
         this.totalCount = result.totalCount;
         this.totalPages = result.totalPages;
+        if (this.totalPages > 0 && this.page > this.totalPages) {
+          this.page = this.totalPages;
+          this.load();
+          return;
+        }
         this.loading = false;
       },
       error: () => {
@@ -136,12 +148,24 @@ export class MagazziniComponent implements OnInit {
     this.load();
   }
 
-  prevPage(): void {
-    if (this.page > 1) { this.page--; this.load(); }
+  goToPage(page: number): void {
+    if (page >= 1 && page <= this.totalPages && page !== this.page) {
+      this.page = page;
+      this.load();
+    }
   }
 
-  nextPage(): void {
-    if (this.page < this.totalPages) { this.page++; this.load(); }
+  onPageSizeChange(pageSize: number): void {
+    this.pageSize = pageSize;
+    this.page = 1;
+    this.load();
+  }
+
+  onSortChange(sort: SortChange): void {
+    this.sortBy = sort.sortBy;
+    this.sortDescending = sort.sortDescending;
+    this.page = 1;
+    this.load();
   }
 
   openNew(): void {

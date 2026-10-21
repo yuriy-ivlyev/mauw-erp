@@ -6,6 +6,9 @@ import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 import { ApiService } from '../../../services/api.service';
 import { WarehouseService } from '../../../services/warehouse.service';
 import { WarehouseSummary } from '../../../models/warehouse.model';
+import { PagedResult, SortChange } from '../../../models/pagination.model';
+import { PaginationComponent } from '../../../shared/pagination/pagination.component';
+import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
 
 interface StockMovementDetailDto {
   id: string;
@@ -32,12 +35,6 @@ interface VariantSearchDto {
   currentStock: number;
 }
 
-interface PagedResult<T> {
-  items: T[];
-  totalCount: number;
-  totalPages: number;
-}
-
 const REASON_LABELS: Record<number, string> = {
   1: 'Carico Fornitore', 2: 'Vendita Cassa', 3: 'Spedizione Ordine',
   4: 'Trasferimento', 5: 'Reso Cliente', 6: 'Reso Fornitore', 7: 'Rettifica Inventario'
@@ -46,14 +43,16 @@ const REASON_LABELS: Record<number, string> = {
 @Component({
   selector: 'app-movimenti',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, PaginationComponent, SortHeaderDirective],
   templateUrl: './movimenti.component.html'
 })
 export class MovimentiComponent implements OnInit, OnDestroy {
   movements: StockMovementDetailDto[] = [];
   warehouses: WarehouseSummary[] = [];
 
-  page = 1; pageSize = 30; totalCount = 0; totalPages = 0;
+  page = 1; pageSize = 20; totalCount = 0; totalPages = 0;
+  sortBy = 'movementDateUtc';
+  sortDescending = true;
   loading = false;
   errorMessage = ''; successMessage = '';
   showForm = false;
@@ -175,12 +174,17 @@ export class MovimentiComponent implements OnInit, OnDestroy {
   load(): void {
     this.loading = true;
     this.api.get<PagedResult<StockMovementDetailDto>>(
-      `v1/inventory/movements-paged?page=${this.page}&pageSize=${this.pageSize}`
+      `v1/inventory/movements-paged?page=${this.page}&pageSize=${this.pageSize}&sortBy=${this.sortBy}&sortDescending=${this.sortDescending}`
     ).subscribe({
       next: r => {
         this.movements = r.items;
         this.totalCount = r.totalCount;
         this.totalPages = r.totalPages;
+        if (this.totalPages > 0 && this.page > this.totalPages) {
+          this.page = this.totalPages;
+          this.load();
+          return;
+        }
         this.loading = false;
       },
       error: () => { this.errorMessage = 'Errore caricamento movimenti.'; this.loading = false; }
@@ -212,8 +216,25 @@ export class MovimentiComponent implements OnInit, OnDestroy {
     });
   }
 
-  prevPage(): void { if (this.page > 1) { this.page--; this.load(); } }
-  nextPage(): void { if (this.page < this.totalPages) { this.page++; this.load(); } }
+  goToPage(page: number): void {
+    if (page >= 1 && page <= this.totalPages && page !== this.page) {
+      this.page = page;
+      this.load();
+    }
+  }
+
+  onPageSizeChange(pageSize: number): void {
+    this.pageSize = pageSize;
+    this.page = 1;
+    this.load();
+  }
+
+  onSortChange(sort: SortChange): void {
+    this.sortBy = sort.sortBy;
+    this.sortDescending = sort.sortDescending;
+    this.page = 1;
+    this.load();
+  }
 
   qtyClass(qty: number): string {
     return qty > 0 ? 'text-green-700 font-bold' : 'text-red-600 font-bold';

@@ -5,15 +5,26 @@ import { ApiService } from './api.service';
 import { PriceListService, priceError } from './price-list.service';
 import { ItemPricingRequest } from '../models/price-list.model';
 import { ContactDetail } from '../models/contact.model';
-import { guidPattern, hasDecimal8Precision } from './price-list.validators';
+import { guidPattern } from './price-list.validators';
+
+export type CashDiscountMode = 'percent' | 'amount';
+
+/** Sconto deciso alla cassa: percentuale oppure importo in euro sul totale di riga, sempre con causale. */
+export interface CashDiscount {
+  mode: CashDiscountMode;
+  value: number;
+  reason: string;
+}
 
 export interface CartItem {
   priceListId?: string | null;
   ruleId?: string | null;
   listUnitPrice?: number;
   agreedUnitNetPrice?: number | null;
-  isPriceOverride?: boolean;
-  overrideReason?: string | null;
+  /** Sconto della cassa: si aggiunge a quello del listino e ha una propria causale. */
+  cashDiscount?: CashDiscount | null;
+  /** Causale dello sconto di listino, quando il listino ne applica uno. */
+  priceListDiscountReason?: string | null;
   isCustomerReturn?: boolean;
   sourceLineId?: string | null;
   natureCode?: string | null;
@@ -32,6 +43,15 @@ export interface CartItem {
   maxQuantity: number;
 }
 
+/** Uno degli sconti di una riga, calcolato dal backend. */
+export interface CassaPreviewDiscount {
+  source: 'PriceList' | 'Cashier';
+  reason: string;
+  percent: number | null;
+  amount: number | null;
+  savedAmount: number;
+}
+
 export interface CassaPreviewLine {
   lineNumber: number;
   unitNetPrice: number;
@@ -39,6 +59,9 @@ export interface CassaPreviewLine {
   vatRate: number;
   natureCode: string | null;
   lineNetTotal: number;
+  /** Prezzo unitario dopo tutti gli sconti, calcolato dal backend. */
+  discountedUnitPrice?: number;
+  discounts?: CassaPreviewDiscount[];
 }
 
 export interface CassaPreviewVat {
@@ -71,6 +94,8 @@ export interface CassaCartRequestItem extends ItemPricingRequest {
   natureCode?: string | null;
   vatRate: number;
   maxQuantity: number;
+  cashDiscount?: { percent: number | null; amount: number | null; reason: string } | null;
+  priceListDiscountReason?: string | null;
 }
 
 export interface CassaContact {
@@ -120,6 +145,7 @@ export interface SavedCartItemDto {
     overrideReason: string | null;
     isCustomerReturn: boolean;
     sourceLineId: string | null;
+    discounts?: Array<{ source: string; reason: string; percent: number | null; amount: number | null }> | null;
   } | null;
   priceListId?: string | null;
   overrideReason?: string | null;
@@ -142,6 +168,43 @@ export interface SavedCartItemDto {
 }
 
 const STORAGE_KEY = 'mauw_cassa_session';
+export const CASH_DISCOUNT_ERROR =
+  'Sconto di cassa: percentuale da 0 a 100 o importo in euro valido, con causale obbligatoria.';
+
+/** Messaggio di validazione di uno sconto di cassa, oppure null se e valido. Il calcolo resta sul backend. */
+export function cashDiscountError(discount: CashDiscount): string | null {
+  const { mode, value, reason } = discount;
+  if (mode === 'percent' && !(Number.isFinite(value) && value > 0 && value <= 100)) {
+    return 'La percentuale deve essere maggiore di 0 e al massimo 100.';
+  }
+  if (mode === 'amount' && !(Number.isFinite(value) && value > 0 && Math.round(value * 100) / 100 === value)) {
+    return 'L\'importo deve essere maggiore di 0, con al massimo due decimali.';
+  }
+  if (reason.trim().length === 0) return 'La causale dello sconto è obbligatoria.';
+  if (reason.trim().length > 500) return 'La causale non può superare 500 caratteri.';
+  return null;
+}
+
+export function isValidCashDiscount(item: CartItem): boolean {
+  return !item.cashDiscount || cashDiscountError(item.cashDiscount) === null;
+}
+export const NOT_A_CUSTOMER_ERROR = 'L\'anagrafica selezionata non è un cliente: non è possibile vendere.';
+
+/** Sconto di cassa di una riga salvata: dall'elenco sconti, oppure dal vecchio formato con un solo sconto manuale. */
+function savedCashDiscount(item: SavedCartItemDto): CashDiscount | null {
+  const snapshot = item.pricingSnapshot;
+  if (!snapshot || snapshot.isCustomerReturn) return null;
+  const cashier = snapshot.discounts?.find(discount => discount.source === 'Cashier');
+  if (cashier) {
+    return cashier.percent !== null
+      ? { mode: 'percent', value: cashier.percent, reason: cashier.reason }
+      : { mode: 'amount', value: cashier.amount ?? 0, reason: cashier.reason };
+  }
+  if (snapshot.isManualOverride && !snapshot.discounts && (item.discountPercent ?? 0) > 0) {
+    return { mode: 'percent', value: item.discountPercent as number, reason: snapshot.overrideReason ?? '' };
+  }
+  return null;
+}
 
 export interface CassaEmissionItem {
   variantId: string;
@@ -181,7 +244,9 @@ export class CassaSessionService {
   constructor(private api: ApiService, private prices: PriceListService) {
     this.contactTrigger.pipe(switchMap(contact => contact
       ? this.api.get<ContactDetail>(`v1/contacts/${contact.id}`).pipe(
-        map(detail => ({ contact: { ...contact, priceListId: detail.customerProfile?.priceListId ?? null }, error: null })),
+        map(detail => detail.customerProfile
+          ? { contact: { ...contact, priceListId: detail.customerProfile.priceListId ?? null }, error: null }
+          : { contact, error: NOT_A_CUSTOMER_ERROR }),
         catchError(error => of({ contact, error: priceError(error) })))
       : of({ contact: null, error: null })))
       .subscribe(result => {
@@ -210,9 +275,8 @@ export class CassaSessionService {
     })))).subscribe(response => {
       if (!response) {
         this.pricingSubject.next({ pending: false, error: null });
-        const invalidReturn = this.state.cart.some(item => item.isCustomerReturn &&
-          (!item.sourceLineId || item.isPriceOverride));
-        this.pricingSubject.next({ pending: false, error: invalidReturn ? 'Il reso richiede la riga fattura originale, senza override del prezzo.' : null });
+        const invalidReturn = this.state.cart.some(item => item.isCustomerReturn && !item.sourceLineId);
+        this.pricingSubject.next({ pending: false, error: invalidReturn ? 'Il reso richiede la riga fattura originale.' : null });
         if (!invalidReturn) this.previewTrigger.next(this.cartRequestItems());
         return;
       }
@@ -229,21 +293,18 @@ export class CassaSessionService {
         return {
           ...item, priceListId: resolved.priceListId, ruleId: resolved.ruleId,
           listUnitPrice: resolved.listUnitPrice, agreedUnitNetPrice: resolved.agreedUnitNetPrice,
-          ...(!item.isPriceOverride ? { unitNetPrice: resolved.listUnitPrice, discountPercent: resolved.discountPercent } : {}),
+          unitNetPrice: resolved.listUnitPrice, discountPercent: resolved.discountPercent,
+          priceListDiscountReason: resolved.discountReason ?? null,
           vatRate: resolved.vatRate
         };
       }) };
-      const invalidReturn = this.state.cart.some(item => item.isCustomerReturn &&
-        (!item.sourceLineId || item.isPriceOverride));
-      const invalid = invalidReturn || this.state.cart.some(item => item.isPriceOverride &&
-        (!item.overrideReason?.trim() || !Number.isFinite(item.unitNetPrice) || item.unitNetPrice < 0 ||
-          !hasDecimal8Precision(item.unitNetPrice) ||
-          !Number.isFinite(item.discountPercent ?? 0) || (item.discountPercent ?? 0) < 0 || (item.discountPercent ?? 0) > 100));
+      const invalidReturn = this.state.cart.some(item => item.isCustomerReturn && !item.sourceLineId);
+      const invalidDiscount = this.state.cart.some(item => !item.isCustomerReturn && !isValidCashDiscount(item));
       this.pricingSubject.next({ pending: false, error: invalidReturn
-        ? 'Il reso richiede la riga fattura originale, senza override del prezzo.'
-        : invalid ? 'Override: prezzo valido (massimo 8 decimali), sconto 0–100 e motivo obbligatorio.' : null });
+        ? 'Il reso richiede la riga fattura originale.'
+        : invalidDiscount ? CASH_DISCOUNT_ERROR : null });
       this.persist();
-      if (!invalid) this.previewTrigger.next(this.cartRequestItems());
+      if (!invalidReturn && !invalidDiscount) this.previewTrigger.next(this.cartRequestItems());
     });
     this.previewTrigger.pipe(
       switchMap(items => items.length === 0
@@ -380,8 +441,8 @@ export class CassaSessionService {
       ruleId: i.pricingSnapshot?.ruleId,
       listUnitPrice: i.pricingSnapshot?.listUnitPrice,
       agreedUnitNetPrice: i.pricingSnapshot?.agreedUnitNetPrice,
-      isPriceOverride: i.pricingSnapshot?.isManualOverride ?? i.isPriceOverride ?? !!i.overrideReason,
-      overrideReason: i.pricingSnapshot?.overrideReason ?? i.overrideReason,
+      cashDiscount: savedCashDiscount(i),
+      priceListDiscountReason: i.pricingSnapshot?.discounts?.find(discount => discount.source === 'PriceList')?.reason ?? null,
       isCustomerReturn: i.pricingSnapshot?.isCustomerReturn ?? i.isCustomerReturn,
       sourceLineId: i.pricingSnapshot?.sourceLineId ?? i.sourceLineId,
       natureCode: i.natureCode,
@@ -416,8 +477,16 @@ export class CassaSessionService {
       priceListId: i.isCustomerReturn ? null : this.state.priceListId ?? null,
       unitNetPrice: i.unitNetPrice,
       discountPercent: i.discountPercent ?? 0,
-      isManualPriceOverride: i.isPriceOverride ?? false,
-      overrideReason: i.isPriceOverride ? i.overrideReason?.trim() : null,
+      isManualPriceOverride: false,
+      overrideReason: null,
+      cashDiscount: !i.isCustomerReturn && i.cashDiscount
+        ? {
+          percent: i.cashDiscount.mode === 'percent' ? i.cashDiscount.value : null,
+          amount: i.cashDiscount.mode === 'amount' ? i.cashDiscount.value : null,
+          reason: i.cashDiscount.reason.trim()
+        }
+        : null,
+      priceListDiscountReason: i.priceListDiscountReason ?? null,
       isCustomerReturn: i.isCustomerReturn ?? false,
       sourceLineId: i.sourceLineId ?? null,
       natureCode: i.natureCode,
@@ -426,13 +495,11 @@ export class CassaSessionService {
     }));
   }
 
+  /** In cassa il prezzo e sempre risolto dal server: la richiesta documento non porta prezzi o sconti. */
   documentRequestItems() {
     return this.cartRequestItems().map(item => {
-      const { unitNetPrice, discountPercent, isManualPriceOverride, ...base } = item;
-      return {
-        ...base,
-        ...(isManualPriceOverride ? { unitNetPrice, discountPercent } : {})
-      };
+      const { unitNetPrice, discountPercent, isManualPriceOverride, cashDiscount, priceListDiscountReason, ...base } = item;
+      return base;
     });
   }
 
@@ -451,7 +518,20 @@ export class CassaSessionService {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        this.state = JSON.parse(raw) as CassaSessionState;
+        const stored = JSON.parse(raw) as CassaSessionState;
+        // Carrelli salvati con le versioni precedenti: il prezzo manuale sparisce e lo sconto passa al nuovo formato.
+        this.state = { ...stored, cart: stored.cart.map(item => {
+          const {
+            isPriceOverride, overrideReason, manualDiscountPercent, discountReason, ...rest
+          } = item as CartItem & {
+            isPriceOverride?: boolean; overrideReason?: string | null;
+            manualDiscountPercent?: number | null; discountReason?: string | null;
+          };
+          if (!rest.cashDiscount && manualDiscountPercent !== null && manualDiscountPercent !== undefined) {
+            rest.cashDiscount = { mode: 'percent', value: manualDiscountPercent, reason: discountReason ?? '' };
+          }
+          return rest;
+        }) };
         this.stateSubject.next({ ...this.state });
         this.refreshPreview();
       }

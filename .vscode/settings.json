@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^dotnet ef --version$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

@@ -28,7 +28,8 @@ public sealed class PriceListService(IPriceListRepository repository, PriceListR
             return OperationResult<PriceListResponse>.Fail("Le regole non possono essere null.");
         var rules = request.Rules.Select(rule => new PriceRuleDefinition(
             rule.Id, rule.CalculationType, rule.Value, rule.VariantId, rule.ProductId,
-            rule.CategoryId, rule.MinimumQuantity, rule.ValidFrom, rule.ValidTo, rule.Priority)).ToList();
+            rule.CategoryId, rule.MinimumQuantity, rule.ValidFrom, rule.ValidTo, rule.Priority,
+            rule.Description)).ToList();
         if (rules.Any(rule => rule.Id.HasValue && (list is null || list.Rules.All(old => old.Id != rule.Id))))
             return OperationResult<PriceListResponse>.Fail("Identificativo regola estraneo al listino.");
 
@@ -110,7 +111,8 @@ public sealed class PriceListService(IPriceListRepository repository, PriceListR
                 return OperationResult<ResolvedPricesResponse>.Fail(result.Error);
             var price = result.Data!;
             results.Add(new ResolvedPriceLineResponse(variant.Id, price.PriceListId, price.RuleId,
-                price.ListUnitPrice, price.DiscountPercent, price.AgreedUnitNetPrice, variant.Product.VatRate));
+                price.ListUnitPrice, price.DiscountPercent, price.AgreedUnitNetPrice, variant.Product.VatRate,
+                price.DiscountReason));
         }
         return OperationResult<ResolvedPricesResponse>.Ok(new ResolvedPricesResponse(priceListId, results));
     }
@@ -121,6 +123,7 @@ public sealed class PriceListService(IPriceListRepository repository, PriceListR
         {
             Id = rule.Id, CalculationType = rule.CalculationType, Value = rule.Value,
             VariantId = rule.VariantId, ProductId = rule.ProductId, CategoryId = rule.CategoryId,
-            MinimumQuantity = rule.MinimumQuantity, ValidFrom = rule.ValidFrom, ValidTo = rule.ValidTo, Priority = rule.Priority
+            MinimumQuantity = rule.MinimumQuantity, ValidFrom = rule.ValidFrom, ValidTo = rule.ValidTo, Priority = rule.Priority,
+            Description = rule.Description
         }).ToList());
 }

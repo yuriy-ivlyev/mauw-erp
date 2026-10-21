@@ -58,6 +58,21 @@ Conservare almeno 4 decimali dello scorporo quando necessari, fino a 8;
 non ricalcolare il netto da un prezzo di visualizzazione a 2 decimali.
 Trasmettere il lordo originale al backend per lo scorporo `decimal`.
 
+### Sconti di riga composti
+
+Una riga puo avere piu sconti, ciascuno con la propria causale obbligatoria
+(listino, cassa). La composizione e solo in
+`ItalianAccountingCalculator.CombineDiscounts`: le percentuali si compongono
+sul residuo, un importo in euro (2 decimali, sul totale di riga) si sottrae dal
+residuo e non puo superarlo. Il risultato e UNA percentuale effettiva, arrotondata
+una sola volta a 10 decimali con `MidpointRounding.AwayFromZero`, che entra nella
+formula `prezzoTotale` qui sopra: lo sconto resta applicato una sola volta e il
+totale di riga resta a 2 decimali. Non applicare sconti in sequenza su importi
+arrotondati e non ricalcolarli in servizi, mapper, PDF o frontend. L'elenco degli
+sconti con causale e salvato nello snapshot della riga; gli importi risparmiati
+per sconto servono solo alla presentazione. Alla cassa il prezzo non e
+modificabile: si puo solo aggiungere uno sconto, sempre motivato.
+
 ### DatiRiepilogo: 2.2.2
 
 Raggruppare SEMPRE per chiave composta `(AliquotaIVA, CodiceNatura)`,
@@ -135,6 +150,9 @@ Preservare e ampliare i test per:
 - scorporo 94,18 x 5: imponibile 385,98, IVA 84,92, totale 470,90;
 - due righe nette da 0,03 al 22%: imponibile 0,06 e IVA 0,01, NON 0,02;
 - quantita frazionarie, sconti, midpoint positivi e negativi;
+- sconti composti: percentuali in sequenza (5%, 3%, 5% su 100,00 = 12,4575%,
+  totale 87,54), importo in euro dopo una percentuale, importo oltre il residuo,
+  causale mancante, percentuale effettiva a 10 decimali;
 - precisione, input invalidi, Natura mancante/incompatibile e overflow;
 - immutabilita, determinismo, nessuna mutazione dopo validazione fallita;
 - coerenza tra aggregati, persistenza e presentazione PDF.

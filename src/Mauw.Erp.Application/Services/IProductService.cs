@@ -10,7 +10,8 @@ public interface IProductService
 {
     Task<OperationResult<ProductDto>> CreateProductAsync(CreateProductRequest request);
     Task<OperationResult<ProductDto>> GetProductAsync(Guid id);
-    Task<OperationResult<PagedResult<ProductDto>>> GetProductsAsync(int page, int pageSize, string? search = null);
+    Task<OperationResult<PagedResult<ProductDto>>> GetProductsAsync(
+        int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false);
     Task<OperationResult<ProductDto>> UpdateProductAsync(Guid id, CreateProductRequest request);
     Task<OperationResult<bool>> DeleteProductAsync(Guid id);
     Task<OperationResult<BarcodeVariantDto>> GetVariantByBarcodeAsync(string barcode);

@@ -8,7 +8,8 @@ import { ApiService } from '../../../services/api.service';
 import { ProductService } from '../../../services/product.service';
 import { ProductMatrixModalComponent, MatrixSelection } from './product-matrix-modal.component';
 import { ProductParentDto, ProductMatrixDto } from '../../../models/product.model';
-import { CassaSessionService, CartItem, CassaContact, CassaPreviewState, PausedSessionSummary, CassaEmissionItem } from '../../../services/cassa-session.service';
+import { CassaSessionService, CartItem, CashDiscount, CassaContact, CassaPreviewLine, CassaPreviewState, PausedSessionSummary, CassaEmissionItem } from '../../../services/cassa-session.service';
+import { DiscountDialogComponent } from './discount-dialog.component';
 import { PriceList } from '../../../models/price-list.model';
 import { PriceListService, priceError } from '../../../services/price-list.service';
 
@@ -33,9 +34,18 @@ interface PageResponse<T> {
 @Component({
   selector: 'app-banco-cassa',
   standalone: true,
-  imports: [CommonModule, FormsModule, ProductMatrixModalComponent],
+  imports: [CommonModule, FormsModule, ProductMatrixModalComponent, DiscountDialogComponent],
   template: `
 <!-- ===== MODALI ===== -->
+
+<!-- Sconti della riga -->
+<app-discount-dialog
+  *ngIf="discountItem as target"
+  [item]="target"
+  [line]="previewLine(discountIndex!)"
+  (applied)="onDiscountApplied($event)"
+  (closed)="closeDiscount()">
+</app-discount-dialog>
 
 <!-- Matrix modal overlay -->
 <app-product-matrix-modal
@@ -285,9 +295,10 @@ interface PageResponse<T> {
         <p class="text-sm mt-1">Scansiona un barcode o cerca un articolo</p>
       </div>
 
-      <div *ngIf="cart.length > 0" class="space-y-2">
+      <div *ngIf="cart.length > 0" class="space-y-1">
         <div *ngFor="let item of cart; let i = index; trackBy: trackCartItem"
-          class="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-4">
+          class="bg-white rounded-xl border border-gray-100 shadow-sm px-3 py-2 flex items-center gap-3"
+          data-testid="cart-row">
           <!-- Product info -->
           <div class="flex-1 min-w-0">
             <div class="font-semibold text-gray-800 truncate">{{ item.productName }}</div>
@@ -308,20 +319,32 @@ interface PageResponse<T> {
             <option [ngValue]="null">Natura IVA</option>
             <option *ngFor="let code of natureCodes" [value]="code">{{ code }}</option>
           </select>
-          <div class="text-right w-24 flex-shrink-0">
+          <div class="text-right w-40 flex-shrink-0">
             <div class="text-xs text-gray-400">Prezzo netto</div>
-            <div *ngIf="!item.isPriceOverride" class="text-sm font-medium">{{ item.unitNetPrice | number:'1.2-8' }} €</div>
-            <div class="text-xs" *ngIf="item.discountPercent">Sconto {{ item.discountPercent }}%</div>
-            <div class="text-xs text-blue-600" *ngIf="item.ruleId">Regola applicata</div>
-            <label class="text-xs"><input type="checkbox" [ngModel]="item.isPriceOverride"
-              (ngModelChange)="togglePriceOverride(item, $event)"> Override</label>
-            <div *ngIf="item.isPriceOverride" class="bg-amber-50 border border-amber-300 p-1 rounded">
-              <input type="number" min="0" step="0.00000001" aria-label="Prezzo netto override"
-                [(ngModel)]="item.unitNetPrice" (ngModelChange)="syncToService()" class="border w-full">
-              <input type="number" min="0" max="100" step="0.01" aria-label="Sconto percentuale override"
-                [(ngModel)]="item.discountPercent" (ngModelChange)="syncToService()" class="border w-full">
-              <input aria-label="Motivo override" placeholder="Motivo obbligatorio" [(ngModel)]="item.overrideReason"
-                (ngModelChange)="syncToService()" class="border w-full">
+            <ng-container *ngIf="discountedPrice(i) !== null; else plainPrice">
+              <div class="flex items-baseline justify-end gap-2 whitespace-nowrap">
+                <span class="text-xs text-red-600 line-through" data-testid="old-price">{{ item.unitNetPrice | number:'1.2-8' }} €</span>
+                <span class="text-sm font-bold text-green-700" data-testid="new-price">{{ discountedPrice(i) | number:'1.2-8' }} €</span>
+              </div>
+            </ng-container>
+            <ng-template #plainPrice>
+              <div class="text-sm font-medium" data-testid="plain-price">{{ item.unitNetPrice | number:'1.2-8' }} €</div>
+            </ng-template>
+            <div class="mt-1 flex items-center justify-end gap-1.5">
+              <span *ngIf="appliedPercent(i) > 0" class="text-xs font-medium text-green-700" data-testid="discount-badge">
+                −{{ appliedPercent(i) | number:'1.0-2' }}%
+              </span>
+              <button *ngIf="!item.isCustomerReturn" type="button" (click)="openDiscount(i)"
+                aria-label="Sconti riga" title="Sconti riga" data-testid="discount-button"
+                [class]="'w-7 h-7 rounded-full border flex items-center justify-center transition ' +
+                  (item.cashDiscount ? 'border-green-500 bg-green-50 text-green-700'
+                    : appliedPercent(i) > 0 ? 'border-blue-300 bg-blue-50 text-blue-600'
+                    : 'border-gray-200 text-gray-500 hover:bg-gray-100')">
+                <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" class="h-4 w-4" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <circle cx="7.5" cy="7.5" r="2.5" /><circle cx="16.5" cy="16.5" r="2.5" /><path d="M18 6 6 18" />
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -348,8 +371,9 @@ interface PageResponse<T> {
           </div>
 
           <!-- Remove -->
-          <button (click)="removeItem(i)"
-            class="text-gray-300 hover:text-red-500 transition text-xl leading-none flex-shrink-0">
+          <button type="button" (click)="removeItem(i)" aria-label="Rimuovi riga" title="Rimuovi riga"
+            data-testid="remove-item"
+            class="text-red-600 hover:text-red-700 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 rounded p-1 transition text-xl leading-none flex-shrink-0">
             &times;
           </button>
         </div>
@@ -379,7 +403,12 @@ interface PageResponse<T> {
             <div class="text-sm font-medium text-gray-400">{{ weightKg | number:'1.2-2' }} kg</div>
           </div>
         </div>
-        <div *ngIf="preview.error" class="text-xs text-red-600 max-w-xs">{{ preview.error }}</div>
+        <div *ngIf="pricingPending || preview.error || pricingError" class="text-xs max-w-xs"
+          [class.text-gray-500]="pricingPending && !preview.error && !pricingError"
+          [class.text-red-600]="!!preview.error || !!pricingError" role="status">
+          <span *ngIf="pricingPending && !preview.error && !pricingError">Calcolo totali in corso…</span>
+          <span *ngIf="preview.error || pricingError" role="alert">{{ preview.error || pricingError }}</span>
+        </div>
 
         <!-- Action buttons: aligned right -->
         <div class="flex gap-2 flex-shrink-0 ml-auto">
@@ -464,14 +493,51 @@ export class BancoCassaComponent implements OnInit, OnDestroy {
   pricingPending = false;
   pricingError: string | null = null;
 
+  discountIndex: number | null = null;
+
   get weightKg(): number {
     const weightG = this.cart.reduce((s, i) => s + (i.weightGrams ?? 0) * i.quantity, 0);
     return weightG / 1000;
   }
 
-  lineNetTotal(index: number): number | null {
+  previewLine(index: number): CassaPreviewLine | null {
     const lines = this.preview.data?.lines;
-    return lines && lines.length === this.cart.length ? lines[index].lineNetTotal : null;
+    return lines && lines.length === this.cart.length ? lines[index] : null;
+  }
+
+  lineNetTotal(index: number): number | null {
+    return this.previewLine(index)?.lineNetTotal ?? null;
+  }
+
+  /** Prezzo unitario dopo gli sconti, calcolato dal backend; null se la riga non e scontata. */
+  discountedPrice(index: number): number | null {
+    const line = this.previewLine(index);
+    if (line) return line.discountPercent > 0 ? line.discountedUnitPrice ?? null : null;
+    const item = this.cart[index];
+    return !item.cashDiscount && (item.discountPercent ?? 0) > 0 ? item.agreedUnitNetPrice ?? null : null;
+  }
+
+  appliedPercent(index: number): number {
+    return this.previewLine(index)?.discountPercent ?? this.cart[index].discountPercent ?? 0;
+  }
+
+  get discountItem(): CartItem | null {
+    return this.discountIndex === null ? null : this.cart[this.discountIndex] ?? null;
+  }
+
+  openDiscount(index: number): void {
+    this.discountIndex = index;
+  }
+
+  closeDiscount(): void {
+    this.discountIndex = null;
+  }
+
+  onDiscountApplied(discount: CashDiscount | null): void {
+    const item = this.discountItem;
+    if (item) item.cashDiscount = discount;
+    this.discountIndex = null;
+    this.syncToService();
   }
 
   constructor(
@@ -516,12 +582,6 @@ export class BancoCassaComponent implements OnInit, OnDestroy {
     this.sessionService.setCart(cart);
     this.sessionService.setContact(selectedContact);
     this.sessionService.setDocumentNumber(documentNumber);
-  }
-
-  togglePriceOverride(item: CartItem, enabled: boolean): void {
-    item.isPriceOverride = enabled;
-    if (!enabled) item.overrideReason = null;
-    this.syncToService();
   }
 
   trackCartItem(_index: number, item: CartItem): string { return item.variantId; }
@@ -651,7 +711,9 @@ export class BancoCassaComponent implements OnInit, OnDestroy {
 
   private runContactSearch(): void {
     const q = this.contactSearch.trim();
-    this.api.get<PageResponse<CassaContact>>(`v1/contacts?page=1&pageSize=20&search=${encodeURIComponent(q)}`).subscribe({
+    // Il listino e il calcolo prezzi richiedono un profilo cliente: agenti e fornitori non sono selezionabili.
+    this.api.get<PageResponse<CassaContact>>(
+      `v1/contacts?page=1&pageSize=20&isCustomer=true&search=${encodeURIComponent(q)}`).subscribe({
       next: (res) => { this.contactResults = res.items || []; },
       error: () => { this.contactResults = []; }
     });

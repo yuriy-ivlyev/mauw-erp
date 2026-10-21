@@ -16,6 +16,7 @@ public static class ContactMapper
         return new(
             Id: contact.Id,
             BusinessName: contact.BusinessName,
+            TradeName: contact.TradeName,
             VatNumber: contact.VatNumber,
             TaxCode: contact.TaxCode,
             City: legalAddress?.City,
@@ -31,6 +32,7 @@ public static class ContactMapper
     public static ContactDetailDto MapToDetail(Contact contact) => new(
         Id: contact.Id,
         BusinessName: contact.BusinessName,
+        TradeName: contact.TradeName,
         VatNumber: contact.VatNumber,
         TaxCode: contact.TaxCode,
         SdiCode: contact.SdiCode,

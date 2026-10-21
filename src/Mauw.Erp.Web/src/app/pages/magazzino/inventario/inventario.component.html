@@ -36,15 +36,15 @@
     <table *ngIf="!loading || stockItems.length > 0" class="w-full text-sm">
       <thead class="bg-gray-50 border-b">
         <tr>
-          <th class="px-4 py-3 text-left font-semibold text-gray-700">Barcode</th>
-          <th class="px-4 py-3 text-left font-semibold text-gray-700">Prodotto</th>
-          <th class="px-4 py-3 text-left font-semibold text-gray-700">Colore / Taglia</th>
-          <th class="px-4 py-3 text-left font-semibold text-gray-700">Magazzino</th>
-          <th class="px-4 py-3 text-right font-semibold text-gray-700">Fisica</th>
-          <th class="px-4 py-3 text-right font-semibold text-gray-700">Impegnata</th>
-          <th class="px-4 py-3 text-right font-semibold text-gray-700">Disponibile</th>
-          <th class="px-4 py-3 text-right font-semibold text-gray-700">Costo Unit.</th>
-          <th class="px-4 py-3 text-right font-semibold text-gray-700">Valore Est.</th>
+          <th appSortHeader="barcode" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left font-semibold text-gray-700">Barcode</th>
+          <th appSortHeader="productName" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left font-semibold text-gray-700">Prodotto</th>
+          <th appSortHeader="colorSize" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left font-semibold text-gray-700">Colore / Taglia</th>
+          <th appSortHeader="warehouseCode" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left font-semibold text-gray-700">Magazzino</th>
+          <th appSortHeader="quantityOnHand" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-right font-semibold text-gray-700">Fisica</th>
+          <th appSortHeader="quantityReserved" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-right font-semibold text-gray-700">Impegnata</th>
+          <th appSortHeader="quantityAvailable" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-right font-semibold text-gray-700">Disponibile</th>
+          <th appSortHeader="unitCost" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-right font-semibold text-gray-700">Costo Unit.</th>
+          <th appSortHeader="estimatedValue" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-right font-semibold text-gray-700">Valore Est.</th>
         </tr>
       </thead>
       <tbody>
@@ -88,11 +88,7 @@
   </div>
 
   <!-- Pagination -->
-  <div *ngIf="totalPages > 1" class="mt-4 flex items-center gap-3 text-sm">
-    <button (click)="prevPage()" [disabled]="page === 1"
-      class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-40">← Prec</button>
-    <span class="text-gray-600">Pagina {{ page }} di {{ totalPages }} ({{ totalCount }} totali)</span>
-    <button (click)="nextPage()" [disabled]="page === totalPages"
-      class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-40">Succ →</button>
-  </div>
+  <app-pagination [page]="page" [pageSize]="pageSize" [totalCount]="totalCount"
+    (pageChange)="goToPage($event)" (pageSizeChange)="onPageSizeChange($event)">
+  </app-pagination>
 </div>

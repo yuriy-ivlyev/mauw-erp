@@ -51,12 +51,12 @@
     <table *ngIf="!loading || warehouses.length > 0" class="w-full">
       <thead class="bg-gray-50 border-b">
         <tr>
-          <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Codice</th>
-          <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Denominazione</th>
-          <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Tipo</th>
-          <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Sede</th>
-          <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Flag</th>
-          <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Stato</th>
+          <th appSortHeader="code" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Codice</th>
+          <th appSortHeader="name" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Denominazione</th>
+          <th appSortHeader="type" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Tipo</th>
+          <th appSortHeader="city" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Sede</th>
+          <th appSortHeader="isDefault" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Flag</th>
+          <th appSortHeader="isActive" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Stato</th>
           <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Azioni</th>
         </tr>
       </thead>
@@ -130,17 +130,9 @@
   </div>
 
   <!-- Pagination -->
-  <div *ngIf="totalPages > 1" class="mt-4 flex items-center gap-3 text-sm">
-    <button (click)="prevPage()" [disabled]="page === 1"
-      class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-40">
-      ← Prec
-    </button>
-    <span class="text-gray-600">Pagina {{ page }} di {{ totalPages }} ({{ totalCount }} totali)</span>
-    <button (click)="nextPage()" [disabled]="page === totalPages"
-      class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-40">
-      Succ →
-    </button>
-  </div>
+  <app-pagination [page]="page" [pageSize]="pageSize" [totalCount]="totalCount"
+    (pageChange)="goToPage($event)" (pageSizeChange)="onPageSizeChange($event)">
+  </app-pagination>
 
   <!-- ─── Form Modal (Crea / Modifica) ──────────────────────────────────────── -->
   <div *ngIf="showForm" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

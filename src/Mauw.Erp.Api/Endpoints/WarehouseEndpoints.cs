@@ -45,9 +45,19 @@ public static class WarehouseEndpoints
         int? type = null,
         bool? isActive = null,
         int page = 1,
-        int pageSize = 20)
+        int pageSize = 20,
+        string? sortBy = null,
+        bool sortDescending = false)
     {
-        var result = await warehouseService.GetPagedAsync(page, Math.Min(pageSize, 100), search, type, isActive);
+        var paging = new PageSortRequest
+        {
+            Page = page,
+            PageSize = pageSize,
+            SortBy = sortBy,
+            SortDescending = sortDescending
+        };
+        var result = await warehouseService.GetPagedAsync(
+            paging.Page, Math.Min(paging.PageSize, 100), search, type, isActive, paging.SortBy, paging.SortDescending);
         if (!result.Success)
             return TypedResults.BadRequest(result.Error);
 

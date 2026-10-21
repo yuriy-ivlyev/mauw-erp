@@ -17,10 +17,13 @@ public class WarehouseService(
         int pageSize,
         string? search,
         int? type,
-        bool? isActive)
+        bool? isActive,
+        string? sortBy = null,
+        bool sortDescending = false)
     {
         if (page <= 0) page = 1;
         if (pageSize <= 0) pageSize = 20;
+        pageSize = Math.Min(pageSize, 100);
 
         WarehouseType? warehouseType = null;
         if (type.HasValue)
@@ -31,7 +34,7 @@ public class WarehouseService(
             warehouseType = (WarehouseType)type.Value;
         }
 
-        var (items, total) = await unitOfWork.Warehouses.GetPagedAsync(page, pageSize, search, warehouseType, isActive);
+        var (items, total) = await unitOfWork.Warehouses.GetPagedAsync(page, pageSize, search, warehouseType, isActive, sortBy, sortDescending);
         var dtos = items.Select(MapSummary).ToList();
 
         return OperationResult<PagedResult<WarehouseSummaryDto>>.Ok(

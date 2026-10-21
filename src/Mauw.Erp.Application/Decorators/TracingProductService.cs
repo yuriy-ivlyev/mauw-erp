@@ -13,8 +13,9 @@ public sealed class TracingProductService(IProductService inner) : TracingDecora
         TraceAsync("Product.Get", () => inner.GetProductAsync(id),
             a => a?.SetTag("product.id", id));
 
-    public Task<OperationResult<PagedResult<ProductDto>>> GetProductsAsync(int page, int pageSize, string? search = null) =>
-        TraceAsync("Product.GetAll", () => inner.GetProductsAsync(page, pageSize, search),
+    public Task<OperationResult<PagedResult<ProductDto>>> GetProductsAsync(
+        int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false) =>
+        TraceAsync("Product.GetAll", () => inner.GetProductsAsync(page, pageSize, search, sortBy, sortDescending),
             a => a?.SetTag("search", search));
 
     public Task<OperationResult<ProductDto>> UpdateProductAsync(Guid id, CreateProductRequest request) =>

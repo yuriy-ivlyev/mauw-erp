@@ -14,8 +14,9 @@ public sealed class TracingOrderService(IOrderService inner) : TracingDecoratorB
         TraceAsync("Order.Get", () => inner.GetOrderAsync(id),
             a => a?.SetTag("order.id", id));
 
-    public Task<OperationResult<PagedResult<OrderDto>>> GetAllOrdersAsync(string? search, string? status, string? orderType, int page, int pageSize) =>
-        inner.GetAllOrdersAsync(search, status, orderType, page, pageSize);
+    public Task<OperationResult<PagedResult<OrderDto>>> GetAllOrdersAsync(
+        string? search, string? status, string? orderType, int page, int pageSize, string? sortBy = null, bool sortDescending = false) =>
+        inner.GetAllOrdersAsync(search, status, orderType, page, pageSize, sortBy, sortDescending);
 
     public Task<OperationResult<PagedResult<OrderDto>>> GetOrdersByContactAsync(Guid contactId, int page, int pageSize) =>
         TraceAsync("Order.GetByContact", () => inner.GetOrdersByContactAsync(contactId, page, pageSize),

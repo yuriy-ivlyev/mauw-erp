@@ -12,7 +12,9 @@ public record CassaCartItemRequest(
     bool IsManualPriceOverride = false,
     string? OverrideReason = null,
     bool IsCustomerReturn = false,
-    Guid? SourceLineId = null
+    Guid? SourceLineId = null,
+    Mauw.Erp.Contracts.Pricing.CashDiscountRequest? CashDiscount = null,
+    string? PriceListDiscountReason = null
 );
 
 public record CreateCassaSessionRequest(

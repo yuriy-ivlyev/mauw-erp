@@ -6,6 +6,10 @@ import { PriceList, PriceListRequest, PriceRule, PriceCalculationType } from '..
 import { PriceListService, priceError } from '../../../services/price-list.service';
 import { decimal8, priceRuleValidator } from '../../../services/price-list.validators';
 import { PriceRuleTargetComponent } from './price-rule-target.component';
+import { PaginationComponent } from '../../../shared/pagination/pagination.component';
+import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
+import { SortChange } from '../../../models/pagination.model';
+import { sortRows } from '../../../shared/sort-rows';
 
 function localDate(value?: string | null): string {
   if (!value) return '';
@@ -16,7 +20,7 @@ function localDate(value?: string | null): string {
 @Component({
   selector: 'app-listini',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, PriceRuleTargetComponent],
+  imports: [CommonModule, ReactiveFormsModule, PriceRuleTargetComponent, PaginationComponent, SortHeaderDirective],
   template: `
     <div class="p-6 space-y-4">
       <div class="flex justify-between"><h1 class="text-3xl font-bold">Listini prezzi</h1>
@@ -26,8 +30,13 @@ function localDate(value?: string | null): string {
       <p *ngIf="error" role="alert" class="bg-red-50 text-red-700 p-3">{{ error }}</p>
       <p *ngIf="loading">Caricamento…</p>
       <div class="bg-white rounded shadow overflow-auto">
-        <table class="w-full text-left"><thead><tr class="border-b"><th class="p-3">Nome</th><th>Valuta</th><th>Regole</th><th>Stato</th><th>Azioni</th></tr></thead>
-          <tbody><tr *ngFor="let list of lists" class="border-b">
+        <table class="w-full text-left"><thead><tr class="border-b">
+          <th appSortHeader="name" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="p-3">Nome</th>
+          <th appSortHeader="currency" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)">Valuta</th>
+          <th appSortHeader="rules" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)">Regole</th>
+          <th appSortHeader="isActive" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)">Stato</th>
+          <th>Azioni</th></tr></thead>
+          <tbody><tr *ngFor="let list of pageItems" class="border-b">
             <td class="p-3">{{ list.name }}</td><td>{{ list.currency }}</td><td>{{ list.rules.length }}</td>
             <td><button [disabled]="busy" (click)="activate(list)" class="border rounded px-2 py-1"
               [attr.aria-label]="(list.isActive ? 'Disattiva ' : 'Attiva ') + list.name">{{ list.isActive ? 'Attivo' : 'Inattivo' }}</button></td>
@@ -36,6 +45,9 @@ function localDate(value?: string | null): string {
           </tr><tr *ngIf="!loading && lists.length === 0"><td colspan="5" class="p-4">Nessun listino.</td></tr></tbody>
         </table>
       </div>
+      <app-pagination [page]="page" [pageSize]="pageSize" [totalCount]="lists.length"
+        (pageChange)="goToPage($event)" (pageSizeChange)="onPageSizeChange($event)">
+      </app-pagination>
       <div *ngIf="deleteId" class="bg-red-50 p-4 rounded">
         Eliminare il listino? I riferimenti esistenti potrebbero impedirne la rimozione.
         <button [disabled]="busy" (click)="remove()" class="text-red-700 px-3">Conferma</button>
@@ -63,6 +75,9 @@ function localDate(value?: string | null): string {
               <label>Valore<input type="number" min="0" step="0.00000001" formControlName="value" class="border p-2 w-full"></label>
               <label>Quantità minima<input type="number" min="0.00000001" step="0.00000001" formControlName="minimumQuantity" class="border p-2 w-full"></label>
               <label>Priorità<input type="number" step="1" formControlName="priority" class="border p-2 w-full"></label>
+              <label class="md:col-span-3">Causale sconto (mostrata in cassa e sui documenti)
+                <input formControlName="description" maxlength="200" class="border p-2 w-full"
+                  placeholder="Es. Sconto magliette"></label>
               <label>Dal (incluso, ora locale)<input type="datetime-local" step="0.001" formControlName="validFrom" class="border p-2 w-full"></label>
               <label>Al (incluso, ora locale)<input type="datetime-local" step="0.001" formControlName="validTo" class="border p-2 w-full"></label>
             </div>
@@ -84,6 +99,10 @@ export class ListiniComponent implements OnInit {
   private fb = inject(FormBuilder);
   private service = inject(PriceListService);
   lists: PriceList[] = [];
+  page = 1;
+  pageSize = 20;
+  sortBy = 'name';
+  sortDescending = false;
   error = '';
   busy = false;
   loading = false;
@@ -96,7 +115,24 @@ export class ListiniComponent implements OnInit {
     rules: new FormArray<ReturnType<ListiniComponent['ruleForm']>>([])
   });
   get rules() { return this.form.controls.rules; }
+  get pageItems(): PriceList[] {
+    return sortRows(this.lists, item => {
+      if (this.sortBy === 'currency') return item.currency;
+      if (this.sortBy === 'rules') return item.rules.length;
+      if (this.sortBy === 'isActive') return item.isActive;
+      return item.name;
+    }, this.sortDescending).slice((this.page - 1) * this.pageSize, this.page * this.pageSize);
+  }
   ngOnInit(): void { this.load(); }
+  goToPage(page: number): void {
+    if (page >= 1 && page <= Math.max(1, Math.ceil(this.lists.length / this.pageSize))) this.page = page;
+  }
+  onPageSizeChange(pageSize: number): void { this.pageSize = pageSize; this.page = 1; }
+  onSortChange(sort: SortChange): void {
+    this.sortBy = sort.sortBy;
+    this.sortDescending = sort.sortDescending;
+    this.page = 1;
+  }
   load(): void {
     this.loading = true;
     this.service.getAll().pipe(finalize(() => this.loading = false)).subscribe({
@@ -113,6 +149,7 @@ export class ListiniComponent implements OnInit {
       value: [rule?.value ?? 0, [Validators.required, Validators.min(0), decimal8]],
       minimumQuantity: [rule?.minimumQuantity ?? 1, [Validators.required, Validators.min(0.00000001), decimal8]],
       priority: [rule?.priority ?? 0, [Validators.required, Validators.min(-2147483648), Validators.max(2147483647), Validators.pattern(/^-?\d+$/)]],
+      description: [rule?.description ?? '', [Validators.maxLength(200)]],
       validFrom: localDate(rule?.validFrom), validTo: localDate(rule?.validTo)
     }, { validators: priceRuleValidator });
   }
@@ -138,6 +175,7 @@ export class ListiniComponent implements OnInit {
         ...(rule.id ? { id: rule.id } : {}),
         calculationType: rule.calculationType, value: rule.value, minimumQuantity: rule.minimumQuantity,
         priority: rule.priority,
+        description: rule.description.trim() || null,
         variantId: rule.target === 'variantId' ? rule.targetId : null,
         productId: rule.target === 'productId' ? rule.targetId : null,
         categoryId: rule.target === 'categoryId' ? rule.targetId : null,

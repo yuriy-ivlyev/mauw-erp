@@ -16,6 +16,7 @@ public class ContactConfiguration : IEntityTypeConfiguration<Contact>
         builder.HasKey(c => c.Id);
 
         builder.Property(c => c.BusinessName).IsRequired().HasMaxLength(255);
+        builder.Property(c => c.TradeName).HasMaxLength(255);
         builder.Property(c => c.VatNumber).HasMaxLength(20);
         builder.Property(c => c.TaxCode).HasMaxLength(16);
         builder.Property(c => c.SdiCode).HasMaxLength(7);

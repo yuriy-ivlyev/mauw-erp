@@ -35,10 +35,39 @@ describe('ListiniComponent', () => {
       name: 'Rivenditori', currency: 'EUR', isActive: true,
       rules: [{
         id: 'rule', calculationType: 'PercentageDiscount', value: 15.5, minimumQuantity: 1, priority: 10,
+        description: null,
         productId: list.rules[0].productId, variantId: null, categoryId: null,
         validFrom: '2026-10-18T08:00:00.000Z', validTo: '2026-10-19T08:00:00.000Z'
       }]
     });
+  });
+  it('saves the discount reason of a rule trimmed, and empties it when blank', () => {
+    component.edit();
+    component.form.controls.name.setValue('Base');
+    component.addRule({
+      calculationType: 'PercentageDiscount', value: 5, minimumQuantity: 1, priority: 0, description: '  Sconto magliette '
+    });
+    component.addRule({
+      calculationType: 'PercentageDiscount', value: 3, minimumQuantity: 1, priority: 0, description: '   '
+    });
+    component.save();
+    const rules = service.create.calls.mostRecent().args[0].rules;
+    expect(rules[0].description).toBe('Sconto magliette');
+    expect(rules[1].description).toBeNull();
+  });
+  it('loads the stored reason into the rule form so it can be edited', () => {
+    component.edit({ ...list, rules: [{ ...list.rules[0], description: 'Sconto catalogo' }] });
+    expect(component.rules.at(0).controls.description.value).toBe('Sconto catalogo');
+  });
+  it('rejects a discount reason longer than 200 characters', () => {
+    component.edit();
+    component.form.controls.name.setValue('Base');
+    component.addRule({
+      calculationType: 'PercentageDiscount', value: 5, minimumQuantity: 1, priority: 0, description: 'x'.repeat(201)
+    });
+    component.save();
+    expect(service.create).not.toHaveBeenCalled();
+    expect(component.rules.at(0).controls.description.errors).toEqual(jasmine.objectContaining({ maxlength: jasmine.anything() }));
   });
   it('creates a global rule without inventing an ID or a target', () => {
     component.edit();

@@ -10,7 +10,8 @@ public interface IOrderService
 {
     Task<OperationResult<OrderDto>> CreateOrderAsync(CreateOrderRequest request);
     Task<OperationResult<OrderDto>> GetOrderAsync(Guid id);
-    Task<OperationResult<PagedResult<OrderDto>>> GetAllOrdersAsync(string? search, string? status, string? orderType, int page, int pageSize);
+    Task<OperationResult<PagedResult<OrderDto>>> GetAllOrdersAsync(
+        string? search, string? status, string? orderType, int page, int pageSize, string? sortBy = null, bool sortDescending = false);
     Task<OperationResult<PagedResult<OrderDto>>> GetOrdersByContactAsync(Guid contactId, int page, int pageSize);
     Task<OperationResult<OrderDto>> AddItemAsync(Guid orderId, CreateOrderItemRequest request);
     Task<OperationResult<OrderDto>> ConfirmOrderAsync(Guid orderId);

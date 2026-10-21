@@ -3,16 +3,24 @@ import { CommonModule } from '@angular/common';
 import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { SupportService, SizeDto, UpdateSizeRequest } from '../../../services/support.service';
+import { PaginationComponent } from '../../../shared/pagination/pagination.component';
+import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
+import { SortChange } from '../../../models/pagination.model';
+import { sortRows } from '../../../shared/sort-rows';
 
 @Component({
   selector: 'app-taglie',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, ConfirmDeleteModalComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, ConfirmDeleteModalComponent, PaginationComponent, SortHeaderDirective],
   templateUrl: './taglie.component.html',
   styleUrl: './taglie.component.scss'
 })
 export class TaglieComponent implements OnInit {
   sizes: SizeDto[] = [];
+  page = 1;
+  pageSize = 20;
+  sortBy = 'name';
+  sortDescending = false;
   showForm = false;
   editingId: string | null = null;
   form!: FormGroup;
@@ -21,6 +29,14 @@ export class TaglieComponent implements OnInit {
   loading = false;
   deleteMessage = '';
   confirmDeleteId: string | null = null;
+
+  get pageItems(): SizeDto[] {
+    return sortRows(this.sizes, item => {
+      if (this.sortBy === 'id') return item.id;
+      if (this.sortBy === 'visibility') return item.isVisible;
+      return item.name;
+    }, this.sortDescending).slice((this.page - 1) * this.pageSize, this.page * this.pageSize);
+  }
 
   constructor(
     private supportService: SupportService,
@@ -159,6 +175,17 @@ export class TaglieComponent implements OnInit {
   }
 
   onDeleteCancelled(): void { this.confirmDeleteId = null; }
-}
 
+  goToPage(page: number): void {
+    if (page >= 1 && page <= Math.max(1, Math.ceil(this.sizes.length / this.pageSize))) this.page = page;
+  }
+
+  onPageSizeChange(pageSize: number): void { this.pageSize = pageSize; this.page = 1; }
+
+  onSortChange(sort: SortChange): void {
+    this.sortBy = sort.sortBy;
+    this.sortDescending = sort.sortDescending;
+    this.page = 1;
+  }
+}
 

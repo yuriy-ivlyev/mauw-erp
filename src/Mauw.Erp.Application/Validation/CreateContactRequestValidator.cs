@@ -16,6 +16,9 @@ public class CreateContactRequestValidator : IValidator<CreateContactRequest>
         else if (request.BusinessName.Length > 255)
             errors.Add(new(nameof(request.BusinessName), "Business name must not exceed 255 characters"));
 
+        if (request.TradeName is { Length: > 255 })
+            errors.Add(new(nameof(request.TradeName), "Trade name must not exceed 255 characters"));
+
         if (request.VatNumber is null && request.TaxCode is null)
             errors.Add(new(nameof(request.VatNumber), "At least one of VAT number or tax code is required"));
 

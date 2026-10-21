@@ -78,9 +78,12 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         return OperationResult<ProductDto>.Ok(withThumbnail[0]);
     }
 
-    public async Task<OperationResult<PagedResult<ProductDto>>> GetProductsAsync(int page, int pageSize, string? search = null)
+    public async Task<OperationResult<PagedResult<ProductDto>>> GetProductsAsync(
+        int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false)
     {
-        var products = (await unitOfWork.Products.GetPaginatedAsync(page, pageSize, search)).ToList();
+        page = page <= 0 ? 1 : page;
+        pageSize = pageSize <= 0 ? 20 : Math.Min(pageSize, 100);
+        var products = (await unitOfWork.Products.GetPaginatedAsync(page, pageSize, search, sortBy, sortDescending)).ToList();
         var total = await unitOfWork.Products.GetTotalCountAsync(search);
 
         var dtos = ProductMapper.MapToListDto(products);

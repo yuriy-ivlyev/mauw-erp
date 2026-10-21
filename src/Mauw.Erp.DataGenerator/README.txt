@@ -166,6 +166,8 @@ incompleto possono produrre piccoli scostamenti, riportati nel riepilogo.
 Il fallato non viene rivenduto come merce commerciale e resta separato.
 I movimenti distinguono carichi, vendite, resi al fornitore e fallati.
 Ogni vendita genera ordine, DDT e fattura con le stesse righe e totali.
+Le vendite sono intestate solo ad anagrafiche con profilo cliente: agenti e
+fornitori non ricevono mai ordini, DDT o fatture di vendita.
 L'IVA ordinaria dello scenario e il 22%; non simula tutti i regimi fiscali,
 la certificazione SDI, le commissioni o una contabilita completa.
 Le giacenze derivano dai movimenti; non si vende merce non ancora ricevuta.

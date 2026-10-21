@@ -87,9 +87,12 @@ public partial class OrderService(
         return OperationResult<OrderDto>.Ok(OrderMapper.MapToDto(order));
     }
 
-    public async Task<OperationResult<PagedResult<OrderDto>>> GetAllOrdersAsync(string? search, string? status, string? orderType, int page, int pageSize)
+    public async Task<OperationResult<PagedResult<OrderDto>>> GetAllOrdersAsync(
+        string? search, string? status, string? orderType, int page, int pageSize, string? sortBy = null, bool sortDescending = false)
     {
-        var (orders, total) = await unitOfWork.Orders.GetAllPagedAsync(search, status, orderType, page, pageSize);
+        page = page <= 0 ? 1 : page;
+        pageSize = pageSize <= 0 ? 20 : Math.Min(pageSize, 100);
+        var (orders, total) = await unitOfWork.Orders.GetAllPagedAsync(search, status, orderType, page, pageSize, sortBy, sortDescending);
         var orderList = orders.ToList();
         var orderIds = orderList.Select(o => o.Id).ToList();
 
@@ -493,15 +496,74 @@ public partial class OrderService(
 
     public OperationResult<CassaPreviewDto> PreviewCassaCart(CassaPreviewRequest request)
     {
-        var accounting = CalculateCart(request?.Items);
+        var items = request?.Items;
+        if (items is null || items.Any(item => item is null))
+            return OperationResult<CassaPreviewDto>.Fail("Il carrello e le sue righe non possono essere null.");
+
+        var inputs = new List<DocumentLineInput>(items.Count);
+        var breakdowns = new List<List<CassaPreviewDiscountDto>>(items.Count);
+        for (var i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+            var percent = item.DiscountPercent;
+            var breakdown = new List<CassaPreviewDiscountDto>();
+            if (item.CashDiscount is not null)
+            {
+                if (item.IsCustomerReturn)
+                    return OperationResult<CassaPreviewDto>.Fail($"Riga {i + 1}: i resi non ammettono sconti di cassa.");
+                if (string.IsNullOrWhiteSpace(item.CashDiscount.Reason))
+                    return OperationResult<CassaPreviewDto>.Fail($"Riga {i + 1}: specificare la causale dello sconto di cassa.");
+                var components = new List<DiscountInput>();
+                if (item.DiscountPercent > 0m)
+                    components.Add(new DiscountInput(item.DiscountPercent, null));
+                components.Add(new DiscountInput(item.CashDiscount.Percent, item.CashDiscount.Amount));
+                var combined = accountingCalculator.CombineDiscounts(item.Quantity, item.UnitNetPrice, components);
+                if (!combined.Success)
+                    return OperationResult<CassaPreviewDto>.Fail($"Riga {i + 1}: {combined.Error}");
+                percent = combined.Data!.EffectivePercent;
+                var saved = combined.Data.SavedAmounts;
+                var next = 0;
+                if (item.DiscountPercent > 0m)
+                    breakdown.Add(new CassaPreviewDiscountDto("PriceList", ListDiscountReason(item),
+                        item.DiscountPercent, null, saved[next++]));
+                breakdown.Add(new CassaPreviewDiscountDto("Cashier", item.CashDiscount.Reason.Trim(),
+                    item.CashDiscount.Percent, item.CashDiscount.Amount, saved[next]));
+            }
+            else if (item.DiscountPercent > 0m)
+            {
+                var savedAmount = 0m;
+                if (item.Quantity > 0)
+                {
+                    var single = accountingCalculator.CombineDiscounts(item.Quantity, item.UnitNetPrice,
+                        [new DiscountInput(item.DiscountPercent, null)]);
+                    if (single.Success)
+                        savedAmount = single.Data!.SavedAmounts[0];
+                }
+                breakdown.Add(new CassaPreviewDiscountDto("PriceList", ListDiscountReason(item),
+                    item.DiscountPercent, null, savedAmount));
+            }
+            inputs.Add(new DocumentLineInput(item.Quantity, item.UnitNetPrice, item.VatRate, item.NatureCode, percent));
+            breakdowns.Add(breakdown);
+        }
+
+        var accounting = accountingCalculator.Calculate(inputs);
         if (!accounting.Success)
             return OperationResult<CassaPreviewDto>.Fail(accounting.Error);
 
         var document = accounting.Data!;
-        return OperationResult<CassaPreviewDto>.Ok(new CassaPreviewDto(
-            document.Lines.Select(line => new CassaPreviewLineDto(
+        var lines = new List<CassaPreviewLineDto>(document.Lines.Length);
+        for (var i = 0; i < document.Lines.Length; i++)
+        {
+            var line = document.Lines[i];
+            var discounted = accountingCalculator.CalculateDiscountedUnitPrice(line.UnitNetPrice, line.DiscountPercent);
+            if (!discounted.Success)
+                return OperationResult<CassaPreviewDto>.Fail(discounted.Error);
+            lines.Add(new CassaPreviewLineDto(
                 line.LineNumber, line.UnitNetPrice, line.DiscountPercent, line.VatRate,
-                line.NatureCode, line.LineNetTotal)).ToList(),
+                line.NatureCode, line.LineNetTotal, discounted.Data!.Value, breakdowns[i]));
+        }
+        return OperationResult<CassaPreviewDto>.Ok(new CassaPreviewDto(
+            lines,
             document.VatSummary.Select(group => new CassaPreviewVatDto(
                 group.VatRate, group.NatureCode, group.TaxableAmount, group.VatAmount)).ToList(),
             document.TotalTaxable,
@@ -509,13 +571,8 @@ public partial class OrderService(
             document.TotalGross));
     }
 
-    private AccountingResult<CalculatedDocument> CalculateCart(List<CassaCartItemRequest>? items)
-    {
-        if (items is null || items.Any(item => item is null))
-            return AccountingResult<CalculatedDocument>.Fail("Il carrello e le sue righe non possono essere null.");
-        return accountingCalculator.Calculate(items.Select(item => new DocumentLineInput(
-            item.Quantity, item.UnitNetPrice, item.VatRate, item.NatureCode, item.DiscountPercent)));
-    }
+    private static string ListDiscountReason(CassaCartItemRequest item) =>
+        string.IsNullOrWhiteSpace(item.PriceListDiscountReason) ? "Sconto listino" : item.PriceListDiscountReason.Trim();
 
     private Task<AccountingResult<PreparedDocumentPricing>> PrepareCartAsync(
         Guid contactId, List<CassaCartItemRequest>? items)
@@ -523,17 +580,21 @@ public partial class OrderService(
         if (items is null || items.Any(item => item is null))
             return Task.FromResult(AccountingResult<PreparedDocumentPricing>.Fail("Il carrello e le righe non possono essere null."));
         if (items.Any(item => item.IsCustomerReturn &&
-            (item.IsManualPriceOverride || !string.IsNullOrWhiteSpace(item.OverrideReason))))
-            return Task.FromResult(AccountingResult<PreparedDocumentPricing>.Fail("Il prezzo del reso proviene dalla fattura e non ammette override."));
+            (item.IsManualPriceOverride || !string.IsNullOrWhiteSpace(item.OverrideReason) || item.CashDiscount is not null)))
+            return Task.FromResult(AccountingResult<PreparedDocumentPricing>.Fail("Il prezzo del reso proviene dalla fattura e non ammette override o sconti."));
+        if (items.Any(item => item.CashDiscount is not null && item.IsManualPriceOverride))
+            return Task.FromResult(AccountingResult<PreparedDocumentPricing>.Fail("Lo sconto di cassa non e combinabile con un prezzo manuale."));
+        // Con uno sconto di cassa il prezzo e il listino sono sempre risolti dal server, mai presi dal client.
         return documentPricing.PrepareAsync(contactId, items.Select(item => new DocumentPricingRequest(
             item.VariantId, item.Quantity,
-            item.IsCustomerReturn && item.SourceLineId.HasValue ? null : item.UnitNetPrice, null,
+            item.CashDiscount is not null || (item.IsCustomerReturn && item.SourceLineId.HasValue) ? null : item.UnitNetPrice, null,
             item.IsCustomerReturn ? null : item.VatRate,
             item.IsCustomerReturn ? null : item.NatureCode,
             item.IsCustomerReturn ? null : item.DiscountPercent,
             item.IsCustomerReturn ? null : item.PriceListId,
             item.IsCustomerReturn ? null : item.OverrideReason, item.IsCustomerReturn, item.SourceLineId,
-            PreserveLegacyPrice: !item.IsManualPriceOverride)).ToList(), DateTimeOffset.UtcNow);
+            PreserveLegacyPrice: !item.IsManualPriceOverride && item.CashDiscount is null,
+            CashDiscount: item.CashDiscount)).ToList(), DateTimeOffset.UtcNow);
     }
 
     private static CassaSessionDetailDto MapCassaDetail(Order order, string contactName) =>

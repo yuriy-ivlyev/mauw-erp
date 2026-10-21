@@ -73,15 +73,15 @@
     <table *ngIf="!loading || categories.length > 0" class="w-full">
       <thead class="bg-gray-50 border-b">
         <tr>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">ID</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nome</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Macro Categoria</th>
-          <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">VisibilitÃ </th>
+          <th appSortHeader="id" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold text-gray-700">ID</th>
+          <th appSortHeader="name" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nome</th>
+          <th appSortHeader="macroCategory" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Macro Categoria</th>
+          <th appSortHeader="visibility" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold text-gray-700">VisibilitÃ </th>
           <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Azioni</th>
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let category of categories" class="border-b hover:bg-gray-50">
+        <tr *ngFor="let category of pageItems" class="border-b hover:bg-gray-50">
           <td class="px-6 py-4 text-sm font-mono text-gray-600">{{ category.id }}</td>
           <td class="px-6 py-4 text-sm text-gray-900">{{ category.name }}</td>
           <td class="px-6 py-4 text-sm text-gray-600">{{ getMacroCategoryName(category.macroCategoryId) }}</td>
@@ -111,6 +111,9 @@
       </tbody>
     </table>
   </div>
+  <app-pagination [page]="page" [pageSize]="pageSize" [totalCount]="categories.length"
+    (pageChange)="goToPage($event)" (pageSizeChange)="onPageSizeChange($event)">
+  </app-pagination>
 
   <!-- Delete message -->
   <div *ngIf="deleteMessage" class="mt-4 p-4 bg-yellow-100 border border-yellow-400 text-yellow-800 rounded">
@@ -125,5 +128,4 @@
     (cancelled)="onDeleteCancelled()">
   </app-confirm-delete-modal>
 </div>
-
 

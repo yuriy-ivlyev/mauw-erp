@@ -25,6 +25,8 @@ export class WarehouseService {
     if (params.search) httpParams = httpParams.set('search', params.search);
     if (params.type != null) httpParams = httpParams.set('type', params.type.toString());
     if (params.isActive != null) httpParams = httpParams.set('isActive', params.isActive.toString());
+    if (params.sortBy) httpParams = httpParams.set('sortBy', params.sortBy);
+    if (params.sortDescending) httpParams = httpParams.set('sortDescending', 'true');
 
     return this.http.get<PagedResult<WarehouseSummary>>(this.base, { params: httpParams });
   }

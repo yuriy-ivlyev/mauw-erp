@@ -72,6 +72,7 @@ export class AnagraficaModificaComponent implements OnInit {
     this.form = this.fb.group({
       // Tab 1: Dati fiscali
       businessName: ['', [Validators.required, Validators.maxLength(255)]],
+      tradeName:    ['', Validators.maxLength(255)],
       vatNumber:    ['', Validators.maxLength(20)],
       taxCode:      ['', Validators.maxLength(16)],
       sdiCode:      ['', Validators.maxLength(7)],
@@ -119,6 +120,7 @@ export class AnagraficaModificaComponent implements OnInit {
       next: (c: ContactDetail) => {
         this.form.patchValue({
           businessName: c.businessName,
+          tradeName:    c.tradeName,
           vatNumber:    c.vatNumber,
           taxCode:      c.taxCode,
           sdiCode:      c.sdiCode,
@@ -296,6 +298,7 @@ export class AnagraficaModificaComponent implements OnInit {
 
     const payload: any = {
       businessName: v.businessName,
+      tradeName:    v.tradeName ?? '',
       vatNumber:    v.vatNumber    || null,
       taxCode:      v.taxCode      || null,
       sdiCode:      v.sdiCode      || null,

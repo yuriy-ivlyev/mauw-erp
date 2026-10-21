@@ -11,6 +11,8 @@ export interface PriceRule {
   validFrom?: string | null;
   validTo?: string | null;
   priority: number;
+  /** Causale mostrata in cassa e sui documenti quando la regola applica uno sconto. */
+  description?: string | null;
 }
 
 export interface PriceListRequest {
@@ -39,6 +41,7 @@ export interface ResolvedPrice {
   discountPercent: number;
   agreedUnitNetPrice: number;
   vatRate: number;
+  discountReason?: string | null;
 }
 
 export interface PriceResolution {

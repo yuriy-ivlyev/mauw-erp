@@ -66,13 +66,15 @@ public class StockService(
     public async Task<OperationResult<PagedResult<StockItemDto>>> GetStockSummaryPagedAsync(StockFilterRequest request)
     {
         var page = request.Page <= 0 ? 1 : request.Page;
-        var pageSize = request.PageSize <= 0 ? 30 : request.PageSize;
+        var pageSize = request.PageSize <= 0 ? 30 : Math.Min(request.PageSize, 100);
 
         var (items, total) = await unitOfWork.Stock.GetStockByWarehousePagedAsync(
             request.WarehouseId,
             request.Search,
             page,
-            pageSize);
+            pageSize,
+            request.SortBy,
+            request.SortDescending);
 
         var dtos = items.Select(Map).ToList();
         return OperationResult<PagedResult<StockItemDto>>.Ok(new PagedResult<StockItemDto>(dtos, page, pageSize, total));
@@ -158,12 +160,13 @@ public class StockService(
     }
 
     public async Task<OperationResult<PagedResult<StockMovementDetailDto>>> GetMovementsPagedAsync(
-        Guid? warehouseId, int page, int pageSize)
+        Guid? warehouseId, int page, int pageSize, string? sortBy = null, bool sortDescending = false)
     {
         page = page <= 0 ? 1 : page;
         pageSize = pageSize <= 0 ? 30 : pageSize;
+        pageSize = Math.Min(pageSize, 100);
 
-        var (items, total) = await unitOfWork.Stock.GetMovementsPagedAsync(warehouseId, page, pageSize);
+        var (items, total) = await unitOfWork.Stock.GetMovementsPagedAsync(warehouseId, page, pageSize, sortBy, sortDescending);
         var dtos = items.Select(MapMovement).ToList();
         return OperationResult<PagedResult<StockMovementDetailDto>>.Ok(
             new PagedResult<StockMovementDetailDto>(dtos, page, pageSize, total));

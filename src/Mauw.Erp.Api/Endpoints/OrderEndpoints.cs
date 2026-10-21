@@ -71,9 +71,13 @@ public static class OrderEndpoints
         string? status = null,
         string? orderType = null,
         int page = 1,
-        int pageSize = 20)
+        int pageSize = 20,
+        string? sortBy = null,
+        bool sortDescending = false)
     {
-        var result = await orderService.GetAllOrdersAsync(search, status, orderType, page, pageSize);
+        var request = new OrderFilterParams(search, status, orderType, page, pageSize, sortBy, sortDescending);
+        var result = await orderService.GetAllOrdersAsync(
+            request.Search, request.Status, request.OrderType, request.Page, request.PageSize, request.SortBy, request.SortDescending);
         return TypedResults.Ok(result.Data!);
     }
 

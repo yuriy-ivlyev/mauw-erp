@@ -16,8 +16,24 @@ public record StockTransferCommand(
     decimal Quantity,
     string? Notes = null);
 
-public record StockFilterRequest(
-    Guid? WarehouseId = null,
-    string? Search = null,
-    int Page = 1,
-    int PageSize = 30);
+public class StockFilterRequest : PageSortRequest
+{
+    public StockFilterRequest(
+        Guid? warehouseId = null,
+        string? search = null,
+        int page = 1,
+        int pageSize = 30,
+        string? sortBy = null,
+        bool sortDescending = false)
+    {
+        WarehouseId = warehouseId;
+        Search = search;
+        Page = page;
+        PageSize = pageSize;
+        SortBy = sortBy;
+        SortDescending = sortDescending;
+    }
+
+    public Guid? WarehouseId { get; init; }
+    public string? Search { get; init; }
+}

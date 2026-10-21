@@ -102,6 +102,11 @@ public class SimulationTests
         var orders = await db.Orders.AsNoTracking().Include(item => item.Items).ToDictionaryAsync(item => item.Id);
         var ddts = await db.DdtDocuments.AsNoTracking().Include(item => item.Items).ToDictionaryAsync(item => item.OrderId!.Value);
         var invoices = await db.Invoices.AsNoTracking().Include(item => item.Items).ToListAsync();
+        var customerContactIds = customers.Select(item => item.ContactId).ToHashSet();
+        Assert.NotEmpty(orders);
+        Assert.All(orders.Values, order => Assert.Contains(order.ContactId, customerContactIds));
+        Assert.All(ddts.Values, ddt => Assert.Contains(ddt.ContactId, customerContactIds));
+        Assert.All(invoices, invoice => Assert.Contains(invoice.ContactId, customerContactIds));
         var calculator = new ItalianAccountingCalculator();
         foreach (var invoice in invoices)
         {

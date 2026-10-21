@@ -217,15 +217,15 @@
     <table *ngIf="company?.operationalSites?.length" class="w-full text-sm">
       <thead class="bg-gray-50 border-b">
         <tr>
-          <th class="px-4 py-2 text-left font-semibold text-gray-700">Nome</th>
-          <th class="px-4 py-2 text-left font-semibold text-gray-700">Tipo</th>
-          <th class="px-4 py-2 text-left font-semibold text-gray-700">Indirizzo</th>
-          <th class="px-4 py-2 text-left font-semibold text-gray-700">Telefono</th>
+          <th appSortHeader="siteName" [activeSortBy]="siteSortBy" [sortDescending]="siteSortDescending" (sortChange)="onSiteSortChange($event)" class="px-4 py-2 text-left font-semibold text-gray-700">Nome</th>
+          <th appSortHeader="purpose" [activeSortBy]="siteSortBy" [sortDescending]="siteSortDescending" (sortChange)="onSiteSortChange($event)" class="px-4 py-2 text-left font-semibold text-gray-700">Tipo</th>
+          <th appSortHeader="address" [activeSortBy]="siteSortBy" [sortDescending]="siteSortDescending" (sortChange)="onSiteSortChange($event)" class="px-4 py-2 text-left font-semibold text-gray-700">Indirizzo</th>
+          <th appSortHeader="phone" [activeSortBy]="siteSortBy" [sortDescending]="siteSortDescending" (sortChange)="onSiteSortChange($event)" class="px-4 py-2 text-left font-semibold text-gray-700">Telefono</th>
           <th class="px-4 py-2 text-left font-semibold text-gray-700">Azioni</th>
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let site of company?.operationalSites" class="border-b hover:bg-gray-50">
+        <tr *ngFor="let site of operationalSitePageItems" class="border-b hover:bg-gray-50">
           <td class="px-4 py-3 font-medium">
             {{ site.siteName || '—' }}
             <span *ngIf="site.isMainOperationalSite"
@@ -248,6 +248,10 @@
         </tr>
       </tbody>
     </table>
+    <app-pagination *ngIf="company?.operationalSites?.length"
+      [page]="sitePage" [pageSize]="sitePageSize" [totalCount]="company?.operationalSites?.length ?? 0"
+      (pageChange)="goToSitePage($event)" (pageSizeChange)="onSitePageSizeChange($event)">
+    </app-pagination>
   </section>
 
   <!-- ── Modale Sede Operativa ─────────────────────────────────────────────── -->

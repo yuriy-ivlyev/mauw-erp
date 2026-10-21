@@ -121,6 +121,65 @@ public sealed class ItalianAccountingCalculator
         return discountPercent is < 0m or > 100m ? "Discount must be between zero and 100." : null;
     }
 
+    /// <summary>
+    /// Combines the discounts of one line, in order, into the single percentage used by <see cref="CalculateLine"/>.
+    /// Percentages compound on the amount left by the previous discounts; an amount is a discount on the line total
+    /// expressed in euros (two decimals) and cannot exceed what is left. The effective percentage is rounded
+    /// once, to ten decimals, so the discount is still applied a single time to the line total.
+    /// Saved amounts are for presentation only and may differ from the total by rounding.
+    /// </summary>
+    public AccountingResult<CombinedDiscount> CombineDiscounts(
+        decimal quantity, decimal unitPrice, IReadOnlyList<DiscountInput>? discounts)
+    {
+        if (discounts is null || discounts.Any(discount => discount is null))
+            return AccountingResult<CombinedDiscount>.Fail("Discounts are required.");
+        if (quantity <= 0m)
+            return AccountingResult<CombinedDiscount>.Fail("Quantity must be positive to apply discounts.");
+        var priceError = ValidatePrice(unitPrice, 0m);
+        if (priceError is not null)
+            return AccountingResult<CombinedDiscount>.Fail(priceError);
+
+        try
+        {
+            var gross = quantity * unitPrice;
+            var remaining = gross;
+            var saved = new List<decimal>(discounts.Count);
+            foreach (var discount in discounts)
+            {
+                if (discount.Percent.HasValue == discount.Amount.HasValue)
+                    return AccountingResult<CombinedDiscount>.Fail("Each discount needs exactly one of percentage or amount.");
+                decimal cut;
+                if (discount.Percent is { } percent)
+                {
+                    if (percent is < 0m or > 100m)
+                        return AccountingResult<CombinedDiscount>.Fail("Discount must be between zero and 100.");
+                    cut = remaining * percent / 100m;
+                }
+                else
+                {
+                    cut = discount.Amount!.Value;
+                    if (cut < 0m || decimal.Round(cut, 2, MidpointRounding.AwayFromZero) != cut)
+                        return AccountingResult<CombinedDiscount>.Fail("Discount amount must not be negative and has at most two decimals.");
+                    if (cut > remaining)
+                        return AccountingResult<CombinedDiscount>.Fail("Discount amount exceeds the line amount.");
+                }
+                saved.Add(Money(cut));
+                remaining -= cut;
+            }
+
+            var effective = gross == 0m
+                ? 0m
+                : decimal.Round((1m - remaining / gross) * 100m, 10, MidpointRounding.AwayFromZero);
+            // Dividing by a value with many zeros drops insignificant trailing zeros.
+            return AccountingResult<CombinedDiscount>.Ok(new CombinedDiscount(
+                effective / 1.0000000000000000000000000000m, saved));
+        }
+        catch (OverflowException)
+        {
+            return AccountingResult<CombinedDiscount>.Fail("Discount calculation exceeds decimal capacity.");
+        }
+    }
+
     private static decimal RequireScale(decimal value, int minimumScale)
     {
         // Decimal can silently drop trailing zeroes near its capacity; do not return the wrong scale.

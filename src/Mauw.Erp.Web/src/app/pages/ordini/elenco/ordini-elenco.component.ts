@@ -5,11 +5,14 @@ import { Observable, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, finalize, takeUntil } from 'rxjs/operators';
 import { Order, OrderFilterParams, PagedResult } from '../../../models/order.model';
 import { OrderService } from '../../../services/order.service';
+import { PaginationComponent } from '../../../shared/pagination/pagination.component';
+import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
+import { SortChange } from '../../../models/pagination.model';
 
 @Component({
   selector: 'app-ordini-elenco',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, PaginationComponent, SortHeaderDirective],
   templateUrl: './ordini-elenco.component.html'
 })
 export class OrdiniElencoComponent implements OnInit, OnDestroy {
@@ -24,6 +27,8 @@ export class OrdiniElencoComponent implements OnInit, OnDestroy {
   typeFilter = '';
   currentPage = 1;
   pageSize = 20;
+  sortBy = 'orderDate';
+  sortDescending = true;
 
   downloadingPdf: string | null = null;
   pdfErrorMessage = '';
@@ -69,7 +74,9 @@ export class OrdiniElencoComponent implements OnInit, OnDestroy {
       status: this.statusFilter || undefined,
       orderType: this.typeFilter || undefined,
       page: this.currentPage,
-      pageSize: this.pageSize
+      pageSize: this.pageSize,
+      sortBy: this.sortBy,
+      sortDescending: this.sortDescending
     };
 
     this.orderService.getList(params).pipe(takeUntil(this.destroy$)).subscribe({
@@ -77,6 +84,11 @@ export class OrdiniElencoComponent implements OnInit, OnDestroy {
         this.orders = result.items;
         this.totalCount = result.totalCount;
         this.totalPages = result.totalPages;
+        if (this.totalPages > 0 && this.currentPage > this.totalPages) {
+          this.currentPage = this.totalPages;
+          this.loadOrders();
+          return;
+        }
         this.loading = false;
       },
       error: () => {
@@ -95,11 +107,17 @@ export class OrdiniElencoComponent implements OnInit, OnDestroy {
     this.loadOrders();
   }
 
-  pages(): number[] {
-    const delta = 2;
-    const start = Math.max(1, this.currentPage - delta);
-    const end = Math.min(this.totalPages, this.currentPage + delta);
-    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  onPageSizeChange(pageSize: number): void {
+    this.pageSize = pageSize;
+    this.currentPage = 1;
+    this.loadOrders();
+  }
+
+  onSortChange(sort: SortChange): void {
+    this.sortBy = sort.sortBy;
+    this.sortDescending = sort.sortDescending;
+    this.currentPage = 1;
+    this.loadOrders();
   }
 
   downloadPdf(type: 'order' | 'invoice' | 'ddt', id: string, filename: string): void {

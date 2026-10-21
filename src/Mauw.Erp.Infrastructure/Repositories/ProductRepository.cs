@@ -29,7 +29,8 @@ public class ProductRepository(MauwDbContext dbContext) : Repository<Product, Gu
             .FirstOrDefaultAsync(p => p.InternalCode == internalCode);
     }
 
-    public async Task<IEnumerable<Product>> GetPaginatedAsync(int page, int pageSize, string? search = null)
+    public async Task<IEnumerable<Product>> GetPaginatedAsync(
+        int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false)
     {
         var query = _dbSet
             .Include(p => p.Variants)
@@ -41,7 +42,22 @@ public class ProductRepository(MauwDbContext dbContext) : Repository<Product, Gu
             query = query.Where(p => p.Name.ToLower().Contains(searchLower) || p.InternalCode.ToLower().Contains(searchLower));
         }
 
-        return await query
+        var orderedQuery = sortBy?.ToLowerInvariant() switch
+        {
+            "internalcode" => sortDescending ? query.OrderByDescending(p => p.InternalCode) : query.OrderBy(p => p.InternalCode),
+            "suppliercode" => sortDescending ? query.OrderByDescending(p => p.SupplierCode) : query.OrderBy(p => p.SupplierCode),
+            "variants" => sortDescending ? query.OrderByDescending(p => p.Variants.Count) : query.OrderBy(p => p.Variants.Count),
+            "purchasecost" => sortDescending
+                ? query.OrderByDescending(p => p.Variants.Select(v => (decimal?)v.PurchaseCost).Min())
+                : query.OrderBy(p => p.Variants.Select(v => (decimal?)v.PurchaseCost).Min()),
+            "sellingprice" => sortDescending
+                ? query.OrderByDescending(p => p.Variants.Select(v => v.SellingPrice).Min())
+                : query.OrderBy(p => p.Variants.Select(v => v.SellingPrice).Min()),
+            _ => sortDescending ? query.OrderByDescending(p => p.Name) : query.OrderBy(p => p.Name)
+        };
+
+        return await orderedQuery
+            .ThenBy(p => p.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .AsNoTracking()

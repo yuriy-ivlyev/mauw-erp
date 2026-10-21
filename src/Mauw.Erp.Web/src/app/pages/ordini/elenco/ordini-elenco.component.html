@@ -50,12 +50,12 @@
     <table *ngIf="!loading || orders.length > 0" class="w-full">
       <thead class="border-b bg-gray-50">
         <tr>
-          <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Numero</th>
-          <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Cliente</th>
-          <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Data</th>
-          <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Stato</th>
-          <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Imponibile</th>
-          <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Totale</th>
+          <th appSortHeader="orderNumber" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Numero</th>
+          <th appSortHeader="contactName" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Cliente</th>
+          <th appSortHeader="orderDate" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Data</th>
+          <th appSortHeader="status" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Stato</th>
+          <th appSortHeader="taxableTotal" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Imponibile</th>
+          <th appSortHeader="grossTotal" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Totale</th>
           <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Documenti</th>
           <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">PDF</th>
         </tr>
@@ -142,25 +142,7 @@
     </table>
   </div>
 
-  <div *ngIf="totalPages > 1" class="mt-4 flex items-center justify-between">
-    <span class="text-sm text-gray-600">
-      {{ (currentPage - 1) * pageSize + 1 }}–{{ currentPage * pageSize < totalCount ? currentPage * pageSize : totalCount }} di {{ totalCount }}
-    </span>
-    <div class="flex gap-1">
-      <button
-        (click)="goToPage(currentPage - 1)"
-        [disabled]="currentPage === 1"
-        class="rounded border px-3 py-1 text-sm hover:bg-gray-100 disabled:opacity-40">‹</button>
-      <button
-        *ngFor="let p of pages()"
-        (click)="goToPage(p)"
-        [class]="'rounded border px-3 py-1 text-sm ' + (p === currentPage ? 'border-blue-600 bg-blue-600 text-white' : 'hover:bg-gray-100')">
-        {{ p }}
-      </button>
-      <button
-        (click)="goToPage(currentPage + 1)"
-        [disabled]="currentPage === totalPages"
-        class="rounded border px-3 py-1 text-sm hover:bg-gray-100 disabled:opacity-40">›</button>
-    </div>
-  </div>
+  <app-pagination [page]="currentPage" [pageSize]="pageSize" [totalCount]="totalCount"
+    (pageChange)="goToPage($event)" (pageSizeChange)="onPageSizeChange($event)">
+  </app-pagination>
 </div>

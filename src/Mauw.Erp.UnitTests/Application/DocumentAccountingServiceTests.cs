@@ -141,6 +141,73 @@ public class DocumentAccountingServiceTests
     }
 
     [Fact]
+    public void CartPreviewAppliesTheLineDiscountOnceBeforeVat()
+    {
+        var result = _fixture.OrderService.PreviewCassaCart(new(
+            [new(_fixture.Variant.Id, 5, 10m, 22m, 10, DiscountPercent: 20m)]));
+
+        Assert.True(result.Success, result.Error);
+        Assert.Equal(20m, Assert.Single(result.Data!.Lines).DiscountPercent);
+        Assert.Equal(40.00m, result.Data.TotalTaxable);
+        Assert.Equal(8.80m, result.Data.TotalVat);
+        Assert.Equal(48.80m, result.Data.TotalGross);
+    }
+
+    [Fact]
+    public void CartPreviewShowsEachDiscountWithItsReasonAndTheDiscountedUnitPrice()
+    {
+        var result = _fixture.OrderService.PreviewCassaCart(new(
+        [
+            new(_fixture.Variant.Id, 5, 10m, 22m, 10, DiscountPercent: 10m, PriceListDiscountReason: "Sconto magliette",
+                CashDiscount: new(5m, null, " Sconto alla cassa ")),
+            new(_fixture.Variant.Id, 5, 10m, 22m, 10, CashDiscount: new(null, 5.00m, "Pezzo con difetto")),
+            new(_fixture.Variant.Id, 5, 10m, 22m, 10, DiscountPercent: 10m),
+            new(_fixture.Variant.Id, 5, 10m, 22m, 10)
+        ]));
+
+        Assert.True(result.Success, result.Error);
+        var lines = result.Data!.Lines;
+        Assert.Equal([42.75m, 45.00m, 45.00m, 50.00m], lines.Select(line => line.LineNetTotal));
+        Assert.Equal([14.5m, 10m, 10m, 0m], lines.Select(line => line.DiscountPercent));
+        Assert.Equal([8.55m, 9m, 9m, 10m], lines.Select(line => line.DiscountedUnitPrice));
+
+        var composed = lines[0].Discounts!;
+        Assert.Equal(["PriceList", "Cashier"], composed.Select(item => item.Source));
+        Assert.Equal(["Sconto magliette", "Sconto alla cassa"], composed.Select(item => item.Reason));
+        Assert.Equal([5.00m, 2.25m], composed.Select(item => item.SavedAmount));
+        Assert.Equal(5.00m, Assert.Single(lines[1].Discounts!).Amount);
+        Assert.Equal("Sconto listino", Assert.Single(lines[2].Discounts!).Reason);
+        Assert.Empty(lines[3].Discounts!);
+        Assert.Equal(182.75m, result.Data.TotalTaxable);
+        Assert.Equal(40.21m, result.Data.TotalVat);
+        Assert.Equal(222.96m, result.Data.TotalGross);
+    }
+
+    [Fact]
+    public void CartPreviewRejectsCashDiscountWithoutReasonOnReturnsOrAboveTheLineTotal()
+    {
+        Assert.False(_fixture.OrderService.PreviewCassaCart(new(
+            [new(_fixture.Variant.Id, 5, 10m, 22m, 10, CashDiscount: new(5m, null, " "))])).Success);
+        Assert.False(_fixture.OrderService.PreviewCassaCart(new(
+            [new(_fixture.Variant.Id, -1, 10m, 22m, 10, IsCustomerReturn: true, CashDiscount: new(5m, null, "Motivo"))])).Success);
+        Assert.False(_fixture.OrderService.PreviewCassaCart(new(
+            [new(_fixture.Variant.Id, 5, 10m, 22m, 10, CashDiscount: new(null, 50.01m, "Motivo"))])).Success);
+        Assert.False(_fixture.OrderService.PreviewCassaCart(new(
+            [new(_fixture.Variant.Id, 5, 10m, 22m, 10, CashDiscount: new(5m, 1m, "Motivo"))])).Success);
+    }
+
+    [Fact]
+    public async Task CashDiscountOnAReturnIsRejectedBeforeSavingTheSession()
+    {
+        var result = await _fixture.OrderService.CreateCassaSessionAsync(new(_fixture.Contact.Id, null, null,
+            [new(_fixture.Variant.Id, -1, 10m, 22m, 10, IsCustomerReturn: true, SourceLineId: Guid.NewGuid(),
+                CashDiscount: new(5m, null, "Motivo"))]));
+
+        Assert.False(result.Success);
+        _fixture.UnitOfWork.Verify(work => work.SaveChangesAsync(), Times.Never);
+    }
+
+    [Fact]
     public void CartPreviewOfEmptyCartIsZero()
     {
         var result = _fixture.OrderService.PreviewCassaCart(new([]));

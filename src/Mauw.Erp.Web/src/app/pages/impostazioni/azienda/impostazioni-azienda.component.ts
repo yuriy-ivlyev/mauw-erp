@@ -5,11 +5,15 @@ import { CompanySettingsService } from '../../../services/company-settings.servi
 import { CompanySettings, CompanyAddressSite, CompanyAddressSiteRequest } from '../../../models/company-settings.model';
 import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
 import { CompanyBrandingService, CompanyLogoKind } from '../../../services/company-branding.service';
+import { PaginationComponent } from '../../../shared/pagination/pagination.component';
+import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
+import { SortChange } from '../../../models/pagination.model';
+import { sortRows } from '../../../shared/sort-rows';
 
 @Component({
   selector: 'app-impostazioni-azienda',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, ConfirmDeleteModalComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, ConfirmDeleteModalComponent, PaginationComponent, SortHeaderDirective],
   templateUrl: './impostazioni-azienda.component.html'
 })
 export class ImpostazioniAziendaComponent implements OnInit {
@@ -29,6 +33,20 @@ export class ImpostazioniAziendaComponent implements OnInit {
   editingSiteId: string | null = null;
   siteForm!: FormGroup;
   savingSite = false;
+  sitePage = 1;
+  sitePageSize = 20;
+  siteSortBy = 'siteName';
+  siteSortDescending = false;
+
+  get operationalSitePageItems(): CompanyAddressSite[] {
+    const sites = this.company?.operationalSites ?? [];
+    return sortRows(sites, site => {
+      if (this.siteSortBy === 'purpose') return site.purpose;
+      if (this.siteSortBy === 'address') return `${site.street} ${site.zipCode} ${site.city} ${site.province ?? ''}`;
+      if (this.siteSortBy === 'phone') return site.phone;
+      return site.siteName;
+    }, this.siteSortDescending).slice((this.sitePage - 1) * this.sitePageSize, this.sitePage * this.sitePageSize);
+  }
 
   constructor(
     private fb: FormBuilder,
@@ -59,6 +77,22 @@ export class ImpostazioniAziendaComponent implements OnInit {
     this.buildForm();
     this.buildSiteForm();
     this.loadCompany();
+  }
+
+  goToSitePage(page: number): void {
+    const totalSites = this.company?.operationalSites?.length ?? 0;
+    if (page >= 1 && page <= Math.max(1, Math.ceil(totalSites / this.sitePageSize))) this.sitePage = page;
+  }
+
+  onSitePageSizeChange(pageSize: number): void {
+    this.sitePageSize = pageSize;
+    this.sitePage = 1;
+  }
+
+  onSiteSortChange(sort: SortChange): void {
+    this.siteSortBy = sort.sortBy;
+    this.siteSortDescending = sort.sortDescending;
+    this.sitePage = 1;
   }
 
   buildForm(): void {

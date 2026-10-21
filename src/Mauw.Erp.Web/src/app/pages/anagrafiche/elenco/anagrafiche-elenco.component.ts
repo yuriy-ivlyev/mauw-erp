@@ -7,11 +7,14 @@ import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 import { ContactService } from '../../../services/contact.service';
 import { ContactSummary, ContactFilterParams, PagedResult } from '../../../models/contact.model';
 import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
+import { PaginationComponent } from '../../../shared/pagination/pagination.component';
+import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
+import { SortChange } from '../../../models/pagination.model';
 
 @Component({
   selector: 'app-anagrafiche-elenco',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ConfirmDeleteModalComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ConfirmDeleteModalComponent, PaginationComponent, SortHeaderDirective],
   templateUrl: './anagrafiche-elenco.component.html'
 })
 export class AnagraficheElencoComponent implements OnInit, OnDestroy {
@@ -28,6 +31,8 @@ export class AnagraficheElencoComponent implements OnInit, OnDestroy {
   statusFilter = '';
   currentPage = 1;
   pageSize = 20;
+  sortBy = 'businessName';
+  sortDescending = false;
 
   confirmDeleteId: string | null = null;
 
@@ -74,6 +79,8 @@ export class AnagraficheElencoComponent implements OnInit, OnDestroy {
       search: this.searchTerm || undefined,
       page: this.currentPage,
       pageSize: this.pageSize,
+      sortBy: this.sortBy,
+      sortDescending: this.sortDescending,
       status: this.statusFilter || undefined,
       isCustomer: this.roleFilter === 'customer' ? true : undefined,
       isSupplier: this.roleFilter === 'supplier' ? true : undefined,
@@ -85,6 +92,11 @@ export class AnagraficheElencoComponent implements OnInit, OnDestroy {
         this.contacts   = result.items;
         this.totalCount = result.totalCount;
         this.totalPages = result.totalPages;
+        if (this.totalPages > 0 && this.currentPage > this.totalPages) {
+          this.currentPage = this.totalPages;
+          this.loadContacts();
+          return;
+        }
         this.loading    = false;
       },
       error: () => {
@@ -97,6 +109,19 @@ export class AnagraficheElencoComponent implements OnInit, OnDestroy {
   goToPage(page: number): void {
     if (page < 1 || page > this.totalPages) return;
     this.currentPage = page;
+    this.loadContacts();
+  }
+
+  onPageSizeChange(pageSize: number): void {
+    this.pageSize = pageSize;
+    this.currentPage = 1;
+    this.loadContacts();
+  }
+
+  onSortChange(sort: SortChange): void {
+    this.sortBy = sort.sortBy;
+    this.sortDescending = sort.sortDescending;
+    this.currentPage = 1;
     this.loadContacts();
   }
 
@@ -131,10 +156,4 @@ export class AnagraficheElencoComponent implements OnInit, OnDestroy {
     });
   }
 
-  pages(): number[] {
-    const delta = 2;
-    const start = Math.max(1, this.currentPage - delta);
-    const end   = Math.min(this.totalPages, this.currentPage + delta);
-    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
-  }
 }

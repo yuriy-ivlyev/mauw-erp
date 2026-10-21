@@ -44,9 +44,12 @@ public sealed class PriceListResolver(ItalianAccountingCalculator calculator)
             if (unitPrice > 99999999999999.99999999m)
                 return AccountingResult<ResolvedPrice>.Fail("Il prezzo supera la precisione supportata dalla persistenza.");
             var agreed = calculator.CalculateDiscountedUnitPrice(unitPrice, discount);
+            var reason = discount > 0m
+                ? selected?.Description ?? $"Sconto listino {list?.Name}".TrimEnd()
+                : null;
             return agreed.Success
                 ? AccountingResult<ResolvedPrice>.Ok(new ResolvedPrice(
-                    list?.Id, selected?.Id, unitPrice, discount, agreed.Data!.Value))
+                    list?.Id, selected?.Id, unitPrice, discount, agreed.Data!.Value, reason))
                 : AccountingResult<ResolvedPrice>.Fail(agreed.Error);
         }
         catch (OverflowException)

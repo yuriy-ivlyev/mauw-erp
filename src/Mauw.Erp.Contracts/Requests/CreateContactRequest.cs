@@ -7,6 +7,7 @@ public class CreateContactRequest
 {
     // Anagrafica
     public string BusinessName { get; set; } = "";
+    public string? TradeName { get; set; }
     public string? VatNumber { get; set; }
     public string? TaxCode { get; set; }
     public string? SdiCode { get; set; }

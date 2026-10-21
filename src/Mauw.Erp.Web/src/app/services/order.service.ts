@@ -15,6 +15,8 @@ export class OrderService {
     if (params.search)     httpParams = httpParams.set('search', params.search);
     if (params.status)     httpParams = httpParams.set('status', params.status);
     if (params.orderType)  httpParams = httpParams.set('orderType', params.orderType);
+    if (params.sortBy)     httpParams = httpParams.set('sortBy', params.sortBy);
+    if (params.sortDescending) httpParams = httpParams.set('sortDescending', 'true');
     httpParams = httpParams
       .set('page', String(params.page ?? 1))
       .set('pageSize', String(params.pageSize ?? 20));

@@ -6,6 +6,7 @@ namespace Mauw.Erp.Contracts.Dtos;
 public record ContactDetailDto(
     Guid Id,
     string BusinessName,
+    string? TradeName,
     string? VatNumber,
     string? TaxCode,
     string? SdiCode,

@@ -1,6 +1,10 @@
+import { PageSortParams } from './pagination.model';
+export type { PagedResult } from './pagination.model';
+
 export interface ContactSummary {
   id: string;
   businessName: string;
+  tradeName: string | null;
   vatNumber: string | null;
   taxCode: string | null;
   city: string | null;
@@ -15,6 +19,7 @@ export interface ContactSummary {
 export interface ContactDetail {
   id: string;
   businessName: string;
+  tradeName: string | null;
   vatNumber: string | null;
   taxCode: string | null;
   sdiCode: string | null;
@@ -75,28 +80,17 @@ export interface ContactPerson {
   isPrimary: boolean;
 }
 
-export interface ContactFilterParams {
+export interface ContactFilterParams extends PageSortParams {
   search?: string;
   isCustomer?: boolean;
   isSupplier?: boolean;
   isAgent?: boolean;
   status?: string;
-  sortBy?: string;
-  sortDescending?: boolean;
-  page?: number;
-  pageSize?: number;
-}
-
-export interface PagedResult<T> {
-  items: T[];
-  pageNumber: number;
-  pageSize: number;
-  totalCount: number;
-  totalPages: number;
 }
 
 export interface CreateContactRequest {
   businessName: string;
+  tradeName?: string | null;
   vatNumber?: string | null;
   taxCode?: string | null;
   sdiCode?: string | null;

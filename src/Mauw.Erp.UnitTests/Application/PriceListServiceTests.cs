@@ -278,6 +278,168 @@ public class PriceListServiceTests
     }
 
     [Fact]
+    public async Task CashDiscountComposesWithTheListDiscountAndKeepsEveryReason()
+    {
+        using var fixture = new Fixture();
+        await fixture.AssignListAsync(PriceCalculationType.PercentageDiscount, 10m, "Sconto magliette");
+
+        var prepared = await fixture.Pricing.PrepareAsync(fixture.Customer.Id,
+            [new(fixture.Variant.Id, 5m, null, null, null, null, null,
+                CashDiscount: new CashDiscountRequest(5m, null, " Sconto alla cassa "))], DateTimeOffset.UtcNow);
+
+        Assert.True(prepared.Success, prepared.Error);
+        var line = Assert.Single(prepared.Data!.Lines);
+        Assert.Equal(10m, line.FiscalLine.UnitNetPrice);
+        Assert.Equal(14.5m, line.FiscalLine.DiscountPercent);
+        Assert.Equal(42.75m, prepared.Data.FiscalDocument.TotalTaxable);
+        Assert.Equal(9.41m, prepared.Data.FiscalDocument.TotalVat);
+        Assert.Equal(52.16m, prepared.Data.FiscalDocument.TotalGross);
+        Assert.True(line.Snapshot.IsManualOverride);
+        Assert.Equal("Sconto alla cassa", line.Snapshot.OverrideReason);
+        Assert.Equal(
+            new[]
+            {
+                new AppliedDiscount(DiscountSource.PriceList, "Sconto magliette", 10m, null),
+                new AppliedDiscount(DiscountSource.Cashier, "Sconto alla cassa", 5m, null)
+            },
+            line.Snapshot.Discounts!);
+    }
+
+    [Fact]
+    public async Task CashDiscountByAmountKeepsTheServerPriceAndExactTotals()
+    {
+        using var fixture = new Fixture();
+
+        var prepared = await fixture.Pricing.PrepareAsync(fixture.Customer.Id,
+            [new(fixture.Variant.Id, 5m, null, null, null, null, null,
+                CashDiscount: new CashDiscountRequest(null, 5.00m, "Pezzo con difetto estetico"))], DateTimeOffset.UtcNow);
+
+        Assert.True(prepared.Success, prepared.Error);
+        var line = Assert.Single(prepared.Data!.Lines);
+        Assert.Equal(10m, line.FiscalLine.UnitNetPrice);
+        Assert.Equal(45.00m, line.FiscalLine.LineNetTotal);
+        Assert.Equal(9.90m, prepared.Data.FiscalDocument.TotalVat);
+        Assert.Equal(54.90m, prepared.Data.FiscalDocument.TotalGross);
+        Assert.Equal(new AppliedDiscount(DiscountSource.Cashier, "Pezzo con difetto estetico", null, 5.00m),
+            Assert.Single(line.Snapshot.Discounts!));
+    }
+
+    [Fact]
+    public async Task InvalidCashDiscountsAreRejectedWithoutPartialResults()
+    {
+        using var fixture = new Fixture();
+        async Task<AccountingResult<PreparedDocumentPricing>> Prepare(CashDiscountRequest discount,
+            decimal? unitNetPrice = null) =>
+            await fixture.Pricing.PrepareAsync(fixture.Customer.Id,
+                [new(fixture.Variant.Id, 5m, unitNetPrice, null, null, null, null, CashDiscount: discount)],
+                DateTimeOffset.UtcNow);
+
+        Assert.False((await Prepare(new(5m, null, null))).Success);
+        Assert.False((await Prepare(new(5m, null, "   "))).Success);
+        Assert.False((await Prepare(new(5m, null, new string('x', 501)))).Success);
+        Assert.False((await Prepare(new(null, null, "Motivo"))).Success);
+        Assert.False((await Prepare(new(5m, 1m, "Motivo"))).Success);
+        Assert.False((await Prepare(new(100.01m, null, "Motivo"))).Success);
+        Assert.False((await Prepare(new(null, 50.01m, "Motivo"))).Success);
+        Assert.False((await Prepare(new(null, 1.005m, "Motivo"))).Success);
+        Assert.False((await Prepare(new(5m, null, "Motivo"), unitNetPrice: 9m)).Success);
+        Assert.True((await Prepare(new(null, 50.00m, "Omaggio autorizzato"))).Success);
+    }
+
+    [Fact]
+    public async Task ListDiscountAloneIsRecordedWithItsRuleReasonOrADefaultOne()
+    {
+        using var fixture = new Fixture();
+        await fixture.AssignListAsync(PriceCalculationType.PercentageDiscount, 10m);
+        var request = new DocumentPricingRequest(fixture.Variant.Id, 5m, null, null, null, null, null);
+
+        var prepared = await fixture.Pricing.PrepareAsync(fixture.Customer.Id, [request], DateTimeOffset.UtcNow);
+
+        Assert.True(prepared.Success, prepared.Error);
+        var line = Assert.Single(prepared.Data!.Lines);
+        Assert.False(line.Snapshot.IsManualOverride);
+        Assert.Equal(new AppliedDiscount(DiscountSource.PriceList, "Sconto listino Listino", 10m, null),
+            Assert.Single(line.Snapshot.Discounts!));
+    }
+
+    [Fact]
+    public async Task ResolutionExposesTheRuleDescriptionAsDiscountReason()
+    {
+        using var fixture = new Fixture();
+        await fixture.AssignListAsync(PriceCalculationType.PercentageDiscount, 3m, "Sconto catalogo");
+
+        var result = await fixture.Service.ResolveAsync(new()
+        {
+            ContactId = fixture.Customer.Id, Lines = [new(fixture.Variant.Id, 1m)]
+        }, default);
+
+        Assert.True(result.Success, result.Error);
+        var quote = Assert.Single(result.Data!.Lines);
+        Assert.Equal(3m, quote.DiscountPercent);
+        Assert.Equal("Sconto catalogo", quote.DiscountReason);
+    }
+
+    [Fact]
+    public async Task ManualDiscountWithoutPriceRequiresReasonEvenWithoutPriceList()
+    {
+        using var fixture = new Fixture();
+        var request = new DocumentPricingRequest(fixture.Variant.Id, 5m, null, null, null, null, 20m);
+
+        var missing = await fixture.Pricing.PrepareAsync(fixture.Customer.Id, [request], DateTimeOffset.UtcNow);
+        var blank = await fixture.Pricing.PrepareAsync(fixture.Customer.Id,
+            [request with { OverrideReason = "   " }], DateTimeOffset.UtcNow);
+
+        Assert.False(missing.Success);
+        Assert.False(blank.Success);
+        Assert.Contains("motivo", missing.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task JustifiedManualDiscountKeepsServerPriceAndIsRecordedInTheSnapshot()
+    {
+        using var fixture = new Fixture();
+        var prepared = await fixture.Pricing.PrepareAsync(fixture.Customer.Id,
+            [new(fixture.Variant.Id, 5m, null, null, null, null, 20m, OverrideReason: " Cliente storico ")],
+            DateTimeOffset.UtcNow);
+
+        Assert.True(prepared.Success, prepared.Error);
+        var line = Assert.Single(prepared.Data!.Lines);
+        Assert.Equal(10m, line.FiscalLine.UnitNetPrice);
+        Assert.Equal(20m, line.FiscalLine.DiscountPercent);
+        Assert.Equal(40.00m, prepared.Data.FiscalDocument.TotalTaxable);
+        Assert.Equal(8.80m, prepared.Data.FiscalDocument.TotalVat);
+        Assert.Equal(48.80m, prepared.Data.FiscalDocument.TotalGross);
+        Assert.True(line.Snapshot.IsManualOverride);
+        Assert.Equal("Cliente storico", line.Snapshot.OverrideReason);
+    }
+
+    [Fact]
+    public async Task ManualDiscountEqualToTheListDiscountDoesNotNeedAReason()
+    {
+        using var fixture = new Fixture();
+        await fixture.AssignListAsync(PriceCalculationType.PercentageDiscount, 10m);
+
+        var prepared = await fixture.Pricing.PrepareAsync(fixture.Customer.Id,
+            [new(fixture.Variant.Id, 5m, null, null, null, null, 10m)], DateTimeOffset.UtcNow);
+
+        Assert.True(prepared.Success, prepared.Error);
+        Assert.False(Assert.Single(prepared.Data!.Lines).Snapshot.IsManualOverride);
+    }
+
+    [Fact]
+    public async Task ContactWithoutCustomerProfileCannotBeQuotedAndReturnsExplicitError()
+    {
+        using var fixture = new Fixture();
+        var result = await fixture.Service.ResolveAsync(new()
+        {
+            ContactId = Guid.NewGuid(), Lines = [new(fixture.Variant.Id, 1m)]
+        }, default);
+
+        Assert.False(result.Success);
+        Assert.Equal("Profilo cliente non trovato.", result.Error);
+    }
+
+    [Fact]
     public async Task FallbackAndUnknownVariantsAreHandledExplicitly()
     {
         using var fixture = new Fixture();
@@ -307,6 +469,35 @@ public class PriceListServiceTests
         var snapshot = db.Model.GetEntityTypes().First(type => type.ClrType == typeof(PricingSnapshot));
         Assert.Single(snapshot.GetForeignKeys());
         Assert.All(snapshot.GetForeignKeys(), key => Assert.True(key.IsOwnership));
+        Assert.Equal("jsonb", snapshot.FindProperty(nameof(PricingSnapshot.Discounts))!.GetColumnType());
+        Assert.Equal(200, rules.FindProperty(nameof(PriceListRule.Description))!.GetMaxLength());
+    }
+
+    [Fact]
+    public async Task DiscountBreakdownSurvivesPersistenceWithTheSnapshot()
+    {
+        using var fixture = new Fixture();
+        var order = new Order(fixture.Customer.Id, "ORD-DISC");
+        var snapshot = new PricingSnapshot(null, null, 10m, 8.55m, true, "Sconto alla cassa", false, null,
+        [
+            new AppliedDiscount(DiscountSource.PriceList, "Sconto magliette", 10m, null),
+            new AppliedDiscount(DiscountSource.Cashier, "Sconto alla cassa", null, 2.50m)
+        ]);
+        order.Items.Add(new OrderItem(order.Id, fixture.Variant.Id, 5, 10m, 22m, 10, null, 14.5m)
+            { LineNetTotal = 42.75m, PricingSnapshot = snapshot });
+        order.Items.Add(new OrderItem(order.Id, fixture.Variant.Id, 1, 10m, 22m, 10)
+            { LineNetTotal = 10m, PricingSnapshot = snapshot with { Discounts = null } });
+        fixture.Db.Add(order);
+        await fixture.Db.SaveChangesAsync();
+        fixture.Db.ChangeTracker.Clear();
+
+        var loaded = await fixture.Db.Set<OrderItem>().AsNoTracking().OrderByDescending(item => item.Quantity).ToListAsync();
+
+        Assert.Equal(snapshot, loaded[0].PricingSnapshot);
+        Assert.Equal(
+            new[] { DiscountSource.PriceList, DiscountSource.Cashier },
+            loaded[0].PricingSnapshot!.Discounts!.Select(discount => discount.Source));
+        Assert.Null(loaded[1].PricingSnapshot!.Discounts);
     }
 
     private static MauwDbContext CreateDb() => new(new DbContextOptionsBuilder<MauwDbContext>()
@@ -335,11 +526,11 @@ public class PriceListServiceTests
             Pricing = new(repository, Service, Calculator);
         }
 
-        public async Task<Guid> AssignListAsync(PriceCalculationType type, decimal value)
+        public async Task<Guid> AssignListAsync(PriceCalculationType type, decimal value, string? description = null)
         {
             var result = await Service.SaveAsync(null, new()
             {
-                Name = "Listino", Rules = [new() { CalculationType = type, Value = value }]
+                Name = "Listino", Rules = [new() { CalculationType = type, Value = value, Description = description }]
             }, default);
             Assert.True(result.Success, result.Error);
             Customer.CustomerProfile!.PriceListId = result.Data!.Id;

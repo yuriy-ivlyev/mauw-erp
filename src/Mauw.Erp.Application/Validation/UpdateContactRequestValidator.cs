@@ -16,6 +16,9 @@ public class UpdateContactRequestValidator : IValidator<UpdateContactRequest>
         else if (request.BusinessName is { Length: > 255 })
             errors.Add(new(nameof(request.BusinessName), "Business name must not exceed 255 characters"));
 
+        if (request.TradeName is { Length: > 255 })
+            errors.Add(new(nameof(request.TradeName), "Trade name must not exceed 255 characters"));
+
         if (request.VatNumber is { Length: > 20 })
             errors.Add(new(nameof(request.VatNumber), "VAT number must not exceed 20 characters"));
 

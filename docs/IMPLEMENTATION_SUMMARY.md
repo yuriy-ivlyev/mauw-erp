@@ -26,7 +26,7 @@ Le finestre temporali sono inclusive e memorizzate in UTC.
   colore o taglia, mostrando barcode/colore/taglia e salvando l'ID della variante.
   Usa il lookup anagrafico, non la matrice prezzi: anche SKU con prezzo catalogo
   ancora da completare possono essere selezionate per configurare una regola.
-  La cassa carica quotazioni batch e distingue gli override motivati.
+  La cassa carica quotazioni batch; ogni sconto, di listino o di cassa, ha la propria causale.
 - Il riferimento cliente usa `ON DELETE SET NULL`. Le regole hanno indici
   separati `(listino, variante)`, `(listino, prodotto)`, `(listino, categoria)`.
   I listini inattivi o inesistenti generano errori; non si ripiega silenziosamente
@@ -53,19 +53,86 @@ Le finestre temporali sono inclusive e memorizzate in UTC.
   `sourceOrderItemId` copia invece lo snapshot dell'ordine salvato per emettere
   fattura/DDT senza riquotare. Non sono accettati prezzi/sconti alternativi.
   I documenti storici privi di snapshot richiedono revisione esplicita.
-- In cassa `isManualPriceOverride=false` con un listino fa ricalcolare al server
-  i prezzi del lotto; con `true` richiede una motivazione. Senza listino rimangono
-  compatibili i prezzi espliciti del flusso preesistente. La cassa autosalva prima
+- In cassa l'operatore non modifica mai il prezzo: il prezzo netto arriva sempre
+  dal listino (o dal prezzo di vendita) e non esiste alcun override del prezzo.
+  Puo solo aggiungere o modificare **lo sconto della cassa** (vedi
+  [Sconti di riga con causale](#sconti-di-riga-con-causale)). Senza sconto di
+  cassa, `isManualPriceOverride=false` con un listino fa ricalcolare al server
+  i prezzi del lotto; senza listino rimangono compatibili i prezzi espliciti del
+  flusso preesistente delle API documentali. La cassa autosalva prima
   dell'emissione e usa gli ID delle righe salvate. Il flusso preesistente di
   emissione documento e movimentazione magazzino resta multi-richiesta, non una
   nuova transazione distribuita. Le schermate autonome ordine/preventivo restano
   i segnaposto preesistenti: la compilazione operativa e nella cassa.
+
+### Sconti di riga con causale
+
+Ogni riga puo avere piu sconti, ciascuno con la propria **causale**, ad esempio
+`1) Sconto magliette 5%`, `2) Sconto catalogo 3%`, `3) Sconto alla cassa 5%`.
+
+- **Origine.** `PriceList`: deriva dalla regola di listino, la cui causale e il
+  campo *Causale sconto* della regola (Catalogo > Listini); se manca si usa
+  `Sconto listino <nome listino>`. `Cashier`: lo sconto deciso alla cassa.
+  Gli sconti di listino sono in sola lettura in cassa.
+- **Quanti sconti di listino.** Il risolutore sceglie una sola regola per riga
+  (le regole non si cumulano, vedi sopra), quindi oggi la riga ha al piu uno
+  sconto di listino piu quello della cassa. Modello, snapshot e interfaccia
+  gestiscono un elenco: cumulare piu regole di listino e una decisione
+  commerciale separata, non ancora presa.
+- **Sconto della cassa.** Percentuale (maggiore di 0, al massimo 100) oppure
+  valore fisso in euro (maggiore di 0, al massimo 2 decimali), con causale
+  obbligatoria (massimo 500 caratteri). Il valore fisso e uno sconto sul
+  *totale di riga* e non puo superare quanto resta dopo gli sconti precedenti.
+  Non e ammesso sui resi da fattura ne insieme a un prezzo manuale.
+- **Composizione, nel solo calcolatore.**
+  `ItalianAccountingCalculator.CombineDiscounts` applica gli sconti nell'ordine
+  (listino, poi cassa): le percentuali si compongono sul residuo, un importo
+  si sottrae dal residuo. Restituisce **un'unica percentuale effettiva**,
+  arrotondata una sola volta a 10 decimali (`AwayFromZero`), usata dalla formula
+  di riga gia in vigore: lo sconto resta applicato una sola volta al totale di
+  riga e il totale di riga resta a 2 decimali. Esempio: 5%, 3%, 5% su 100,00
+  danno 12,4575% e 87,54. Un valore fisso di 4,20 su 5 x 18,84 da 90,00 esatti.
+  Gli importi risparmiati per sconto servono solo alla presentazione e possono
+  differire dal totale per arrotondamento. Frontend, PDF e mapper non ricalcolano.
+- **Server autorevole.** Alla creazione/aggiornamento della sessione il server
+  risolve di nuovo prezzo e sconto di listino e vi compone lo sconto di cassa:
+  non si fida di prezzo o sconto inviati dal client. L'anteprima
+  `POST /api/v1/cassa/sessions/preview` accetta `cashDiscount`
+  (`percent` oppure `amount`, `reason`) e `priceListDiscountReason`, e
+  restituisce per riga `discountedUnitPrice` e `discounts` con
+  `source`, `reason`, `percent`/`amount` e `savedAmount`.
+- **Persistenza.** La riga conserva la percentuale effettiva in `DiscountPercent`
+  (numeric); lo snapshot conserva l'elenco in `pricing_discounts` (jsonb) su
+  `order_items`, `ddt_items` e `invoice_items`, copiato all'emissione di DDT e
+  fattura. `IsManualOverride` e vero se c'e uno sconto di cassa e
+  `OverrideReason` ne contiene la causale (compatibilita). Le righe storiche
+  senza elenco restano valide e non vengono riscritte; una sessione sospesa
+  salvata con il vecchio sconto manuale unico viene ripresa come sconto di cassa
+  percentuale con la sua causale.
+- **Interfaccia di cassa.** Su ogni riga un piccolo pulsante con il glifo della
+  percentuale apre il dialogo *Sconti sulla riga*: elenca gli sconti numerati con
+  causale, mostra i prezzi e permette di aggiungere, modificare o togliere lo
+  sconto della cassa scegliendo `%` o `€`. Se la riga e scontata (da listino o
+  da cassa) il prezzo di listino e **barrato in rosso** e il nuovo prezzo e
+  **in verde**, con la percentuale effettiva. Prezzi e percentuali mostrati
+  arrivano dal backend. Il PDF stampa la percentuale effettiva con al massimo
+  due decimali, solo per presentazione: il totale di riga e quello persistito.
+- **Test.** `DiscountCompositionTests` (composizione, importi, arrotondamento,
+  input invalidi, determinismo), `PriceListServiceTests` (sconto di cassa per
+  percentuale e valore, composizione col listino, causali, rifiuti, persistenza
+  dell'elenco), `DocumentAccountingServiceTests` (anteprima), oltre a
+  `discount-dialog.component.spec.ts`, `banco-cassa.component.spec.ts`,
+  `cassa-session.service.spec.ts` e `listini.component.spec.ts`.
 
 ### Migrazione e verifiche
 
 La migrazione `AddPriceListsAndPricingSnapshots` e generata con
 `dotnet ef migrations add`; aggiunge colonne snapshot nullable senza riscrivere
 importi o classificazioni storiche. Per applicarla usare `dotnet ef database update`.
+La migrazione `AddDiscountBreakdown` aggiunge, sempre nullable, `description`
+(max 200) a `price_list_rules` e `pricing_discounts` (jsonb) a `order_items`,
+`ddt_items` e `invoice_items`; non modifica righe esistenti. L'API applica le
+migrazioni all'avvio.
 La factory EF accetta `ConnectionStrings__DefaultConnection`, anche per database
 di test isolati. Eventuali vecchi riferimenti cliente a listini inesistenti devono
 essere revisionati prima di introdurre la FK: non vengono corretti automaticamente.
@@ -77,7 +144,7 @@ un database isolato con tale tabella legacy vuota come fixture; nessuna migrazio
 storica e stata modificata.
 
 I test xUnit coprono cascata, priorita/ambiguita, soglie e date, formule/precisione,
-immutabilita, caricamento batch di 1000 righe, override, resi e copia degli
+immutabilita, caricamento batch di 1000 righe, sconti di cassa, resi e copia degli
 snapshot all'emissione, oltre alle regressioni fiscali e ai contratti HTTP.
 Il test PostgreSQL esegue una transazione con rollback su un database gia migrato:
 impostare `MAUW_TEST_POSTGRES_CONNECTION` per abilitarlo; altrimenti e

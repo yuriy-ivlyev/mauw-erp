@@ -190,13 +190,7 @@ export interface UpdateProductVariantRequest {
   sellingPrice: number | null;
 }
 
-export interface PageResponse<T> {
-  items: T[];
-  pageNumber: number;
-  pageSize: number;
-  totalCount: number;
-  totalPages: number;
-}
+export type PageResponse<T> = PagedResult<T>;
 
 export function generateUUID(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -205,3 +199,5 @@ export function generateUUID(): string {
     return v.toString(16);
   });
 }
+import { PagedResult } from './pagination.model';
+export type { PagedResult } from './pagination.model';

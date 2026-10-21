@@ -59,6 +59,7 @@ public class ContactService(
 
         var contact = new Contact(request.BusinessName, Normalize(request.VatNumber), Normalize(request.TaxCode))
         {
+            TradeName = Normalize(request.TradeName),
             SdiCode = Normalize(request.SdiCode),
             PecEmail = Normalize(request.PecEmail),
             CountryCode = string.IsNullOrWhiteSpace(request.CountryCode) ? "IT" : request.CountryCode,
@@ -112,6 +113,7 @@ public class ContactService(
             return OperationResult<ContactDetailDto>.Fail("Contact not found");
 
         if (!string.IsNullOrWhiteSpace(request.BusinessName)) contact.BusinessName = request.BusinessName;
+        if (request.TradeName is not null) contact.TradeName = Normalize(request.TradeName);
         if (request.VatNumber is not null) contact.VatNumber = Normalize(request.VatNumber);
         if (request.TaxCode   is not null) contact.TaxCode   = Normalize(request.TaxCode);
         if (request.SdiCode   is not null) contact.SdiCode   = Normalize(request.SdiCode);

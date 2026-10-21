@@ -8,7 +8,8 @@ public sealed record DocumentPricingRequest(
     decimal? VatRate, string? NatureCode, decimal? DiscountPercent,
     Guid? PriceListId = null, string? OverrideReason = null,
     bool IsCustomerReturn = false, Guid? SourceLineId = null,
-    bool PreserveLegacyPrice = false, decimal DefaultDiscountPercent = 0m, Guid? SourceOrderItemId = null);
+    bool PreserveLegacyPrice = false, decimal DefaultDiscountPercent = 0m, Guid? SourceOrderItemId = null,
+    Mauw.Erp.Contracts.Pricing.CashDiscountRequest? CashDiscount = null);
 
 public sealed record PreparedPricingLine(CalculatedDocumentLine FiscalLine, PricingSnapshot Snapshot);
 public sealed record PreparedDocumentPricing(IReadOnlyList<PreparedPricingLine> Lines, CalculatedDocument FiscalDocument);
