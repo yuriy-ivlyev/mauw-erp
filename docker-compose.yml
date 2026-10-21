@@ -90,7 +90,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: "http://+:8080"
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
-      ConnectionStrings__DefaultConnection: "Host=postgres;Database=mauw_erp;Username=postgres;Password=postgres;Port=5432"
+      ConnectionStrings__DefaultConnection: "${API_DB_CONNECTION:-Host=postgres;Database=mauw_erp;Username=postgres;Password=postgres;Port=5432}"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
       OTEL_SERVICE_NAME: mauw-erp-backend

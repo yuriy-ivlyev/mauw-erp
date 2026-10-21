@@ -18,7 +18,26 @@ public sealed class SimulationGenerator(
 {
     private int pendingEntities;
     private static readonly string[] SizeCodes = ["XXS", "XS", "S", "M", "L", "XL", "XXL"];
-    private static readonly string[] ColorNames = ["Nero", "Bianco", "Blu", "Rosso", "Verde", "Beige"];
+    private static readonly (string Name, string Html)[] Palette =
+    [
+        ("Nero", "#1A1A1A"), ("Bianco", "#FFFFFF"), ("Blu", "#1E40AF"),
+        ("Rosso", "#DC2626"), ("Verde", "#16A34A"), ("Beige", "#D8C8A8")
+    ];
+
+    // Each delivery of a model brings one color in a size run (pieces per size, XXS..XXL) summing to LotSize.
+    private const int LotSize = 24;
+    private static readonly int[] SizeRun = BuildSizeRun([1, 3, 5, 6, 5, 3, 1]);
+
+    private static int[] BuildSizeRun(int[] pieces)
+    {
+        // Interleaved so a delivery split across two receipts is not skewed towards the smallest sizes.
+        var run = new List<int>();
+        for (var round = 0; round < pieces.Max(); round++)
+            for (var size = 0; size < pieces.Length; size++)
+                if (pieces[size] > round)
+                    run.Add(size);
+        return [.. run];
+    }
 
     public async Task<AccountingResult<SimulationSummary>> GenerateAsync(
         SimulationOptions options, CancellationToken token)
@@ -62,24 +81,26 @@ public sealed class SimulationGenerator(
                 token.ThrowIfCancellationRequested();
                 while (year < receipt.Date.Year)
                 {
-                    var clearance = await SellAsync(state, state.Commercial.Values.Sum(stock => stock.Quantity),
-                        new DateOnly(year, 12, 31), true, token);
+                    var clearance = await ClearYearAsync(state, year, token);
                     if (!clearance.Success)
                         return Fail(clearance.Error);
                     year++;
                 }
                 await ReceiveAsync(state, receipt, token);
-                var target = state.Purchased * 90 / 100;
+                var cutoff = receipt.Date.AddDays(-options.SalesLagDays);
+                while (state.LagIndex < schedule.Count && schedule[state.LagIndex].Date <= cutoff)
+                    state.LagUnits += schedule[state.LagIndex++].Quantity;
+                var target = Math.Max(0, state.LagUnits - state.PurchasedAtClear) * options.SellThroughPercent / 100;
+                var due = target - (state.RegularSold - state.RegularSoldAtClear);
                 var sales = await SellAsync(state,
-                    Math.Min(target - state.RegularSold, state.Commercial.Values.Sum(stock => stock.Quantity)),
+                    Math.Clamp(due, 0, state.Commercial.Values.Sum(stock => stock.Quantity)),
                     receipt.Date, false, token);
                 if (!sales.Success)
                     return Fail(sales.Error);
             }
             while (year < options.EndDate.Year)
             {
-                var clearance = await SellAsync(state, state.Commercial.Values.Sum(stock => stock.Quantity),
-                    new DateOnly(year, 12, 31), true, token);
+                var clearance = await ClearYearAsync(state, year, token);
                 if (!clearance.Success)
                     return Fail(clearance.Error);
                 year++;
@@ -117,7 +138,7 @@ public sealed class SimulationGenerator(
             var summary = new SimulationSummary(start, options.EndDate, options.Customers,
                 state.CustomersWithMovements.Count, options.Suppliers, dominantCount, options.Agents,
                 options.ActiveAgents, options.Customers * 3 / 10, options.Products,
-                (int)Math.Min(options.Products, state.Purchased), state.Variants, schedule.Count,
+                (int)Math.Min(options.Products, (state.Purchased + LotSize - 1) / LotSize), state.Variants, schedule.Count,
                 state.Purchased, state.DominantPurchased, state.Returned, state.Defects, state.RegularSold,
                 state.Liquidated, commercial, defective, state.Documents, state.Documents,
                 state.Documents, state.Movements, reconciled);
@@ -203,9 +224,9 @@ public sealed class SimulationGenerator(
     private async Task CreateLookupsAsync(CancellationToken token)
     {
         var colors = await db.Colors.AsNoTracking().Select(color => color.Id).ToListAsync(token);
-        for (var i = 0; i < ColorNames.Length; i++)
+        for (var i = 0; i < Palette.Length; i++)
             if (!colors.Contains($"G{i:D2}"))
-                db.Colors.Add(new Color($"G{i:D2}", ColorNames[i], $"#{i + 1:X6}"));
+                db.Colors.Add(new Color($"G{i:D2}", Palette[i].Name, Palette[i].Html));
         var sizes = await db.Sizes.AsNoTracking().Select(size => size.Id).ToListAsync(token);
         foreach (var size in SizeCodes)
             if (!sizes.Contains(size))
@@ -217,12 +238,14 @@ public sealed class SimulationGenerator(
         RunState state, List<Receipt> schedule, CancellationToken token)
     {
         var introductions = new DateOnly[state.Options.Products];
-        long offset = 0;
+        long cumulative = 0;
+        var introduced = 0;
         foreach (var receipt in schedule)
         {
-            for (var j = 0; j < receipt.Quantity && offset + j < introductions.Length; j++)
-                introductions[(int)(offset + j)] = receipt.Date;
-            offset += receipt.Quantity;
+            cumulative += receipt.Quantity;
+            // Model i receives its first delivery with global piece number i * LotSize.
+            while (introduced < introductions.Length && (long)introduced * LotSize < cumulative)
+                introductions[introduced++] = receipt.Date;
         }
         for (var i = 0; i < state.Options.Products; i++)
         {
@@ -243,8 +266,13 @@ public sealed class SimulationGenerator(
             for (var color = 0; color < colors; color++)
                 foreach (var size in SizeCodes)
                 {
-                    var variant = new ProductVariant(product.Id, $"SIM{i + 1:D6}C{color}{size}",
-                        cost, $"G{color:D2}", size) { SellingPrice = selling, MarkupRate = 40m };
+                    var variant = new ProductVariant(product.Id, BarcodeFactory.Ean13(state.Variants + 1L),
+                        cost, $"G{color:D2}", size)
+                    {
+                        SellingPrice = selling,
+                        MarkupRate = 40m,
+                        VarianteVetrina = variantIds.Count == 0
+                    };
                     Track(variant, date);
                     variantIds.Add(variant.Id);
                     state.Variants++;
@@ -253,9 +281,9 @@ public sealed class SimulationGenerator(
             state.Models.Add(new Model(variantIds.ToArray(), cost, selling));
         }
         await FlushAsync(token);
-        if (offset < state.Options.Products)
+        if (introduced < state.Options.Products)
             logger.LogWarning("Only {Introduced} of {Products} models can receive stock within the requested horizon",
-                offset, state.Options.Products);
+                introduced, state.Options.Products);
         return AccountingResult<SimulationOptions>.Ok(state.Options);
     }
 
@@ -264,9 +292,13 @@ public sealed class SimulationGenerator(
         state.ReceiptNumber++;
         for (var i = 0; i < receipt.Quantity; i++)
         {
-            var modelIndex = (int)(state.Purchased % state.Models.Count);
+            var lotPosition = (int)(state.Purchased % LotSize);
+            if (lotPosition == 0)
+                state.LotColor = state.Faker.Random.Int(0, state.Models[(int)(state.Purchased / LotSize % state.Models.Count)]
+                    .Variants.Length / SizeCodes.Length - 1);
+            var modelIndex = (int)(state.Purchased / LotSize % state.Models.Count);
             var model = state.Models[modelIndex];
-            var variant = state.Faker.PickRandom(model.Variants);
+            var variant = model.Variants[state.LotColor * SizeCodes.Length + SizeRun[lotPosition]];
             state.Purchased++;
             if (modelIndex % 5 != 4) state.DominantPurchased++;
             var reference = $"SIM-REC-{state.ReceiptNumber:D6}";
@@ -294,6 +326,20 @@ public sealed class SimulationGenerator(
             }
             await FlushIfNeededAsync(state.Options.BatchSize, token);
         }
+    }
+
+    private async Task<AccountingResult<SimulationOptions>> ClearYearAsync(
+        RunState state, int year, CancellationToken token)
+    {
+        var residual = state.Commercial.Values.Sum(stock => stock.Quantity);
+        // Oldest stock is liquidated first (see SellAsync); the carried share stays on the shelves.
+        var result = await SellAsync(state, residual * (100 - state.Options.YearEndCarryoverPercent) / 100,
+            new DateOnly(year, 12, 31), true, token);
+        if (!result.Success)
+            return result;
+        state.PurchasedAtClear = state.Purchased;
+        state.RegularSoldAtClear = state.RegularSold;
+        return result;
     }
 
     private async Task<AccountingResult<SimulationOptions>> SellAsync(
@@ -429,7 +475,7 @@ public sealed class SimulationGenerator(
 
     private static List<Receipt> PlanReceipts(DateOnly start, SimulationOptions options)
     {
-        var result = new List<Receipt> { new(start, options.InitialProducts) };
+        var result = new List<Receipt> { new(start, options.InitialProducts * LotSize) };
         var random = new Randomizer(options.Seed);
         for (var day = start.DayNumber + 1; day <= options.EndDate.DayNumber; day += 7)
         {
@@ -472,6 +518,9 @@ public sealed class SimulationGenerator(
         public Guid CommercialWarehouse { get; set; }
         public Guid DefectiveWarehouse { get; set; }
         public long Purchased, DominantPurchased, Returned, Defects, RegularSold, Liquidated, Movements;
+        // Year-end clearance empties the shelves: later regular sales only draw on goods received afterwards.
+        public long PurchasedAtClear, RegularSoldAtClear, LagUnits;
+        public int LagIndex, LotColor;
         public long EventSequence;
         public int Variants, ReceiptNumber, SaleNumber, ClearanceNumber, Documents;
     }

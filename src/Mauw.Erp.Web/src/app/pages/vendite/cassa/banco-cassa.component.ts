@@ -140,7 +140,6 @@ interface PageResponse<T> {
         <option [ngValue]="null">Predefinito cliente / prezzo base</option>
         <option *ngFor="let list of priceLists" [value]="list.id" [disabled]="!list.isActive">{{ list.name }}{{ list.isActive ? '' : ' (inattivo)' }}</option>
       </select></label>
-      <span>Prezzi fino a 8 decimali · risoluzione commerciale, non fiscale</span>
       <span *ngIf="pricingPending">Aggiornamento prezzi…</span>
       <span *ngIf="pricingError" role="alert" class="text-red-700">{{ pricingError }}</span>
     </div>

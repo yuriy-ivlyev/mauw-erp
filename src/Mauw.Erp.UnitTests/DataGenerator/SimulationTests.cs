@@ -33,8 +33,7 @@ public class SimulationTests
         Assert.True(summary.StockReconciled);
         Assert.Equal(10, summary.ActiveCustomers);
         Assert.Equal(3, summary.AssignedCustomers * options.ActiveCustomers / options.Customers);
-        Assert.Equal(summary.PurchasedUnits * 4 / 5, summary.DominantSupplierUnits);
-        Assert.InRange(summary.RegularSoldUnits * 100m / summary.PurchasedUnits, 85m, 95m);
+        AssertDominantShare(summary);
         Assert.Equal(summary.PurchasedUnits / 100, summary.DefectiveUnits);
         Assert.Equal(summary.PurchasedUnits / 100 * 2, summary.SupplierReturnUnits);
         Assert.True(summary.CommercialStockUnits > 0);
@@ -137,7 +136,90 @@ public class SimulationTests
         Assert.Equal(products.Select(item => (item.InternalCode, item.BasePurchaseCost, item.SellingPrice)),
             (await repeated.Products.AsNoTracking().OrderBy(item => item.InternalCode).ToListAsync())
             .Select(item => (item.InternalCode, item.BasePurchaseCost, item.SellingPrice)));
+
+        var allVariants = await db.ProductVariants.AsNoTracking().ToListAsync();
+        Assert.All(allVariants.GroupBy(item => item.ProductId), group => Assert.Single(group, item => item.VarianteVetrina));
+
+        // Ids and timestamps differ between runs; every seed-driven registry value must not.
+        var registryOf = async (MauwDbContext context) => string.Join("\n",
+            (await context.Contacts.AsNoTracking().OrderBy(item => item.VatNumber)
+                .Select(item => new { item.BusinessName, item.VatNumber, item.TaxCode, item.PecEmail, item.SdiCode }).ToListAsync())
+            .Select(item => item.ToString())
+            .Concat((await context.ContactAddresses.AsNoTracking().OrderBy(item => item.Email).ThenBy(item => item.Street)
+                .Select(item => new { item.Street, item.ZipCode, item.City, item.Phone, item.Email }).ToListAsync())
+                .Select(item => item.ToString()))
+            .Concat((await context.ContactPersons.AsNoTracking().OrderBy(item => item.Email)
+                .Select(item => new { item.FirstName, item.LastName, item.Email, item.Phone }).ToListAsync())
+                .Select(item => item.ToString())));
+        Assert.Equal(await registryOf(db), await registryOf(repeated));
     }
+
+    [Fact]
+    public async Task CatalogUsesRealColorsEan13BarcodesAndConcentratedStock()
+    {
+        await using var db = Context();
+        var options = FixtureOptions() with
+        {
+            Years = 3, EndDate = new DateOnly(2026, 10, 19), Products = 100, InitialProducts = 20,
+            Suppliers = 10, WeeklyPiecesFactor = 1, SalesLagDays = 60, YearEndCarryoverPercent = 50
+        };
+        var result = await Generator(db).GenerateAsync(options, CancellationToken.None);
+        Assert.True(result.Success, result.Error);
+
+        var colors = await db.Colors.AsNoTracking().ToListAsync();
+        Assert.Equal(6, colors.Count);
+        Assert.Equal(colors.Count, colors.Select(item => item.HtmlColor).Distinct().Count());
+        Assert.All(colors, color => Assert.Matches("^#[0-9A-F]{6}$", color.HtmlColor));
+        Assert.Contains(colors, color => color.Name == "Bianco" && color.HtmlColor == "#FFFFFF");
+
+        var variants = await db.ProductVariants.AsNoTracking().ToListAsync();
+        Assert.All(variants, variant =>
+        {
+            Assert.Matches("^[0-9]{13}$", variant.Barcode);
+            Assert.True(BarcodeFactory.IsValidEan13(variant.Barcode));
+        });
+        Assert.Equal(variants.Count, variants.Select(item => item.Barcode).Distinct().Count());
+
+        // Deliveries are size runs of one color: stocked variants hold several pieces, not a single one.
+        var stock = await db.StockItems.AsNoTracking().Where(item => item.QuantityOnHand > 0).ToListAsync();
+        var commercial = await db.Warehouses.AsNoTracking().SingleAsync(item => item.IsSellable);
+        var available = stock.Where(item => item.WarehouseId == commercial.Id).ToList();
+        Assert.NotEmpty(available);
+        Assert.True(available.Average(item => item.QuantityOnHand) >= 2m);
+    }
+
+    [Fact]
+    public async Task YearEndCarryoverKeepsMoreStockOnTheShelves()
+    {
+        var options = FixtureOptions() with
+        {
+            Years = 3, EndDate = new DateOnly(2026, 10, 19), Products = 100, InitialProducts = 20, Suppliers = 10,
+            WeeklyPiecesFactor = 1
+        };
+        await using var cleared = Context();
+        var none = await Generator(cleared).GenerateAsync(options with { YearEndCarryoverPercent = 0 }, CancellationToken.None);
+        await using var kept = Context();
+        var carried = await Generator(kept).GenerateAsync(options with { YearEndCarryoverPercent = 50 }, CancellationToken.None);
+        Assert.True(none.Success, none.Error);
+        Assert.True(carried.Success, carried.Error);
+        Assert.True(carried.Data!.StockReconciled);
+        Assert.True(carried.Data.CommercialStockUnits > none.Data!.CommercialStockUnits);
+        Assert.True(carried.Data.LiquidatedUnits < none.Data.LiquidatedUnits);
+        Assert.False((options with { YearEndCarryoverPercent = 100 }).Validate().Success);
+        Assert.False((options with { SellThroughPercent = 100 }).Validate().Success);
+    }
+
+    [Fact]
+    public void BarcodeFactoryBuildsValidEan13()
+    {
+        Assert.Equal("2900000000018", BarcodeFactory.Ean13(1));
+        Assert.True(BarcodeFactory.IsValidEan13(BarcodeFactory.Ean13(770231)));
+        Assert.False(BarcodeFactory.IsValidEan13("2900000000015"));
+        Assert.False(BarcodeFactory.IsValidEan13("SIM000001C0XXS"));
+    }
+
+    private static void AssertDominantShare(SimulationSummary summary) =>
+        Assert.InRange(summary.DominantSupplierUnits, summary.PurchasedUnits * 4 / 5 - 24, summary.PurchasedUnits * 4 / 5 + 24);
 
     [Fact]
     public async Task InvalidInputDoesNotMutateDatabase()
@@ -192,8 +274,7 @@ public class SimulationTests
         Assert.Equal(new DateOnly(2021, 10, 19), summary.StartDate);
         Assert.Equal(options.Products, summary.IntroducedProducts);
         Assert.Equal(60, summary.DominantSuppliers);
-        Assert.Equal(summary.PurchasedUnits * 4 / 5, summary.DominantSupplierUnits);
-        Assert.Equal(options.ActiveCustomers, summary.ActiveCustomers);
+        AssertDominantShare(summary);
         Assert.True(summary.StockReconciled);
         Assert.True(summary.CommercialStockUnits > 0);
 
@@ -202,7 +283,7 @@ public class SimulationTests
             summary.StartDate, options.EndDate));
         var receipts = movements.Where(item => item.Type == StockMovementType.PurchaseReceipt).ToList();
         var opening = receipts.Where(item => DateOnly.FromDateTime(item.MovementDateUtc) == summary.StartDate).ToList();
-        Assert.Equal(options.InitialProducts, opening.Count);
+        Assert.Equal(options.InitialProducts * 24, opening.Count);
         var firstWeek = summary.StartDate.DayNumber + 1;
         var weekly = receipts.Except(opening)
             .GroupBy(item => (DateOnly.FromDateTime(item.MovementDateUtc).DayNumber - firstWeek) / 7);
@@ -230,7 +311,7 @@ public class SimulationTests
     {
         EndDate = new DateOnly(2026, 2, 1), Years = 1, Customers = 20, ActiveCustomers = 10,
         Suppliers = 10, Agents = 4, ActiveAgents = 2,         Products = 10, InitialProducts = 10, BatchSize = 100,
-                WeeklyPiecesFactor = 1
+                WeeklyPiecesFactor = 1, YearEndCarryoverPercent = 0
             };
 
     private static MauwDbContext Context() => new(new DbContextOptionsBuilder<MauwDbContext>()

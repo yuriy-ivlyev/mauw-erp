@@ -96,7 +96,8 @@ public static class ContactDataFactory
         }
     }
 
-    private static string Slug(Contact contact) => "sim" + contact.Id.ToString("N")[..8];
+    // Derived from the sequence-based VAT number, not the random Id, so reruns with the same seed match.
+    private static string Slug(Contact contact) => "sim" + contact.VatNumber;
 
     private static string Letters(string value)
     {

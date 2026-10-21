@@ -17,6 +17,12 @@ public sealed record SimulationOptions
     public int BatchSize { get; init; } = 1000;
     /// <summary>Multiplies the 300-600 weekly received pieces; 4 gives about one million movements in five years.</summary>
     public int WeeklyPiecesFactor { get; init; } = 4;
+    /// <summary>Days a received piece stays on the shelf before regular sales can draw on it.</summary>
+    public int SalesLagDays { get; init; } = 60;
+    /// <summary>Share of the pieces eligible for regular sale that is actually sold.</summary>
+    public int SellThroughPercent { get; init; } = 75;
+    /// <summary>Share of the residual commercial stock kept on the shelves at year end; the rest is liquidated.</summary>
+    public int YearEndCarryoverPercent { get; init; } = 50;
 
     public AccountingResult<SimulationOptions> Validate()
     {
@@ -35,6 +41,12 @@ public sealed record SimulationOptions
             return Invalid("BatchSize must be between one and 100000.");
         if (WeeklyPiecesFactor < 1 || WeeklyPiecesFactor > 20)
             return Invalid("WeeklyPiecesFactor must be between one and 20.");
+        if (SalesLagDays is < 0 or > 365)
+            return Invalid("SalesLagDays must be between zero and 365.");
+        if (SellThroughPercent is < 50 or > 95)
+            return Invalid("SellThroughPercent must be between 50 and 95.");
+        if (YearEndCarryoverPercent is < 0 or > 90)
+            return Invalid("YearEndCarryoverPercent must be between zero and 90.");
         return AccountingResult<SimulationOptions>.Ok(this);
 
         static AccountingResult<SimulationOptions> Invalid(string error) =>

@@ -19,7 +19,7 @@ public sealed class GeneratorRunner(ILogger<GeneratorRunner> logger)
         var command = parsed.Data!;
         if (command.Action == "help")
         {
-            logger.LogInformation("Comandi: plan | seed --confirm-database NOME | reset --confirm-database NOME --allow-reset. Connessione: MAUW_LOADTEST_CONNECTION. Opzioni: --end-date yyyy-MM-dd --years --seed --customers --active-customers --suppliers --agents --active-agents --products --initial-products --batch-size --weekly-pieces-factor. Manuale: src/Mauw.Erp.DataGenerator/README.txt");
+            logger.LogInformation("Comandi: plan | seed --confirm-database NOME | reset --confirm-database NOME --allow-reset. Connessione: MAUW_LOADTEST_CONNECTION. Opzioni: --end-date yyyy-MM-dd --years --seed --customers --active-customers --suppliers --agents --active-agents --products --initial-products --batch-size --weekly-pieces-factor --sales-lag-days --sell-through-percent --year-end-carryover-percent. Manuale: src/Mauw.Erp.DataGenerator/README.txt");
             return 0;
         }
         logger.LogInformation("Scenario: {@Options}", command.Options);

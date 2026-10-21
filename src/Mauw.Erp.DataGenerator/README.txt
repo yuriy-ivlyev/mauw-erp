@@ -38,16 +38,10 @@ Preparazione (Bash; dalla radice del repository)
 ----------------------------------------------
 Richiesti SDK .NET 10, PostgreSQL e strumento dotnet-ef compatibile con la
 versione EF di Directory.Packages.props. Non sono richieste nuove migrazioni.
-ATTENZIONE: in questo checkout la catena di migrazioni applicativa non riparte
-da un database vuoto. La migrazione 20261017204302_RefactorCassaSessionToOrder
-elimina cassa_sessions, ma le migrazioni precedenti non creano quella tabella.
-dotnet ef database update si interrompe su quel DROP. Il generatore non
-corregge migrazioni applicative, non crea tabelle legacy fittizie e non aggira
-la catena con EnsureCreated, per rispettare l'isolamento richiesto.
-Prima di seguire la creazione da zero o il ciclo reset/ricreazione serve una
-correzione separatamente approvata di questa migrazione. Nel frattempo seed
-richiede un database dedicato vuoto nei dati operativi, ma gia correttamente
-migrato. NON eliminare un database che non si e ancora in grado di ricreare.
+La catena di migrazioni riparte da un database vuoto (la migrazione
+RefactorCassaSessionToOrder usa DROP TABLE IF EXISTS): il ciclo
+reset -> database update -> seed e percorribile. Il generatore non usa
+EnsureCreated e non corregge migrazioni applicative.
 
 Non conservare password nel repository o nella cronologia della shell.
 Impostare MAUW_LOADTEST_CONNECTION nel proprio secret manager/ambiente:
@@ -110,7 +104,8 @@ Default:
   --active-agents 50           --products 20000
   --initial-products 4000      --years 5
   --seed 42                   --batch-size 1000
-  --weekly-pieces-factor 4
+  --weekly-pieces-factor 4     --sales-lag-days 60
+  --sell-through-percent 75    --year-end-carryover-percent 50
   --end-date <oggi UTC>
 
 Il 30% dei clienti e assegnato agli agenti attivi; il primo 10% dei fornitori
@@ -128,11 +123,22 @@ numeri non assegnati. IBAN, REA e regime fiscale non sono popolati.
 20.000 prodotti significa MODELLI, non singole SKU: ogni modello ha 5 o 6
 colori per 7 taglie (XXS, XS, S, M, L, XL, XXL), circa 770.000 varianti.
 300–600 articoli settimanali (x --weekly-pieces-factor, default 4 = 1.200–2.400,
-circa 490.000 pezzi e 1.000.000 di movimenti in cinque anni; 1 = 300–600)
+circa 573.000 pezzi e 760.000 movimenti in cinque anni; 1 = 300–600)
 significa PEZZI ricevuti, non nuovi modelli
 moltiplicati per tutte le varianti: molte SKU avranno stock zero.
-Il caricamento iniziale introduce 4.000 modelli; i successivi introducono
-progressivamente gli altri e riassortiscono quelli gia introdotti.
+Ogni consegna di un modello e un lotto di 24 pezzi di UN colore con curva
+taglie XXS..XXL = 1-3-5-6-5-3-1: le varianti in stock hanno piu pezzi, non uno.
+Il caricamento iniziale introduce 4.000 modelli (un lotto ciascuno, quindi
+96.000 pezzi); i successivi introducono progressivamente gli altri e
+riassortiscono quelli gia introdotti, di solito con un altro colore.
+Il fornitore dominante vale l'80% dei pezzi con la tolleranza di un lotto.
+Colori: Nero, Bianco, Blu, Rosso, Verde, Beige con valori HTML reali.
+Barcode/SKU delle varianti: EAN-13 numerico con cifra di controllo valida,
+prefisso 29 (uso interno GS1), univoco e deterministico.
+Per ogni modello la prima variante e marcata VarianteVetrina (una sola).
+Idempotenza: seed non e un upsert; rifiuta database gia popolati. A parita di
+--seed, --end-date e opzioni, i dati anagrafici, i prezzi e la distribuzione
+sono identici tra esecuzioni (verificato dai test); cambiano solo Id e timestamp.
 
 Costi netti 5–40 EUR; ricarico 40%, prezzo di vendita per eccesso a 0,10 EUR.
 Esempio coerente: 20,2653 -> 20,30; 19,8679 -> 19,90.
@@ -144,8 +150,17 @@ Le imposte e i totali sono calcolati solo dal calcolatore fiscale condiviso.
 Sono previsti 2–3 carichi per settimana (salvo l'ultima settimana incompleta),
 oltre al carico iniziale, per un totale settimanale di 300–600 pezzi per il
 fattore (--weekly-pieces-factor, default 4).
-La vendita ordinaria punta al 90% dei pezzi acquistati (nel range 85–95%);
-il 2% e reso al fornitore e l'1% e trasferito nel magazzino fallati.
+La vendita ordinaria punta al --sell-through-percent (default 75) dei pezzi
+acquistati da almeno --sales-lag-days giorni (default 60): la merce resta a
+scaffale prima di essere venduta. Con --sales-lag-days 0 si vende subito dopo
+ogni carico. A fine anno si liquida (sconto 50%, agli stocchisti, merce piu
+vecchia per prima) solo la quota di residuo non riportata: il
+--year-end-carryover-percent (default 50) resta a magazzino nell'anno nuovo.
+Con 0 il magazzino commerciale e vuoto a ogni 31 dicembre. Dopo la
+liquidazione il ciclo ordinario riparte dalla merce ricevuta dopo (nei primi
+giorni dell'anno non ci sono vendite ordinarie). Il riepilogo riporta i
+valori reali.
+Il 2% e reso al fornitore e l'1% e trasferito nel magazzino fallati.
 Le quote sono applicate a pezzi interi; arrotondamenti e ultimo centinaio
 incompleto possono produrre piccoli scostamenti, riportati nel riepilogo.
 Il fallato non viene rivenduto come merce commerciale e resta separato.

@@ -54,6 +54,9 @@ public sealed record GeneratorCommand(string Action, string? Confirmation, bool 
                 case "--initial-products": options = options with { InitialProducts = number }; break;
                 case "--batch-size": options = options with { BatchSize = number }; break;
                 case "--weekly-pieces-factor": options = options with { WeeklyPiecesFactor = number }; break;
+                case "--sales-lag-days": options = options with { SalesLagDays = number }; break;
+                case "--sell-through-percent": options = options with { SellThroughPercent = number }; break;
+                case "--year-end-carryover-percent": options = options with { YearEndCarryoverPercent = number }; break;
                 default: return AccountingResult<GeneratorCommand>.Fail($"Opzione sconosciuta: {key}.");
             }
         }
