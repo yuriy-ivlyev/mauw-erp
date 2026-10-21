@@ -76,7 +76,10 @@ public static class ContactDataFactory
         if (!contact.IsAgent)
             contact.PecEmail = $"amministrazione{sequence}@pec.example.com";
         if (contact.IsCustomer)
+        {
             contact.SdiCode = faker.Random.String2(7, "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
+            contact.TradeName = $"Negozio {sequence:D5} {faker.Company.CompanyName()}";
+        }
     }
 
     public static ContactAddress LegalHeadquarters(Contact contact, Faker faker) => new(

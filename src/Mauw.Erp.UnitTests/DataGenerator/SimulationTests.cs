@@ -71,6 +71,11 @@ public class SimulationTests
         }
         var customers = await db.CustomerProfiles.AsNoTracking().ToListAsync();
         Assert.Equal(options.Customers * 3 / 10, customers.Count(item => item.DefaultAgentId.HasValue));
+        var generatedCustomerIds = customers.Select(item => item.ContactId).ToHashSet();
+        var generatedCustomers = registry.Where(item => generatedCustomerIds.Contains(item.Id)).ToList();
+        Assert.All(generatedCustomers, item => Assert.False(string.IsNullOrWhiteSpace(item.TradeName)));
+        Assert.All(generatedCustomers, item => Assert.NotEqual(item.BusinessName, item.TradeName));
+        Assert.All(registry.Where(item => !generatedCustomerIds.Contains(item.Id)), item => Assert.Null(item.TradeName));
         var activeContacts = await db.Contacts.AsNoTracking()
             .Where(item => item.CustomerProfile != null && item.Status == ContactStatus.Active)
             .Select(item => item.Id).ToListAsync();

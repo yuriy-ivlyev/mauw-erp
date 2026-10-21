@@ -50,16 +50,25 @@
       Caricamento…
     </div>
 
-    <table *ngIf="!loading || contacts.length > 0" class="w-full">
+    <table *ngIf="!loading || contacts.length > 0" class="w-full min-w-[900px] table-fixed">
+      <colgroup>
+        <col />
+        <col />
+        <col />
+        <col />
+        <col class="w-24" />
+        <col class="w-20" />
+        <col class="w-16" />
+      </colgroup>
       <thead class="bg-gray-50 border-b">
         <tr>
           <th appSortHeader="businessName" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Ragione Sociale</th>
           <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Insegna</th>
           <th appSortHeader="fiscalIdentifier" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold text-gray-700">P.IVA / CF</th>
           <th appSortHeader="city" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Città</th>
-          <th appSortHeader="roles" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="w-36 px-2 py-3 text-left text-sm font-semibold text-gray-700">Ruoli</th>
-          <th appSortHeader="status" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="w-28 px-2 py-3 text-left text-sm font-semibold text-gray-700">Stato</th>
-          <th class="w-20 px-2 py-3 text-left text-sm font-semibold text-gray-700">Azioni</th>
+          <th appSortHeader="roles" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-1 py-3 text-left text-sm font-semibold text-gray-700">Ruoli</th>
+          <th appSortHeader="status" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-1 py-3 text-left text-sm font-semibold text-gray-700">Stato</th>
+          <th class="whitespace-nowrap px-1 py-3 text-left text-sm font-semibold text-gray-700">Azioni</th>
         </tr>
       </thead>
       <tbody>
@@ -75,7 +84,7 @@
           <td class="px-6 py-4 text-sm text-gray-600">
             {{ c.city }}<span *ngIf="c.province"> ({{ c.province }})</span>
           </td>
-          <td class="px-2 py-4 text-sm">
+          <td class="px-1 py-4 text-sm">
             <div class="flex gap-1 flex-wrap">
               <span *ngIf="c.isCustomer"
                 class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">Cliente</span>
@@ -85,7 +94,7 @@
                 class="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">Agente</span>
             </div>
           </td>
-          <td class="px-2 py-4 text-sm">
+          <td class="px-1 py-4 text-sm">
             <span [ngClass]="{
               'bg-gray-100 text-gray-600':   c.status === 'Draft',
               'bg-green-100 text-green-700': c.status === 'Active',
@@ -96,10 +105,10 @@
                  c.status === 'Suspended' ? 'Sospeso' : 'Archiviato' }}
             </span>
           </td>
-          <td class="px-2 py-4 text-sm">
-            <div class="inline-flex items-center gap-1 whitespace-nowrap">
+          <td class="px-1 py-4 text-sm">
+            <div class="inline-flex items-center whitespace-nowrap">
               <button (click)="editContact(c.id)" [attr.aria-label]="'Modifica ' + c.businessName"
-                title="Modifica" class="inline-flex h-8 w-8 items-center justify-center rounded text-blue-600 hover:bg-blue-50">
+                title="Modifica" class="inline-flex h-6 w-6 items-center justify-center rounded text-blue-600 hover:bg-blue-50">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                   stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
                   <path d="M12 20h9" />
@@ -107,7 +116,7 @@
                 </svg>
               </button>
               <button (click)="askDelete(c.id)" [attr.aria-label]="'Elimina ' + c.businessName"
-                title="Elimina" class="inline-flex h-8 w-8 items-center justify-center rounded text-red-600 hover:bg-red-50">
+                title="Elimina" class="inline-flex h-6 w-6 items-center justify-center rounded text-red-600 hover:bg-red-50">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                   stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
                   <path d="M3 6h18" />
