@@ -29,24 +29,12 @@ public sealed class TracingProductService(IProductService inner) : TracingDecora
         TraceAsync("Product.GetByBarcode", () => inner.GetVariantByBarcodeAsync(barcode),
             a => a?.SetTag("barcode", barcode));
 
-    public Task<OperationResult<ProductImageDto>> AddImageAsync(Guid productId, AddProductImageRequest request) =>
-        TraceAsync("Product.AddImage", () => inner.AddImageAsync(productId, request),
-            a => a?.SetTag("product.id", productId));
-
-    public Task<OperationResult<bool>> RemoveImageAsync(Guid productId, Guid imageId) =>
-        TraceAsync("Product.RemoveImage", () => inner.RemoveImageAsync(productId, imageId),
+    public Task<OperationResult<bool>> SetVarianteVetrinaAsync(Guid productId, Guid variantId, bool value) =>
+        TraceAsync("Product.SetVarianteVetrina", () => inner.SetVarianteVetrinaAsync(productId, variantId, value),
             a =>
             {
                 a?.SetTag("product.id", productId);
-                a?.SetTag("image.id", imageId);
-            });
-
-    public Task<OperationResult<bool>> SetMainImageAsync(Guid productId, Guid imageId) =>
-        TraceAsync("Product.SetMainImage", () => inner.SetMainImageAsync(productId, imageId),
-            a =>
-            {
-                a?.SetTag("product.id", productId);
-                a?.SetTag("image.id", imageId);
+                a?.SetTag("variant.id", variantId);
             });
 
     public Task<OperationResult<ProductVariantDto>> CreateProductVariantAsync(Guid productId, CreateProductVariantRequest request) =>

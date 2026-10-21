@@ -1,5 +1,6 @@
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
+using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,6 +15,46 @@ public sealed class ImagesController(
     IImageStorageService storage,
     IImageApplicationService imageService) : ControllerBase
 {
+    /// <summary>Elenca le immagini di un prodotto o di una variante, ordinate per SortOrder.</summary>
+    [HttpGet("{targetId:guid}")]
+    [ProducesResponseType<IReadOnlyList<ImageDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ListImages(Guid targetId, CancellationToken ct)
+    {
+        var result = await imageService.ListAsync(targetId, ct);
+        return result.Success ? Ok(result.Data) : NotFound(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Cambia la categoria di un'immagine. Impostare Main scambia la categoria con l'attuale Main,
+    /// cosi' un target ha al massimo un'immagine Principale.
+    /// </summary>
+    [HttpPut("{targetId:guid}/{imageId:guid}/category")]
+    [ProducesResponseType<ImageDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetCategory(
+        Guid targetId, Guid imageId, SetImageCategoryRequest request, CancellationToken ct)
+    {
+        var result = await imageService.SetCategoryAsync(targetId, imageId, request.Category, ct);
+
+        return result.Success
+            ? Ok(result.Data)
+            : result.Error == ImageErrors.ImageNotFound
+                ? NotFound(new { error = result.Error })
+                : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>Elimina un'immagine (record e oggetto nello storage).</summary>
+    [HttpDelete("{targetId:guid}/{imageId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteImage(Guid targetId, Guid imageId, CancellationToken ct)
+    {
+        var result = await imageService.DeleteAsync(targetId, imageId, ct);
+        return result.Success ? NoContent() : NotFound(new { error = result.Error });
+    }
+
     /// <summary>Restituisce l'immagine tramite proxy (nessun presigned URL).</summary>
     [HttpGet("{targetId:guid}/{fileName}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -45,9 +86,10 @@ public sealed class ImagesController(
     [HttpPost("{targetId:guid}")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(ImageApplicationService.MaxFileBytes + 1024 * 1024)]
-    [ProducesResponseType<UploadedImageDto>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ImageDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> UploadImage(
         Guid targetId, IFormFile file, [FromForm] ImageCategory? category, CancellationToken ct)
@@ -62,6 +104,7 @@ public sealed class ImagesController(
             {
                 ImageErrors.TargetNotFound => NotFound(new { error = result.Error }),
                 ImageErrors.TargetInconsistent => UnprocessableEntity(new { error = result.Error }),
+                ImageErrors.MainAlreadyExists => Conflict(new { error = result.Error }),
                 _ => BadRequest(new { error = result.Error })
             };
     }

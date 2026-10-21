@@ -31,7 +31,6 @@ public static class ProductMapper
             SellingPrice: product.HasVariants ? null : product.SellingPrice,
             VatRate: product.VatRate,
             BasePurchaseCost: product.BasePurchaseCost,
-            Images: product.Images.OrderBy(i => i.DisplayOrder).Select(MapImageToDto).ToList(),
             Variants: variants,
             HasVariants: product.HasVariants,
             CategoryId: product.CategoryId,
@@ -41,19 +40,6 @@ public static class ProductMapper
             MaterialId: product.MaterialId,
             MaterialName: product.Material?.Name
         ));
-    }
-
-    public static ProductImageDto MapImageToDto(ProductImage image)
-    {
-        return new(
-            Id: image.Id,
-            ProductId: image.ProductId,
-            Url: image.Url,
-            StorageKey: image.StorageKey,
-            DisplayOrder: image.DisplayOrder,
-            IsMain: image.IsMain,
-            ProductVariantId: image.ProductVariantId
-        );
     }
 
     public static OperationResult<ProductVariantDto> MapVariantToDto(ProductVariant variant, Product product)
@@ -81,7 +67,8 @@ public static class ProductMapper
             VatAmount: 0,
             FinalGrossPrice: price,
             WeightGrams: variant.WeightGrams,
-            SellingPrice: variant.SellingPrice
+            SellingPrice: variant.SellingPrice,
+            VarianteVetrina: variant.VarianteVetrina
         ));
     }
 

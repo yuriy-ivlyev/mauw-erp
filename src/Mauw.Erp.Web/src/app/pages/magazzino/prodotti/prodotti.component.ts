@@ -1,18 +1,19 @@
 ﻿import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
+import { ProductImageGalleryComponent } from '../../../components/product-image-gallery/product-image-gallery.component';
 import { FormsModule } from '@angular/forms';
 import { ProductService } from '../../../services/product.service';
 import { hasDecimal8Precision } from '../../../services/price-list.validators';
 import {
-  ProductDto, ProductImageDto, PageResponse, ColorDto, SizeDto, CategoryDto, CollectionDto, MaterialDto,
-  CreateProductRequest, CreateProductVariantRequest, AddProductImageRequest, ProductVariantDto
+  ProductDto, PageResponse, ColorDto, SizeDto, CategoryDto, CollectionDto, MaterialDto,
+  CreateProductRequest, CreateProductVariantRequest, ProductVariantDto
 } from '../../../models/product.model';
 
 @Component({
   selector: 'app-prodotti',
   standalone: true,
-  imports: [CommonModule, FormsModule, ConfirmDeleteModalComponent],
+  imports: [CommonModule, FormsModule, ConfirmDeleteModalComponent, ProductImageGalleryComponent],
   template: `
     <div class="p-6">
       <div class="flex justify-between items-center mb-6">
@@ -409,70 +410,16 @@ import {
             </div>
 
             <!-- TAB: Gallery -->
-            <div *ngIf="activeTab === 'gallery'" class="space-y-4">
-              <div class="flex h-96 overflow-hidden gap-4">
-                <div class="flex-1 bg-gray-900 flex items-center justify-center p-4 rounded border-2 border-gray-200">
-                  <ng-container *ngIf="selectedImage; else noSelectedImg">
-                    <img [src]="selectedImage.url" alt="Immagine selezionata"
-                      class="max-w-full max-h-full object-contain rounded"
-                      (error)="onImgError($event)" />
-                  </ng-container>
-                  <ng-template #noSelectedImg>
-                    <div class="text-gray-500 text-center">
-                      <div class="text-6xl mb-2">&#128444;</div>
-                      <p class="text-sm">Nessuna immagine</p>
-                    </div>
-                  </ng-template>
-                </div>
-
-                <div class="w-48 flex flex-col border rounded">
-                  <div class="flex-1 overflow-y-auto p-2 space-y-2 border-b">
-                    <div *ngFor="let img of (galleryProduct?.images || [])"
-                      (click)="selectImage(img)"
-                      class="relative rounded overflow-hidden cursor-pointer border-2 transition"
-                      [class.border-blue-500]="selectedImage?.id === img.id"
-                      [class.border-transparent]="selectedImage?.id !== img.id">
-                      <img [src]="img.url" [alt]="img.url"
-                        class="w-full h-24 object-cover"
-                        (error)="onImgError($event)" />
-                      <div *ngIf="img.isMain" class="absolute top-1 left-1 bg-yellow-400 text-xs font-bold px-1.5 py-0.5 rounded">
-                        &#9733;
-                      </div>
-                    </div>
-                    <div *ngIf="!galleryProduct || galleryProduct.images.length === 0" class="text-gray-400 text-xs text-center py-4">
-                      Nessuna immagine
-                    </div>
-                  </div>
-
-                  <div class="border-t p-2 space-y-1 flex-shrink-0">
-                    <button *ngIf="selectedImage && !selectedImage.isMain"
-                      (click)="setMainImage(selectedImage)"
-                      class="w-full text-xs bg-yellow-400 hover:bg-yellow-500 font-semibold py-1.5 rounded">
-                      &#9733; Imposta principale
-                    </button>
-                    <button *ngIf="selectedImage"
-                      (click)="askDelete(selectedImage.id, 'image')"
-                      class="w-full text-xs bg-red-600 hover:bg-red-700 text-white font-semibold py-1.5 rounded">
-                      &#128465; Elimina
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="border-t pt-4 space-y-2">
-                <div class="flex gap-2 items-center">
-                  <input [(ngModel)]="newImageUrl" type="text" placeholder="URL nuova immagine..."
-                    class="flex-1 px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  <label class="flex items-center gap-1 text-sm whitespace-nowrap">
-                    <input type="checkbox" [(ngModel)]="newImageIsMain" /> Principale
-                  </label>
-                  <button (click)="addImage()" [disabled]="!newImageUrl || addingImage"
-                    class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded disabled:opacity-50 whitespace-nowrap">
-                    {{ addingImage ? '...' : '+ Aggiungi' }}
-                  </button>
-                </div>
-                <div *ngIf="galleryError" class="bg-red-100 text-red-800 p-2 rounded text-sm">{{ galleryError }}</div>
-              </div>
+            <div *ngIf="activeTab === 'gallery'">
+              <app-product-image-gallery *ngIf="galleryProduct; else galleryNotSaved"
+                [productId]="galleryProduct.id"
+                [hasVariants]="galleryProduct.hasVariants"
+                [variants]="productVariants"
+                (changed)="onGalleryChanged()">
+              </app-product-image-gallery>
+              <ng-template #galleryNotSaved>
+                <p class="text-sm text-gray-500">Salva il prodotto per poter caricare le immagini.</p>
+              </ng-template>
             </div>
           </div>
 
@@ -529,9 +476,9 @@ export class ProdottiComponent implements OnInit, OnDestroy {
   private priceCalculation?: import('rxjs').Subscription;
 
   confirmDeleteId: string | null = null;
-  confirmDeleteType: 'product' | 'variant' | 'image' | null = null;
+  confirmDeleteType: 'product' | 'variant' | null = null;
 
-  askDelete(id: string, type: 'product' | 'variant' | 'image' = 'product'): void {
+  askDelete(id: string, type: 'product' | 'variant' = 'product'): void {
     this.confirmDeleteId = id;
     this.confirmDeleteType = type;
   }
@@ -564,11 +511,6 @@ export class ProdottiComponent implements OnInit, OnDestroy {
 
   // Gallery (now within modal)
   galleryProduct: ProductDto | null = null;
-  selectedImage: ProductImageDto | null = null;
-  newImageUrl = '';
-  newImageIsMain = false;
-  addingImage = false;
-  galleryError: string | null = null;
 
   constructor(private productService: ProductService) { }
 
@@ -675,7 +617,6 @@ export class ProdottiComponent implements OnInit, OnDestroy {
     this.formError = null;
     this.variantError = null;
     this.galleryProduct = null;
-    this.selectedImage = null;
     this.showModal = true;
   }
 
@@ -702,9 +643,7 @@ export class ProdottiComponent implements OnInit, OnDestroy {
     this.activeTab = 'details';
     this.formError = null;
     this.variantError = null;
-    this.galleryProduct = { ...product, images: [...(product.images ?? [])] };
-    this.selectedImage = this.galleryProduct.images.find(i => i.isMain) ?? this.galleryProduct.images[0] ?? null;
-    this.loadSupportData();
+    this.galleryProduct = { ...product };
     this.loadVariants(product.id);
     this.showModal = true;
   }
@@ -718,7 +657,6 @@ export class ProdottiComponent implements OnInit, OnDestroy {
     this.newVariantForm = this.initializeVariantForm();
     this.productVariants = [];
     this.galleryProduct = null;
-    this.selectedImage = null;
   }
 
   private loadVariants(productId: string): void {
@@ -765,7 +703,7 @@ export class ProdottiComponent implements OnInit, OnDestroy {
         this.savingProduct = false;
         if (!this.editingProductId) {
           this.editingProductId = product.id;
-          this.galleryProduct = { ...product, images: [...(product.images ?? [])] };
+          this.galleryProduct = { ...product };
           this.newVariantForm = this.initializeVariantForm(product.basePurchaseCost);
           if (product.hasVariants) this.activeTab = 'variants';
           else this.closeModal();
@@ -812,7 +750,7 @@ export class ProdottiComponent implements OnInit, OnDestroy {
     this.savingVariant = true;
     this.productService.createProductVariant(request).subscribe({
       next: (variant) => {
-        this.productVariants.push(variant);
+        this.productVariants = [...this.productVariants, variant];
         this.newVariantForm = this.initializeVariantForm(this.formData.basePurchaseCost ?? 0);
         this.savingVariant = false;
       },
@@ -875,10 +813,7 @@ export class ProdottiComponent implements OnInit, OnDestroy {
 
     this.productService.updateProductVariant(this.editingProductId, this.editingVariantId, request).subscribe({
       next: (updated) => {
-        const idx = this.productVariants.findIndex(v => v.id === this.editingVariantId);
-        if (idx >= 0) {
-          this.productVariants[idx] = updated;
-        }
+        this.productVariants = this.productVariants.map(v => v.id === this.editingVariantId ? updated : v);
         this.editingVariantId = null;
         this.savingVariantEdit = false;
       },
@@ -980,71 +915,14 @@ export class ProdottiComponent implements OnInit, OnDestroy {
     this.loadProducts();
   }
 
-  selectImage(img: ProductImageDto): void {
-    this.selectedImage = img;
-  }
-
-  addImage(): void {
-    if (!this.galleryProduct || !this.newImageUrl) return;
-    const request: AddProductImageRequest = { url: this.newImageUrl, isMain: this.newImageIsMain };
-    this.addingImage = true;
-    this.galleryError = null;
-    this.productService.addImage(this.galleryProduct.id, request).subscribe({
-      next: (img: ProductImageDto) => {
-        if (request.isMain) {
-          this.galleryProduct!.images = this.galleryProduct!.images.map(i => ({ ...i, isMain: false }));
-        }
-        this.galleryProduct!.images.push(img);
-        this.selectedImage = img;
-        this.newImageUrl = '';
-        this.newImageIsMain = false;
-        this.addingImage = false;
-      },
-      error: (err: any) => {
-        this.galleryError = "Errore nell'aggiunta dell'immagine";
-        this.addingImage = false;
-        console.error(err);
-      }
-    });
-  }
-
-  removeImage(img: ProductImageDto): void {
-    if (!this.galleryProduct) return;
-    this.productService.removeImage(this.galleryProduct.id, img.id).subscribe({
-      next: () => {
-        this.galleryProduct!.images = this.galleryProduct!.images.filter(i => i.id !== img.id);
-        if (img.isMain && this.galleryProduct!.images.length > 0) {
-          this.galleryProduct!.images[0] = { ...this.galleryProduct!.images[0], isMain: true };
-        }
-        this.selectedImage = this.galleryProduct!.images.find(i => i.isMain) ?? this.galleryProduct!.images[0] ?? null;
-      },
-      error: (err: any) => {
-        this.galleryError = "Errore nella rimozione dell'immagine";
-        console.error(err);
-      }
-    });
-  }
-
-  setMainImage(img: ProductImageDto): void {
-    if (!this.galleryProduct) return;
-    this.productService.setMainImage(this.galleryProduct.id, img.id).subscribe({
-      next: () => {
-        this.galleryProduct!.images = this.galleryProduct!.images.map(i => ({ ...i, isMain: i.id === img.id }));
-        this.selectedImage = { ...img, isMain: true };
-      },
-      error: (err: any) => {
-        this.galleryError = "Errore nell'impostazione dell'immagine principale";
-        console.error(err);
-      }
-    });
+  onGalleryChanged(): void {
+    // La miniatura in lista e i flag vetrina dipendono dalle immagini: si ricaricano entrambi.
+    this.loadProducts();
+    if (this.editingProductId) this.loadVariants(this.editingProductId);
   }
 
   onThumbError(event: Event, product: ProductDto): void {
     product.mainImageUrl = undefined;
-    (event.target as HTMLImageElement).style.display = 'none';
-  }
-
-  onImgError(event: Event): void {
     (event.target as HTMLImageElement).style.display = 'none';
   }
 

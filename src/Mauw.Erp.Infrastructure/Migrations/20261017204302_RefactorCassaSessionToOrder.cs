@@ -11,8 +11,8 @@ namespace Mauw.Erp.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "cassa_sessions");
+            // La tabella non e' creata da nessuna migrazione precedente: su un database nuovo non esiste.
+            migrationBuilder.Sql("DROP TABLE IF EXISTS cassa_sessions;");
 
             migrationBuilder.AddColumn<string>(
                 name: "document_reference",

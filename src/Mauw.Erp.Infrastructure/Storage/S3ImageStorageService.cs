@@ -6,9 +6,10 @@ using Microsoft.Extensions.Options;
 
 namespace Mauw.Erp.Infrastructure.Storage;
 
-public sealed class S3ImageStorageService(IAmazonS3 s3, IOptions<S3StorageSettings> options) : IImageStorageService
+public sealed class S3ImageStorageService(Lazy<IAmazonS3> client, IOptions<S3StorageSettings> options) : IImageStorageService
 {
     private readonly string _bucket = options.Value.BucketName;
+    private IAmazonS3 s3 => client.Value;
 
     public async Task<string> UploadImageAsync(
         Guid targetId, Stream imageStream, string fileName, string contentType, CancellationToken ct = default)

@@ -15,8 +15,9 @@ public static class StorageServiceCollectionExtensions
     {
         services.Configure<S3StorageSettings>(configuration.GetSection(S3StorageSettings.Section));
 
-        // The client is built lazily so a missing S3 configuration fails on first use, not at startup.
-        services.AddSingleton<IAmazonS3>(sp =>
+        // The client is built lazily so a missing S3 configuration fails on first storage use, not at startup
+        // nor when services that only clean up images are resolved.
+        services.AddSingleton(sp => new Lazy<IAmazonS3>(() =>
         {
             var settings = sp.GetRequiredService<IOptions<S3StorageSettings>>().Value;
             if (string.IsNullOrWhiteSpace(settings.Endpoint) ||
@@ -37,7 +38,7 @@ public static class StorageServiceCollectionExtensions
                     RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
                     ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED
                 });
-        });
+        }));
 
         services.AddSingleton<IImageStorageService, S3ImageStorageService>();
         services.AddScoped<IProductVariantImageRepository, ProductVariantImageRepository>();

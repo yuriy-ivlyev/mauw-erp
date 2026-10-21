@@ -7,6 +7,38 @@ namespace Mauw.Erp.Infrastructure.Repositories;
 
 public sealed class ProductVariantImageRepository(DbContext.MauwDbContext db) : IProductVariantImageRepository
 {
+    public async Task<IReadOnlyList<ProductVariantImage>> GetByTargetAsync(Guid targetId, CancellationToken ct) =>
+        await db.ProductVariantImages.AsNoTracking()
+            .Where(i => i.TargetId == targetId)
+            .OrderBy(i => i.SortOrder)
+            .ToListAsync(ct);
+
+    public async Task<ProductVariantImage?> GetAsync(Guid targetId, Guid imageId, CancellationToken ct) =>
+        await db.ProductVariantImages.FirstOrDefaultAsync(i => i.Id == imageId && i.TargetId == targetId, ct);
+
+    public void Remove(ProductVariantImage image) => db.ProductVariantImages.Remove(image);
+
+    public async Task<ProductVariantImage?> GetMainAsync(Guid targetId, CancellationToken ct) =>
+        await db.ProductVariantImages
+            .FirstOrDefaultAsync(i => i.TargetId == targetId && i.Category == ImageCategory.Main, ct);
+
+    public async Task<IReadOnlyList<ProductVariantImage>> GetByTargetsAsync(
+        IReadOnlyCollection<Guid> targetIds, CancellationToken ct) =>
+        await db.ProductVariantImages.Where(i => targetIds.Contains(i.TargetId)).ToListAsync(ct);
+
+    public async Task<IReadOnlyList<ProductVariantImage>> GetCoversAsync(
+        IReadOnlyCollection<Guid> targetIds, CancellationToken ct)
+    {
+        var images = await db.ProductVariantImages.AsNoTracking()
+            .Where(i => targetIds.Contains(i.TargetId))
+            .ToListAsync(ct);
+
+        return images
+            .GroupBy(i => i.TargetId)
+            .Select(g => g.OrderBy(i => i.Category == ImageCategory.Main ? 0 : 1).ThenBy(i => i.SortOrder).First())
+            .ToList();
+    }
+
     public async Task<int?> GetMaxSortOrderAsync(Guid targetId, CancellationToken ct) =>
         await db.ProductVariantImages
             .Where(i => i.TargetId == targetId)

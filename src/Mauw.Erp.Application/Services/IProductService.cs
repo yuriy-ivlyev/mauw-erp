@@ -17,12 +17,11 @@ public interface IProductService
     Task<OperationResult<List<ProductParentDto>>> SearchParentProductsAsync(string query, int limit = 20);
     Task<OperationResult<ProductMatrixDto>> GetProductMatrixAsync(Guid productId, Guid warehouseId);
 
-    Task<OperationResult<ProductImageDto>> AddImageAsync(Guid productId, AddProductImageRequest request);
-    Task<OperationResult<bool>> RemoveImageAsync(Guid productId, Guid imageId);
-    Task<OperationResult<bool>> SetMainImageAsync(Guid productId, Guid imageId);
-
     Task<OperationResult<ProductVariantDto>> CreateProductVariantAsync(Guid productId, CreateProductVariantRequest request);
     Task<OperationResult<List<ProductVariantDto>>> GetProductVariantsAsync(Guid productId);
     Task<OperationResult<ProductVariantDto>> UpdateProductVariantAsync(Guid productId, Guid variantId, UpdateProductVariantRequest request);
     Task<OperationResult<bool>> DeleteProductVariantAsync(Guid productId, Guid variantId);
+
+    /// <summary>Marks (or unmarks) the variant whose images represent the product in lists; at most one per product.</summary>
+    Task<OperationResult<bool>> SetVarianteVetrinaAsync(Guid productId, Guid variantId, bool value);
 }

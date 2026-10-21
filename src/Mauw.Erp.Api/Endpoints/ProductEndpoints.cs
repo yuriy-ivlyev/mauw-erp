@@ -74,19 +74,6 @@ public static class ProductEndpoints
         group.MapDelete("/{productId}/variants/{variantId}", DeleteProductVariant)
             .WithName("DeleteProductVariant")
             .WithSummary("Delete a product variant");
-
-        // Image gallery endpoints
-        group.MapPost("/{id}/images", AddImage)
-            .WithName("AddProductImage")
-            .WithSummary("Add an image to the product gallery");
-
-        group.MapDelete("/{id}/images/{imageId}", RemoveImage)
-            .WithName("RemoveProductImage")
-            .WithSummary("Remove an image from the product gallery");
-
-        group.MapPut("/{id}/images/{imageId}/main", SetMainImage)
-            .WithName("SetMainProductImage")
-            .WithSummary("Set an image as the main product image");
     }
 
     private static Results<Ok<decimal>, BadRequest<string>> CalculateSellingPrice(
@@ -210,57 +197,6 @@ public static class ProductEndpoints
         
         if (!result.Success)
             return TypedResults.NotFound();
-
-        return TypedResults.NoContent();
-    }
-
-    private static async Task<Results<Created<ProductImageDto>, BadRequest<string>, NotFound>> AddImage(
-        Guid id,
-        AddProductImageRequest request,
-        IProductService productService)
-    {
-        var result = await productService.AddImageAsync(id, request);
-
-        if (!result.Success)
-        {
-            if (result.Error == "Product not found")
-                return TypedResults.NotFound();
-            return TypedResults.BadRequest(result.Error);
-        }
-
-        return TypedResults.Created($"/api/v1/products/{id}/images/{result.Data!.Id}", result.Data);
-    }
-
-    private static async Task<Results<NoContent, BadRequest<string>, NotFound>> RemoveImage(
-        Guid id,
-        Guid imageId,
-        IProductService productService)
-    {
-        var result = await productService.RemoveImageAsync(id, imageId);
-
-        if (!result.Success)
-        {
-            if (result.Error == "Product not found" || result.Error == "Image not found")
-                return TypedResults.NotFound();
-            return TypedResults.BadRequest(result.Error);
-        }
-
-        return TypedResults.NoContent();
-    }
-
-    private static async Task<Results<NoContent, BadRequest<string>, NotFound>> SetMainImage(
-        Guid id,
-        Guid imageId,
-        IProductService productService)
-    {
-        var result = await productService.SetMainImageAsync(id, imageId);
-
-        if (!result.Success)
-        {
-            if (result.Error == "Product not found" || result.Error == "Image not found")
-                return TypedResults.NotFound();
-            return TypedResults.BadRequest(result.Error);
-        }
 
         return TypedResults.NoContent();
     }

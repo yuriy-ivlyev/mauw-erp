@@ -111,9 +111,13 @@ Successfully refactored `prodotti.component.ts` (463 → 705 lines) to implement
 - `GET /v1/products/{productId}/variants` → List variants
 - `POST /v1/products/{productId}/variants` → Create variant
 - `DELETE /v1/products/{productId}/variants/{variantId}` → Delete variant
-- `POST /v1/products/{productId}/images` → Add image
-- `DELETE /v1/products/{productId}/images/{imageId}` → Delete image
-- `PUT /v1/products/{productId}/images/{imageId}/main` → Set main image
+- `PUT|DELETE /v1/products/{productId}/variants/{variantId}/vetrina` → Set / clear varianteVetrina (its images are the list thumbnail)
+- `GET /images/{targetId}` → List images of a product or variant
+- `POST /images/{targetId}` → Upload image (multipart `file`, optional `category`)
+- `PUT /images/{targetId}/{imageId}/category` → Change image category (Main swaps with the current Main)
+- `DELETE /images/{targetId}/{imageId}` → Delete image
+- `GET /images/{targetId}/{fileName}` → Authenticated image proxy (S3)
+- `GET /catalog/resolve-sku/{sku}` → Resolve a SKU to a product or variant `targetId`
 
 ### Request/Response Contracts
 - `CreateProductRequest`: No variants (separate API call)

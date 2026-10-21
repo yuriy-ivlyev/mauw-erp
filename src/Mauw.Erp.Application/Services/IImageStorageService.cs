@@ -21,6 +21,8 @@ public static partial class ImageStorageKeys
     public static bool IsValidFileName(string? fileName) =>
         fileName is not null && SafeFileName().IsMatch(fileName) && !fileName.Contains("..");
 
+    public static string ToUrl(string key) => $"/api/{key}";
+
     public static string Build(Guid targetId, string fileName) =>
         IsValidFileName(fileName)
             ? $"images/{targetId:D}/{fileName}"

@@ -26,6 +26,9 @@ public class ProductVariantConfiguration : IEntityTypeConfiguration<ProductVaria
             .HasPrecision(10, 2)
             .IsRequired(false);
 
+        builder.Property(v => v.VarianteVetrina)
+            .HasDefaultValue(false);
+
         builder.Property(v => v.CreatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 

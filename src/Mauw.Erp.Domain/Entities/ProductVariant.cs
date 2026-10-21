@@ -14,8 +14,8 @@ public class ProductVariant : Entity<Guid>
     // Legacy data only; never used to resolve or update selling prices.
     public decimal? MarkupRate { get; set; }
     public decimal? WeightGrams { get; set; }
-
-    // Navigation
+    /// <summary>Variant whose images represent the product in lists. At most one per product.</summary>
+    public bool VarianteVetrina { get; set; }
     public Product Product { get; set; } = null!;
     public Color? Color { get; set; }
     public Size? Size { get; set; }

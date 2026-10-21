@@ -12,6 +12,12 @@ public class ProductVariantImage : Entity<Guid>
     public ImageCategory Category { get; private set; }
     public int SortOrder { get; private set; }
 
+    public void ChangeCategory(ImageCategory category)
+    {
+        Category = category;
+        UpdateTimestamp();
+    }
+
     public ProductVariantImage(Guid targetId, string filePath, ImageCategory category, int sortOrder) : base()
     {
         Id = Guid.NewGuid();

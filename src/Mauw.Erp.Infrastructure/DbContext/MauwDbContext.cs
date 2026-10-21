@@ -26,7 +26,6 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
     public DbSet<Material> Materials { get; set; }
     public DbSet<MaterialComposition> MaterialCompositions { get; set; }
     public DbSet<Product> Products { get; set; }
-    public DbSet<ProductImage> ProductImages { get; set; }
     public DbSet<ProductVariant> ProductVariants { get; set; }
     public DbSet<ProductVariantImage> ProductVariantImages { get; set; }
     public DbSet<StockItem> StockItems { get; set; }
@@ -89,7 +88,6 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
         modelBuilder.ApplyConfiguration(new MaterialConfiguration());
         modelBuilder.ApplyConfiguration(new MaterialCompositionConfiguration());
         modelBuilder.ApplyConfiguration(new ProductConfiguration());
-        modelBuilder.ApplyConfiguration(new ProductImageConfiguration());
         modelBuilder.ApplyConfiguration(new ProductVariantConfiguration());
         modelBuilder.ApplyConfiguration(new ProductVariantImageConfiguration());
         modelBuilder.ApplyConfiguration(new StockItemConfiguration());

@@ -1865,63 +1865,6 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.ToTable("products");
                 });
 
-            modelBuilder.Entity("Mauw.Erp.Domain.Entities.ProductImage", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("display_order");
-
-                    b.Property<bool>("IsMain")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_main");
-
-                    b.Property<Guid>("ProductId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("product_id");
-
-                    b.Property<Guid?>("ProductVariantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("product_variant_id");
-
-                    b.Property<string>("StorageKey")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("storage_key");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<string>("Url")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("url");
-
-                    b.HasKey("Id")
-                        .HasName("p_k_product_images");
-
-                    b.HasIndex("ProductId")
-                        .HasDatabaseName("i_x_product_images_product_id");
-
-                    b.HasIndex("ProductId", "DisplayOrder");
-
-                    b.ToTable("product_images");
-                });
-
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.ProductVariant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1973,6 +1916,12 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<bool>("VarianteVetrina")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("variante_vetrina");
 
                     b.Property<decimal?>("WeightGrams")
                         .HasPrecision(10, 2)
@@ -2744,18 +2693,6 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Navigation("Material");
                 });
 
-            modelBuilder.Entity("Mauw.Erp.Domain.Entities.ProductImage", b =>
-                {
-                    b.HasOne("Mauw.Erp.Domain.Entities.Product", "Product")
-                        .WithMany("Images")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("f_k_product_images_products_product_id");
-
-                    b.Navigation("Product");
-                });
-
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.ProductVariant", b =>
                 {
                     b.HasOne("Mauw.Erp.Domain.Entities.Color", "Color")
@@ -2899,8 +2836,6 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Product", b =>
                 {
-                    b.Navigation("Images");
-
                     b.Navigation("Variants");
                 });
 

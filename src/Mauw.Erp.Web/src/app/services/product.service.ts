@@ -2,10 +2,8 @@ import { Injectable } from '@angular/core';
 import { ApiService } from './api.service';
 import {
   ProductDto,
-  ProductImageDto,
   CreateProductRequest,
   UpdateProductRequest,
-  AddProductImageRequest,
   CreateProductVariantRequest,
   UpdateProductVariantRequest,
   ProductVariantDto,
@@ -98,17 +96,10 @@ export class ProductService {
     return this.apiService.get<ProductMatrixDto>(`${this.endpoint}/${productId}/matrix${whParam}`);
   }
 
-  // Images
-  addImage(productId: string, request: AddProductImageRequest): Observable<ProductImageDto> {
-    return this.apiService.post<ProductImageDto>(`${this.endpoint}/${productId}/images`, request);
-  }
-
-  removeImage(productId: string, imageId: string): Observable<void> {
-    return this.apiService.delete<void>(`${this.endpoint}/${productId}/images/${imageId}`);
-  }
-
-  setMainImage(productId: string, imageId: string): Observable<void> {
-    return this.apiService.put<void>(`${this.endpoint}/${productId}/images/${imageId}/main`, {});
+  // Variante vetrina: le sue immagini rappresentano il prodotto nella lista
+  setVarianteVetrina(productId: string, variantId: string, value: boolean): Observable<void> {
+    const url = `${this.endpoint}/${productId}/variants/${variantId}/vetrina`;
+    return value ? this.apiService.put<void>(url, {}) : this.apiService.delete<void>(url);
   }
 
   // Support: Colors

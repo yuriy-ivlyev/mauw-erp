@@ -216,6 +216,8 @@ public class PriceListEndpointTests
             builder.Services.AddApplicationServices();
             builder.Services.AddMemoryCache();
             builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+            builder.Services.AddScoped<IProductVariantImageRepository, ProductVariantImageRepository>();
+            builder.Services.AddSingleton(new Moq.Mock<Mauw.Erp.Application.Services.IImageStorageService>().Object);
             builder.Services.AddScoped<IValidator<CreateProductRequest>, CreateProductRequestValidator>();
             builder.Services.AddAuthentication("PricingTests")
                 .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>("PricingTests", _ => { });

@@ -16,7 +16,7 @@ describe('ProdottiComponent stored selling prices', () => {
   const product: ProductDto = {
     id: 'product', supplierId: 'supplier', supplierCode: 'SUP', internalCode: 'P', name: 'Articolo',
     sellingPrice: 23.12345678, vatRate: 22, basePurchaseCost: 10,
-    hasVariants: true, variants: [variant], images: []
+    hasVariants: true, variants: [variant]
   };
 
   beforeEach(() => {

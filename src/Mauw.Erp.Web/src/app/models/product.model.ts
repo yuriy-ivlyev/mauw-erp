@@ -55,21 +55,18 @@ export interface ProductVariantDto {
   vatAmount: number;
   finalGrossPrice: number | null;
   weightGrams?: number | null;
+  varianteVetrina?: boolean;
 }
 
-export interface ProductImageDto {
+export type ImageCategory = 'Main' | 'Left' | 'Right' | 'Zoom1' | 'Zoom2' | 'Zoom3' | 'OnPerson' | 'OnManikin';
+
+/** Immagine di un prodotto o di una variante (storage S3, servita dal proxy autenticato). */
+export interface ImageDto {
   id: string;
-  productId: string;
+  targetId: string;
   url: string;
-  storageKey?: string;
-  displayOrder: number;
-  isMain: boolean;
-  productVariantId?: string;
-}
-
-export interface AddProductImageRequest {
-  url: string;
-  isMain: boolean;
+  category: ImageCategory;
+  sortOrder: number;
 }
 
 export interface ProductDto {
@@ -88,7 +85,7 @@ export interface ProductDto {
   collectionName?: string;
   materialId?: string;
   materialName?: string;
-  images: ProductImageDto[];
+  /** Miniatura per la lista: copertina del prodotto o della sua variante vetrina. */
   mainImageUrl?: string;
   variants: ProductVariantDto[];
 }

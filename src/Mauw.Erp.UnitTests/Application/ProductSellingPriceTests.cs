@@ -181,7 +181,10 @@ public class ProductSellingPriceTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
         private readonly MemoryCache _cache = new(new MemoryCacheOptions());
         public ProductService Service { get; }
-        public Fixture() => Service = new(new UnitOfWork(Db, _cache), new CreateProductRequestValidator(), new());
+        public Fixture() => Service = new(new UnitOfWork(Db, _cache), new CreateProductRequestValidator(), new(),
+            new ImageApplicationService(new ProductVariantImageRepository(Db),
+                new Moq.Mock<IImageStorageService>().Object,
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<ImageApplicationService>.Instance));
         public void Dispose() { Db.Dispose(); _cache.Dispose(); }
     }
 }
