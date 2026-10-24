@@ -9,5 +9,7 @@ public record VariantSearchDto(
     string Barcode,
     string? ColorName,
     string? SizeName,
-    decimal CurrentStock  // giacenza disponibile nel magazzino richiesto (0 se non specificato)
+    decimal CurrentStock,  // giacenza disponibile nel magazzino richiesto (0 se non specificato)
+    string? SupplierCode,
+    decimal PurchaseCost
 );

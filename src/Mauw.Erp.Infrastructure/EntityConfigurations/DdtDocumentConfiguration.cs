@@ -37,6 +37,8 @@ public class DdtDocumentConfiguration : IEntityTypeConfiguration<DdtDocument>
         builder.Property(d => d.UpdatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+        builder.HasQueryFilter(d => !d.Contact.IsDeleted);
+
         builder.HasOne(d => d.Contact)
             .WithMany()
             .HasForeignKey(d => d.ContactId)

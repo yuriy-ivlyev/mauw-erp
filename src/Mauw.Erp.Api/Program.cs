@@ -49,6 +49,7 @@ builder.Services.AddScoped<Mauw.Erp.Domain.Services.PricingEngine>();
 builder.Services.AddInvoicePdfReporting();
 builder.Services.AddCompanyBranding();
 builder.Services.AddImageStorage(builder.Configuration);
+builder.Services.AddSupplierDeliveryNotes();
 
 // Register application services with tracing decorators
 builder.Services.AddApplicationServices();
@@ -148,10 +149,13 @@ app.MapCompanyLogoEndpoints();
 app.MapLookupsEndpoints();
 app.MapGeoEndpoints();
 app.MapOrderEndpoints();
+app.MapDashboardEndpoints();
 app.MapInvoiceEndpoints();
 app.MapDdtEndpoints();
 app.MapCassaSessionEndpoints();
 app.MapPriceListEndpoints();
+app.MapSupplierDeliveryNoteEndpoints();
+app.MapSupplierPurchaseOrderEndpoints();
 
 // Migrate database on startup and initialize seed data
 using (var scope = app.Services.CreateScope())

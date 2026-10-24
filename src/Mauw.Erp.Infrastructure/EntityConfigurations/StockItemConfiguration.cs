@@ -19,7 +19,7 @@ public class StockItemConfiguration : IEntityTypeConfiguration<StockItem>
             .HasPrecision(18, 3);
 
         builder.Property(s => s.UnitCost)
-            .HasPrecision(18, 3)
+            .HasPrecision(23, 8)
             .IsRequired(false);
 
         builder.Property(s => s.CreatedAt)
@@ -27,6 +27,8 @@ public class StockItemConfiguration : IEntityTypeConfiguration<StockItem>
 
         builder.Property(s => s.UpdatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        builder.HasQueryFilter(s => !s.Warehouse.IsDeleted);
 
         builder.Ignore(s => s.QuantityAvailable);
 

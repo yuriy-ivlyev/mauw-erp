@@ -35,6 +35,8 @@ public class AgentCommissionConfiguration : IEntityTypeConfiguration<AgentCommis
         builder.Property(ac => ac.UpdatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+        builder.HasQueryFilter(ac => !ac.Agent.IsDeleted);
+
         // Relationships
         builder.HasOne(ac => ac.Agent)
             .WithMany(c => c.Commissions)

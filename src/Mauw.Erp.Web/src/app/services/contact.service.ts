@@ -24,6 +24,8 @@ export class ContactService {
     if (params.isCustomer != null) httpParams = httpParams.set('isCustomer', String(params.isCustomer));
     if (params.isSupplier != null) httpParams = httpParams.set('isSupplier', String(params.isSupplier));
     if (params.isAgent    != null) httpParams = httpParams.set('isAgent',    String(params.isAgent));
+    if (params.assignedAgentId) httpParams = httpParams.set('assignedAgentId', params.assignedAgentId);
+    if (params.hasAssignedAgent != null) httpParams = httpParams.set('hasAssignedAgent', String(params.hasAssignedAgent));
     if (params.status)           httpParams = httpParams.set('status', params.status);
     if (params.sortBy)           httpParams = httpParams.set('sortBy', params.sortBy);
     if (params.sortDescending)   httpParams = httpParams.set('sortDescending', 'true');
@@ -43,6 +45,14 @@ export class ContactService {
 
   update(id: string, request: UpdateContactRequest): Observable<ContactDetail> {
     return this.http.put<ContactDetail>(`${this.base}/${id}`, request);
+  }
+
+  assignCustomerToAgent(agentId: string, customerId: string): Observable<void> {
+    return this.http.put<void>(`${this.base}/agents/${agentId}/customers/${customerId}`, {});
+  }
+
+  removeCustomerFromAgent(agentId: string, customerId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/agents/${agentId}/customers/${customerId}`);
   }
 
   delete(id: string): Observable<void> {

@@ -27,6 +27,8 @@ public sealed class SimulationGenerator(
     // Each delivery of a model brings one color in a size run (pieces per size, XXS..XXL) summing to LotSize.
     private const int LotSize = 24;
     private static readonly int[] SizeRun = BuildSizeRun([1, 3, 5, 6, 5, 3, 1]);
+    private const long InternalProductCodeSequenceStart = 1_000_000_000L;
+    private const long VariantBarcodeSequenceStart = 3_000_000_000L;
 
     private static int[] BuildSizeRun(int[] pieces)
     {
@@ -258,7 +260,8 @@ public sealed class SimulationGenerator(
                 ? (i / 5 * 4 + i % 5) % state.DominantCount
                 : state.DominantCount + (i / 5) % (state.Options.Suppliers - state.DominantCount);
             var date = introductions[i] == default ? state.Options.EndDate : introductions[i];
-            var product = new Product(state.Suppliers[supplier], $"S{i + 1:D6}", $"SIM-{i + 1:D6}",
+            var product = new Product(state.Suppliers[supplier], $"S{i + 1:D6}",
+                BarcodeFactory.Ean13(InternalProductCodeSequenceStart + i),
                 $"Modello {i + 1:D6}", 40m, 22m, cost) { SellingPrice = selling };
             Track(product, date);
             var variantIds = new List<Guid>();
@@ -266,9 +269,11 @@ public sealed class SimulationGenerator(
             for (var color = 0; color < colors; color++)
                 foreach (var size in SizeCodes)
                 {
-                    var variant = new ProductVariant(product.Id, BarcodeFactory.Ean13(state.Variants + 1L),
-                        cost, $"G{color:D2}", size)
+                    var variant = new ProductVariant(product.Id,
+                        BarcodeFactory.Ean13(VariantBarcodeSequenceStart + state.Variants + 1L),
+                        cost, product.SupplierId, $"G{color:D2}", size)
                     {
+                        SupplierCode = $"{product.SupplierCode}-G{color:D2}-{size}",
                         SellingPrice = selling,
                         MarkupRate = 40m,
                         VarianteVetrina = variantIds.Count == 0

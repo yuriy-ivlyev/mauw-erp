@@ -24,7 +24,7 @@ import { priceError } from '../../../services/price-list.service';
         [placeholder]="target === 'variantId' ? 'Barcode, nome prodotto, colore o taglia' : 'Nome o codice'"></label>
       <div *ngFor="let product of products">
         <button type="button" (click)="chooseProduct(product)" class="text-blue-700 text-left border-b p-2 w-full">
-          {{ product.internalCode }} · {{ product.name }}
+          {{ product.barcode }} · {{ product.name }}
         </button>
       </div>
       <div *ngFor="let variant of variants">

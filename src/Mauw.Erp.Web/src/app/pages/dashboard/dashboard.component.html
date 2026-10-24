@@ -1,70 +1,70 @@
-<div>
-  <!-- Stats Cards -->
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <div *ngFor="let stat of stats" class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-gray-500 dark:text-gray-400 text-sm">{{ stat.title }}</p>
-          <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ stat.value }}</p>
-        </div>
-        <div [ngClass]="stat.color" class="w-12 h-12 rounded-full flex items-center justify-center text-2xl">
-          {{ stat.icon }}
-        </div>
-      </div>
+<div class="dashboard">
+  <section class="welcome" aria-labelledby="welcome-title">
+    <div class="welcome__content">
+      <span class="welcome__eyebrow">
+        <span class="welcome__status" aria-hidden="true"></span>
+        MAUW ERP <span class="welcome__eyebrow-divider">/</span> {{ roleLabel }}
+      </span>
+      <h1 id="welcome-title">Ciao, {{ firstName }}<span class="welcome__wave" aria-hidden="true">.</span></h1>
+      <p>Il tuo spazio di lavoro, tutto in un unico posto.</p>
     </div>
-  </div>
 
-  <!-- Chart Placeholder -->
-  <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
-    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Sales Overview</h3>
-    <div class="h-80 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded">
-      <div class="text-center">
-        <p class="text-gray-600 dark:text-gray-400">Chart will be displayed here</p>
-        <p class="text-sm text-gray-500 dark:text-gray-500">Connect to API for live data</p>
-      </div>
+    <div class="welcome__date">
+      <span class="welcome__date-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <rect x="3.5" y="5" width="17" height="16" rx="2.5"></rect>
+          <path d="M7.5 3v4M16.5 3v4M3.5 9.5h17"></path>
+        </svg>
+      </span>
+      <span>{{ today }}</span>
     </div>
-  </div>
+  </section>
 
-  <!-- Table -->
-  <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Orders</h3>
-    <div class="overflow-x-auto">
-      <table class="w-full">
-        <thead class="border-b dark:border-gray-700">
-          <tr>
-            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Order ID</th>
-            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Customer</th>
-            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Amount</th>
-            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
-            <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">#001</td>
-            <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">John Doe</td>
-            <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">$125.00</td>
-            <td class="px-4 py-3 text-sm">
-              <span class="px-3 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full text-xs font-semibold">Completed</span>
-            </td>
-          </tr>
-          <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
-            <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">#002</td>
-            <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">Jane Smith</td>
-            <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">$245.50</td>
-            <td class="px-4 py-3 text-sm">
-              <span class="px-3 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 rounded-full text-xs font-semibold">Pending</span>
-            </td>
-          </tr>
-          <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
-            <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">#003</td>
-            <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">Mike Johnson</td>
-            <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">$89.99</td>
-            <td class="px-4 py-3 text-sm">
-              <span class="px-3 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full text-xs font-semibold">Processing</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+  <section class="workspace" aria-labelledby="workspace-title">
+    <div class="workspace__heading">
+      <div>
+        <span class="workspace__overline">TUTTO PRONTO</span>
+        <h2 id="workspace-title">Da dove vuoi iniziare?</h2>
+      </div>
+      <span class="workspace__count" *ngIf="sections.length">
+        {{ sections.length }} {{ sections.length === 1 ? 'sezione' : 'sezioni' }}
+      </span>
     </div>
-  </div>
+
+    <div class="section-grid" *ngIf="sections.length; else noSections">
+      <article class="section-card" *ngFor="let section of sections; let index = index"
+        [style.--card-index]="index">
+        <div class="section-card__heading">
+          <span class="section-card__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path [attr.d]="section.icon"></path>
+            </svg>
+          </span>
+          <h3>{{ section.label }}</h3>
+          <span class="section-card__line" aria-hidden="true"></span>
+        </div>
+
+        <div class="section-card__links">
+          <a class="shortcut" *ngFor="let link of section.links" [routerLink]="link.route">
+            <span class="shortcut__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path [attr.d]="link.icon"></path>
+              </svg>
+            </span>
+            <span class="shortcut__label">{{ link.label }}</span>
+            <svg class="shortcut__arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 12h14m-6-6 6 6-6 6"></path>
+            </svg>
+          </a>
+        </div>
+      </article>
+    </div>
+
+    <ng-template #noSections>
+      <div class="empty-state">
+        <h3>Nessuna sezione disponibile</h3>
+        <p>Al momento non ci sono voci associate al tuo profilo. Contatta l’amministratore per verificare i tuoi permessi.</p>
+      </div>
+    </ng-template>
+  </section>
 </div>

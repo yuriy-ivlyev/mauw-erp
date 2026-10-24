@@ -17,11 +17,11 @@ public class CreateProductRequestValidator : IValidator<CreateProductRequest>
         else if (request.SupplierCode.Length > 100)
             errors.Add(new(nameof(request.SupplierCode), "Supplier code must not exceed 100 characters"));
 
-        // InternalCode validation
-        if (string.IsNullOrWhiteSpace(request.InternalCode))
-            errors.Add(new(nameof(request.InternalCode), "Internal code is required"));
-        else if (request.InternalCode.Length > 100)
-            errors.Add(new(nameof(request.InternalCode), "Internal code must not exceed 100 characters"));
+        // Barcode validation
+        if (string.IsNullOrWhiteSpace(request.Barcode))
+            errors.Add(new(nameof(request.Barcode), "Barcode is required"));
+        else if (request.Barcode.Length > 100)
+            errors.Add(new(nameof(request.Barcode), "Barcode must not exceed 100 characters"));
 
         // Name validation
         if (string.IsNullOrWhiteSpace(request.Name))

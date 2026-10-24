@@ -40,10 +40,18 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
     public DbSet<Payment> Payments { get; set; }
     public DbSet<AgentCommission> AgentCommissions { get; set; }
     public DbSet<Warehouse> Warehouses { get; set; }
+    public DbSet<SupplierDeliveryNote> SupplierDeliveryNotes { get; set; }
+    public DbSet<SupplierDeliveryNoteLine> SupplierDeliveryNoteLines { get; set; }
+    public DbSet<SupplierArticleMapping> SupplierArticleMappings { get; set; }
+    public DbSet<SupplierPurchaseOrder> SupplierPurchaseOrders { get; set; }
+    public DbSet<SupplierPurchaseOrderLine> SupplierPurchaseOrderLines { get; set; }
+    public DbSet<SupplierReturnDraft> SupplierReturnDrafts { get; set; }
+    public DbSet<SupplierReturnDraftLine> SupplierReturnDraftLines { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.HasSequence<long>("supplier_purchase_order_number_seq");
 
         var converter = new SnakeCaseNameConverter();
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
@@ -102,6 +110,13 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
         modelBuilder.ApplyConfiguration(new PaymentConfiguration());
         modelBuilder.ApplyConfiguration(new AgentCommissionConfiguration());
         modelBuilder.ApplyConfiguration(new WarehouseConfiguration());
+        modelBuilder.ApplyConfiguration(new SupplierDeliveryNoteConfiguration());
+        modelBuilder.ApplyConfiguration(new SupplierDeliveryNoteLineConfiguration());
+        modelBuilder.ApplyConfiguration(new SupplierArticleMappingConfiguration());
+        modelBuilder.ApplyConfiguration(new SupplierPurchaseOrderConfiguration());
+        modelBuilder.ApplyConfiguration(new SupplierPurchaseOrderLineConfiguration());
+        modelBuilder.ApplyConfiguration(new SupplierReturnDraftConfiguration());
+        modelBuilder.ApplyConfiguration(new SupplierReturnDraftLineConfiguration());
     }
 
     /// <summary>

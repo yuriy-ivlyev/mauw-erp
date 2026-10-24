@@ -21,6 +21,14 @@ public sealed class TracingContactService(IContactService inner) : TracingDecora
         TraceAsync("Contact.Update", () => inner.UpdateAsync(id, request),
             a => a?.SetTag("contact.id", id));
 
+    public Task<OperationResult<bool>> AssignCustomerToAgentAsync(Guid agentId, Guid customerId) =>
+        TraceAsync("Contact.AssignCustomerToAgent", () => inner.AssignCustomerToAgentAsync(agentId, customerId),
+            a => a?.SetTag("agent.id", agentId).SetTag("customer.id", customerId));
+
+    public Task<OperationResult<bool>> RemoveCustomerFromAgentAsync(Guid agentId, Guid customerId) =>
+        TraceAsync("Contact.RemoveCustomerFromAgent", () => inner.RemoveCustomerFromAgentAsync(agentId, customerId),
+            a => a?.SetTag("agent.id", agentId).SetTag("customer.id", customerId));
+
     public Task<OperationResult<bool>> DeleteAsync(Guid id) =>
         TraceAsync("Contact.Delete", () => inner.DeleteAsync(id),
             a => a?.SetTag("contact.id", id));

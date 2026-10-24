@@ -7,14 +7,15 @@ using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos.Pdf;
 using Mauw.Erp.Contracts.Interfaces;
 using Mauw.Erp.Infrastructure.Reporting;
+using Mauw.Erp.UnitTests.Application;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Mauw.Erp.UnitTests.Branding;
 
-public class CompanyLogoTests
+[Collection(PostgreSqlTestCollection.Name)]
+public class CompanyLogoTests(PostgreSqlContainerFixture postgres)
 {
-    private static MauwDbContext CreateDb() => new(new DbContextOptionsBuilder<MauwDbContext>()
-        .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+    private MauwDbContext CreateDb() => postgres.CreateDbContext();
 
     [Theory]
     [InlineData("horizontal")]

@@ -48,6 +48,7 @@ export interface ProductVariantDto {
   size: string;
   color: string;
   barcode: string;
+  supplierCode?: string | null;
   purchaseCost: number;
   stockQuantity: number;
   listPrice: number | null;
@@ -74,7 +75,7 @@ export interface ProductDto {
   id: string;
   supplierId: string;
   supplierCode: string;
-  internalCode: string;
+  barcode: string;
   name: string;
   vatRate: number;
   basePurchaseCost: number;
@@ -94,7 +95,7 @@ export interface CreateProductRequest {
   sellingPrice: number | null;
   supplierId: string;
   supplierCode: string;
-  internalCode: string;
+  barcode: string;
   name: string;
   vatRate: number;
   basePurchaseCost: number;
@@ -108,7 +109,7 @@ export interface UpdateProductRequest {
   sellingPrice: number | null;
   supplierId: string;
   supplierCode: string;
-  internalCode: string;
+  barcode: string;
   name: string;
   vatRate: number;
   basePurchaseCost: number;
@@ -121,7 +122,7 @@ export interface UpdateProductRequest {
 export interface ProductParentDto {
   productId: string;
   supplierCode: string;
-  internalCode: string;
+  barcode: string;
   name: string;
   hasVariants: boolean;
   variantCount: number;
@@ -136,6 +137,8 @@ export interface VariantSearchDto {
   colorName: string | null;
   sizeName: string | null;
   currentStock: number;
+  supplierCode: string | null;
+  purchaseCost: number;
 }
 
 export interface MatrixSizeDto {
@@ -177,6 +180,7 @@ export interface CreateProductVariantRequest {
   colorId: string;
   sizeId: string;
   barcode: string;
+  supplierCode?: string | null;
   purchaseCost: number;
   weightGrams?: number | null;
 }
@@ -185,6 +189,7 @@ export interface UpdateProductVariantRequest {
   colorId: string | null;
   sizeId: string | null;
   barcode: string;
+  supplierCode?: string | null;
   purchaseCost: number;
   weightGrams?: number | null;
   sellingPrice: number | null;

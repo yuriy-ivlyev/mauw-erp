@@ -7,7 +7,7 @@ public class Product : Entity<Guid>
 {
     public Guid SupplierId { get; set; }
     public string SupplierCode { get; set; }
-    public string InternalCode { get; set; }
+    public string Barcode { get; set; }
     public string Name { get; set; }
     // Legacy data only; never used to resolve or update selling prices.
     public decimal DefaultMarkupRate { get; set; }
@@ -28,7 +28,7 @@ public class Product : Entity<Guid>
     public Product(
         Guid supplierId,
         string supplierCode,
-        string internalCode,
+        string barcode,
         string name,
         decimal defaultMarkupRate,
         decimal vatRate,
@@ -41,7 +41,7 @@ public class Product : Entity<Guid>
     {
         SupplierId = supplierId;
         SupplierCode = supplierCode;
-        InternalCode = internalCode;
+        Barcode = barcode;
         Name = name;
         DefaultMarkupRate = defaultMarkupRate;
         VatRate = vatRate;
@@ -55,7 +55,7 @@ public class Product : Entity<Guid>
     public void Update(
         Guid supplierId,
         string supplierCode,
-        string internalCode,
+        string barcode,
         string name,
         decimal defaultMarkupRate,
         decimal vatRate,
@@ -67,7 +67,7 @@ public class Product : Entity<Guid>
     {
         SupplierId = supplierId;
         SupplierCode = supplierCode;
-        InternalCode = internalCode;
+        Barcode = barcode;
         Name = name;
         DefaultMarkupRate = defaultMarkupRate;
         VatRate = vatRate;
@@ -76,6 +76,8 @@ public class Product : Entity<Guid>
         CollectionId = collectionId;
         MaterialId = materialId;
         if (hasVariants.HasValue) HasVariants = hasVariants.Value;
+        foreach (var variant in Variants)
+            variant.SupplierId = supplierId;
         UpdateTimestamp();
     }
 }

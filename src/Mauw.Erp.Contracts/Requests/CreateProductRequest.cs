@@ -6,7 +6,7 @@
 public record CreateProductRequest(
     Guid SupplierId,
     string SupplierCode,
-    string InternalCode,
+    string Barcode,
     string Name,
     decimal? SellingPrice,
     decimal VatRate,

@@ -19,6 +19,12 @@ public class ProductVariantConfiguration : IEntityTypeConfiguration<ProductVaria
             .IsRequired()
             .HasMaxLength(50);
 
+        builder.Property(v => v.SupplierCode)
+            .HasMaxLength(100);
+
+        builder.HasIndex(v => new { v.SupplierId, v.SupplierCode })
+            .IsUnique();
+
         builder.Property(v => v.PurchaseCost)
             .HasPrecision(18, 4);
 

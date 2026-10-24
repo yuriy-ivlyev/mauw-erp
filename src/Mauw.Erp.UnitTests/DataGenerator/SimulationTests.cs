@@ -2,12 +2,14 @@ using Mauw.Erp.DataGenerator;
 using Mauw.Erp.Domain.Enums;
 using Mauw.Erp.Domain.Services;
 using Mauw.Erp.Infrastructure.DbContext;
+using Mauw.Erp.UnitTests.Application;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Mauw.Erp.UnitTests.DataGenerator;
 
-public class SimulationTests
+[Collection(PostgreSqlTestCollection.Name)]
+public class SimulationTests(PostgreSqlContainerFixture postgres)
 {
     [Fact]
     public void OptionsValidateWithoutThrowing()
@@ -56,7 +58,7 @@ public class SimulationTests
             Assert.Equal(ContactDataFactory.TaxCodeCheckCharacter(contact.TaxCode![..15]), contact.TaxCode![15]));
         Assert.All(registry.Where(item => item.SdiCode is not null), contact => Assert.Equal(7, contact.SdiCode!.Length));
 
-        var products = await db.Products.AsNoTracking().OrderBy(item => item.InternalCode).ToListAsync();
+        var products = await db.Products.AsNoTracking().OrderBy(item => item.Barcode).ToListAsync();
         var variants = await db.ProductVariants.AsNoTracking().ToListAsync();
         Assert.All(variants, item => Assert.InRange(item.ColorId!.Length, 1, 3));
         Assert.Equal(options.Products, products.Count);
@@ -143,9 +145,9 @@ public class SimulationTests
         var second = await Generator(repeated).GenerateAsync(options, CancellationToken.None);
         Assert.True(second.Success, second.Error);
         Assert.Equal(summary, second.Data);
-        Assert.Equal(products.Select(item => (item.InternalCode, item.BasePurchaseCost, item.SellingPrice)),
-            (await repeated.Products.AsNoTracking().OrderBy(item => item.InternalCode).ToListAsync())
-            .Select(item => (item.InternalCode, item.BasePurchaseCost, item.SellingPrice)));
+        Assert.Equal(products.Select(item => (item.Barcode, item.BasePurchaseCost, item.SellingPrice)),
+            (await repeated.Products.AsNoTracking().OrderBy(item => item.Barcode).ToListAsync())
+            .Select(item => (item.Barcode, item.BasePurchaseCost, item.SellingPrice)));
 
         var allVariants = await db.ProductVariants.AsNoTracking().ToListAsync();
         Assert.All(allVariants.GroupBy(item => item.ProductId), group => Assert.Single(group, item => item.VarianteVetrina));
@@ -182,13 +184,21 @@ public class SimulationTests
         Assert.All(colors, color => Assert.Matches("^#[0-9A-F]{6}$", color.HtmlColor));
         Assert.Contains(colors, color => color.Name == "Bianco" && color.HtmlColor == "#FFFFFF");
 
+        var products = await db.Products.AsNoTracking().ToListAsync();
+        Assert.All(products, product => Assert.True(BarcodeFactory.IsValidEan13(product.Barcode)));
+        Assert.Equal(products.Count, products.Select(product => product.Barcode).Distinct().Count());
+
         var variants = await db.ProductVariants.AsNoTracking().ToListAsync();
         Assert.All(variants, variant =>
         {
             Assert.Matches("^[0-9]{13}$", variant.Barcode);
             Assert.True(BarcodeFactory.IsValidEan13(variant.Barcode));
+            Assert.NotNull(variant.SupplierCode);
+            Assert.Equal(products.Single(product => product.Id == variant.ProductId).SupplierId, variant.SupplierId);
         });
         Assert.Equal(variants.Count, variants.Select(item => item.Barcode).Distinct().Count());
+        Assert.All(variants.GroupBy(item => item.SupplierId), group =>
+            Assert.Equal(group.Count(), group.Select(item => item.SupplierCode).Distinct().Count()));
 
         // Deliveries are size runs of one color: stocked variants hold several pieces, not a single one.
         var stock = await db.StockItems.AsNoTracking().Where(item => item.QuantityOnHand > 0).ToListAsync();
@@ -249,8 +259,12 @@ public class SimulationTests
         await using var db = Context();
         if (warehouse)
         {
+            var owner = new Mauw.Erp.Domain.Entities.Contact("Warehouse owner");
+            var address = owner.SetLegalHeadquarters("Via Test 1", "20100", "Milano");
+            db.Contacts.Add(owner);
+            await db.SaveChangesAsync();
             var existing = new Mauw.Erp.Domain.Entities.Warehouse("DELETED", "Deleted",
-                WarehouseType.Standard, Guid.NewGuid(), true);
+                WarehouseType.Standard, address.Id, true);
             existing.SoftDelete(null);
             db.Warehouses.Add(existing);
         }
@@ -324,8 +338,7 @@ public class SimulationTests
                 WeeklyPiecesFactor = 1, YearEndCarryoverPercent = 0
             };
 
-    private static MauwDbContext Context() => new(new DbContextOptionsBuilder<MauwDbContext>()
-        .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+    private MauwDbContext Context() => postgres.CreateDbContext();
 
     private static SimulationGenerator Generator(MauwDbContext db) => new(
         db, new ItalianAccountingCalculator(), new CatalogPriceCalculator(),

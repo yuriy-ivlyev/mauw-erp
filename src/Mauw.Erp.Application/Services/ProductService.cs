@@ -34,7 +34,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         var product = new Product(
             supplierId: request.SupplierId,
             supplierCode: request.SupplierCode,
-            internalCode: request.InternalCode,
+            barcode: request.Barcode,
             name: request.Name,
             defaultMarkupRate: 0m,
             vatRate: request.VatRate,
@@ -52,10 +52,12 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         {
             var defaultVariant = new ProductVariant(
                 productId: product.Id,
-                barcode: $"MNVR-{product.InternalCode.ToUpper()}-{Guid.NewGuid().ToString("N")[..8].ToUpper()}",
+                barcode: $"MNVR-{product.Barcode.ToUpper()}-{Guid.NewGuid().ToString("N")[..8].ToUpper()}",
                 purchaseCost: product.BasePurchaseCost,
+                supplierId: product.SupplierId,
                 colorId: null,
-                sizeId: null
+                sizeId: null,
+                supplierCode: NormalizeSupplierCode(request.SupplierCode)
             ) { SellingPrice = request.SellingPrice };
             await unitOfWork.ProductVariants.AddAsync(defaultVariant);
         }
@@ -115,10 +117,11 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             if (!pricing.Success)
                 return OperationResult<ProductDto>.Fail(pricing.Error);
         }
+        var previousSupplierCode = product.SupplierCode;
         product.Update(
             supplierId: request.SupplierId,
             supplierCode: request.SupplierCode,
-            internalCode: request.InternalCode,
+            barcode: request.Barcode,
             name: request.Name,
             defaultMarkupRate: product.DefaultMarkupRate,
             vatRate: request.VatRate,
@@ -132,8 +135,10 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         if (!product.HasVariants && product.Variants.Count == 0)
         {
             var defaultVariant = new ProductVariant(product.Id,
-                $"MNVR-{product.InternalCode.ToUpper()}-{Guid.NewGuid().ToString("N")[..8].ToUpper()}",
-                request.BasePurchaseCost) { SellingPrice = request.SellingPrice };
+                $"MNVR-{product.Barcode.ToUpper()}-{Guid.NewGuid().ToString("N")[..8].ToUpper()}",
+                request.BasePurchaseCost,
+                request.SupplierId,
+                supplierCode: NormalizeSupplierCode(request.SupplierCode)) { SellingPrice = request.SellingPrice };
             await unitOfWork.ProductVariants.AddAsync(defaultVariant);
         }
         if (!product.HasVariants)
@@ -141,6 +146,8 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             {
                 variant.PurchaseCost = request.BasePurchaseCost;
                 variant.SellingPrice = request.SellingPrice;
+                if (variant.SupplierCode is null || variant.SupplierCode == previousSupplierCode)
+                    variant.SupplierCode = NormalizeSupplierCode(request.SupplierCode);
             }
 
         await unitOfWork.Products.UpdateAsync(product);
@@ -236,6 +243,8 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             return OperationResult<ProductVariantDto>.Fail("Il prodotto semplice ha gia una SKU unica; non aggiungere varianti.");
         if (request.PurchaseCost < 0m)
             return OperationResult<ProductVariantDto>.Fail("Il costo di acquisto deve essere non negativo.");
+        if (request.SupplierCode?.Length > 100)
+            return OperationResult<ProductVariantDto>.Fail("Il codice fornitore della variante non puo superare 100 caratteri.");
         var pricing = catalogPrices.Validate(request.SellingPrice);
         if (!pricing.Success)
             return OperationResult<ProductVariantDto>.Fail(pricing.Error);
@@ -260,7 +269,9 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             sizeId: request.SizeId,
             barcode: request.Barcode,
             purchaseCost: request.PurchaseCost,
-            weightGrams: request.WeightGrams
+            supplierId: product.SupplierId,
+            weightGrams: request.WeightGrams,
+            supplierCode: NormalizeSupplierCode(request.SupplierCode)
         ) { SellingPrice = request.SellingPrice };
 
         await unitOfWork.ProductVariants.AddAsync(variant);
@@ -308,6 +319,8 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             return OperationResult<ProductVariantDto>.Fail("Variant not found");
         if (request.PurchaseCost < 0m)
             return OperationResult<ProductVariantDto>.Fail("Il costo di acquisto deve essere non negativo.");
+        if (request.SupplierCode?.Length > 100)
+            return OperationResult<ProductVariantDto>.Fail("Il codice fornitore della variante non puo superare 100 caratteri.");
         var pricing = catalogPrices.Validate(request.SellingPrice);
         if (!pricing.Success)
             return OperationResult<ProductVariantDto>.Fail(pricing.Error);
@@ -333,7 +346,10 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             sizeId: request.SizeId,
             barcode: request.Barcode,
             purchaseCost: request.PurchaseCost,
-            weightGrams: request.WeightGrams
+            weightGrams: request.WeightGrams,
+            supplierCode: request.SupplierCode is null
+                ? variant.SupplierCode
+                : NormalizeSupplierCode(request.SupplierCode)
         );
         variant.SellingPrice = request.SellingPrice;
         if (!product.HasVariants)
@@ -356,6 +372,9 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         var updated = await unitOfWork.ProductVariants.GetByIdAsync(variantId);
         return ProductMapper.MapVariantToDto(updated!, product);
     }
+
+    private static string? NormalizeSupplierCode(string? supplierCode) =>
+        string.IsNullOrWhiteSpace(supplierCode) ? null : supplierCode.Trim();
 
     public async Task<OperationResult<bool>> DeleteProductVariantAsync(Guid productId, Guid variantId)
     {
@@ -393,7 +412,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         var dtos = products.Select(p => new ProductParentDto(
             ProductId: p.Id,
             SupplierCode: p.SupplierCode,
-            InternalCode: p.InternalCode,
+            Barcode: p.Barcode,
             Name: p.Name,
             HasVariants: p.HasVariants,
             VariantCount: p.Variants.Count

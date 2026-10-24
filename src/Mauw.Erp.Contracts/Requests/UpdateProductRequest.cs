@@ -6,7 +6,7 @@ namespace Mauw.Erp.Contracts.Requests;
 public record UpdateProductRequest(
     Guid SupplierId,
     string SupplierCode,
-    string InternalCode,
+    string Barcode,
     string Name,
     decimal? SellingPrice,
     decimal VatRate,

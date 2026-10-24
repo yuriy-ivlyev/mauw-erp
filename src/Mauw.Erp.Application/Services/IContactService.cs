@@ -12,6 +12,8 @@ public interface IContactService
     Task<OperationResult<ContactDetailDto>> GetByIdAsync(Guid id);
     Task<OperationResult<ContactDetailDto>> CreateAsync(CreateContactRequest request);
     Task<OperationResult<ContactDetailDto>> UpdateAsync(Guid id, UpdateContactRequest request);
+    Task<OperationResult<bool>> AssignCustomerToAgentAsync(Guid agentId, Guid customerId);
+    Task<OperationResult<bool>> RemoveCustomerFromAgentAsync(Guid agentId, Guid customerId);
     Task<OperationResult<bool>> DeleteAsync(Guid id);
     Task<OperationResult<bool>> ToggleBlockCustomerAsync(Guid contactId, bool isBlocked, string? reason);
 }

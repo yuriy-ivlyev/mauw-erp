@@ -11,18 +11,19 @@ using Moq;
 
 namespace Mauw.Erp.UnitTests.Application;
 
-/// <summary>Variante vetrina, miniatura in lista, categoria immagini e pulizia alla cancellazione, su EF InMemory.</summary>
+/// <summary>Variante vetrina, miniatura in lista, categoria immagini e pulizia alla cancellazione.</summary>
+[Collection(PostgreSqlTestCollection.Name)]
 public class ProductGalleryTests : IDisposable
 {
-    private readonly MauwDbContext _db = new(new DbContextOptionsBuilder<MauwDbContext>()
-        .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+    private readonly MauwDbContext _db;
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
     private readonly Mock<IImageStorageService> _storage = new();
     private readonly ImageApplicationService _images;
     private readonly ProductService _products;
 
-    public ProductGalleryTests()
+    public ProductGalleryTests(PostgreSqlContainerFixture postgres)
     {
+        _db = postgres.CreateDbContext();
         var repository = new ProductVariantImageRepository(_db);
         _images = new ImageApplicationService(repository, _storage.Object, NullLogger<ImageApplicationService>.Instance);
         _products = new ProductService(new UnitOfWork(_db, _cache), new CreateProductRequestValidator(), new(), _images);
@@ -37,7 +38,7 @@ public class ProductGalleryTests : IDisposable
         await _db.SaveChangesAsync();
         for (var i = 0; i < variantCount; i++)
         {
-            var variant = new ProductVariant(product.Id, $"B-{Guid.NewGuid():N}"[..12], 10m);
+            var variant = new ProductVariant(product.Id, $"B-{Guid.NewGuid():N}"[..12], 10m, product.SupplierId);
             _db.ProductVariants.Add(variant);
             await _db.SaveChangesAsync();
         }

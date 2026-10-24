@@ -4,7 +4,7 @@ using Mauw.Erp.Domain.Enums;
 namespace Mauw.Erp.Domain.Repositories;
 
 /// <summary>
-/// Raw SKU match. VariantId is null when the SKU is the product's own code (InternalCode),
+/// Raw SKU match. VariantId is null when the SKU is the product's own barcode,
 /// set when it is a variant barcode.
 /// </summary>
 public sealed record SkuMatch(Guid ProductId, Guid? VariantId, bool ProductHasVariants);
@@ -32,6 +32,6 @@ public interface IProductVariantImageRepository
 
     Task<ImageTargetInfo?> GetTargetAsync(Guid targetId, CancellationToken ct);
 
-    /// <summary>Returns the variants (by barcode) and products (by InternalCode) matching the SKU.</summary>
+    /// <summary>Returns the variants (by barcode) and products (by barcode) matching the SKU.</summary>
     Task<IReadOnlyList<SkuMatch>> FindBySkuAsync(string sku, CancellationToken ct);
 }

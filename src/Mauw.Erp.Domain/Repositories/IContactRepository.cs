@@ -18,9 +18,12 @@ public interface IContactRepository : IRepository<Contact, Guid>
         bool? isAgent = null,
         string? status = null,
         string? sortBy = null,
-        bool sortDescending = false);
+        bool sortDescending = false,
+        Guid? assignedAgentId = null,
+        bool? hasAssignedAgent = null);
 
     Task<Contact?> GetByIdWithDetailsAsync(Guid id);
+    Task<int> CountCustomersAssignedToAgentAsync(Guid agentId);
 
     Task<bool> AddressExistsAsync(Guid addressId);
 

@@ -40,7 +40,7 @@ public static class ProductEndpoints
 
         group.MapGet("/variants/search", SearchVariants)
             .WithName("SearchVariants")
-            .WithSummary("Ricerca varianti per barcode, nome prodotto, colore o taglia (autocomplete)");
+            .WithSummary("Ricerca varianti per barcode (o barcode prodotto per articoli semplici), nome, colore o taglia");
 
         group.MapGet("/barcode/{barcode}", GetVariantByBarcode)
             .WithName("GetVariantByBarcode")
@@ -140,12 +140,13 @@ public static class ProductEndpoints
         IUnitOfWork unitOfWork,
         IStockService stockService,
         Guid? warehouseId = null,
+        Guid? supplierId = null,
         int limit = 10)
     {
         if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 1)
             return TypedResults.Ok(new List<VariantSearchDto>());
 
-        var variants = await unitOfWork.ProductVariants.SearchAsync(q.Trim(), Math.Min(limit, 30));
+        var variants = await unitOfWork.ProductVariants.SearchAsync(q.Trim(), Math.Min(limit, 30), supplierId);
 
         var results = new List<VariantSearchDto>();
         foreach (var v in variants)
@@ -158,11 +159,13 @@ public static class ProductEndpoints
                 VariantId:    v.Id,
                 ProductId:    v.ProductId,
                 ProductName:  v.Product.Name,
-                Sku:          v.Barcode, // barcode doubles as SKU in this domain
-                Barcode:      v.Barcode,
+                Sku:          v.Product.HasVariants ? v.Barcode : v.Product.Barcode,
+                Barcode:      v.Product.HasVariants ? v.Barcode : v.Product.Barcode,
                 ColorName:    v.Color?.Name,
                 SizeName:     v.Size?.Name,
-                CurrentStock: stock));
+                CurrentStock: stock,
+                SupplierCode: v.SupplierCode ?? v.Product.SupplierCode,
+                PurchaseCost: v.PurchaseCost));
         }
 
         return TypedResults.Ok(results);

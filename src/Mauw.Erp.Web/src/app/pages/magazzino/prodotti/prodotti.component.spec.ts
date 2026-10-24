@@ -9,12 +9,13 @@ describe('ProdottiComponent stored selling prices', () => {
   let component: ProdottiComponent;
   const variant: ProductVariantDto = {
     id: 'variant', productId: 'product', barcode: 'SKU', purchaseCost: 10,
+    supplierCode: 'SUP-M',
     colorId: 'RED', sizeId: 'M', size: 'M', color: 'Rosso', stockQuantity: 0,
     listPrice: 18.12345678, finalNetPrice: 18.12345678, vatAmount: 0, finalGrossPrice: 18.12345678,
     sellingPrice: 18.12345678
   };
   const product: ProductDto = {
-    id: 'product', supplierId: 'supplier', supplierCode: 'SUP', internalCode: 'P', name: 'Articolo',
+    id: 'product', supplierId: 'supplier', supplierCode: 'SUP', barcode: 'P', name: 'Articolo',
     sellingPrice: 23.12345678, vatRate: 22, basePurchaseCost: 10,
     hasVariants: true, variants: [variant]
   };
@@ -55,7 +56,7 @@ describe('ProdottiComponent stored selling prices', () => {
 
   it('uses decimal backend calculation only on request and submits just its resulting price', () => {
     component.openNewProductModal();
-    component.formData = { ...component.formData, internalCode: 'NEW', name: 'Nuovo', supplierCode: 'SUP',
+    component.formData = { ...component.formData, barcode: 'NEW', name: 'Nuovo', supplierCode: 'SUP',
       basePurchaseCost: 10, hasVariants: false };
     component.productMarkupRate = 30;
     component.applyMarkup('product');
@@ -88,10 +89,11 @@ describe('ProdottiComponent stored selling prices', () => {
     component.editProduct(product);
     expect(component.newVariantForm.sellingPrice).toBeNull();
     component.newVariantForm = { ...component.newVariantForm, barcode: 'NEW', colorId: 'RED', sizeId: 'M',
-      sellingPrice: 15.12345678 };
+      supplierCode: 'SUP-M', sellingPrice: 15.12345678 };
     component.addVariant();
     const payload = service.createProductVariant.calls.mostRecent().args[0];
     expect(payload.sellingPrice).toBe(15.12345678);
+    expect(payload.supplierCode).toBe('SUP-M');
     expect(Object.keys(payload)).not.toContain('markupRate');
     expect(Object.keys(payload)).not.toContain('pricingMode');
   });
@@ -103,6 +105,7 @@ describe('ProdottiComponent stored selling prices', () => {
     component.editingVariantForm.purchaseCost = 999;
     component.saveVariantEdit();
     expect(service.updateProductVariant.calls.mostRecent().args[2].sellingPrice).toBe(18.12345678);
+    expect(service.updateProductVariant.calls.mostRecent().args[2].supplierCode).toBe('SUP-M');
     component.startEditVariant(variant);
     component.editingVariantForm.markupRate = 30;
     component.applyMarkup('editVariant');
@@ -165,7 +168,7 @@ describe('ProdottiComponent stored selling prices', () => {
   it('creates a variant parent without a price and hides its price editor', async () => {
     component.openNewProductModal();
     expect(component.formData.hasVariants).toBeTrue();
-    component.formData = { ...component.formData, internalCode: 'P', name: 'Scarpa', supplierCode: 'S' };
+    component.formData = { ...component.formData, barcode: 'P', name: 'Scarpa', supplierCode: 'S' };
     component.saveProduct();
     expect(service.createProduct.calls.mostRecent().args[0].sellingPrice).toBeNull();
     await TestBed.configureTestingModule({

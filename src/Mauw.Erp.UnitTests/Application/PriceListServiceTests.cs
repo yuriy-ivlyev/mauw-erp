@@ -12,12 +12,13 @@ using Moq;
 
 namespace Mauw.Erp.UnitTests.Application;
 
-public class PriceListServiceTests
+[Collection(PostgreSqlTestCollection.Name)]
+public class PriceListServiceTests(PostgreSqlContainerFixture postgres)
 {
     [Fact]
     public async Task CrudPreservesRuleIdsAndDeletionSetsCustomerReferenceNull()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var created = await fixture.Service.SaveAsync(null, new()
         {
             Name = "Ingrosso", Rules = [new() { CalculationType = PriceCalculationType.FixedPrice, Value = 10.12345678m }]
@@ -53,7 +54,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task MissingTargetsAndInvalidUpdateDoNotChangeTrackedList()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var original = await fixture.Service.SaveAsync(null, new() { Name = "Original" }, default);
         var failed = await fixture.Service.SaveAsync(original.Data!.Id, new()
         {
@@ -70,10 +71,11 @@ public class PriceListServiceTests
         var repository = new Mock<IPriceListRepository>();
         var list = PriceList.Create("Test", "EUR", true,
             [new(null, PriceCalculationType.PercentageDiscount, 10m, MinimumQuantity: 0.25m)]).Data!;
-        var variant = new ProductVariant(Guid.NewGuid(), "SKU", 10m)
+        var product = new Product(Guid.NewGuid(), "S", "P", "Product", 100m, 22m, 10m);
+        var variant = new ProductVariant(product.Id, "SKU", 10m, product.SupplierId)
         {
             SellingPrice = 20m,
-            Product = new(Guid.NewGuid(), "S", "P", "Product", 100m, 22m, 10m)
+            Product = product
         };
         using var db = CreateDb();
         db.Add(variant);
@@ -96,7 +98,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task CustomerDefaultPriceAndVatGroupsArePersistedWithoutDoubleDiscount()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         await fixture.AssignListAsync(PriceCalculationType.PercentageDiscount, 10m);
         var prepared = await fixture.Pricing.PrepareAsync(fixture.Customer.Id,
             [new(fixture.Variant.Id, 5m, null, null, null, null, null)], DateTimeOffset.UtcNow);
@@ -114,7 +116,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task SnapshotsSurviveRuleChangesDeletionAndReload()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var listId = await fixture.AssignListAsync(PriceCalculationType.FixedPrice, 0.03m);
         var pricing = await fixture.Pricing.PrepareAsync(fixture.Customer.Id,
             [new(fixture.Variant.Id, 1m, null, null, null, null, null),
@@ -146,7 +148,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task ManualOverrideRequiresReasonAndPreservesOriginalQuotation()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         await fixture.AssignListAsync(PriceCalculationType.FixedPrice, 12m);
         DocumentPricingRequest request = new(fixture.Variant.Id, 1m, 8m, null, 22m, null, 0m);
         Assert.False((await fixture.Pricing.PrepareAsync(fixture.Customer.Id, [request], DateTimeOffset.UtcNow)).Success);
@@ -162,7 +164,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task ReturnCopiesInvoicePriceWithoutRepricingEvenWithInactiveList()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var id = await fixture.AssignListAsync(PriceCalculationType.FixedPrice, 100m);
         var invoice = new Invoice(fixture.Customer.Id, "ORIGIN");
         var source = new InvoiceItem(invoice.Id, fixture.Variant.Id, 5, 18.83606557m, 22m);
@@ -190,7 +192,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task ReturnWithoutInvoiceIsRejectedEvenWithForcedPriceAndReason()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         DocumentPricingRequest request = new(fixture.Variant.Id, -1m, null, null, 0m, null, 0m, IsCustomerReturn: true);
         Assert.False((await fixture.Pricing.PrepareAsync(fixture.Customer.Id, [request], DateTimeOffset.UtcNow)).Success);
         request = request with { UnitNetPrice = 10m, OverrideReason = "Reso senza riferimento" };
@@ -204,7 +206,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task ReturnCopiesExistingPriceSnapshotAndRejectsManualPrice()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var invoice = new Invoice(fixture.Customer.Id, "ORIGIN");
         var snapshot = new PricingSnapshot(Guid.NewGuid(), Guid.NewGuid(), 25m, 18.83606557m,
             true, "Accordo originale", false, null);
@@ -229,7 +231,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task EmissionFromSavedOrderCopiesSnapshotEvenAfterListDeactivation()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var listId = await fixture.AssignListAsync(PriceCalculationType.PercentageDiscount, 10m);
         var pricing = await fixture.Pricing.PrepareAsync(fixture.Customer.Id,
             [new(fixture.Variant.Id, 5m, null, null, null, null, null)], DateTimeOffset.UtcNow);
@@ -261,7 +263,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task CartAutoPricingIgnoresClientPriceButManualPriceIsExplicitAndTracked()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         await fixture.AssignListAsync(PriceCalculationType.FixedPrice, 12m);
         DocumentPricingRequest request = new(fixture.Variant.Id, 1m, 999m, null, 22m, null, 99m,
             PreserveLegacyPrice: true);
@@ -280,7 +282,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task CashDiscountComposesWithTheListDiscountAndKeepsEveryReason()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         await fixture.AssignListAsync(PriceCalculationType.PercentageDiscount, 10m, "Sconto magliette");
 
         var prepared = await fixture.Pricing.PrepareAsync(fixture.Customer.Id,
@@ -308,7 +310,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task CashDiscountByAmountKeepsTheServerPriceAndExactTotals()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
 
         var prepared = await fixture.Pricing.PrepareAsync(fixture.Customer.Id,
             [new(fixture.Variant.Id, 5m, null, null, null, null, null,
@@ -327,7 +329,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task InvalidCashDiscountsAreRejectedWithoutPartialResults()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         async Task<AccountingResult<PreparedDocumentPricing>> Prepare(CashDiscountRequest discount,
             decimal? unitNetPrice = null) =>
             await fixture.Pricing.PrepareAsync(fixture.Customer.Id,
@@ -349,7 +351,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task ListDiscountAloneIsRecordedWithItsRuleReasonOrADefaultOne()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         await fixture.AssignListAsync(PriceCalculationType.PercentageDiscount, 10m);
         var request = new DocumentPricingRequest(fixture.Variant.Id, 5m, null, null, null, null, null);
 
@@ -365,7 +367,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task ResolutionExposesTheRuleDescriptionAsDiscountReason()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         await fixture.AssignListAsync(PriceCalculationType.PercentageDiscount, 3m, "Sconto catalogo");
 
         var result = await fixture.Service.ResolveAsync(new()
@@ -382,7 +384,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task ManualDiscountWithoutPriceRequiresReasonEvenWithoutPriceList()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var request = new DocumentPricingRequest(fixture.Variant.Id, 5m, null, null, null, null, 20m);
 
         var missing = await fixture.Pricing.PrepareAsync(fixture.Customer.Id, [request], DateTimeOffset.UtcNow);
@@ -397,7 +399,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task JustifiedManualDiscountKeepsServerPriceAndIsRecordedInTheSnapshot()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var prepared = await fixture.Pricing.PrepareAsync(fixture.Customer.Id,
             [new(fixture.Variant.Id, 5m, null, null, null, null, 20m, OverrideReason: " Cliente storico ")],
             DateTimeOffset.UtcNow);
@@ -416,7 +418,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task ManualDiscountEqualToTheListDiscountDoesNotNeedAReason()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         await fixture.AssignListAsync(PriceCalculationType.PercentageDiscount, 10m);
 
         var prepared = await fixture.Pricing.PrepareAsync(fixture.Customer.Id,
@@ -429,7 +431,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task ContactWithoutCustomerProfileCannotBeQuotedAndReturnsExplicitError()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var result = await fixture.Service.ResolveAsync(new()
         {
             ContactId = Guid.NewGuid(), Lines = [new(fixture.Variant.Id, 1m)]
@@ -442,7 +444,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task FallbackAndUnknownVariantsAreHandledExplicitly()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var result = await fixture.Service.ResolveAsync(new()
         {
             ContactId = fixture.Customer.Id, Lines = [new(fixture.Variant.Id, 1m)]
@@ -476,7 +478,7 @@ public class PriceListServiceTests
     [Fact]
     public async Task DiscountBreakdownSurvivesPersistenceWithTheSnapshot()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var order = new Order(fixture.Customer.Id, "ORD-DISC");
         var snapshot = new PricingSnapshot(null, null, 10m, 8.55m, true, "Sconto alla cassa", false, null,
         [
@@ -500,25 +502,25 @@ public class PriceListServiceTests
         Assert.Null(loaded[1].PricingSnapshot!.Discounts);
     }
 
-    private static MauwDbContext CreateDb() => new(new DbContextOptionsBuilder<MauwDbContext>()
-        .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+    private MauwDbContext CreateDb() => postgres.CreateDbContext();
 
     private sealed class Fixture : IDisposable
     {
-        public MauwDbContext Db { get; } = CreateDb();
+        public MauwDbContext Db { get; }
         public ItalianAccountingCalculator Calculator { get; } = new();
         public PriceListService Service { get; }
         public DocumentPricingService Pricing { get; }
         public Contact Customer { get; } = new("Cliente");
         public ProductVariant Variant { get; }
 
-        public Fixture()
+        public Fixture(PostgreSqlContainerFixture postgres)
         {
+            Db = postgres.CreateDbContext();
             Customer.EnableAsCustomer();
             Db.Add(Customer);
             var product = new Product(Guid.NewGuid(), "S", "P", "Articolo", 0m, 22m, 10m);
             Db.Add(product);
-            Variant = new(product.Id, "SKU", 10m) { Product = product, SellingPrice = 10m };
+            Variant = new(product.Id, "SKU", 10m, product.SupplierId) { Product = product, SellingPrice = 10m };
             Db.Add(Variant);
             Db.SaveChanges();
             var repository = new PriceListRepository(Db);

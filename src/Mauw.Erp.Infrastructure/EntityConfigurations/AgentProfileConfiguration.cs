@@ -14,6 +14,8 @@ public class AgentProfileConfiguration : IEntityTypeConfiguration<AgentProfile>
         builder.Property(ap => ap.DefaultCommissionRate).HasPrecision(5, 2);
         builder.Property(ap => ap.OperatingArea).HasMaxLength(255);
 
+        builder.HasQueryFilter(ap => !ap.Contact.IsDeleted);
+
         builder.HasOne(ap => ap.Contact)
             .WithOne(c => c.AgentProfile)
             .HasForeignKey<AgentProfile>(ap => ap.ContactId)

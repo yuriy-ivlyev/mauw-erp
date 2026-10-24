@@ -1,0 +1,118 @@
+@baseUrl = http://localhost:5020
+@supplierId = 00000000-0000-0000-0000-000000000001
+@warehouseId = 00000000-0000-0000-0000-000000000002
+@noteId = 00000000-0000-0000-0000-000000000003
+@variantId = 00000000-0000-0000-0000-000000000004
+@version = 00000000-0000-0000-0000-000000000005
+
+# Requires an authenticated Admin or Warehouse session.
+# Replace IDs and version using the previous response. Original file is local.
+
+### List
+GET {{baseUrl}}/api/supplier-delivery-notes?page=1&pageSize=20
+
+### Upload original and draft header (number optional)
+POST {{baseUrl}}/api/supplier-delivery-notes
+Content-Type: multipart/form-data; boundary=MauwSupplierBoundary
+
+--MauwSupplierBoundary
+Content-Disposition: form-data; name="supplierId"
+
+{{supplierId}}
+--MauwSupplierBoundary
+Content-Disposition: form-data; name="warehouseId"
+
+{{warehouseId}}
+--MauwSupplierBoundary
+Content-Disposition: form-data; name="documentDate"
+
+2026-10-20T00:00:00Z
+--MauwSupplierBoundary
+Content-Disposition: form-data; name="documentNumber"
+
+DDT-123
+--MauwSupplierBoundary
+Content-Disposition: form-data; name="file"; filename="supplier-ddt.pdf"
+Content-Type: application/pdf
+
+< .\supplier-ddt.pdf
+--MauwSupplierBoundary--
+
+### Read header, lines and version
+GET {{baseUrl}}/api/supplier-delivery-notes/{{noteId}}
+
+### Download original
+GET {{baseUrl}}/api/supplier-delivery-notes/{{noteId}}/file
+
+### Find by supplier product/variant code; does not save lines or update the DDT version
+GET {{baseUrl}}/api/supplier-delivery-notes/{{noteId}}/article-match?supplierItemCode=MAGLIA-BLU-M
+
+### Fall back to a variant barcode, always within the DDT supplier
+# Supplier variant codes, saved mappings and unique product codes take precedence.
+GET {{baseUrl}}/api/supplier-delivery-notes/{{noteId}}/article-match?supplierItemCode=2900001444804
+
+### Unresolved or ambiguous supplier code: 400 with Problem Details, no mutation
+GET {{baseUrl}}/api/supplier-delivery-notes/{{noteId}}/article-match?supplierItemCode=UNKNOWN
+
+### Replace draft lines (add/edit/map/remove). Empty lines removes all.
+PUT {{baseUrl}}/api/supplier-delivery-notes/{{noteId}}/lines
+Content-Type: application/json
+
+{
+  "version": "{{version}}",
+  "documentNumber": "DDT-123",
+  "documentDate": "2026-10-20T00:00:00Z",
+  "lines": [
+    {
+      "supplierItemCode": "MAGLIA-BLU-M",
+      "articleVariantId": "{{variantId}}",
+      "description": "Maglia blu taglia M",
+      "quantity": 5,
+      "unitPrice": "12.34567890"
+    }
+  ]
+}
+
+### Match external structured OCR/AI data (does not invoke an OCR provider)
+POST {{baseUrl}}/api/supplier-delivery-notes/{{noteId}}/parse
+Content-Type: application/json
+
+{
+  "version": "{{version}}",
+  "documentNumber": "DDT-123",
+  "documentDate": "2026-10-20T00:00:00Z",
+  "lines": [
+    {
+      "supplierItemCode": "MAGLIA-BLU-M",
+      "description": "Maglia blu taglia M",
+      "quantity": 5,
+      "unitPrice": "12.34567890"
+    }
+  ]
+}
+
+### Confirm the latest saved revision, exactly once
+POST {{baseUrl}}/api/supplier-delivery-notes/{{noteId}}/confirm
+Content-Type: application/json
+
+{ "version": "{{version}}" }
+
+### Cancel an unconfirmed draft
+POST {{baseUrl}}/api/supplier-delivery-notes/{{noteId}}/cancel
+Content-Type: application/json
+
+{ "version": "{{version}}" }
+
+### Missing resource: 404
+GET {{baseUrl}}/api/supplier-delivery-notes/00000000-0000-0000-0000-000000000000
+
+### Invalid fractional quantity: 400, no mutation
+PUT {{baseUrl}}/api/supplier-delivery-notes/{{noteId}}/lines
+Content-Type: application/json
+
+{
+  "version": "{{version}}",
+  "documentNumber": "DDT-123",
+  "documentDate": "2026-10-20T00:00:00Z",
+  "lines": [{ "description": "Non valida", "quantity": 1.5, "unitPrice": "12.00" }]
+}

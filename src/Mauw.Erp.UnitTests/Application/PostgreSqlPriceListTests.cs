@@ -9,15 +9,35 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mauw.Erp.UnitTests.Application;
 
-public class PostgreSqlPriceListTests
+[Collection(PostgreSqlTestCollection.Name)]
+public class PostgreSqlPriceListTests(PostgreSqlContainerFixture postgres)
 {
-    private const string ConnectionVariable = "MAUW_TEST_POSTGRES_CONNECTION";
+    [Fact]
+    public async Task VariantSupplierCodeCanRepeatAcrossSuppliersButNotWithinOneSupplier()
+    {
+        await using var db = postgres.CreateDbContext();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        var supplierA = Guid.NewGuid();
+        var supplierB = Guid.NewGuid();
+        var productA = new Product(supplierA, "PRODUCT", $"A-{Guid.NewGuid():N}", "Articolo A", 0m, 22m, 10m);
+        var productB = new Product(supplierB, "PRODUCT", $"B-{Guid.NewGuid():N}", "Articolo B", 0m, 22m, 10m);
+        var secondProductA = new Product(supplierA, "PRODUCT-2", $"A2-{Guid.NewGuid():N}", "Articolo A2", 0m, 22m, 10m);
+        db.AddRange(productA, productB, secondProductA);
+        await db.SaveChangesAsync();
 
-    [PostgreSqlFact]
+        db.AddRange(
+            new ProductVariant(productA.Id, $"A-{Guid.NewGuid():N}", 10m, supplierA, supplierCode: "VARIANT"),
+            new ProductVariant(productB.Id, $"B-{Guid.NewGuid():N}", 10m, supplierB, supplierCode: "VARIANT"));
+        await db.SaveChangesAsync();
+
+        db.Add(new ProductVariant(secondProductA.Id, $"A2-{Guid.NewGuid():N}", 10m, supplierA, supplierCode: "VARIANT"));
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+    }
+
+    [Fact]
     public async Task PrecisionSnapshotReloadAndDatabaseSetNullUseRealPostgreSql()
     {
-        await using var db = new MauwDbContext(new DbContextOptionsBuilder<MauwDbContext>()
-            .UseNpgsql(Environment.GetEnvironmentVariable(ConnectionVariable)).Options);
+        await using var db = postgres.CreateDbContext();
         await using var transaction = await db.Database.BeginTransactionAsync();
         if (await db.Countries.FindAsync("IT") is null)
             db.Countries.Add(new() { IsoCode = "IT", Name = "Italia" });
@@ -28,7 +48,7 @@ public class PostgreSqlPriceListTests
         var product = new Product(Guid.NewGuid(), code, code, "Articolo test", 0m, 22m, 10m)
             { SellingPrice = 23.12345678m };
         db.Add(product);
-        var variant = new ProductVariant(product.Id, code, 10m)
+        var variant = new ProductVariant(product.Id, code, 10m, product.SupplierId)
             { Product = product, SellingPrice = 17.12345678m };
         db.Add(variant);
         await db.SaveChangesAsync();
@@ -98,12 +118,4 @@ public class PostgreSqlPriceListTests
         Assert.Empty(await db.PriceListRules.Where(rule => rule.PriceListId == listId).ToListAsync());
     }
 
-    public sealed class PostgreSqlFactAttribute : FactAttribute
-    {
-        public PostgreSqlFactAttribute()
-        {
-            if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ConnectionVariable)))
-                Skip = $"Set {ConnectionVariable} to a migrated test database to run this PostgreSQL integration test.";
-        }
-    }
 }

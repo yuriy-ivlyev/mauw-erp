@@ -51,5 +51,17 @@ describe('SidebarComponent', () => {
     expect(text).not.toContain('Prodotti');
     expect(text).not.toContain('Sistema');
     expect(text).not.toContain('Cassa');
+    expect(text).not.toContain('Acquisti');
+  });
+
+  it('shows supplier stock-in under Purchases immediately after Sales for warehouse users', async () => {
+    const fixture = await createSidebar(['Warehouse']);
+    const menu = fixture.componentInstance.menuItems;
+    const purchases = menu.find(item => item.label === 'Acquisti')!;
+    expect(purchases).toBeTruthy();
+    fixture.componentInstance.toggleSubmenu(purchases);
+    fixture.detectChanges();
+    const link: HTMLAnchorElement | null = fixture.nativeElement.querySelector('a[href="/acquisti/ddt-fornitore"]');
+    expect(link?.textContent?.trim()).toBe('Carico Merce');
   });
 });

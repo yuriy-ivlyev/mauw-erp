@@ -17,6 +17,9 @@ public class StockMovement : Entity<Guid>
     public DateTime MovementDateUtc { get; private set; } = DateTime.UtcNow;
     public string? Notes { get; private set; }
     public string? CreatedByUserId { get; private set; }
+    public Guid? SupplierDeliveryNoteLineId { get; private set; }
+    public SupplierDeliveryNoteLine? SupplierDeliveryNoteLine { get; private set; }
+    public Guid? ReferenceId { get; private set; }
 
     // Navigation
     public ProductVariant Variant { get; set; } = null!;
@@ -59,4 +62,35 @@ public class StockMovement : Entity<Guid>
     }
 
     private StockMovement() { } // For EF Core
+
+    public static StockMovement FromSupplierDeliveryNote(
+        SupplierDeliveryNote note, SupplierDeliveryNoteLine line) => new()
+    {
+        Id = Guid.NewGuid(),
+        VariantId = line.ArticleVariantId!.Value,
+        WarehouseId = note.WarehouseId,
+        Type = StockMovementType.SupplierStockIn,
+        Reason = StockMovementReason.SupplierReceipt,
+        Quantity = line.Quantity,
+        UnitCost = line.UnitPrice,
+        MovementDateUtc = note.DocumentDate,
+        ReferenceDoc = note.DocumentNumber,
+        ReferenceId = note.Id,
+        SupplierDeliveryNoteLineId = line.Id
+    };
+
+    public static StockMovement FromSupplierReturnDraft(
+        SupplierReturnDraft draft, SupplierReturnDraftLine line) => new()
+    {
+        Id = Guid.NewGuid(),
+        VariantId = line.ArticleVariantId,
+        WarehouseId = draft.SupplierDeliveryNote.WarehouseId,
+        Type = StockMovementType.SupplierStockReturn,
+        Reason = StockMovementReason.SupplierReturn,
+        Quantity = line.Quantity,
+        UnitCost = line.SupplierDeliveryNoteLine.UnitPrice,
+        MovementDateUtc = draft.CreatedOn,
+        ReferenceDoc = $"RESO-{draft.Id:N}",
+        ReferenceId = draft.Id
+    };
 }

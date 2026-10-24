@@ -69,7 +69,7 @@ public sealed class ProductVariantImageRepository(DbContext.MauwDbContext db) : 
             .ToListAsync(ct);
 
         var products = await db.Products.AsNoTracking()
-            .Where(p => p.InternalCode == sku)
+            .Where(p => p.Barcode == sku)
             .Select(p => new SkuMatch(p.Id, null, p.HasVariants))
             .Take(2)
             .ToListAsync(ct);

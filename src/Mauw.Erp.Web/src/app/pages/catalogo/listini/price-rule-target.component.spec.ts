@@ -11,9 +11,11 @@ describe('PriceRuleTargetComponent', () => {
   let service: jasmine.SpyObj<ProductService>;
   const variants: VariantSearchDto[] = [
     { variantId: 'sku-red-40', productId: 'product', productName: 'Scarpa saguaro',
-      sku: 'RED40', barcode: 'RED40', colorName: 'Rosso', sizeName: '40', currentStock: 0 },
+      sku: 'RED40', barcode: 'RED40', colorName: 'Rosso', sizeName: '40', currentStock: 0,
+      supplierCode: null, purchaseCost: 0 },
     { variantId: 'sku-blue-41', productId: 'product', productName: 'Scarpa saguaro',
-      sku: 'BLUE41', barcode: 'BLUE41', colorName: 'Blu', sizeName: '41', currentStock: 0 }
+      sku: 'BLUE41', barcode: 'BLUE41', colorName: 'Blu', sizeName: '41', currentStock: 0,
+      supplierCode: null, purchaseCost: 0 }
   ];
 
   beforeEach(() => {
@@ -22,7 +24,7 @@ describe('PriceRuleTargetComponent', () => {
     service.getCategories.and.returnValue(of([]));
     service.searchVariants.and.returnValue(of(variants));
     service.searchParents.and.returnValue(of([
-      { productId: 'product', internalCode: 'P', supplierCode: 'S', name: 'Scarpa saguaro', hasVariants: true, variantCount: 2 }
+      { productId: 'product', barcode: 'P', supplierCode: 'S', name: 'Scarpa saguaro', hasVariants: true, variantCount: 2 }
     ]));
     TestBed.configureTestingModule({
       imports: [PriceRuleTargetComponent],

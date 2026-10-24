@@ -6,6 +6,8 @@ namespace Mauw.Erp.Domain.Entities;
 public class ProductVariant : Entity<Guid>
 {
     public Guid ProductId { get; set; }
+    public Guid SupplierId { get; set; }
+    public string? SupplierCode { get; set; }
     public string? ColorId { get; set; }
     public string? SizeId { get; set; }
     public string Barcode { get; set; }
@@ -25,12 +27,16 @@ public class ProductVariant : Entity<Guid>
         Guid productId,
         string barcode,
         decimal purchaseCost,
+        Guid supplierId,
         string? colorId = null,
         string? sizeId = null,
-        decimal? weightGrams = null
+        decimal? weightGrams = null,
+        string? supplierCode = null
     ) : base()
     {
         ProductId = productId;
+        SupplierId = supplierId;
+        SupplierCode = supplierCode;
         Barcode = barcode;
         PurchaseCost = purchaseCost;
         ColorId = colorId;
@@ -38,8 +44,15 @@ public class ProductVariant : Entity<Guid>
         WeightGrams = weightGrams;
     }
 
-    public void Update(string? colorId, string? sizeId, string barcode, decimal purchaseCost, decimal? weightGrams = null)
+    public void Update(
+        string? colorId,
+        string? sizeId,
+        string barcode,
+        decimal purchaseCost,
+        decimal? weightGrams = null,
+        string? supplierCode = null)
     {
+        SupplierCode = supplierCode;
         ColorId = colorId;
         SizeId = sizeId;
         Barcode = barcode;

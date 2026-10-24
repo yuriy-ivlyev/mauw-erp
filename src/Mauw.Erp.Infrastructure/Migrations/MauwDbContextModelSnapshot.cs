@@ -22,6 +22,8 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.HasSequence("supplier_purchase_order_number_seq");
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.AgentCommission", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1783,6 +1785,12 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Barcode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("barcode");
+
                     b.Property<decimal>("BasePurchaseCost")
                         .HasColumnType("numeric")
                         .HasColumnName("base_purchase_cost");
@@ -1811,12 +1819,6 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true)
                         .HasColumnName("has_variants");
-
-                    b.Property<string>("InternalCode")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("internal_code");
 
                     b.Property<Guid?>("MaterialId")
                         .HasColumnType("uuid")
@@ -1857,14 +1859,14 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("p_k_products");
 
+                    b.HasIndex("Barcode")
+                        .IsUnique();
+
                     b.HasIndex("CategoryId")
                         .HasDatabaseName("i_x_products_category_id");
 
                     b.HasIndex("CollectionId")
                         .HasDatabaseName("i_x_products_collection_id");
-
-                    b.HasIndex("InternalCode")
-                        .IsUnique();
 
                     b.HasIndex("MaterialId")
                         .HasDatabaseName("i_x_products_material_id");
@@ -1921,6 +1923,15 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("character varying(5)")
                         .HasColumnName("size_id");
 
+                    b.Property<string>("SupplierCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("supplier_code");
+
+                    b.Property<Guid>("SupplierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_id");
+
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1952,6 +1963,9 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
                     b.HasIndex("SizeId")
                         .HasDatabaseName("i_x_product_variants_size_id");
+
+                    b.HasIndex("SupplierId", "SupplierCode")
+                        .IsUnique();
 
                     b.ToTable("product_variants");
                 });
@@ -2064,8 +2078,8 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnName("quantity_reserved");
 
                     b.Property<decimal?>("UnitCost")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("numeric(18,3)")
+                        .HasPrecision(23, 8)
+                        .HasColumnType("numeric(23,8)")
                         .HasColumnName("unit_cost");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -2135,13 +2149,21 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("reference_doc");
 
+                    b.Property<Guid?>("ReferenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reference_id");
+
+                    b.Property<Guid?>("SupplierDeliveryNoteLineId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_delivery_note_line_id");
+
                     b.Property<int>("Type")
                         .HasColumnType("integer")
                         .HasColumnName("type");
 
                     b.Property<decimal>("UnitCost")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)")
+                        .HasPrecision(23, 8)
+                        .HasColumnType("numeric(23,8)")
                         .HasColumnName("unit_cost");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -2163,12 +2185,207 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
                     b.HasIndex("MovementDateUtc");
 
+                    b.HasIndex("SupplierDeliveryNoteLineId")
+                        .IsUnique()
+                        .HasDatabaseName("i_x_stock_movements_supplier_delivery_note_line_id");
+
                     b.HasIndex("WarehouseId", "VariantId");
 
                     b.HasIndex("VariantId", "CreatedAt", "Id")
                         .IsDescending(false, true, true);
 
                     b.ToTable("stock_movements");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierArticleMapping", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ArticleVariantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("article_variant_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("SupplierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_id");
+
+                    b.Property<string>("SupplierItemCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("supplier_item_code");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_supplier_article_mappings");
+
+                    b.HasIndex("ArticleVariantId")
+                        .HasDatabaseName("i_x_supplier_article_mappings_article_variant_id");
+
+                    b.HasIndex("SupplierId", "SupplierItemCode")
+                        .IsUnique();
+
+                    b.ToTable("supplier_article_mappings", (string)null);
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierDeliveryNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("content_type");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("DocumentDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("document_date");
+
+                    b.Property<string>("DocumentNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("document_number");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("file_path");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("SupplierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_id");
+
+                    b.Property<Guid?>("SupplierPurchaseOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_purchase_order_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("uploaded_at");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_supplier_delivery_notes");
+
+                    b.HasIndex("SupplierId")
+                        .HasDatabaseName("i_x_supplier_delivery_notes_supplier_id");
+
+                    b.HasIndex("SupplierPurchaseOrderId")
+                        .HasDatabaseName("i_x_supplier_delivery_notes_supplier_purchase_order_id");
+
+                    b.HasIndex("WarehouseId")
+                        .HasDatabaseName("i_x_supplier_delivery_notes_warehouse_id");
+
+                    b.HasIndex("UploadedAt", "Id")
+                        .IsDescending();
+
+                    b.ToTable("supplier_delivery_notes", (string)null);
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierDeliveryNoteLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ArticleVariantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("article_variant_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("LineStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("line_status");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<Guid>("SupplierDeliveryNoteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_delivery_note_id");
+
+                    b.Property<string>("SupplierItemCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("supplier_item_code");
+
+                    b.Property<Guid?>("SupplierPurchaseOrderLineId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_purchase_order_line_id");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)")
+                        .HasColumnName("unit_price");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_supplier_delivery_note_lines");
+
+                    b.HasIndex("ArticleVariantId")
+                        .HasDatabaseName("i_x_supplier_delivery_note_lines_article_variant_id");
+
+                    b.HasIndex("SupplierPurchaseOrderLineId")
+                        .HasDatabaseName("i_x_supplier_delivery_note_lines_supplier_purchase_order_line_id");
+
+                    b.HasIndex("SupplierDeliveryNoteId", "Position");
+
+                    b.ToTable("supplier_delivery_note_lines", (string)null);
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierProfile", b =>
@@ -2194,6 +2411,209 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasKey("ContactId");
 
                     b.ToTable("supplier_profiles", (string)null);
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierPurchaseOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateTime>("OrderDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("order_date");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("order_number");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("SupplierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_supplier_purchase_orders");
+
+                    b.HasIndex("OrderNumber")
+                        .IsUnique();
+
+                    b.HasIndex("SupplierId")
+                        .HasDatabaseName("i_x_supplier_purchase_orders_supplier_id");
+
+                    b.HasIndex("Status", "SupplierId", "OrderDate");
+
+                    b.ToTable("supplier_purchase_orders", (string)null);
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierPurchaseOrderLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ArticleVariantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("article_variant_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("QuantityOrdered")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity_ordered");
+
+                    b.Property<int>("QuantityReceived")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity_received");
+
+                    b.Property<Guid>("SupplierPurchaseOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_purchase_order_id");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)")
+                        .HasColumnName("unit_cost");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_supplier_purchase_order_lines");
+
+                    b.HasIndex("ArticleVariantId")
+                        .HasDatabaseName("i_x_supplier_purchase_order_lines_article_variant_id");
+
+                    b.HasIndex("SupplierPurchaseOrderId", "ArticleVariantId")
+                        .IsUnique();
+
+                    b.ToTable("supplier_purchase_order_lines", (string)null);
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierReturnDraft", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on");
+
+                    b.Property<DateTime?>("IssuedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issued_on");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("SupplierDeliveryNoteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_delivery_note_id");
+
+                    b.Property<Guid>("SupplierPurchaseOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_purchase_order_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_supplier_return_drafts");
+
+                    b.HasIndex("SupplierDeliveryNoteId")
+                        .HasDatabaseName("i_x_supplier_return_drafts_supplier_delivery_note_id");
+
+                    b.HasIndex("SupplierPurchaseOrderId")
+                        .HasDatabaseName("i_x_supplier_return_drafts_supplier_purchase_order_id");
+
+                    b.ToTable("supplier_return_drafts", (string)null);
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierReturnDraftLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ArticleVariantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("article_variant_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<Guid>("SupplierDeliveryNoteLineId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_delivery_note_line_id");
+
+                    b.Property<Guid>("SupplierReturnDraftId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_return_draft_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_supplier_return_draft_lines");
+
+                    b.HasIndex("ArticleVariantId")
+                        .HasDatabaseName("i_x_supplier_return_draft_lines_article_variant_id");
+
+                    b.HasIndex("SupplierDeliveryNoteLineId")
+                        .HasDatabaseName("i_x_supplier_return_draft_lines_supplier_delivery_note_line_id");
+
+                    b.HasIndex("SupplierReturnDraftId", "SupplierDeliveryNoteLineId")
+                        .IsUnique();
+
+                    b.ToTable("supplier_return_draft_lines", (string)null);
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Warehouse", b =>
@@ -2766,6 +3186,12 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.StockMovement", b =>
                 {
+                    b.HasOne("Mauw.Erp.Domain.Entities.SupplierDeliveryNoteLine", "SupplierDeliveryNoteLine")
+                        .WithOne("StockMovement")
+                        .HasForeignKey("Mauw.Erp.Domain.Entities.StockMovement", "SupplierDeliveryNoteLineId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("f_k_stock_movements__supplier_delivery_note_lines_supplier_delivery~");
+
                     b.HasOne("Mauw.Erp.Domain.Entities.ProductVariant", "Variant")
                         .WithMany("StockMovements")
                         .HasForeignKey("VariantId")
@@ -2779,9 +3205,89 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("f_k_stock_movements__warehouses_warehouse_id");
 
+                    b.Navigation("SupplierDeliveryNoteLine");
+
                     b.Navigation("Variant");
 
                     b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierArticleMapping", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.ProductVariant", "ArticleVariant")
+                        .WithMany()
+                        .HasForeignKey("ArticleVariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_supplier_article_mappings_product_variants_article_variant_~");
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.Contact", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_supplier_article_mappings_contacts_supplier_id");
+
+                    b.Navigation("ArticleVariant");
+
+                    b.Navigation("Supplier");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierDeliveryNote", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.Contact", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_supplier_delivery_notes_contacts_supplier_id");
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.SupplierPurchaseOrder", "SupplierPurchaseOrder")
+                        .WithMany()
+                        .HasForeignKey("SupplierPurchaseOrderId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("f_k_supplier_delivery_notes__supplier_purchase_orders_supplier_pur~");
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_supplier_delivery_notes__warehouses_warehouse_id");
+
+                    b.Navigation("Supplier");
+
+                    b.Navigation("SupplierPurchaseOrder");
+
+                    b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierDeliveryNoteLine", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.ProductVariant", "ArticleVariant")
+                        .WithMany()
+                        .HasForeignKey("ArticleVariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("f_k_supplier_delivery_note_lines_product_variants_article_varia~");
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.SupplierDeliveryNote", "SupplierDeliveryNote")
+                        .WithMany("Lines")
+                        .HasForeignKey("SupplierDeliveryNoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_supplier_delivery_note_lines_supplier_delivery_notes_suppli~");
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.SupplierPurchaseOrderLine", "SupplierPurchaseOrderLine")
+                        .WithMany()
+                        .HasForeignKey("SupplierPurchaseOrderLineId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("f_k_supplier_delivery_note_lines__supplier_purchase_order_lines_sup~");
+
+                    b.Navigation("ArticleVariant");
+
+                    b.Navigation("SupplierDeliveryNote");
+
+                    b.Navigation("SupplierPurchaseOrderLine");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierProfile", b =>
@@ -2794,6 +3300,90 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasConstraintName("f_k_supplier_profiles_contacts_contact_id");
 
                     b.Navigation("Contact");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierPurchaseOrder", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.Contact", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_supplier_purchase_orders_contacts_supplier_id");
+
+                    b.Navigation("Supplier");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierPurchaseOrderLine", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.ProductVariant", "ArticleVariant")
+                        .WithMany()
+                        .HasForeignKey("ArticleVariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_supplier_purchase_order_lines_product_variants_article_vari~");
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.SupplierPurchaseOrder", "SupplierPurchaseOrder")
+                        .WithMany("Lines")
+                        .HasForeignKey("SupplierPurchaseOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_supplier_purchase_order_lines_supplier_purchase_orders_supp~");
+
+                    b.Navigation("ArticleVariant");
+
+                    b.Navigation("SupplierPurchaseOrder");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierReturnDraft", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.SupplierDeliveryNote", "SupplierDeliveryNote")
+                        .WithMany()
+                        .HasForeignKey("SupplierDeliveryNoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_supplier_return_drafts_supplier_delivery_notes_supplier_del~");
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.SupplierPurchaseOrder", "SupplierPurchaseOrder")
+                        .WithMany()
+                        .HasForeignKey("SupplierPurchaseOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_supplier_return_drafts_supplier_purchase_orders_supplier_pu~");
+
+                    b.Navigation("SupplierDeliveryNote");
+
+                    b.Navigation("SupplierPurchaseOrder");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierReturnDraftLine", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.ProductVariant", "ArticleVariant")
+                        .WithMany()
+                        .HasForeignKey("ArticleVariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_supplier_return_draft_lines_product_variants_article_varian~");
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.SupplierDeliveryNoteLine", "SupplierDeliveryNoteLine")
+                        .WithMany()
+                        .HasForeignKey("SupplierDeliveryNoteLineId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_supplier_return_draft_lines_supplier_delivery_note_lines_su~");
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.SupplierReturnDraft", "SupplierReturnDraft")
+                        .WithMany("Lines")
+                        .HasForeignKey("SupplierReturnDraftId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_supplier_return_draft_lines_supplier_return_drafts_supplier~");
+
+                    b.Navigation("ArticleVariant");
+
+                    b.Navigation("SupplierDeliveryNoteLine");
+
+                    b.Navigation("SupplierReturnDraft");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Warehouse", b =>
@@ -2864,6 +3454,26 @@ namespace Mauw.Erp.Infrastructure.Migrations
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.ProductVariant", b =>
                 {
                     b.Navigation("StockMovements");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierDeliveryNote", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierDeliveryNoteLine", b =>
+                {
+                    b.Navigation("StockMovement");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierPurchaseOrder", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierReturnDraft", b =>
+                {
+                    b.Navigation("Lines");
                 });
 #pragma warning restore 612, 618
         }

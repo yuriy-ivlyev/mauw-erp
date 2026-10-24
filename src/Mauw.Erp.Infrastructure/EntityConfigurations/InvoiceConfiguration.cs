@@ -40,6 +40,8 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(i => i.UpdatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+        builder.HasQueryFilter(i => !i.Contact.IsDeleted);
+
         builder.HasOne(i => i.Contact)
             .WithMany()
             .HasForeignKey(i => i.ContactId)

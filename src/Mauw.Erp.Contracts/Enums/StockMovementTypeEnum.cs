@@ -8,5 +8,7 @@ public enum StockMovementTypeEnum
     PurchaseReceipt,
     SalesDelivery,
     InventoryAdjustment,
-    CustomerReturn
+    CustomerReturn,
+    SupplierStockIn,
+    SupplierStockReturn
 }

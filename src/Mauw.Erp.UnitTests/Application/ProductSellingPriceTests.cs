@@ -11,12 +11,13 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace Mauw.Erp.UnitTests.Application;
 
-public class ProductSellingPriceTests
+[Collection(PostgreSqlTestCollection.Name)]
+public class ProductSellingPriceTests(PostgreSqlContainerFixture postgres)
 {
     [Fact]
     public async Task OnlyDefinitivePriceIsSavedAndCostChangesNeverRepriceVariants()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var entered = new CatalogPriceCalculator().FromMarkup(10m, 30m).Data!.Value;
         var created = await fixture.Service.CreateProductAsync(Request(entered));
         Assert.True(created.Success, created.Error);
@@ -42,7 +43,7 @@ public class ProductSellingPriceTests
     [Fact]
     public async Task BarcodeMatrixPriceListAndDocumentsUseStoredPriceWithoutRoundingOrMarkup()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var product = (await fixture.Service.CreateProductAsync(Request(94.18m))).Data!;
         var variant = (await fixture.Service.CreateProductVariantAsync(product.Id,
             new(product.Id, null, null, "BARCODE", 90m, SellingPrice: 18.83606557m))).Data!;
@@ -65,7 +66,7 @@ public class ProductSellingPriceTests
     [Fact]
     public async Task InvalidChangesDoNotMutateAndMissingPricesCannotBeSaved()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var product = (await fixture.Service.CreateProductAsync(Request(19m))).Data!;
         var variant = (await fixture.Service.CreateProductVariantAsync(product.Id,
             new(product.Id, null, null, "SKU", 10m, SellingPrice: 15m))).Data!;
@@ -85,7 +86,7 @@ public class ProductSellingPriceTests
     [Fact]
     public async Task ProductWithoutVariantsSavesTheExplicitPriceAndDoesNotRecalculateOnCostChange()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var created = await fixture.Service.CreateProductAsync(Request(18.12345678m) with { HasVariants = false });
         Assert.True(created.Success, created.Error);
         var updated = await fixture.Service.UpdateProductAsync(created.Data!.Id,
@@ -97,7 +98,7 @@ public class ProductSellingPriceTests
     [Fact]
     public async Task VariantParentNeedsNoPriceAndVariantPricesRemainIndependent()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var created = await fixture.Service.CreateProductAsync(Request(null));
         Assert.True(created.Success, created.Error);
         Assert.True(created.Data!.HasVariants);
@@ -119,7 +120,7 @@ public class ProductSellingPriceTests
     [Fact]
     public async Task SimpleProductKeepsOneSkuAndSynchronizesExplicitPriceEdits()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var created = await fixture.Service.CreateProductAsync(Request(20m) with { HasVariants = false });
         var sku = Assert.Single(created.Data!.Variants);
         Assert.False((await fixture.Service.DeleteProductVariantAsync(created.Data.Id, sku.Id)).Success);
@@ -144,7 +145,7 @@ public class ProductSellingPriceTests
     [Fact]
     public async Task EmptyVariantParentCanBecomeSimpleAndReceivesItsSingleSku()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var created = await fixture.Service.CreateProductAsync(Request(null));
         var updated = await fixture.Service.UpdateProductAsync(created.Data!.Id,
             Request(25m) with { HasVariants = false });
@@ -157,9 +158,9 @@ public class ProductSellingPriceTests
     [Fact]
     public async Task LegacyMissingPricesRemainEditableButCannotBeUsedForSales()
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture(postgres);
         var product = new Product(Guid.NewGuid(), "S", "P", "Test", 30m, 22m, 10m);
-        var variant = new ProductVariant(product.Id, "OLD", 10m) { Product = product };
+        var variant = new ProductVariant(product.Id, "OLD", 10m, product.SupplierId) { Product = product };
         fixture.Db.AddRange(product, variant);
         await fixture.Db.SaveChangesAsync();
         var catalog = await fixture.Service.GetProductAsync(product.Id);
@@ -177,14 +178,17 @@ public class ProductSellingPriceTests
 
     private sealed class Fixture : IDisposable
     {
-        public MauwDbContext Db { get; } = new(new DbContextOptionsBuilder<MauwDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+        public MauwDbContext Db { get; }
         private readonly MemoryCache _cache = new(new MemoryCacheOptions());
         public ProductService Service { get; }
-        public Fixture() => Service = new(new UnitOfWork(Db, _cache), new CreateProductRequestValidator(), new(),
-            new ImageApplicationService(new ProductVariantImageRepository(Db),
+        public Fixture(PostgreSqlContainerFixture postgres)
+        {
+            Db = postgres.CreateDbContext();
+            Service = new(new UnitOfWork(Db, _cache), new CreateProductRequestValidator(), new(),
+                new ImageApplicationService(new ProductVariantImageRepository(Db),
                 new Moq.Mock<IImageStorageService>().Object,
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<ImageApplicationService>.Instance));
+        }
         public void Dispose() { Db.Dispose(); _cache.Dispose(); }
     }
 }

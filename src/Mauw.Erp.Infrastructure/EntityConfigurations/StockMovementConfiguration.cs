@@ -20,7 +20,7 @@ public class StockMovementConfiguration : IEntityTypeConfiguration<StockMovement
             .IsRequired();
 
         builder.Property(sm => sm.UnitCost)
-            .HasPrecision(18, 4);
+            .HasPrecision(23, 8);
 
         builder.Property(sm => sm.ReferenceDoc)
             .IsRequired(false)
@@ -61,5 +61,9 @@ public class StockMovementConfiguration : IEntityTypeConfiguration<StockMovement
             .IsDescending(false, true, true);
         builder.HasIndex(sm => new { sm.WarehouseId, sm.VariantId });
         builder.HasIndex(sm => sm.MovementDateUtc);
+        builder.HasOne(sm => sm.SupplierDeliveryNoteLine)
+            .WithOne(line => line.StockMovement)
+            .HasForeignKey<StockMovement>(sm => sm.SupplierDeliveryNoteLineId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

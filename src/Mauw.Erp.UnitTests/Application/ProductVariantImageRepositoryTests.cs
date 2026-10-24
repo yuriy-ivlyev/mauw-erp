@@ -7,19 +7,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mauw.Erp.UnitTests.Application;
 
-public class ProductVariantImageRepositoryTests
+[Collection(PostgreSqlTestCollection.Name)]
+public class ProductVariantImageRepositoryTests(PostgreSqlContainerFixture postgres)
 {
     [Fact]
     public async Task FindBySkuReturnsVariantAndProductMatchesWithHasVariantsFlag()
     {
-        using var db = new MauwDbContext(new DbContextOptionsBuilder<MauwDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+        using var db = postgres.CreateDbContext();
         var supplier = Guid.NewGuid();
         var parent = new Product(supplier, "S1", "PARENT", "Con varianti", 0m, 22m, 10m, hasVariants: true);
         var simple = new Product(supplier, "S2", "SIMPLE", "Semplice", 0m, 22m, 10m, hasVariants: false);
         db.Products.AddRange(parent, simple);
         await db.SaveChangesAsync();
-        var variant = new ProductVariant(parent.Id, "VAR-1", 10m);
+        var variant = new ProductVariant(parent.Id, "VAR-1", 10m, parent.SupplierId);
         db.ProductVariants.Add(variant);
         await db.SaveChangesAsync();
         var repo = new ProductVariantImageRepository(db);

@@ -11,12 +11,13 @@
 - [x] Data loaded in `ngOnInit()` via `loadSupportData()`
 - [x] Uses Promise.all() for parallel loading
 - [x] Error handling for load failures
+- [x] Barcode lookup resolves a simple product through its product-level barcode
 
 ### 2. Product Form (Details Tab)
 - [x] Keep existing fields:
   - [x] supplierId
   - [x] supplierCode
-  - [x] internalCode (required)
+  - [x] barcode (required)
   - [x] name (required)
   - [x] defaultMarkupRate
   - [x] vatRate

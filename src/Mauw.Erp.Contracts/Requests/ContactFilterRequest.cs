@@ -9,5 +9,7 @@ public class ContactFilterRequest : PageSortRequest
     public bool? IsCustomer { get; set; }
     public bool? IsSupplier { get; set; }
     public bool? IsAgent { get; set; }
+    public Guid? AssignedAgentId { get; set; }
+    public bool? HasAssignedAgent { get; set; }
     public string? Status { get; set; }
 }

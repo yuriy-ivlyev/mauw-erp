@@ -74,6 +74,97 @@ La migrazione `AddCompanyInvoiceDetails` e solo additiva: nuovi campi facoltativ
 e flag inizialmente disattivato, senza riscrivere documenti o inventare dati bancari.
 Le modifiche si vedono nei PDF rigenerati; quelli gia scaricati restano invariati.
 
+## Acquisti / Carico Merce (DDT fornitore)
+
+La voce **Acquisti > Carico Merce**, subito sotto Vendite, e disponibile ai ruoli
+`Admin` e `Warehouse`. La rotta `/acquisti/ddt-fornitore` mostra esclusivamente
+l'elenco paginato con ricerca su numero DDT/fornitore/magazzino, fornitore,
+stato e intervallo date. **Nuovo carico** apre
+`/acquisti/ddt-fornitore/nuovo`; selezionare un documento apre
+`/acquisti/ddt-fornitore/:id`. Il vecchio percorso `/acquisti/carico-merce`
+reindirizza all'elenco. Il wizard separa i tre step Documento & Fornitore,
+Riconciliazione righe e Riepilogo & Conferma; una bozza esistente apre lo step
+di riconciliazione, mentre documenti finalizzati sono consultabili nel riepilogo.
+
+Il flusso consente di:
+
+1. Archiviare l'originale PDF, PNG o JPEG (massimo 20 MB) su S3 usando la
+   configurazione `S3Storage` gia presente. Il numero DDT puo essere completato dopo.
+2. Aggiungere, modificare, eliminare e associare le righe in bozza. Le quantita
+   sono **pezzi interi positivi**, rappresentati da `int` nel modello e nei DTO;
+   JSON con quantita frazionarie viene rifiutato, mai arrotondato.
+3. Importare un payload OCR/IA strutturato tramite il pannello JSON o l'API
+   `/parse`. Non e incluso un motore OCR e nessun documento viene inviato
+   automaticamente a fornitori IA esterni.
+4. Salvare e confermare il carico: testata, movimenti `SupplierStockIn`,
+   mapping fornitore/variante e giacenze del magazzino sono aggiornati in una
+   transazione PostgreSQL serializzabile. Una versione obsoleta o una doppia
+   conferma restituisce `409`; ricaricare il documento prima di riprovare.
+
+Ogni variante puo avere il proprio **Codice fornitore variante** (massimo 100
+caratteri), distinto dal codice fornitore generale del prodotto. In fase di
+riconciliazione il matching cerca prima il codice sulla variante, limitatamente
+al fornitore del DDT e solo quando identifica una variante univoca; poi usa i
+mapping appresi alla conferma e, per compatibilita con il catalogo esistente,
+il codice generale del prodotto solo se identifica una variante univoca.
+I codici duplicati non producono associazioni automatiche e taglie/colori non
+vengono indovinati. Una variante selezionata manualmente deve appartenere allo
+stesso fornitore. Un codice non puo essere riassociato silenziosamente a una
+variante diversa. I prodotti mancanti si creano nel catalogo prima di associare
+e confermare le righe.
+La migrazione `AddSupplierCodeToProductVariant` aggiunge la colonna nullable
+senza riscrivere i codici storici; valorizzare i codici mancanti dal catalogo
+prodotti prima di affidarsi al matching diretto per variante.
+
+`Products` ha gia l'indice univoco `(SupplierId, SupplierCode)`. Anche le
+varianti applicano il vincolo `(SupplierId, SupplierCode)`, con `SupplierId`
+copiato dal prodotto padre e aggiornato quando cambia il fornitore. La migrazione
+`AddSupplierVariantSupplierCodeUniqueIndex` crea questo vincolo senza modificare
+i codici variante. Prima di applicarla, verificare e risolvere eventuali codici
+variante duplicati per lo stesso fornitore:
+
+```sql
+SELECT p.supplier_id, v.supplier_code, COUNT(*)
+FROM product_variants v
+JOIN products p ON p.id = v.product_id
+WHERE v.supplier_code IS NOT NULL
+GROUP BY p.supplier_id, v.supplier_code
+HAVING COUNT(*) > 1;
+```
+
+Le modifiche non salvate disabilitano la conferma; documenti confermati o
+annullati sono in sola lettura. L'annullamento e ammesso solo prima del carico.
+Il documento originale rimane scaricabile attraverso l'API autenticata.
+La giacenza del vecchio schema e ancora persistita come `numeric`: questo
+flusso accetta e genera esclusivamente interi e rifiuta giacenze storiche
+frazionarie, senza convertirle automaticamente.
+
+API principale: `/api/supplier-delivery-notes`, con alias `/api/v1/supplier-delivery-notes`:
+`GET /` (parametri opzionali `search`, `supplierId`, `status`, `dateFrom`,
+`dateTo`, oltre a `page`/`pageSize`), `GET /{id}`, `POST /` multipart, `GET /{id}/file`,
+`PUT /{id}/lines` (sostituzione completa), `POST /{id}/parse`,
+`POST /{id}/confirm`, `POST /{id}/cancel`. Le modifiche richiedono `version`.
+I costi unitari mantengono 8 decimali e vengono trasmessi come stringhe decimali
+per evitare perdite nel frontend; questo flusso non calcola IVA o totali fiscali.
+Gli esempi sono in
+[SupplierDeliveryNotes.http](../src/Mauw.Erp.Api/SupplierDeliveryNotes.http).
+
+Applicare la migrazione additiva prima dell'uso:
+
+```powershell
+dotnet ef database update --project src\Mauw.Erp.Infrastructure --startup-project src\Mauw.Erp.Api
+```
+
+La migrazione non riclassifica documenti storici e amplia la precisione dei
+costi di magazzino preservando anche la precedente capacita delle cifre intere.
+I proxy consentono 21 MB per includere l'overhead multipart del file da 20 MB.
+
+I test PostgreSQL si attivano con `MAUW_TEST_POSTGRES_CONNECTION`, indirizzata a
+un database di test gia migrato. Verificano rollback anche dopo `SaveChanges`,
+doppia conferma, concorrenza su documenti diversi, overflow e tracciabilita.
+Il roundtrip S3 opzionale usa `MAUW_TEST_S3_ENDPOINT`, `MAUW_TEST_S3_ACCESS_KEY`
+e `MAUW_TEST_S3_SECRET_KEY`: crea e rimuove un bucket temporaneo dedicato.
+
 ## 📁 Struttura
 
 ```

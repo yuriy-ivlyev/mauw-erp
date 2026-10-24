@@ -25,7 +25,7 @@ Content-Type: application/json
 {
   "supplierId": "00000000-0000-0000-0000-000000000003",
   "supplierCode": "SUP-001",
-  "internalCode": "ART-001",
+  "barcode": "ART-001",
   "name": "Camicia",
   "sellingPrice": null,
   "vatRate": 22,
@@ -40,7 +40,7 @@ Content-Type: application/json
 {
   "supplierId": "00000000-0000-0000-0000-000000000003",
   "supplierCode": "SUP-001",
-  "internalCode": "ART-001",
+  "barcode": "ART-001",
   "name": "Camicia",
   "sellingPrice": null,
   "vatRate": 22,

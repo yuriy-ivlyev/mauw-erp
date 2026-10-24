@@ -1,0 +1,96 @@
+<div class="space-y-6">
+  <header class="flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold dark:text-white">Carico Merce</h1>
+      <p class="mt-1 text-sm text-gray-500">Acquisti / DDT Fornitore</p>
+    </div>
+    <a routerLink="/acquisti/ddt-fornitore/nuovo" class="action primary inline-flex items-center gap-2">
+      <span aria-hidden="true">+</span> Nuovo carico
+    </a>
+  </header>
+
+  <p *ngIf="error" role="alert" class="rounded-lg bg-red-50 p-4 text-red-700">{{ error }}</p>
+
+  <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-gray-900">
+    <form (ngSubmit)="applyFilters()" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+      <label class="xl:col-span-2">
+        <span class="mb-1 block text-sm font-medium dark:text-white">Ricerca</span>
+        <input name="search" [(ngModel)]="search" placeholder="N° DDT, fornitore o magazzino" />
+      </label>
+      <label>
+        <span class="mb-1 block text-sm font-medium dark:text-white">Fornitore</span>
+        <select name="supplierId" [(ngModel)]="supplierId">
+          <option value="">Tutti i fornitori</option>
+          <option *ngFor="let supplier of suppliers" [value]="supplier.id">{{ supplier.businessName }}</option>
+        </select>
+      </label>
+      <label>
+        <span class="mb-1 block text-sm font-medium dark:text-white">Stato</span>
+        <select name="status" [(ngModel)]="status">
+          <option value="">Tutti gli stati</option>
+          <option value="Draft">Bozza</option>
+          <option value="Parsing">In elaborazione</option>
+          <option value="Parsed">Elaborata</option>
+          <option value="Confirmed">Confermato</option>
+          <option value="Cancelled">Annullato</option>
+        </select>
+      </label>
+      <label>
+        <span class="mb-1 block text-sm font-medium dark:text-white">Dal</span>
+        <input type="date" name="dateFrom" [(ngModel)]="dateFrom" />
+      </label>
+      <label>
+        <span class="mb-1 block text-sm font-medium dark:text-white">Al</span>
+        <input type="date" name="dateTo" [(ngModel)]="dateTo" />
+      </label>
+      <div class="flex items-end gap-2 sm:col-span-2 xl:col-span-6">
+        <button class="action primary" type="submit" [disabled]="busy">Filtra</button>
+        <button class="action" type="button" (click)="resetFilters()" [disabled]="busy">Azzera filtri</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:bg-gray-900">
+    <div class="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+      <h2 class="font-semibold dark:text-white">DDT registrati</h2>
+      <span class="text-sm text-gray-500">{{ totalCount }} documenti</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+          <tr>
+            <th>N° DDT</th><th>Data</th><th>Fornitore</th><th>Magazzino</th>
+            <th>Righe / Pezzi</th><th>Stato</th><th class="text-right">Azioni</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+          <tr *ngFor="let note of notes" class="dark:text-gray-200">
+            <td class="font-medium">{{ note.documentNumber || 'Da completare' }}</td>
+            <td>{{ note.documentDate | date:'dd/MM/yyyy':'UTC' }}</td>
+            <td>{{ note.supplierName }}</td>
+            <td>{{ note.warehouseName }}</td>
+            <td>{{ note.lineCount }} / {{ note.pieceCount }}</td>
+            <td><span class="badge" [ngClass]="badgeClass(note.status)">{{ labels[note.status] }}</span></td>
+            <td class="text-right">
+              <a class="action inline-block" [routerLink]="['/acquisti/ddt-fornitore', note.id]">
+                {{ note.status === 'Draft' || note.status === 'Parsed' ? 'Modifica' : 'Apri' }}
+              </a>
+            </td>
+          </tr>
+          <tr *ngIf="!notes.length">
+            <td colspan="7" class="px-4 py-12 text-center text-gray-500">
+              {{ busy ? 'Caricamento DDT...' : 'Nessun documento trovato con i filtri selezionati.' }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <footer class="flex items-center justify-between border-t border-gray-100 px-5 py-4 dark:border-gray-800">
+      <span class="text-sm text-gray-500">Pagina {{ page }} di {{ totalPages || 1 }}</span>
+      <div class="flex gap-2">
+        <button class="action" type="button" (click)="changePage(-1)" [disabled]="page <= 1 || busy">Precedente</button>
+        <button class="action" type="button" (click)="changePage(1)" [disabled]="page >= totalPages || busy">Successiva</button>
+      </div>
+    </footer>
+  </section>
+</div>

@@ -32,7 +32,9 @@ public class ContactService(
             request.IsAgent,
             request.Status,
             request.SortBy,
-            request.SortDescending);
+            request.SortDescending,
+            request.AssignedAgentId,
+            request.HasAssignedAgent);
 
         var dtos = ContactMapper.MapToSummaryList(items);
         return OperationResult<PagedResult<ContactSummaryDto>>.Ok(
@@ -53,6 +55,9 @@ public class ContactService(
         var validation = createValidator.Validate(request);
         if (!validation.IsValid)
             return OperationResult<ContactDetailDto>.Fail(JoinErrors(validation));
+        var agentError = await ValidateAssignedAgentAsync(request.CustomerProfile?.DefaultAgentId);
+        if (agentError is not null)
+            return OperationResult<ContactDetailDto>.Fail(agentError);
         if (request.CustomerProfile?.PriceListId is Guid priceListId &&
             await priceLists.GetAsync(priceListId, CancellationToken.None) is null)
             return OperationResult<ContactDetailDto>.Fail("Listino cliente non trovato.");
@@ -104,6 +109,16 @@ public class ContactService(
         var validation = updateValidator.Validate(request);
         if (!validation.IsValid)
             return OperationResult<ContactDetailDto>.Fail(JoinErrors(validation));
+        if (!request.DisableCustomer)
+        {
+            var agentError = await ValidateAssignedAgentAsync(request.CustomerProfile?.DefaultAgentId);
+            if (agentError is not null)
+                return OperationResult<ContactDetailDto>.Fail(agentError);
+        }
+        if (request.DisableAgent &&
+            await unitOfWork.Contacts.CountCustomersAssignedToAgentAsync(id) > 0)
+            return OperationResult<ContactDetailDto>.Fail(
+                "Rimuovere i clienti associati prima di disabilitare il ruolo Agente.");
         if (!request.DisableCustomer && request.CustomerProfile?.PriceListId is Guid priceListId &&
             await priceLists.GetAsync(priceListId, CancellationToken.None) is null)
             return OperationResult<ContactDetailDto>.Fail("Listino cliente non trovato.");
@@ -190,6 +205,9 @@ public class ContactService(
         var contact = await unitOfWork.Contacts.GetByIdAsync(id);
         if (contact is null)
             return OperationResult<bool>.Fail("Contact not found");
+        if (await unitOfWork.Contacts.CountCustomersAssignedToAgentAsync(id) > 0)
+            return OperationResult<bool>.Fail(
+                "Rimuovere i clienti associati prima di eliminare l'agente.");
 
         contact.SoftDelete();
         await unitOfWork.Contacts.UpdateAsync(contact);
@@ -205,6 +223,39 @@ public class ContactService(
         }
 
         return OperationResult<bool>.Ok(true);
+    }
+
+    public async Task<OperationResult<bool>> AssignCustomerToAgentAsync(Guid agentId, Guid customerId)
+    {
+        var agent = await unitOfWork.Contacts.GetByIdWithDetailsAsync(agentId);
+        if (agent?.AgentProfile is null)
+            return OperationResult<bool>.Fail("Agente non trovato o non abilitato.");
+
+        var customer = await unitOfWork.Contacts.GetByIdWithDetailsAsync(customerId);
+        if (customer?.CustomerProfile is null)
+            return OperationResult<bool>.Fail("Cliente non trovato o non abilitato.");
+
+        if (customer.CustomerProfile.DefaultAgentId is Guid currentAgentId && currentAgentId != agentId)
+            return OperationResult<bool>.Fail("Il cliente è già assegnato a un altro agente.");
+
+        if (customer.CustomerProfile.DefaultAgentId == agentId)
+            return OperationResult<bool>.Ok(true);
+
+        customer.CustomerProfile.DefaultAgentId = agentId;
+        return await SaveAgentAssignmentAsync(customer, customerId);
+    }
+
+    public async Task<OperationResult<bool>> RemoveCustomerFromAgentAsync(Guid agentId, Guid customerId)
+    {
+        var customer = await unitOfWork.Contacts.GetByIdWithDetailsAsync(customerId);
+        if (customer?.CustomerProfile is null)
+            return OperationResult<bool>.Fail("Cliente non trovato o non abilitato.");
+
+        if (customer.CustomerProfile.DefaultAgentId != agentId)
+            return OperationResult<bool>.Fail("Il cliente non è assegnato a questo agente.");
+
+        customer.CustomerProfile.DefaultAgentId = null;
+        return await SaveAgentAssignmentAsync(customer, customerId);
     }
 
     public async Task<OperationResult<bool>> ToggleBlockCustomerAsync(Guid contactId, bool isBlocked, string? reason)
@@ -234,6 +285,33 @@ public class ContactService(
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private async Task<string?> ValidateAssignedAgentAsync(Guid? agentId)
+    {
+        if (agentId is not Guid id)
+            return null;
+
+        var agent = await unitOfWork.Contacts.GetByIdWithDetailsAsync(id);
+        return agent?.AgentProfile is null
+            ? "L'agente selezionato non esiste o non è abilitato come agente."
+            : null;
+    }
+
+    private async Task<OperationResult<bool>> SaveAgentAssignmentAsync(Contact customer, Guid customerId)
+    {
+        await unitOfWork.Contacts.UpdateAsync(customer);
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+            logger.LogInformation("Customer {CustomerId} agent assignment updated", customerId);
+        }
+        catch (ConcurrencyException ex)
+        {
+            return OperationResult<bool>.Fail(ex.Message);
+        }
+
+        return OperationResult<bool>.Ok(true);
+    }
 
     private static void ApplyProfiles(
         Contact contact,

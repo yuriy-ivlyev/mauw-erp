@@ -26,7 +26,7 @@ public static class ProductMapper
             Id: product.Id,
             SupplierId: product.SupplierId,
             SupplierCode: product.SupplierCode,
-            InternalCode: product.InternalCode,
+            Barcode: product.Barcode,
             Name: product.Name,
             SellingPrice: product.HasVariants ? null : product.SellingPrice,
             VatRate: product.VatRate,
@@ -59,7 +59,7 @@ public static class ProductMapper
             SizeId: variant.SizeId,
             Color: variant.Color?.Name,
             Size: variant.Size?.Name,
-            Barcode: variant.Barcode,
+            Barcode: product.HasVariants ? variant.Barcode : product.Barcode,
             PurchaseCost: variant.PurchaseCost,
             StockQuantity: 0,
             ListPrice: price,
@@ -68,7 +68,8 @@ public static class ProductMapper
             FinalGrossPrice: price,
             WeightGrams: variant.WeightGrams,
             SellingPrice: variant.SellingPrice,
-            VarianteVetrina: variant.VarianteVetrina
+            VarianteVetrina: variant.VarianteVetrina,
+            SupplierCode: variant.SupplierCode
         ));
     }
 
@@ -80,7 +81,7 @@ public static class ProductMapper
         var price = pricing.Data!.Value;
 
         return OperationResult<BarcodeVariantDto>.Ok(new(
-            Barcode: variant.Barcode,
+            Barcode: product.HasVariants ? variant.Barcode : product.Barcode,
             VariantId: variant.Id,
             ProductId: variant.ProductId,
             ProductName: product.Name,

@@ -7,7 +7,7 @@ public record ProductDto(
     Guid Id,
     Guid SupplierId,
     string SupplierCode,
-    string InternalCode,
+    string Barcode,
     string Name,
     decimal? SellingPrice,
     decimal VatRate,

@@ -52,6 +52,8 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.UpdatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+        builder.HasQueryFilter(o => !o.Contact.IsDeleted);
+
         // Relationships
         builder.HasOne(o => o.Contact)
             .WithMany(c => c.Orders)

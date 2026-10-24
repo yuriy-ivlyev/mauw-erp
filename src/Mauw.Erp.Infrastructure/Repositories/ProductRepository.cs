@@ -21,12 +21,12 @@ public class ProductRepository(MauwDbContext dbContext) : Repository<Product, Gu
             .FirstOrDefaultAsync(p => p.Id == id);
     }
 
-    public async Task<Product?> GetByInternalCodeAsync(string internalCode)
+    public async Task<Product?> GetByBarcodeAsync(string barcode)
     {
         return await _dbSet
             .Include(p => p.Variants)
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.InternalCode == internalCode);
+            .FirstOrDefaultAsync(p => p.Barcode == barcode);
     }
 
     public async Task<IEnumerable<Product>> GetPaginatedAsync(
@@ -39,12 +39,12 @@ public class ProductRepository(MauwDbContext dbContext) : Repository<Product, Gu
         if (!string.IsNullOrEmpty(search))
         {
             var searchLower = search.ToLower();
-            query = query.Where(p => p.Name.ToLower().Contains(searchLower) || p.InternalCode.ToLower().Contains(searchLower));
+            query = query.Where(p => p.Name.ToLower().Contains(searchLower) || p.Barcode.ToLower().Contains(searchLower));
         }
 
         var orderedQuery = sortBy?.ToLowerInvariant() switch
         {
-            "internalcode" => sortDescending ? query.OrderByDescending(p => p.InternalCode) : query.OrderBy(p => p.InternalCode),
+            "barcode" or "internalcode" => sortDescending ? query.OrderByDescending(p => p.Barcode) : query.OrderBy(p => p.Barcode),
             "suppliercode" => sortDescending ? query.OrderByDescending(p => p.SupplierCode) : query.OrderBy(p => p.SupplierCode),
             "variants" => sortDescending ? query.OrderByDescending(p => p.Variants.Count) : query.OrderBy(p => p.Variants.Count),
             "purchasecost" => sortDescending
@@ -71,7 +71,7 @@ public class ProductRepository(MauwDbContext dbContext) : Repository<Product, Gu
         if (!string.IsNullOrEmpty(search))
         {
             var searchLower = search.ToLower();
-            query = query.Where(p => p.Name.ToLower().Contains(searchLower) || p.InternalCode.ToLower().Contains(searchLower));
+            query = query.Where(p => p.Name.ToLower().Contains(searchLower) || p.Barcode.ToLower().Contains(searchLower));
         }
 
         return await query.CountAsync();
@@ -89,7 +89,7 @@ public class ProductRepository(MauwDbContext dbContext) : Repository<Product, Gu
             .Where(p =>
                 p.Name.ToLower().Contains(term) ||
                 p.SupplierCode.ToLower().Contains(term) ||
-                p.InternalCode.ToLower().Contains(term))
+                p.Barcode.ToLower().Contains(term))
             .OrderBy(p => p.Name)
             .Take(limit)
             .ToListAsync();

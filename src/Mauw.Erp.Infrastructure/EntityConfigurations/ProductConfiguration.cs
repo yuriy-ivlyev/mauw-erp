@@ -18,7 +18,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .IsRequired()
             .HasMaxLength(100);
 
-        builder.Property(p => p.InternalCode)
+        builder.Property(p => p.Barcode)
             .IsRequired()
             .HasMaxLength(100);
 
@@ -63,8 +63,8 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasForeignKey(p => p.MaterialId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        // Unique index for InternalCode
-        builder.HasIndex(p => p.InternalCode)
+        // Product barcodes are unique across the catalog.
+        builder.HasIndex(p => p.Barcode)
             .IsUnique();
 
         // Unique index for SupplierCode per Supplier

@@ -29,7 +29,7 @@ import {
 
       <div class="mb-6">
         <input [(ngModel)]="searchTerm" (keyup.enter)="search()" type="text"
-          placeholder="Cerca per nome o codice interno..."
+          placeholder="Cerca per nome o barcode..."
           class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </div>
 
@@ -38,7 +38,7 @@ import {
           <thead class="bg-gray-100 border-b">
             <tr>
               <th class="px-4 py-3 text-left text-sm font-semibold w-20">Img</th>
-              <th appSortHeader="internalCode" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold">Codice</th>
+              <th appSortHeader="barcode" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold">Barcode</th>
               <th appSortHeader="name" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold">Nome Prodotto</th>
               <th appSortHeader="supplierCode" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold">Fornitore Codice</th>
               <th appSortHeader="variants" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold">Varianti</th>
@@ -66,7 +66,7 @@ import {
                 </div>
               </td>
 
-              <td class="px-6 py-3 text-sm">{{ product.internalCode }}</td>
+              <td class="px-6 py-3 text-sm">{{ product.barcode }}</td>
               <td class="px-6 py-3 text-sm">{{ product.name }}</td>
               <td class="px-6 py-3 text-sm">{{ product.supplierCode }}</td>
               <td class="px-6 py-3 text-sm">
@@ -149,8 +149,8 @@ import {
               </p>
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <label class="block text-sm font-medium mb-1">Codice Interno *</label>
-                  <input [(ngModel)]="formData.internalCode" type="text"
+                  <label class="block text-sm font-medium mb-1">Barcode *</label>
+                  <input [(ngModel)]="formData.barcode" type="text"
                     class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
@@ -232,6 +232,7 @@ import {
                       <tr>
                         <th class="px-4 py-3 text-left font-medium">Colore</th>
                         <th class="px-4 py-3 text-left font-medium">Taglia</th>
+                        <th class="px-4 py-3 text-left font-medium">Codice fornitore</th>
                         <th class="px-4 py-3 text-left font-medium">Barcode</th>
                         <th class="px-4 py-3 text-left font-medium">Costo Acquisto</th>
                         <th class="px-4 py-3 text-left font-medium">Peso (g)</th>
@@ -252,6 +253,7 @@ import {
                             </div>
                           </td>
                           <td class="px-4 py-3">{{ getSizeName(variant.sizeId) }}</td>
+                          <td class="px-4 py-3">{{ variant.supplierCode || '—' }}</td>
                           <td class="px-4 py-3">{{ variant.barcode }}</td>
                           <td class="px-4 py-3">
                             <div>Acquisto: &euro;{{ variant.purchaseCost.toFixed(2) }}</div>
@@ -294,6 +296,11 @@ import {
                                 {{ size.name }}
                               </option>
                             </select>
+                          </td>
+                          <td class="px-4 py-3">
+                            <input [(ngModel)]="editingVariantForm.supplierCode" type="text" maxlength="100"
+                              aria-label="Codice fornitore variante"
+                              class="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                           </td>
                           <td class="px-4 py-3">
                             <input [(ngModel)]="editingVariantForm.barcode" type="text"
@@ -364,6 +371,12 @@ import {
                         <option value="">-- Seleziona taglia --</option>
                         <option *ngFor="let size of sizes" [value]="size.id">{{ size.name }}</option>
                       </select>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium mb-1">Codice fornitore variante</label>
+                      <input [(ngModel)]="newVariantForm.supplierCode" type="text" maxlength="100"
+                        placeholder="Codice articolo indicato dal fornitore"
+                        class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div>
                       <label class="block text-sm font-medium mb-1">Barcode *</label>
@@ -545,7 +558,7 @@ export class ProdottiComponent implements OnInit, OnDestroy {
     return {
       supplierId: '',
       supplierCode: '',
-      internalCode: '',
+      barcode: '',
       name: '',
       sellingPrice: null,
       vatRate: 0,
@@ -558,6 +571,7 @@ export class ProdottiComponent implements OnInit, OnDestroy {
     return {
       colorId: '',
       sizeId: '',
+      supplierCode: '',
       barcode: '',
       purchaseCost: defaultPurchaseCost,
       sellingPrice,
@@ -637,7 +651,7 @@ export class ProdottiComponent implements OnInit, OnDestroy {
     this.formData = {
       supplierId: product.supplierId,
       supplierCode: product.supplierCode,
-      internalCode: product.internalCode,
+      barcode: product.barcode,
       name: product.name,
       sellingPrice: product.hasVariants ? null : product.sellingPrice,
       vatRate: product.vatRate,
@@ -686,8 +700,8 @@ export class ProdottiComponent implements OnInit, OnDestroy {
   saveProduct(): void {
     if (this.calculatingPrice) return;
     this.formError = null;
-    if (!this.formData.name || !this.formData.internalCode) {
-      this.formError = 'Completa i campi obbligatori (Nome e Codice Interno)';
+    if (!this.formData.name || !this.formData.barcode) {
+      this.formError = 'Completa i campi obbligatori (Nome e Barcode)';
       return;
     }
     if (this.formData.basePurchaseCost == null || this.formData.basePurchaseCost < 0) {
@@ -751,6 +765,7 @@ export class ProdottiComponent implements OnInit, OnDestroy {
       productId: this.editingProductId!,
       colorId: this.newVariantForm.colorId,
       sizeId: this.newVariantForm.sizeId,
+      supplierCode: this.newVariantForm.supplierCode.trim() || null,
       barcode: this.newVariantForm.barcode,
       purchaseCost: this.newVariantForm.purchaseCost,
       sellingPrice: this.newVariantForm.sellingPrice,
@@ -797,6 +812,7 @@ export class ProdottiComponent implements OnInit, OnDestroy {
     this.editingVariantForm = {
       colorId: variant.colorId || '',
       sizeId: variant.sizeId || '',
+      supplierCode: variant.supplierCode || '',
       barcode: variant.barcode,
       purchaseCost: variant.purchaseCost,
       sellingPrice: variant.sellingPrice,
@@ -815,6 +831,7 @@ export class ProdottiComponent implements OnInit, OnDestroy {
     const request = {
       colorId: this.editingVariantForm.colorId || null,
       sizeId: this.editingVariantForm.sizeId || null,
+      supplierCode: this.editingVariantForm.supplierCode.trim(),
       barcode: this.editingVariantForm.barcode,
       purchaseCost: this.editingVariantForm.purchaseCost,
       sellingPrice: this.editingVariantForm.sellingPrice,

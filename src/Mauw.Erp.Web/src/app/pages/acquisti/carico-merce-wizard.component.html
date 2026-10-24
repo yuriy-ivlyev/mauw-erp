@@ -1,0 +1,259 @@
+<div class="mx-auto max-w-7xl space-y-6 pb-28">
+  <header class="flex flex-wrap items-center gap-4">
+    <button type="button" class="action" (click)="goBack()" [disabled]="busy">← Torna all’elenco</button>
+    <div>
+      <p class="text-sm text-gray-500">Acquisti / DDT Fornitore</p>
+      <h1 class="text-2xl font-semibold dark:text-white">
+        {{ selected ? (selected.documentNumber ? 'DDT N° ' + selected.documentNumber : 'Completa DDT fornitore') : 'Nuovo Carico Fornitore' }}
+      </h1>
+    </div>
+  </header>
+
+  <p *ngIf="error" role="alert" class="rounded-lg bg-red-50 p-4 text-red-700">{{ error }}</p>
+  <p *ngIf="success" role="status" class="rounded-lg bg-green-50 p-4 text-green-700">{{ success }}</p>
+
+  <nav aria-label="Avanzamento carico" class="grid grid-cols-3 rounded-xl border border-gray-200 bg-white dark:bg-gray-900">
+    <button *ngFor="let step of [
+      { number: 1, title: 'Documento & Fornitore' },
+      { number: 2, title: 'Riconciliazione Righe & Articoli' },
+      { number: 3, title: 'Riepilogo & Conferma' }
+    ]" type="button" class="flex min-h-20 items-center gap-3 border-b-2 px-3 py-4 text-left transition sm:px-6"
+      [class.border-indigo-600]="activeStep === step.number"
+      [class.border-transparent]="activeStep !== step.number"
+      [class.text-indigo-700]="activeStep === step.number"
+      [class.text-gray-500]="activeStep !== step.number"
+      [disabled]="busy || (step.number === 1 && !!selected) || (step.number === 2 && (!selected || !editable)) || (step.number === 3 && (!selected || dirty))"
+      (click)="activeStep = step.number">
+      <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border font-semibold"
+        [class.border-indigo-600]="activeStep === step.number"
+        [class.bg-indigo-600]="activeStep === step.number"
+        [class.text-white]="activeStep === step.number">{{ step.number }}</span>
+      <span class="text-xs font-semibold sm:text-sm">{{ step.title }}</span>
+    </button>
+  </nav>
+
+  <section *ngIf="activeStep === 1" class="rounded-xl border border-gray-200 bg-white p-6 dark:bg-gray-900">
+    <div class="mb-5">
+      <h2 class="text-lg font-semibold dark:text-white">Documento & Fornitore</h2>
+      <p class="mt-1 text-sm text-gray-500">Seleziona il fornitore e il magazzino, quindi archivia il DDT originale.</p>
+    </div>
+    <form (ngSubmit)="upload()" class="space-y-5">
+      <fieldset [disabled]="busy" class="grid gap-5 md:grid-cols-2">
+        <label class="dark:text-white">Cerca fornitore
+          <div class="mt-1 flex gap-2">
+            <input name="supplierSearch" [(ngModel)]="supplierSearch" placeholder="Ragione sociale" />
+            <button class="action shrink-0" type="button" (click)="searchSuppliers()">Cerca</button>
+          </div>
+        </label>
+        <label class="dark:text-white">Fornitore
+          <select name="supplierId" [(ngModel)]="supplierId" (ngModelChange)="supplierChanged()" required>
+            <option value="">Seleziona fornitore</option>
+            <option *ngFor="let supplier of suppliers" [value]="supplier.id">{{ supplier.businessName }}</option>
+          </select>
+        </label>
+        <label class="dark:text-white">Ordine fornitore (facoltativo)
+          <select name="purchaseOrderId" [(ngModel)]="purchaseOrderId" (ngModelChange)="syncSupplierFromOrder()">
+            <option value="">Carico non collegato a ordine</option>
+            <option *ngFor="let order of purchaseOrders" [hidden]="supplierId && order.supplierId !== supplierId"
+              [value]="order.id">{{ order.orderNumber }} · {{ order.supplierName }}</option>
+          </select>
+        </label>
+        <label class="dark:text-white">Magazzino di destinazione
+          <select name="warehouseId" [(ngModel)]="warehouseId" required>
+            <option value="">Seleziona magazzino</option>
+            <option *ngFor="let warehouse of warehouses" [value]="warehouse.id">{{ warehouse.code }} - {{ warehouse.name }}</option>
+          </select>
+        </label>
+        <label class="dark:text-white">Numero DDT
+          <input name="documentNumber" [(ngModel)]="documentNumber" maxlength="100" placeholder="Facoltativo se non presente sul documento" />
+        </label>
+        <label class="dark:text-white">Data del DDT
+          <input type="date" name="documentDate" [(ngModel)]="documentDate" required />
+        </label>
+        <label class="dark:text-white">Documento originale
+          <input type="file" accept="application/pdf,image/png,image/jpeg" (change)="chooseFile($event)" required />
+          <span class="mt-1 block text-xs text-gray-500">PDF, PNG o JPEG · massimo 20 MB</span>
+        </label>
+      </fieldset>
+    </form>
+  </section>
+
+  <section *ngIf="activeStep === 2 && selected as note" class="grid items-start gap-5 xl:grid-cols-12">
+    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:bg-gray-900 xl:col-span-9">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+        <div>
+          <h2 class="font-semibold dark:text-white">Riconciliazione righe e articoli</h2>
+          <p class="text-sm text-gray-500">{{ note.supplierName }} · {{ note.warehouseName }} · {{ labels[note.status] }}</p>
+        </div>
+        <button class="action" type="button" (click)="download()" [disabled]="busy">Scarica originale</button>
+      </div>
+      <div class="grid gap-4 border-b border-gray-100 p-5 dark:border-gray-800 md:grid-cols-2">
+        <label class="dark:text-white">Numero DDT
+          <input [(ngModel)]="note.documentNumber" (ngModelChange)="dirty = true" [disabled]="!editable || busy" maxlength="100" />
+        </label>
+        <label class="dark:text-white">Data DDT
+          <input type="date" [ngModel]="note.documentDate.slice(0, 10)"
+            (ngModelChange)="note.documentDate = $event + 'T00:00:00Z'; dirty = true" [disabled]="!editable || busy" />
+        </label>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[850px] text-sm">
+          <thead class="bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+            <tr><th>Codice prodotto fornitore</th><th>Descrizione</th><th>Quantità (pezzi)</th><th>Costo unitario</th><th>Associazione articolo</th><th></th></tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+            <tr *ngFor="let line of note.lines; let i = index">
+              <td>
+                <div class="flex items-center gap-2">
+                  <input [(ngModel)]="line.supplierItemCode" (ngModelChange)="supplierCodeChanged(line)"
+                    (keydown.enter)="$event.preventDefault(); findArticle(line)"
+                    [disabled]="!editable || busy" maxlength="100" aria-label="Codice prodotto fornitore" />
+                  <button *ngIf="editable" class="action shrink-0" type="button" (click)="findArticle(line)"
+                    [disabled]="busy || !line.supplierItemCode.trim()" aria-label="Cerca per codice prodotto fornitore">Cerca</button>
+                </div>
+              </td>
+              <td><input [(ngModel)]="line.description" (ngModelChange)="dirty = true" [disabled]="!editable || busy" maxlength="1000" aria-label="Descrizione" /></td>
+              <td><input type="number" min="1" max="2147483647" step="1" [(ngModel)]="line.quantity" (ngModelChange)="dirty = true" [disabled]="!editable || busy" aria-label="Quantità intera" /></td>
+              <td><input type="text" inputmode="decimal" [(ngModel)]="line.unitPrice" (ngModelChange)="dirty = true" [disabled]="!editable || busy" aria-label="Costo unitario" /></td>
+              <td>
+                <span class="text-xs" [class.text-green-700]="line.lineStatus === 'Matched'" [class.text-amber-700]="line.lineStatus !== 'Matched'">
+                  {{ labels[line.lineStatus] }}
+                </span>
+                <small *ngIf="line.articleVariantId" class="block truncate text-gray-500">
+                  {{ line.articleDescription || 'Articolo associato' }}
+                </small>
+                <button *ngIf="editable" class="action mt-1" type="button"
+                  (click)="matchingLine = line; variants = []; variantQuery = ''" [disabled]="busy">
+                  {{ line.articleVariantId ? 'Modifica associazione' : 'Associa variante' }}
+                </button>
+                <small *ngIf="line.stockMovementId" class="block">Movimento: {{ line.stockMovementId }}</small>
+              </td>
+              <td>
+                <button *ngIf="editable" type="button" (click)="removeLine(i)" [disabled]="busy"
+                  class="rounded-md border border-red-200 bg-red-50 p-2 text-red-600 transition-colors hover:bg-red-100 hover:text-red-700"
+                  [attr.aria-label]="'Rimuovi riga ' + (i + 1)" title="Rimuovi riga">
+                  <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M4 7h16m-10 0V5a2 2 0 012-2h2a2 2 0 012 2v2" />
+                  </svg>
+                </button>
+              </td>
+            </tr>
+            <tr *ngIf="!note.lines.length"><td colspan="6" class="px-4 py-10 text-center text-gray-500">Aggiungi una riga manualmente o importa il risultato OCR/IA.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <fieldset *ngIf="matchingLine && editable" [disabled]="busy" class="m-5 space-y-3 rounded-lg border border-indigo-200 p-4">
+        <h3 class="font-semibold">Associa: {{ matchingLine.description }}</h3>
+        <p class="text-sm text-gray-500">Seleziona una variante esistente o crea prima l’articolo nel catalogo.</p>
+        <a routerLink="/magazzino/prodotti" target="_blank" rel="noopener" class="text-indigo-600 underline">Apri catalogo prodotti</a>
+        <div class="flex gap-2">
+          <input [(ngModel)]="variantQuery" placeholder="Nome, barcode, colore o taglia" aria-label="Ricerca variante" />
+          <button class="action" type="button" (click)="searchVariants()">Cerca</button>
+          <button class="action" type="button" (click)="matchingLine = null">Chiudi</button>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button *ngFor="let variant of variants" class="action" type="button" (click)="match(variant)">
+            {{ variant.productName }} - {{ variant.colorName }} / {{ variant.sizeName }} - {{ variant.barcode }}
+          </button>
+        </div>
+      </fieldset>
+
+      <div *ngIf="editable" class="flex flex-wrap items-center gap-3 border-t border-gray-100 p-5 dark:border-gray-800">
+        <button class="action" type="button" (click)="addLine()" [disabled]="busy">Aggiungi riga</button>
+        <span *ngIf="dirty" class="text-sm text-amber-700">Modifiche non salvate</span>
+      </div>
+      <details *ngIf="editable" class="border-t border-gray-100 px-5 py-4 dark:border-gray-800">
+        <summary class="cursor-pointer font-medium">Importa dati estratti da OCR / IA</summary>
+        <p class="my-2 text-sm text-gray-500">Incolla il payload strutturato. Sostituisce tutte le righe; il documento non viene inviato automaticamente a servizi esterni.</p>
+        <textarea rows="5" [(ngModel)]="ocrJson" [disabled]="busy"
+          placeholder='{"documentNumber":"DDT-123","lines":[{"supplierItemCode":"MAGLIA-BLU-M","description":"Maglia blu M","quantity":5,"unitPrice":"12.34567890"}]}'></textarea>
+        <button class="action mt-2" type="button" (click)="importOcr()" [disabled]="busy || !ocrJson.trim()">Importa righe</button>
+      </details>
+    </div>
+
+    <aside class="space-y-4 rounded-xl border border-gray-200 bg-white p-5 dark:bg-gray-900 xl:sticky xl:top-6 xl:col-span-3">
+      <div>
+        <h2 class="font-semibold dark:text-white">Documento originale</h2>
+        <p class="mt-1 break-all text-xs text-gray-500">{{ note.filePath }}</p>
+      </div>
+      <div class="overflow-hidden rounded-lg bg-gray-50 dark:bg-gray-800">
+        <iframe *ngIf="documentPreview" [src]="documentPreview" title="Anteprima documento fornitore"
+          class="h-[34rem] w-full border-0"></iframe>
+        <div *ngIf="!documentPreview" class="flex min-h-52 items-center justify-center p-4 text-center">
+          <div>
+          <span class="text-4xl" aria-hidden="true">▤</span>
+            <p class="mt-2 text-sm text-gray-500">{{ previewLoading ? 'Caricamento anteprima...' : 'Anteprima non disponibile' }}</p>
+          </div>
+        </div>
+      </div>
+      <button class="action w-full" type="button" (click)="download()" [disabled]="busy">Apri / scarica documento</button>
+      <dl class="space-y-2 border-t pt-4 text-sm">
+        <div class="flex justify-between gap-2"><dt class="text-gray-500">Fornitore</dt><dd class="text-right">{{ note.supplierName }}</dd></div>
+        <div class="flex justify-between gap-2"><dt class="text-gray-500">Magazzino</dt><dd class="text-right">{{ note.warehouseName }}</dd></div>
+        <div class="flex justify-between gap-2"><dt class="text-gray-500">Righe / pezzi</dt><dd>{{ note.lines.length }} / {{ pieceCount() }}</dd></div>
+      </dl>
+    </aside>
+  </section>
+
+  <section *ngIf="activeStep === 3 && selected as note" class="space-y-5">
+    <div class="rounded-xl border border-gray-200 bg-white p-6 dark:bg-gray-900">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div><h2 class="text-lg font-semibold dark:text-white">Riepilogo del carico</h2><p class="text-sm text-gray-500">Verifica il DDT prima della registrazione in magazzino.</p></div>
+        <span class="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium">{{ labels[note.status] }}</span>
+      </div>
+      <dl class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div><dt class="text-sm text-gray-500">N° DDT</dt><dd class="mt-1 font-medium dark:text-white">{{ note.documentNumber }}</dd></div>
+        <div><dt class="text-sm text-gray-500">Data</dt><dd class="mt-1 font-medium dark:text-white">{{ note.documentDate | date:'dd/MM/yyyy':'UTC' }}</dd></div>
+        <div><dt class="text-sm text-gray-500">Fornitore</dt><dd class="mt-1 font-medium dark:text-white">{{ note.supplierName }}</dd></div>
+        <div><dt class="text-sm text-gray-500">Magazzino</dt><dd class="mt-1 font-medium dark:text-white">{{ note.warehouseName }}</dd></div>
+      </dl>
+    </div>
+    <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:bg-gray-900">
+      <table class="w-full min-w-[650px] text-sm">
+        <thead class="bg-gray-50 dark:bg-gray-800"><tr><th class="p-4 text-left">Codice</th><th class="p-4 text-left">Descrizione</th><th class="p-4 text-right">Pezzi</th><th class="p-4 text-right">Costo unitario</th><th class="p-4 text-left">Associazione</th></tr></thead>
+        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+          <tr *ngFor="let line of note.lines">
+            <td class="p-4">{{ line.supplierItemCode || '—' }}</td><td class="p-4">{{ line.description }}</td>
+            <td class="p-4 text-right">{{ line.quantity }}</td><td class="p-4 text-right">{{ line.unitPrice }}</td>
+            <td class="p-4">{{ labels[line.lineStatus] }}<small *ngIf="line.stockMovementId" class="block text-gray-500">Mov. {{ line.stockMovementId }}</small></td>
+          </tr>
+          <tr *ngIf="!note.lines.length"><td colspan="5" class="p-8 text-center text-gray-500">Nessuna riga presente.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p *ngIf="editable" class="rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
+      La conferma aggiorna in un’unica transazione la giacenza e i movimenti di tutte le righe. Il documento confermato non sarà più modificabile.
+    </p>
+  </section>
+
+  <footer class="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white/95 px-4 py-4 shadow-lg backdrop-blur dark:border-gray-800 dark:bg-gray-950/95">
+    <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
+      <button class="action" type="button" (click)="goBack()" [disabled]="busy">Annulla</button>
+      <div class="flex flex-wrap gap-2">
+        <button *ngIf="activeStep === 1 && !selected" class="action primary" type="button" (click)="upload()" [disabled]="busy">
+          {{ busy ? 'Caricamento...' : 'Carica documento' }}
+        </button>
+        <ng-container *ngIf="activeStep === 2 && editable">
+          <button class="action" type="button" (click)="previousStep()" [disabled]="busy">Indietro</button>
+          <button class="action" type="button" (click)="save()" [disabled]="busy">Salva bozza</button>
+          <button class="action primary" type="button" (click)="review()" [disabled]="busy">Avanti · Riepilogo</button>
+        </ng-container>
+        <ng-container *ngIf="activeStep === 3 && editable">
+          <button class="action" type="button" (click)="previousStep()" [disabled]="busy">Indietro</button>
+          <button class="action" type="button" (click)="save()" [disabled]="busy">Salva bozza</button>
+          <button class="action primary" type="button" (click)="action('confirm')" [disabled]="busy || !canConfirm">Conferma carico</button>
+        </ng-container>
+        <a *ngIf="selected && !editable" routerLink="/acquisti/ddt-fornitore" class="action">Torna all’elenco</a>
+      </div>
+    </div>
+  </footer>
+  <app-confirm-delete-modal
+    [isOpen]="deleteConfirmationOpen"
+    title="Rimuovi riga"
+    message="La riga verrà rimossa dalla bozza al prossimo salvataggio. Continuare?"
+    (confirmed)="confirmRemoveLine()"
+    (cancelled)="cancelRemoveLine()">
+  </app-confirm-delete-modal>
+</div>

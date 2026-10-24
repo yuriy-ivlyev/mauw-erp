@@ -10,7 +10,7 @@ public interface IProductVariantRepository : IRepository<ProductVariant, Guid>
     Task<ProductVariant?> GetByBarcodeAsync(string barcode);
 
     /// <summary>
-    /// Ricerca full-text varianti per barcode, nome prodotto, colore o taglia.
+    /// Ricerca varianti per codice, nome prodotto, colore o taglia; per gli articoli semplici usa il barcode del prodotto.
     /// </summary>
-    Task<IEnumerable<ProductVariant>> SearchAsync(string query, int limit = 10);
+    Task<IEnumerable<ProductVariant>> SearchAsync(string query, int limit = 10, Guid? supplierId = null);
 }

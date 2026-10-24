@@ -24,6 +24,9 @@ services:
     image: otel/opentelemetry-collector-contrib:latest
     container_name: mauw-erp-otel-collector
     command: ["--config=/etc/otel/config.yaml"]
+    environment:
+      GRAFANA_CLOUD_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:?definire OTEL_EXPORTER_OTLP_ENDPOINT in .env}
+      GRAFANA_CLOUD_AUTHORIZATION: ${GRAFANA_CLOUD_AUTHORIZATION:?definire GRAFANA_CLOUD_AUTHORIZATION in .env}
     volumes:
       - ./otel-collector-config.yaml:/etc/otel/config.yaml:ro
     ports:
@@ -93,7 +96,7 @@ services:
       ConnectionStrings__DefaultConnection: "${API_DB_CONNECTION:-Host=postgres;Database=mauw_erp;Username=postgres;Password=postgres;Port=5432}"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
-      OTEL_SERVICE_NAME: mauw-erp-backend
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-mauw-erp-backend}
       AzureAd__ClientSecret: "${AZURE_CLIENT_SECRET}"
     # Nessuna porta pubblicata: l'API e' raggiungibile solo dalla rete interna (web -> api:8080)
     expose:

@@ -85,6 +85,8 @@ export interface ContactFilterParams extends PageSortParams {
   isCustomer?: boolean;
   isSupplier?: boolean;
   isAgent?: boolean;
+  assignedAgentId?: string;
+  hasAssignedAgent?: boolean;
   status?: string;
 }
 

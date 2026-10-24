@@ -24,12 +24,13 @@ using Microsoft.Extensions.Options;
 
 namespace Mauw.Erp.UnitTests.Application;
 
-public class PriceListEndpointTests
+[Collection(PostgreSqlTestCollection.Name)]
+public class PriceListEndpointTests(PostgreSqlContainerFixture postgres)
 {
     [Fact]
     public async Task VariantLookupAndRuleSelectionDoNotRequireAValidCatalogPrice()
     {
-        await using var fixture = await Fixture.CreateAsync(invalidCatalogPrice: true);
+        await using var fixture = await Fixture.CreateAsync(postgres, invalidCatalogPrice: true);
         using var client = fixture.CreateClient("Sales");
         var response = await client.GetAsync("/api/v1/products/variants/search?q=SKU");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -49,7 +50,7 @@ public class PriceListEndpointTests
     [Fact]
     public async Task MarkupIsATransientDecimalCalculationAndProductsOnlySaveTheFinalPrice()
     {
-        await using var fixture = await Fixture.CreateAsync();
+        await using var fixture = await Fixture.CreateAsync(postgres);
         using var client = fixture.CreateClient("Sales");
         var calculation = await client.PostAsJsonAsync("/api/v1/products/calculate-selling-price",
             new { purchaseCost = 0.00000005m, markupRate = 10m });
@@ -61,7 +62,7 @@ public class PriceListEndpointTests
             "/api/v1/products/calculate-selling-price", new { purchaseCost = 10m, markupRate = -1m })).StatusCode);
         var created = await client.PostAsJsonAsync("/api/v1/products", new
         {
-            supplierId = Guid.NewGuid(), supplierCode = "SUP", internalCode = "NEW",
+            supplierId = Guid.NewGuid(), supplierCode = "SUP", barcode = "NEW",
             name = "Nuovo", sellingPrice = 18.12345678m, vatRate = 22m,
             basePurchaseCost = 10m, hasVariants = false
         });
@@ -79,7 +80,7 @@ public class PriceListEndpointTests
     [InlineData(true)]
     public async Task CatalogEndpointsPreserveFixedPricesAndExplicitlyReportInvalidStoredPricing(bool invalidCatalogPrice)
     {
-        await using var fixture = await Fixture.CreateAsync(invalidCatalogPrice);
+        await using var fixture = await Fixture.CreateAsync(postgres, invalidCatalogPrice);
         using var client = fixture.CreateClient("Sales");
         var barcode = await client.GetAsync("/api/v1/products/barcode/SKU");
         var expected = invalidCatalogPrice ? HttpStatusCode.BadRequest : HttpStatusCode.OK;
@@ -104,7 +105,7 @@ public class PriceListEndpointTests
     [Fact]
     public async Task HttpCrudAndBatchResolutionReturnDocumentedShapesAndStatuses()
     {
-        await using var fixture = await Fixture.CreateAsync();
+        await using var fixture = await Fixture.CreateAsync(postgres);
         using var client = fixture.CreateClient("Sales");
         var created = await client.PostAsJsonAsync("/api/v1/price-lists", new
         {
@@ -153,7 +154,7 @@ public class PriceListEndpointTests
     [InlineData("Cashier", 403)]
     public async Task ConfigurationRequiresAuthorizedSalesRole(string? role, int status)
     {
-        await using var fixture = await Fixture.CreateAsync();
+        await using var fixture = await Fixture.CreateAsync(postgres);
         using var client = fixture.CreateClient(role);
         var response = await client.PostAsJsonAsync("/api/v1/price-lists", new { name = "Test", rules = Array.Empty<object>() });
         Assert.Equal(status, (int)response.StatusCode);
@@ -162,7 +163,7 @@ public class PriceListEndpointTests
     [Fact]
     public async Task InvalidInputReturnsProblemDetailsAndReadAccessWorksForCashier()
     {
-        await using var fixture = await Fixture.CreateAsync();
+        await using var fixture = await Fixture.CreateAsync(postgres);
         using var sales = fixture.CreateClient("Sales");
         var response = await sales.PostAsJsonAsync("/api/v1/price-lists", new { name = "Test", currency = "USD", rules = Array.Empty<object>() });
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -179,7 +180,7 @@ public class PriceListEndpointTests
     [Fact]
     public async Task OpenApiIncludesAllPriceListOperationsAndStringCalculationTypes()
     {
-        await using var fixture = await Fixture.CreateAsync();
+        await using var fixture = await Fixture.CreateAsync(postgres);
         using var client = fixture.CreateClient(null);
         var response = await client.GetAsync("/swagger/v1/swagger.json");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -205,13 +206,16 @@ public class PriceListEndpointTests
         public Guid VariantId { get; } = variantId;
         public Guid ProductId { get; } = productId;
 
-        public static async Task<Fixture> CreateAsync(bool invalidCatalogPrice = false)
+        public static async Task<Fixture> CreateAsync(
+            PostgreSqlContainerFixture postgres,
+            bool invalidCatalogPrice = false)
         {
             var builder = WebApplication.CreateBuilder();
             builder.Logging.ClearProviders();
             builder.WebHost.ConfigureKestrel(options => options.Listen(IPAddress.Loopback, 0));
-            var databaseName = Guid.NewGuid().ToString();
-            builder.Services.AddDbContext<MauwDbContext>(options => options.UseInMemoryDatabase(databaseName));
+            await using var database = postgres.CreateDbContext();
+            var connectionString = database.Database.GetConnectionString()!;
+            builder.Services.AddDbContext<MauwDbContext>(options => options.UseNpgsql(connectionString));
             builder.Services.AddPricingApi();
             builder.Services.AddApplicationServices();
             builder.Services.AddMemoryCache();
@@ -238,7 +242,7 @@ public class PriceListEndpointTests
                 var db = scope.ServiceProvider.GetRequiredService<MauwDbContext>();
                 var product = new Product(Guid.NewGuid(), "S", "P", "Test", 0m, 22m, 10m);
                 db.Add(product);
-                var variant = new ProductVariant(product.Id, "SKU", 10m)
+                var variant = new ProductVariant(product.Id, "SKU", 10m, product.SupplierId)
                 {
                     Product = product, SellingPrice = invalidCatalogPrice ? -1m : 17.12345678m
                 };

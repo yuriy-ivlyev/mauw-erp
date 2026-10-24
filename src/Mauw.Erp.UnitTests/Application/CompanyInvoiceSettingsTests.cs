@@ -19,14 +19,14 @@ using Moq;
 
 namespace Mauw.Erp.UnitTests.Application;
 
-public class CompanyInvoiceSettingsTests
+[Collection(PostgreSqlTestCollection.Name)]
+public class CompanyInvoiceSettingsTests(PostgreSqlContainerFixture postgres)
 {
     private const string Notes = "La merce viaggia con regolare imballaggio originale e identificativi barcode/SKU " +
         "per showroom/negozio. Trascorsi 8 giorni dalla ricezione merce non si accettano resi o contestazioni " +
         "su differenze taglia o capo non conforme.";
 
-    private static MauwDbContext CreateDb() => new(new DbContextOptionsBuilder<MauwDbContext>()
-        .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+    private MauwDbContext CreateDb() => postgres.CreateDbContext();
 
     private static UpdateCompanySettingsRequest Request() => new()
     {
@@ -153,7 +153,7 @@ public class CompanyInvoiceSettingsTests
         customer.CustomerProfile!.DefaultAgentId = hasAgent ? agent.Id : null;
         var product = new Product(Guid.NewGuid(), "SUP", "SKU", "Articolo", 0m, 22m, 10m);
         db.Add(product);
-        var variant = new ProductVariant(product.Id, "123", 10.00m);
+        var variant = new ProductVariant(product.Id, "123", 10.00m, product.SupplierId);
         db.Add(variant);
         var invoice = new Invoice(customer.Id, "F-1");
         invoice.Items.Add(new(invoice.Id, variant.Id, 1, 10.00m, 22m));

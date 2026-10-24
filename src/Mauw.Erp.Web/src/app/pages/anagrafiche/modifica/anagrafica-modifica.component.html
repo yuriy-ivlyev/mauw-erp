@@ -311,6 +311,27 @@
         Abilita il ruolo Cliente per configurare questa sezione.
       </div>
       <div *ngIf="hasCustomer" formGroupName="customer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Agente associato</label>
+          <div class="flex gap-2">
+            <input [(ngModel)]="agentSearchTerm" [ngModelOptions]="{standalone: true}" type="search"
+              (keyup.enter)="loadAgentOptions(form.get('customer.defaultAgentId')?.value)"
+              placeholder="Cerca agente per nome, P.IVA o codice fiscale"
+              class="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+            <button type="button" (click)="loadAgentOptions(form.get('customer.defaultAgentId')?.value)"
+              [disabled]="agentOptionsLoading"
+              class="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50">
+              {{ agentOptionsLoading ? 'Ricerca…' : 'Cerca' }}
+            </button>
+          </div>
+          <select formControlName="defaultAgentId"
+            class="mt-2 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+            <option [ngValue]="null">Nessun agente</option>
+            <option *ngFor="let agent of agents" [ngValue]="agent.id">{{ agent.businessName }}</option>
+          </select>
+          <p *ngIf="agentOptionsError" role="alert" class="mt-1 text-sm text-red-600">{{ agentOptionsError }}</p>
+        </div>
+
         <div>
           <label class="block text-sm font-medium mb-1" for="customer-price-list">Listino predefinito</label>
           <select id="customer-price-list" formControlName="priceListId" class="w-full border rounded-lg p-2">
@@ -400,6 +421,100 @@
             class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
         </div>
       </div>
+      <div *ngIf="hasAgent && !agentProfilePersisted" class="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+        Salva prima l’anagrafica come agente per poter gestire i clienti associati.
+      </div>
+      <section *ngIf="editId && agentProfilePersisted" class="mt-8 space-y-6 border-t pt-6">
+        <div>
+          <h3 class="text-lg font-semibold">Clienti associati</h3>
+          <p class="mb-3 text-sm text-gray-500">Ogni cliente può essere associato a un solo agente.</p>
+          <p *ngIf="customerAssociationError" role="alert" class="mb-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {{ customerAssociationError }}
+          </p>
+          <div *ngIf="assignedCustomersLoading" class="py-6 text-center text-sm text-gray-500">Caricamento clienti…</div>
+          <div *ngIf="!assignedCustomersLoading" class="overflow-x-auto rounded-lg border">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-gray-50 text-xs uppercase text-gray-600">
+                <tr>
+                  <th class="px-3 py-2">Cliente</th>
+                  <th class="px-3 py-2">Insegna</th>
+                  <th class="px-3 py-2">Città</th>
+                  <th class="w-20 px-3 py-2">Azioni</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let customer of assignedCustomers" class="border-t">
+                  <td class="px-3 py-2">{{ customer.businessName }}</td>
+                  <td class="px-3 py-2">{{ customer.tradeName || '—' }}</td>
+                  <td class="px-3 py-2">{{ customer.city || '—' }}</td>
+                  <td class="px-3 py-2">
+                    <button type="button" (click)="removeCustomerFromAgent(customer.id)"
+                      [disabled]="customerAssociationBusy"
+                      [attr.aria-label]="'Rimuovi ' + customer.businessName + ' da questo agente'"
+                      title="Rimuovi cliente" class="rounded px-2 py-1 text-red-700 hover:bg-red-50 disabled:opacity-50">
+                      Rimuovi
+                    </button>
+                  </td>
+                </tr>
+                <tr *ngIf="assignedCustomers.length === 0">
+                  <td colspan="4" class="px-3 py-6 text-center text-gray-500">Nessun cliente associato.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <app-pagination [page]="assignedCustomersPage" [pageSize]="assignedCustomersPageSize"
+            [totalCount]="assignedCustomersTotalCount" (pageChange)="goToAssignedCustomersPage($event)"
+            (pageSizeChange)="onAssignedCustomersPageSizeChange($event)">
+          </app-pagination>
+        </div>
+
+        <div *ngIf="hasAgent">
+          <h3 class="mb-3 text-lg font-semibold">Aggiungi un cliente</h3>
+          <div class="mb-3 flex gap-2">
+            <input [(ngModel)]="availableCustomersSearch" [ngModelOptions]="{standalone: true}"
+              type="search" (keyup.enter)="searchAvailableCustomers()"
+              placeholder="Cerca cliente per nome, insegna, P.IVA o codice fiscale"
+              class="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+            <button type="button" (click)="searchAvailableCustomers()"
+              class="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">Cerca</button>
+          </div>
+          <div *ngIf="availableCustomersLoading" class="py-6 text-center text-sm text-gray-500">Ricerca clienti…</div>
+          <div *ngIf="!availableCustomersLoading" class="overflow-x-auto rounded-lg border">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-gray-50 text-xs uppercase text-gray-600">
+                <tr>
+                  <th class="px-3 py-2">Cliente</th>
+                  <th class="px-3 py-2">Insegna</th>
+                  <th class="px-3 py-2">Città</th>
+                  <th class="w-24 px-3 py-2">Azioni</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let customer of availableCustomers" class="border-t">
+                  <td class="px-3 py-2">{{ customer.businessName }}</td>
+                  <td class="px-3 py-2">{{ customer.tradeName || '—' }}</td>
+                  <td class="px-3 py-2">{{ customer.city || '—' }}</td>
+                  <td class="px-3 py-2">
+                    <button type="button" (click)="assignCustomerToAgent(customer.id)"
+                      [disabled]="customerAssociationBusy"
+                      [attr.aria-label]="'Associa ' + customer.businessName + ' a questo agente'"
+                      class="rounded px-2 py-1 text-blue-700 hover:bg-blue-50 disabled:opacity-50">
+                      Aggiungi
+                    </button>
+                  </td>
+                </tr>
+                <tr *ngIf="availableCustomers.length === 0">
+                  <td colspan="4" class="px-3 py-6 text-center text-gray-500">Nessun cliente disponibile trovato.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <app-pagination [page]="availableCustomersPage" [pageSize]="availableCustomersPageSize"
+            [totalCount]="availableCustomersTotalCount" (pageChange)="goToAvailableCustomersPage($event)"
+            (pageSizeChange)="onAvailableCustomersPageSizeChange($event)">
+          </app-pagination>
+        </div>
+      </section>
     </div>
 
   </div><!-- end form -->

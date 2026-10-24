@@ -7,7 +7,7 @@ namespace Mauw.Erp.Domain.Repositories;
 /// </summary>
 public interface IProductRepository : IRepository<Product, Guid>
 {
-    Task<Product?> GetByInternalCodeAsync(string internalCode);
+    Task<Product?> GetByBarcodeAsync(string barcode);
     Task<IEnumerable<Product>> GetPaginatedAsync(
         int page, int pageSize, string? search = null, string? sortBy = null, bool sortDescending = false);
     Task<int> GetTotalCountAsync(string? search = null);

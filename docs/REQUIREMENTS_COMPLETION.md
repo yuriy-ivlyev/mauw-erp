@@ -18,7 +18,7 @@
 |-------------|--------|-----------------|
 | Keep: supplierId | ✅ | Form field with UUID generation |
 | Keep: supplierCode | ✅ | Form field |
-| Keep: internalCode | ✅ | Form field (required) |
+| Keep: barcode | ✅ | Product barcode; used for lookup when the product has no variants |
 | Keep: name | ✅ | Form field (required) |
 | Keep: defaultMarkupRate | ✅ | Form field (number) |
 | Keep: vatRate | ✅ | Form field (number) |

@@ -26,7 +26,9 @@ public class ContactRepository(MauwDbContext dbContext) : Repository<Contact, Gu
         bool? isAgent = null,
         string? status = null,
         string? sortBy = null,
-        bool sortDescending = false)
+        bool sortDescending = false,
+        Guid? assignedAgentId = null,
+        bool? hasAssignedAgent = null)
     {
         var query = _dbSet
             .Where(c => !c.IsInternalCompany)          // exclude "Nostra Azienda"
@@ -50,6 +52,12 @@ public class ContactRepository(MauwDbContext dbContext) : Repository<Contact, Gu
         if (isCustomer == true) query = query.Where(c => c.CustomerProfile != null);
         if (isSupplier == true) query = query.Where(c => c.SupplierProfile != null);
         if (isAgent    == true) query = query.Where(c => c.AgentProfile    != null);
+        if (assignedAgentId is Guid agentId)
+            query = query.Where(c => c.CustomerProfile != null && c.CustomerProfile.DefaultAgentId == agentId);
+        if (hasAssignedAgent == true)
+            query = query.Where(c => c.CustomerProfile != null && c.CustomerProfile.DefaultAgentId != null);
+        else if (hasAssignedAgent == false)
+            query = query.Where(c => c.CustomerProfile != null && c.CustomerProfile.DefaultAgentId == null);
 
         if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<ContactStatus>(status, true, out var statusEnum))
             query = query.Where(c => c.Status == statusEnum);
@@ -101,6 +109,9 @@ public class ContactRepository(MauwDbContext dbContext) : Repository<Contact, Gu
             .Include(c => c.Persons)
             .AsSplitQuery()
             .FirstOrDefaultAsync(c => c.Id == id);
+
+    public Task<int> CountCustomersAssignedToAgentAsync(Guid agentId) =>
+        _dbContext.CustomerProfiles.CountAsync(profile => profile.DefaultAgentId == agentId);
 
     public async Task<bool> AddressExistsAsync(Guid addressId) =>
         await _dbSet.AnyAsync(c => c.Addresses.Any(a => a.Id == addressId));

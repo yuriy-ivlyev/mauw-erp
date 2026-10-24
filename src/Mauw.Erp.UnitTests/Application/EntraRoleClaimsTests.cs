@@ -17,6 +17,25 @@ namespace Mauw.Erp.UnitTests.Application;
 
 public class EntraRoleClaimsTests
 {
+    [Fact]
+    public void ApiRequestsUseCookieChallengeInsteadOfRedirectingToOpenIdConnect()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddMicrosoftEntraAuth(new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["AzureAd:Instance"] = "https://login.microsoftonline.com",
+                ["AzureAd:TenantId"] = "test-tenant",
+                ["AzureAd:ClientId"] = "test-client"
+            }).Build());
+        using var provider = services.BuildServiceProvider();
+
+        var authOptions = provider.GetRequiredService<IOptions<AuthenticationOptions>>().Value;
+
+        Assert.Equal(CookieAuthenticationDefaults.AuthenticationScheme, authOptions.DefaultChallengeScheme);
+    }
+
     [Theory]
     [InlineData("Admin", true, true)]
     [InlineData("Sales", true, true)]

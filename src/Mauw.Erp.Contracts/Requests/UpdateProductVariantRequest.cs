@@ -9,5 +9,6 @@ public record UpdateProductVariantRequest(
     string Barcode,
     decimal PurchaseCost,
     decimal? WeightGrams = null,
-    decimal? SellingPrice = null
+    decimal? SellingPrice = null,
+    string? SupplierCode = null
 );

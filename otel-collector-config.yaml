@@ -15,18 +15,23 @@ processors:
 exporters:
   debug:
     verbosity: detailed
+  otlphttp/grafana_cloud:
+    endpoint: ${env:GRAFANA_CLOUD_OTLP_ENDPOINT}
+    encoding: proto
+    headers:
+      Authorization: ${env:GRAFANA_CLOUD_AUTHORIZATION}
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug]
+      exporters: [debug, otlphttp/grafana_cloud]
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug]
+      exporters: [debug, otlphttp/grafana_cloud]
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug]
+      exporters: [debug, otlphttp/grafana_cloud]

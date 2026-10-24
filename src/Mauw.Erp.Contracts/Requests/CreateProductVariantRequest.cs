@@ -10,5 +10,6 @@ public record CreateProductVariantRequest(
     string Barcode,
     decimal PurchaseCost,
     decimal? WeightGrams = null,
-    decimal? SellingPrice = null
+    decimal? SellingPrice = null,
+    string? SupplierCode = null
 );

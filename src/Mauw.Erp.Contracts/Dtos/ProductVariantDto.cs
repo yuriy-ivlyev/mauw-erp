@@ -19,5 +19,6 @@ public record ProductVariantDto(
     decimal? FinalGrossPrice,
     decimal? WeightGrams = null,
     decimal? SellingPrice = null,
-    bool VarianteVetrina = false
+    bool VarianteVetrina = false,
+    string? SupplierCode = null
 );

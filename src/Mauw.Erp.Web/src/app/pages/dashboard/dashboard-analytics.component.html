@@ -1,0 +1,167 @@
+<section class="analytics" aria-labelledby="analytics-title">
+  <div class="analytics__heading">
+    <div>
+      <span class="workspace__overline">DATI AGGIORNATI</span>
+      <h2 id="analytics-title">{{ analyticsTitle }}</h2>
+      <p>Vendite e movimenti degli ultimi 30 giorni; anagrafiche conteggiate su settimana e mese correnti.</p>
+    </div>
+    <button class="analytics__refresh" type="button" (click)="loadStatistics()" [disabled]="loadingStatistics">
+      {{ loadingStatistics ? 'Aggiornamento…' : 'Aggiorna' }}
+    </button>
+  </div>
+
+  <div class="analytics__state" *ngIf="loadingStatistics" role="status">Caricamento statistiche…</div>
+  <div class="analytics__state analytics__state--error" *ngIf="statisticsError" role="alert">
+    <span>{{ statisticsError }}</span>
+    <button type="button" (click)="loadStatistics()">Riprova</button>
+  </div>
+
+  <ng-container *ngIf="statistics as stats">
+    <div class="analytics__metrics" *ngIf="showSales">
+      <article class="metric-card">
+        <span>Ordini confermati</span>
+        <strong>{{ formatNumber(stats.sales.orderCount) }}</strong>
+        <small>ultimi 30 giorni</small>
+      </article>
+      <article class="metric-card metric-card--accent">
+        <span>Valore lordo ordini</span>
+        <strong>{{ formatCurrency(stats.sales.grossRevenue) }}</strong>
+        <small>IVA inclusa · ultimi 30 giorni</small>
+      </article>
+    </div>
+
+    <div class="analytics__metrics" *ngIf="showContacts">
+      <article class="metric-card">
+        <span>Anagrafiche totali</span>
+        <strong>{{ formatNumber(stats.contacts.totalContacts) }}</strong>
+        <small>{{ formatNumber(stats.contacts.totalCustomers) }} clienti · {{ formatNumber(stats.contacts.totalSuppliers) }} fornitori</small>
+      </article>
+      <article class="metric-card">
+        <span>Nuove questo mese</span>
+        <strong>{{ formatNumber(stats.contacts.newThisMonth) }}</strong>
+        <small>anagrafiche registrate nel mese</small>
+      </article>
+      <article class="metric-card">
+        <span>Nuove questa settimana</span>
+        <strong>{{ formatNumber(stats.contacts.newThisWeek) }}</strong>
+        <small>{{ formatNumber(stats.contacts.totalAgents) }} agenti in totale</small>
+      </article>
+    </div>
+
+    <div class="analytics__metrics" *ngIf="showWarehouse">
+      <article class="metric-card">
+        <span>Giacenza totale</span>
+        <strong>{{ formatNumber(stats.inventory.quantityOnHand, 2) }}</strong>
+        <small>unità fisiche in magazzino</small>
+      </article>
+      <article class="metric-card">
+        <span>Quantità prenotata</span>
+        <strong>{{ formatNumber(stats.inventory.quantityReserved, 2) }}</strong>
+        <small>{{ formatNumber(stats.inventory.quantityAvailable, 2) }} disponibili</small>
+      </article>
+      <article class="metric-card">
+        <span>Magazzini attivi</span>
+        <strong>{{ formatNumber(stats.inventory.activeWarehouses) }}</strong>
+        <small>{{ formatNumber(stats.movements.totalCount) }} movimenti nel periodo</small>
+      </article>
+    </div>
+
+    <div class="analytics__charts">
+      <article class="analytics-card analytics-card--wide" *ngIf="showSales">
+        <div class="analytics-card__heading">
+          <div>
+            <h3>Andamento vendite</h3>
+            <p>Ordini confermati e valore lordo giornaliero · ultimi 30 giorni</p>
+          </div>
+          <div class="chart-legend">
+            <span><i class="legend-dot legend-dot--orders"></i>Ordini</span>
+            <span><i class="legend-dot legend-dot--revenue"></i>Valore lordo</span>
+          </div>
+        </div>
+        <div class="chart-scroll">
+          <svg class="trend-chart" viewBox="0 0 760 230" role="img" aria-label="Grafico vendite giornaliere con ordini e valore lordo">
+            <g class="chart-grid">
+              <ng-container *ngFor="let line of salesGridLines">
+                <line x1="62" x2="698" [attr.y1]="line.y" [attr.y2]="line.y"></line>
+                <text x="56" [attr.y]="line.y - 4" text-anchor="end">{{ line.orders }}</text>
+                <text x="704" [attr.y]="line.y - 4">{{ line.revenue }}</text>
+              </ng-container>
+            </g>
+            <line class="chart-axis" x1="62" y1="190" x2="698" y2="190"></line>
+            <ng-container *ngFor="let point of salesPoints">
+              <rect class="sales-bar" [attr.x]="point.x - 5" [attr.y]="point.orderY"
+                width="10" [attr.height]="190 - point.orderY">
+                <title>{{ point.label }} · {{ point.orderCount }} ordini</title>
+              </rect>
+              <text *ngIf="point.showLabel" class="chart-date" [attr.x]="point.x" y="214" text-anchor="middle">{{ point.label }}</text>
+            </ng-container>
+            <polyline class="sales-line" [attr.points]="revenueLine"></polyline>
+            <circle *ngFor="let point of salesPoints" class="sales-point"
+              [attr.cx]="point.x" [attr.cy]="point.revenueY" r="2.5">
+              <title>{{ point.label }} · {{ formatCurrency(point.grossRevenue) }}</title>
+            </circle>
+          </svg>
+        </div>
+      </article>
+
+      <article class="analytics-card" *ngIf="showContacts">
+        <div class="analytics-card__heading">
+          <div>
+            <h3>Distribuzione clienti per città</h3>
+            <p>Clienti distinti per città in base alle sedi registrate</p>
+          </div>
+        </div>
+        <div class="location-list" *ngIf="stats.customerLocations.length; else noLocations">
+          <div class="location-row" *ngFor="let location of stats.customerLocations">
+            <div class="location-row__label">
+              <span>{{ location.city }}<small *ngIf="location.province"> ({{ location.province }})</small></span>
+              <strong>{{ formatNumber(location.customerCount) }}</strong>
+            </div>
+            <div class="location-track">
+              <span [style.width.%]="location.customerCount / largestLocationCount * 100"></span>
+            </div>
+          </div>
+        </div>
+        <ng-template #noLocations>
+          <div class="chart-empty">Nessuna sede cliente con città valorizzata.</div>
+        </ng-template>
+      </article>
+
+      <article class="analytics-card analytics-card--wide" *ngIf="showWarehouse">
+        <div class="analytics-card__heading">
+          <div>
+            <h3>Movimentazione merce</h3>
+            <p>Numero di operazioni giornaliere · ultimi 30 giorni</p>
+          </div>
+          <div class="chart-legend">
+            <span><i class="legend-dot legend-dot--inbound"></i>Entrate</span>
+            <span><i class="legend-dot legend-dot--outbound"></i>Uscite</span>
+            <span><i class="legend-dot legend-dot--adjustment"></i>Rettifiche</span>
+          </div>
+        </div>
+        <div class="chart-scroll">
+          <svg class="trend-chart" viewBox="0 0 760 230" role="img" aria-label="Grafico giornaliero dei movimenti di magazzino">
+            <g class="chart-grid">
+              <ng-container *ngFor="let line of movementGridLines">
+                <line x1="62" x2="698" [attr.y1]="line.y" [attr.y2]="line.y"></line>
+                <text x="56" [attr.y]="line.y - 4" text-anchor="end">{{ line.count }}</text>
+              </ng-container>
+            </g>
+            <line class="chart-axis" x1="62" y1="190" x2="698" y2="190"></line>
+            <ng-container *ngFor="let point of movementPoints">
+              <rect class="movement-bar movement-bar--inbound" [attr.x]="point.x - 6"
+                [attr.y]="point.inboundY" width="12" [attr.height]="point.inboundHeight"></rect>
+              <rect class="movement-bar movement-bar--outbound" [attr.x]="point.x - 6"
+                [attr.y]="point.outboundY" width="12" [attr.height]="point.outboundHeight"></rect>
+              <rect class="movement-bar movement-bar--adjustment" [attr.x]="point.x - 6"
+                [attr.y]="point.adjustmentY" width="12" [attr.height]="point.adjustmentHeight">
+                <title>{{ point.label }}</title>
+              </rect>
+              <text *ngIf="point.showLabel" class="chart-date" [attr.x]="point.x" y="214" text-anchor="middle">{{ point.label }}</text>
+            </ng-container>
+          </svg>
+        </div>
+      </article>
+    </div>
+  </ng-container>
+</section>

@@ -27,6 +27,8 @@ public class ContactAddressConfiguration : IEntityTypeConfiguration<ContactAddre
         builder.Property(a => a.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         builder.Property(a => a.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+        builder.HasQueryFilter(a => !a.Contact.IsDeleted);
+
         builder.HasOne(a => a.Contact)
             .WithMany(c => c.Addresses)
             .HasForeignKey(a => a.ContactId)

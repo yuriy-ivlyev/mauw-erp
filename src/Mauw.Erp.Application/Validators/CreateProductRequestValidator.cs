@@ -14,9 +14,9 @@ public class CreateProductRequestValidator : AbstractValidator<CreateProductRequ
             .NotEmpty().WithMessage("Supplier code is required")
             .MaximumLength(100).WithMessage("Supplier code must not exceed 100 characters");
 
-        RuleFor(x => x.InternalCode)
-            .NotEmpty().WithMessage("Internal code is required")
-            .MaximumLength(100).WithMessage("Internal code must not exceed 100 characters");
+        RuleFor(x => x.Barcode)
+            .NotEmpty().WithMessage("Barcode is required")
+            .MaximumLength(100).WithMessage("Barcode must not exceed 100 characters");
 
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("Product name is required")

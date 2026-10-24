@@ -1,0 +1,66 @@
+@baseUrl = http://localhost:5020
+@supplierId = 00000000-0000-0000-0000-000000000001
+@variantId = 00000000-0000-0000-0000-000000000004
+@orderId = 00000000-0000-0000-0000-000000000005
+@version = 00000000-0000-0000-0000-000000000006
+
+# Requires an authenticated Admin or Warehouse session.
+
+### Create a draft supplier order
+POST {{baseUrl}}/api/supplier-purchase-orders
+Content-Type: application/json
+
+{
+  "supplierId": "{{supplierId}}",
+  "orderDate": "2026-10-24T00:00:00Z",
+  "notes": "Ordine della collezione autunno",
+  "lines": [
+    { "articleVariantId": "{{variantId}}", "quantityOrdered": 24, "unitCost": "12.34567890" }
+  ]
+}
+
+### List supplier orders
+GET {{baseUrl}}/api/supplier-purchase-orders?openOnly=true
+
+### Read order
+GET {{baseUrl}}/api/supplier-purchase-orders/{{orderId}}
+
+### Confirm order
+POST {{baseUrl}}/api/supplier-purchase-orders/{{orderId}}/confirm
+Content-Type: application/json
+
+{ "version": "{{version}}" }
+
+### Compare ordered quantities with confirmed supplier receipts
+GET {{baseUrl}}/api/supplier-purchase-orders/{{orderId}}/reconciliation
+
+### Downloadable shortage data
+GET {{baseUrl}}/api/supplier-purchase-orders/{{orderId}}/shortages
+
+### Create supplier return draft from selected surplus receipt lines
+POST {{baseUrl}}/api/supplier-purchase-orders/{{orderId}}/return-drafts
+Content-Type: application/json
+
+{
+  "lines": [
+    { "supplierDeliveryNoteLineId": "00000000-0000-0000-0000-000000000007", "quantity": 2 }
+  ]
+}
+
+### List return drafts for the order
+GET {{baseUrl}}/api/supplier-purchase-orders/{{orderId}}/return-drafts
+
+### Read a return draft
+GET {{baseUrl}}/api/supplier-purchase-orders/{{orderId}}/return-drafts/00000000-0000-0000-0000-000000000008
+
+### Issue a return draft; stock is decremented exactly once
+POST {{baseUrl}}/api/supplier-purchase-orders/{{orderId}}/return-drafts/00000000-0000-0000-0000-000000000008/issue
+Content-Type: application/json
+
+{ "version": "{{version}}" }
+
+### Close order accepting the reported differences
+POST {{baseUrl}}/api/supplier-purchase-orders/{{orderId}}/close
+Content-Type: application/json
+
+{ "version": "{{version}}" }

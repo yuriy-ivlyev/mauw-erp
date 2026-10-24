@@ -26,7 +26,7 @@ public class CatalogPriceCalculatorTests
     public void ReadingPriceNeverUsesCostProductOrLegacyMarkupAndDoesNotInherit()
     {
         var product = new Product(Guid.NewGuid(), "S", "P", "Test", 9999m, 22m, 10m) { SellingPrice = 50m };
-        var variant = new ProductVariant(product.Id, "SKU", 10m)
+        var variant = new ProductVariant(product.Id, "SKU", 10m, product.SupplierId)
             { Product = product, SellingPrice = 17.12345678m, MarkupRate = 50m };
         var calculator = new CatalogPriceCalculator();
         Assert.Equal(17.12345678m, calculator.GetStoredPrice(variant).Data!.Value);

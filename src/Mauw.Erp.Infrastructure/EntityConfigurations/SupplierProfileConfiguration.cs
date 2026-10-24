@@ -14,6 +14,8 @@ public class SupplierProfileConfiguration : IEntityTypeConfiguration<SupplierPro
         builder.Property(sp => sp.Iban).HasMaxLength(34);
         builder.Property(sp => sp.BicSwift).HasMaxLength(11);
 
+        builder.HasQueryFilter(sp => !sp.Contact.IsDeleted);
+
         builder.HasOne(sp => sp.Contact)
             .WithOne(c => c.SupplierProfile)
             .HasForeignKey<SupplierProfile>(sp => sp.ContactId)

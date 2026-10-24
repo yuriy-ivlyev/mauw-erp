@@ -45,11 +45,21 @@ export const routes: Routes = [
     component: AdminLayoutComponent,
     canActivate: [authGuard],
     children: [
-      { path: '',          component: DashboardComponent, pathMatch: 'full', title: 'Dashboard | Mauw ERP' },
-      { path: 'dashboard', component: DashboardComponent, title: 'Dashboard | Mauw ERP' },
+      { path: '', component: DashboardComponent, pathMatch: 'full', title: 'Dashboard | Mauw ERP' },
+      { path: 'dashboard', loadComponent: () => import('./pages/dashboard/dashboard-analytics.component').then(m => m.DashboardAnalyticsComponent), canActivate: [roleGuard], data: { roles: ['Admin'], dashboardSection: 'overview' }, title: 'Dashboard | Mauw ERP' },
+      { path: 'dashboard/vendite', loadComponent: () => import('./pages/dashboard/dashboard-analytics.component').then(m => m.DashboardAnalyticsComponent), canActivate: [roleGuard], data: { roles: ['Admin'], dashboardSection: 'sales' }, title: 'Dashboard Vendite | Mauw ERP' },
+      { path: 'dashboard/anagrafiche', loadComponent: () => import('./pages/dashboard/dashboard-analytics.component').then(m => m.DashboardAnalyticsComponent), canActivate: [roleGuard], data: { roles: ['Admin'], dashboardSection: 'contacts' }, title: 'Dashboard Anagrafiche | Mauw ERP' },
+      { path: 'dashboard/magazzino', loadComponent: () => import('./pages/dashboard/dashboard-analytics.component').then(m => m.DashboardAnalyticsComponent), canActivate: [roleGuard], data: { roles: ['Admin'], dashboardSection: 'warehouse' }, title: 'Dashboard Magazzino | Mauw ERP' },
 
       // Vendite
       { path: 'vendite/cassa', component: BancoCassaComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Cashier'] }, title: 'Banco / Cassa | Mauw ERP' },
+
+      // Acquisti
+      { path: 'acquisti/ordini-fornitore', loadComponent: () => import('./pages/acquisti/ordini-fornitore.component').then(m => m.OrdiniFornitoreComponent), canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Ordini Fornitore | Mauw ERP' },
+      { path: 'acquisti/ddt-fornitore', loadComponent: () => import('./pages/acquisti/carico-merce.component').then(m => m.CaricoMerceComponent), canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Carico Merce | Mauw ERP' },
+      { path: 'acquisti/ddt-fornitore/nuovo', loadComponent: () => import('./pages/acquisti/carico-merce-wizard.component').then(m => m.CaricoMerceWizardComponent), canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Nuovo Carico Fornitore | Mauw ERP' },
+      { path: 'acquisti/ddt-fornitore/:id', loadComponent: () => import('./pages/acquisti/carico-merce-wizard.component').then(m => m.CaricoMerceWizardComponent), canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'DDT Fornitore | Mauw ERP' },
+      { path: 'acquisti/carico-merce', redirectTo: 'acquisti/ddt-fornitore', pathMatch: 'full' },
 
       // Ordini
       { path: 'ordini/elenco', component: OrdiniElencoComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Cashier'] }, title: 'Elenco Ordini | Mauw ERP' },

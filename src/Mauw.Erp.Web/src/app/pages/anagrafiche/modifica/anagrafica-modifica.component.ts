@@ -4,20 +4,26 @@ import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, FormArray, Va
 import { Router, ActivatedRoute } from '@angular/router';
 import { ContactService } from '../../../services/contact.service';
 import { CountryService } from '../../../services/country.service';
-import { ContactDetail } from '../../../models/contact.model';
+import { ContactDetail, ContactSummary } from '../../../models/contact.model';
 import { PriceList } from '../../../models/price-list.model';
 import { PriceListService, priceError } from '../../../services/price-list.service';
 import { CountryDto, VatValidationResult } from '../../../models/country.model';
 import { VatLookupComponent } from '../../../components/vat-lookup/vat-lookup.component';
 import { AddressAutocompleteComponent, ParsedAddress } from '../../../components/address-autocomplete/address-autocomplete.component';
 import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
+import { PaginationComponent } from '../../../shared/pagination/pagination.component';
 
 type Tab = 'fiscal' | 'addresses' | 'persons' | 'customer' | 'supplier' | 'agent';
+
+interface AgentOption {
+  id: string;
+  businessName: string;
+}
 
 @Component({
   selector: 'app-anagrafica-modifica',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, VatLookupComponent, AddressAutocompleteComponent, ConfirmDeleteModalComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, VatLookupComponent, AddressAutocompleteComponent, ConfirmDeleteModalComponent, PaginationComponent],
   templateUrl: './anagrafica-modifica.component.html'
 })
 export class AnagraficaModificaComponent implements OnInit {
@@ -34,10 +40,30 @@ export class AnagraficaModificaComponent implements OnInit {
   hasCustomer = false;
   hasSupplier = false;
   hasAgent    = false;
+  agentProfilePersisted = false;
 
   countries: CountryDto[] = [];
   priceLists: PriceList[] = [];
   priceListsError = '';
+  agents: AgentOption[] = [];
+  agentSearchTerm = '';
+  agentOptionsLoading = false;
+  agentOptionsError = '';
+
+  assignedCustomers: ContactSummary[] = [];
+  assignedCustomersPage = 1;
+  assignedCustomersPageSize = 10;
+  assignedCustomersTotalCount = 0;
+  assignedCustomersLoading = false;
+
+  availableCustomers: ContactSummary[] = [];
+  availableCustomersPage = 1;
+  availableCustomersPageSize = 10;
+  availableCustomersTotalCount = 0;
+  availableCustomersSearch = '';
+  availableCustomersLoading = false;
+  customerAssociationError = '';
+  customerAssociationBusy = false;
   get selectedCountry(): string { return this.form?.get('countryCode')?.value ?? 'IT'; }
   get selectedVatNumber(): string { return this.form?.get('vatNumber')?.value ?? ''; }
   get isExtraEu(): boolean {
@@ -64,6 +90,7 @@ export class AnagraficaModificaComponent implements OnInit {
       this.countries = c;
       this.countryService.preload(); // popola cache per VatLookup
     });
+    this.loadAgentOptions();
     this.editId = this.route.snapshot.paramMap.get('id');
     if (this.editId) this.loadContact(this.editId);
   }
@@ -133,6 +160,7 @@ export class AnagraficaModificaComponent implements OnInit {
         if (c.customerProfile) {
           this.hasCustomer = true;
           this.form.get('customer')!.patchValue(c.customerProfile);
+          this.loadAgentOptions(c.customerProfile.defaultAgentId);
         }
         if (c.supplierProfile) {
           this.hasSupplier = true;
@@ -140,6 +168,7 @@ export class AnagraficaModificaComponent implements OnInit {
         }
         if (c.agentProfile) {
           this.hasAgent = true;
+          this.agentProfilePersisted = true;
           this.form.get('agent')!.patchValue(c.agentProfile);
         }
 
@@ -288,6 +317,159 @@ export class AnagraficaModificaComponent implements OnInit {
     this.vatResult = null;
   }
 
+  loadAgentOptions(selectedAgentId?: string | null): void {
+    this.agentOptionsLoading = true;
+    this.agentOptionsError = '';
+    this.contactService.getList({
+      isAgent: true,
+      search: this.agentSearchTerm || undefined,
+      page: 1,
+      pageSize: 100,
+      sortBy: 'businessName'
+    }).subscribe({
+      next: result => {
+        this.agents = result.items.map(agent => ({ id: agent.id, businessName: agent.businessName }));
+        this.agentOptionsLoading = false;
+        if (selectedAgentId && !this.agents.some(agent => agent.id === selectedAgentId)) {
+          this.contactService.getById(selectedAgentId).subscribe({
+            next: agent => {
+              if (agent.agentProfile && !this.agents.some(item => item.id === agent.id)) {
+                this.agents = [{ id: agent.id, businessName: agent.businessName }, ...this.agents];
+              }
+            },
+            error: () => {
+              this.agentOptionsError = 'Impossibile caricare l’agente attualmente associato.';
+            }
+          });
+        }
+      },
+      error: () => {
+        this.agentOptionsError = 'Errore nel caricamento degli agenti.';
+        this.agentOptionsLoading = false;
+      }
+    });
+  }
+
+  loadAssignedCustomers(): void {
+    if (!this.editId || !this.agentProfilePersisted) return;
+    this.assignedCustomersLoading = true;
+    this.customerAssociationError = '';
+    this.contactService.getList({
+      isCustomer: true,
+      assignedAgentId: this.editId,
+      page: this.assignedCustomersPage,
+      pageSize: this.assignedCustomersPageSize,
+      sortBy: 'businessName'
+    }).subscribe({
+      next: result => {
+        this.assignedCustomers = result.items;
+        this.assignedCustomersTotalCount = result.totalCount;
+        const totalPages = Math.ceil(result.totalCount / this.assignedCustomersPageSize);
+        if (totalPages > 0 && this.assignedCustomersPage > totalPages) {
+          this.assignedCustomersPage = totalPages;
+          this.loadAssignedCustomers();
+          return;
+        }
+        this.assignedCustomersLoading = false;
+      },
+      error: () => {
+        this.customerAssociationError = 'Errore nel caricamento dei clienti associati.';
+        this.assignedCustomersLoading = false;
+      }
+    });
+  }
+
+  loadAvailableCustomers(): void {
+    if (!this.editId || !this.hasAgent || !this.agentProfilePersisted) return;
+    this.availableCustomersLoading = true;
+    this.customerAssociationError = '';
+    this.contactService.getList({
+      isCustomer: true,
+      hasAssignedAgent: false,
+      search: this.availableCustomersSearch || undefined,
+      page: this.availableCustomersPage,
+      pageSize: this.availableCustomersPageSize,
+      sortBy: 'businessName'
+    }).subscribe({
+      next: result => {
+        this.availableCustomers = result.items;
+        this.availableCustomersTotalCount = result.totalCount;
+        const totalPages = Math.ceil(result.totalCount / this.availableCustomersPageSize);
+        if (totalPages > 0 && this.availableCustomersPage > totalPages) {
+          this.availableCustomersPage = totalPages;
+          this.loadAvailableCustomers();
+          return;
+        }
+        this.availableCustomersLoading = false;
+      },
+      error: () => {
+        this.customerAssociationError = 'Errore nel caricamento dei clienti disponibili.';
+        this.availableCustomersLoading = false;
+      }
+    });
+  }
+
+  searchAvailableCustomers(): void {
+    this.availableCustomersPage = 1;
+    this.loadAvailableCustomers();
+  }
+
+  goToAssignedCustomersPage(page: number): void {
+    this.assignedCustomersPage = page;
+    this.loadAssignedCustomers();
+  }
+
+  onAssignedCustomersPageSizeChange(pageSize: number): void {
+    this.assignedCustomersPageSize = pageSize;
+    this.assignedCustomersPage = 1;
+    this.loadAssignedCustomers();
+  }
+
+  goToAvailableCustomersPage(page: number): void {
+    this.availableCustomersPage = page;
+    this.loadAvailableCustomers();
+  }
+
+  onAvailableCustomersPageSizeChange(pageSize: number): void {
+    this.availableCustomersPageSize = pageSize;
+    this.availableCustomersPage = 1;
+    this.loadAvailableCustomers();
+  }
+
+  assignCustomerToAgent(customerId: string): void {
+    if (!this.editId || this.customerAssociationBusy) return;
+    this.customerAssociationBusy = true;
+    this.customerAssociationError = '';
+    this.contactService.assignCustomerToAgent(this.editId, customerId).subscribe({
+      next: () => {
+        this.customerAssociationBusy = false;
+        this.loadAssignedCustomers();
+        this.loadAvailableCustomers();
+      },
+      error: err => {
+        this.customerAssociationError = err?.error ?? 'Errore durante l’assegnazione del cliente.';
+        this.customerAssociationBusy = false;
+      }
+    });
+  }
+
+  removeCustomerFromAgent(customerId: string): void {
+    if (!this.editId || this.customerAssociationBusy) return;
+    this.customerAssociationBusy = true;
+    this.customerAssociationError = '';
+    this.contactService.removeCustomerFromAgent(this.editId, customerId).subscribe({
+      next: () => {
+        this.customerAssociationBusy = false;
+        this.loadAssignedCustomers();
+        this.loadAvailableCustomers();
+      },
+      error: err => {
+        this.customerAssociationError = err?.error ?? 'Errore durante la rimozione del cliente.';
+        this.customerAssociationBusy = false;
+      }
+    });
+  }
+
   // ── Save ──────────────────────────────────────────────────────────────────
 
   save(): void {
@@ -335,5 +517,11 @@ export class AnagraficaModificaComponent implements OnInit {
 
   cancel(): void { this.router.navigate(['/anagrafiche/elenco']); }
 
-  setTab(t: string): void { this.activeTab = t as Tab; }
+  setTab(t: string): void {
+    this.activeTab = t as Tab;
+    if (t === 'agent') {
+      this.loadAssignedCustomers();
+      this.loadAvailableCustomers();
+    }
+  }
 }

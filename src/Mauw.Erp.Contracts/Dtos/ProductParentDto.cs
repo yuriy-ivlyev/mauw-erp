@@ -6,7 +6,7 @@ namespace Mauw.Erp.Contracts.Dtos;
 public record ProductParentDto(
     Guid ProductId,
     string SupplierCode,
-    string InternalCode,
+    string Barcode,
     string Name,
     bool HasVariants,
     int VariantCount

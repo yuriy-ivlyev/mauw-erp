@@ -24,6 +24,14 @@ public static class ContactEndpoints
             .WithName("ListContacts")
             .WithSummary("Paginated contact list with role/status filters");
 
+        group.MapPut("/agents/{agentId:guid}/customers/{customerId:guid}", AssignCustomerToAgent)
+            .WithName("AssignCustomerToAgent")
+            .WithSummary("Assign a customer to an agent");
+
+        group.MapDelete("/agents/{agentId:guid}/customers/{customerId:guid}", RemoveCustomerFromAgent)
+            .WithName("RemoveCustomerFromAgent")
+            .WithSummary("Remove a customer from an agent");
+
         group.MapGet("/{id:guid}", GetContact)
             .WithName("GetContact")
             .WithSummary("Get full contact detail by ID");
@@ -82,6 +90,8 @@ public static class ContactEndpoints
         bool? isCustomer = null,
         bool? isSupplier = null,
         bool? isAgent = null,
+        Guid? assignedAgentId = null,
+        bool? hasAssignedAgent = null,
         string? status = null,
         string? sortBy = null,
         bool sortDescending = false,
@@ -94,6 +104,8 @@ public static class ContactEndpoints
             IsCustomer = isCustomer,
             IsSupplier = isSupplier,
             IsAgent = isAgent,
+            AssignedAgentId = assignedAgentId,
+            HasAssignedAgent = hasAssignedAgent,
             Status = status,
             SortBy = sortBy,
             SortDescending = sortDescending,
@@ -105,6 +117,32 @@ public static class ContactEndpoints
         var result = await contactService.GetPagedAsync(request);
         logger.LogInformation("Listed contacts – total: {Total}", result.Data?.TotalCount);
         return TypedResults.Ok(result.Data!);
+    }
+
+    private static async Task<Results<NoContent, BadRequest<string>, NotFound>> AssignCustomerToAgent(
+        Guid agentId,
+        Guid customerId,
+        IContactService contactService)
+    {
+        var result = await contactService.AssignCustomerToAgentAsync(agentId, customerId);
+        if (result.Success)
+            return TypedResults.NoContent();
+        if (result.Error is "Agente non trovato o non abilitato." or "Cliente non trovato o non abilitato.")
+            return TypedResults.NotFound();
+        return TypedResults.BadRequest(result.Error);
+    }
+
+    private static async Task<Results<NoContent, BadRequest<string>, NotFound>> RemoveCustomerFromAgent(
+        Guid agentId,
+        Guid customerId,
+        IContactService contactService)
+    {
+        var result = await contactService.RemoveCustomerFromAgentAsync(agentId, customerId);
+        if (result.Success)
+            return TypedResults.NoContent();
+        if (result.Error == "Cliente non trovato o non abilitato.")
+            return TypedResults.NotFound();
+        return TypedResults.BadRequest(result.Error);
     }
 
     private static async Task<Results<Ok<ContactDetailDto>, NotFound>> GetContact(
@@ -147,12 +185,14 @@ public static class ContactEndpoints
         return TypedResults.Ok(result.Data!);
     }
 
-    private static async Task<Results<NoContent, NotFound>> DeleteContact(
+    private static async Task<Results<NoContent, BadRequest<string>, NotFound>> DeleteContact(
         Guid id,
         IContactService contactService)
     {
         var result = await contactService.DeleteAsync(id);
-        return result.Success ? TypedResults.NoContent() : TypedResults.NotFound();
+        if (result.Success) return TypedResults.NoContent();
+        if (result.Error == "Contact not found") return TypedResults.NotFound();
+        return TypedResults.BadRequest(result.Error);
     }
 
     private static async Task<Results<NoContent, BadRequest<string>, NotFound>> ToggleCustomerBlock(
