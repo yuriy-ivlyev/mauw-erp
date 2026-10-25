@@ -1,3 +1,4 @@
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Application.Mappers;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
@@ -15,7 +16,8 @@ public static class SupportEndpoints
     public static void MapSupportEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/support")
-            .WithTags("Support");
+            .WithTags("Support")
+            .RequireAuthorization(AppPolicies.AnyRole);
 
         // Colors endpoints
         group.MapGet("/colors", GetColors)
@@ -27,14 +29,17 @@ public static class SupportEndpoints
             .WithSummary("Get color by ID");
 
         group.MapPost("/colors", CreateColor)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("CreateColor")
             .WithSummary("Create a new color");
 
         group.MapPut("/colors/{id}", UpdateColor)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("UpdateColor")
             .WithSummary("Update a color");
 
         group.MapDelete("/colors/{id}", DeleteColor)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("DeleteColor")
             .WithSummary("Delete a color");
 
@@ -48,14 +53,17 @@ public static class SupportEndpoints
             .WithSummary("Get size by ID");
 
         group.MapPost("/sizes", CreateSize)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("CreateSize")
             .WithSummary("Create a new size");
 
         group.MapPut("/sizes/{id}", UpdateSize)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("UpdateSize")
             .WithSummary("Update a size");
 
         group.MapDelete("/sizes/{id}", DeleteSize)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("DeleteSize")
             .WithSummary("Delete a size");
 
@@ -69,14 +77,17 @@ public static class SupportEndpoints
             .WithSummary("Get category by ID");
 
         group.MapPost("/categories", CreateCategory)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("CreateCategory")
             .WithSummary("Create a new category");
 
         group.MapPut("/categories/{id:guid}", UpdateCategory)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("UpdateCategory")
             .WithSummary("Update a category");
 
         group.MapDelete("/categories/{id:guid}", DeleteCategory)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("DeleteCategory")
             .WithSummary("Delete a category");
 
@@ -90,14 +101,17 @@ public static class SupportEndpoints
             .WithSummary("Get collection by ID");
 
         group.MapPost("/collections", CreateCollection)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("CreateCollection")
             .WithSummary("Create a new collection");
 
         group.MapPut("/collections/{id:guid}", UpdateCollection)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("UpdateCollection")
             .WithSummary("Update a collection");
 
         group.MapDelete("/collections/{id:guid}", DeleteCollection)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("DeleteCollection")
             .WithSummary("Delete a collection");
 
@@ -111,14 +125,17 @@ public static class SupportEndpoints
             .WithSummary("Get material by ID with composition");
 
         group.MapPost("/materials", CreateMaterial)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("CreateMaterial")
             .WithSummary("Create a new material");
 
         group.MapPut("/materials/{id:guid}", UpdateMaterial)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("UpdateMaterial")
             .WithSummary("Update a material");
 
         group.MapDelete("/materials/{id:guid}", DeleteMaterial)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("DeleteMaterial")
             .WithSummary("Delete a material");
 
@@ -132,14 +149,17 @@ public static class SupportEndpoints
             .WithSummary("Get macro category by ID");
 
         group.MapPost("/macro-categories", CreateMacroCategory)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("CreateMacroCategory")
             .WithSummary("Create a new macro category");
 
         group.MapPut("/macro-categories/{id:guid}", UpdateMacroCategory)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("UpdateMacroCategory")
             .WithSummary("Update a macro category");
 
         group.MapDelete("/macro-categories/{id:guid}", DeleteMacroCategory)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("DeleteMacroCategory")
             .WithSummary("Delete a macro category");
     }

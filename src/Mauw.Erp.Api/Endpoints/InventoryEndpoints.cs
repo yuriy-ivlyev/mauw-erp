@@ -1,3 +1,4 @@
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
@@ -14,9 +15,11 @@ public static class InventoryEndpoints
     public static void MapInventoryEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/inventory")
-            .WithTags("Inventory");
+            .WithTags("Inventory")
+            .RequireAuthorization(AppPolicies.AnyRole);
 
         group.MapPost("/scan", ScanBarcode)
+            .RequireAuthorization(AppPolicies.WarehouseOperations)
             .WithName("ScanBarcode")
             .WithSummary("Scan barcode and record stock movement");
 
@@ -29,10 +32,12 @@ public static class InventoryEndpoints
             .WithSummary("Get paged stock summary");
 
         group.MapPost("/movements", ExecuteMovement)
+            .RequireAuthorization(AppPolicies.StockMovementWrite)
             .WithName("ExecuteStockMovement")
             .WithSummary("Execute a stock movement");
 
         group.MapPost("/transfer", Transfer)
+            .RequireAuthorization(AppPolicies.WarehouseOperations)
             .WithName("TransferStock")
             .WithSummary("Transfer stock between warehouses");
 

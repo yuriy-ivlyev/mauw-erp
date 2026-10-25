@@ -2,11 +2,13 @@ using Mauw.Erp.Application.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Mauw.Erp.Api.Endpoints;
 
 [ApiController]
+[AllowAnonymous]
 [Route("api/auth")]
 public sealed class AuthController(ICurrentUserService currentUser) : ControllerBase
 {

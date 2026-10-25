@@ -1,3 +1,4 @@
+using Mauw.Erp.Application.Constants;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Requests;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -17,7 +18,7 @@ public static class CompanyLogoEndpoints
         group.MapPut("/{name:regex(^(horizontal|compact)$)}", UpdateLogo)
             .RequireAuthorization(policy => policy
                 .AddAuthenticationSchemes(CookieAuthenticationDefaults.AuthenticationScheme)
-                .RequireRole("Admin"))
+                .RequireRole(AppRoles.Admin))
             .WithName("UpdateCompanyLogo")
             .WithSummary("Sostituisce un logo aziendale nel database (solo amministratori)");
     }

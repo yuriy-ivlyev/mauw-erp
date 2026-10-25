@@ -1,4 +1,5 @@
-﻿using Mauw.Erp.Application.Services;
+﻿using Mauw.Erp.Api.Authorization;
+using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -13,25 +14,30 @@ public static class CompanySettingsEndpoints
     public static void MapCompanySettingsEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/settings/company")
-            .WithName("CompanySettings");
+            .WithName("CompanySettings")
+            .RequireAuthorization(AppPolicies.AnyRole);
 
         group.MapGet("/", GetCompany)
             .WithName("GetCompanySettings")
             .WithSummary("Restituisce i dati della Nostra Azienda");
 
         group.MapPut("/", UpsertCompany)
+            .RequireAuthorization(AppPolicies.AdminOnly)
             .WithName("UpsertCompanySettings")
             .WithSummary("Crea o aggiorna la Nostra Azienda");
 
         group.MapPost("/operational-sites", AddOperationalSite)
+            .RequireAuthorization(AppPolicies.AdminOnly)
             .WithName("AddCompanyOperationalSite")
             .WithSummary("Aggiunge una sede operativa aziendale");
 
         group.MapPut("/operational-sites/{siteId:guid}", UpdateOperationalSite)
+            .RequireAuthorization(AppPolicies.AdminOnly)
             .WithName("UpdateCompanyOperationalSite")
             .WithSummary("Aggiorna una sede operativa aziendale");
 
         group.MapDelete("/operational-sites/{siteId:guid}", DeleteOperationalSite)
+            .RequireAuthorization(AppPolicies.AdminOnly)
             .WithName("DeleteCompanyOperationalSite")
             .WithSummary("Elimina una sede operativa aziendale");
     }

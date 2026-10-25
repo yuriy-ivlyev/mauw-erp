@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Mauw.Erp.Api.Endpoints;
+using Mauw.Erp.Api.Extensions;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Domain.Entities;
@@ -184,7 +185,7 @@ public class SupplierDeliveryNoteEndpointTests(PostgreSqlContainerFixture postgr
             builder.Services.AddSingleton(storage.Object);
             builder.Services.AddAuthentication("SupplierTests")
                 .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>("SupplierTests", _ => { });
-            builder.Services.AddAuthorization();
+            builder.Services.AddAppAuthorization();
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(options => options.SwaggerDoc("v1", new() { Title = "Supplier tests", Version = "v1" }));
             var app = builder.Build();

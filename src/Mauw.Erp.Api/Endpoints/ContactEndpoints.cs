@@ -1,3 +1,4 @@
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
@@ -14,7 +15,8 @@ public static class ContactEndpoints
     public static void MapContactEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/contacts")
-            .WithName("Contacts");
+            .WithName("Contacts")
+            .RequireAuthorization(AppPolicies.AnyRole);
 
         group.MapGet("/validate-vat", ValidateVat)
             .WithName("ValidateVat")
@@ -25,10 +27,12 @@ public static class ContactEndpoints
             .WithSummary("Paginated contact list with role/status filters");
 
         group.MapPut("/agents/{agentId:guid}/customers/{customerId:guid}", AssignCustomerToAgent)
+            .RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("AssignCustomerToAgent")
             .WithSummary("Assign a customer to an agent");
 
         group.MapDelete("/agents/{agentId:guid}/customers/{customerId:guid}", RemoveCustomerFromAgent)
+            .RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("RemoveCustomerFromAgent")
             .WithSummary("Remove a customer from an agent");
 
@@ -37,18 +41,22 @@ public static class ContactEndpoints
             .WithSummary("Get full contact detail by ID");
 
         group.MapPost("/", CreateContact)
+            .RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("CreateContact")
             .WithSummary("Create a new contact");
 
         group.MapPut("/{id:guid}", UpdateContact)
+            .RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("UpdateContact")
             .WithSummary("Full update of an existing contact");
 
         group.MapDelete("/{id:guid}", DeleteContact)
+            .RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("DeleteContact")
             .WithSummary("Soft-delete a contact");
 
         group.MapPatch("/{id:guid}/customer-block", ToggleCustomerBlock)
+            .RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("ToggleCustomerBlock")
             .WithSummary("Activate or remove commercial block on a customer");
 
@@ -58,18 +66,22 @@ public static class ContactEndpoints
             .WithSummary("Get all addresses for a contact");
 
         group.MapPost("/{id:guid}/addresses", AddAddress)
+            .RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("AddContactAddress")
             .WithSummary("Add an address to a contact");
 
         group.MapPut("/{id:guid}/addresses/{addressId:guid}", UpdateAddress)
+            .RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("UpdateContactAddress")
             .WithSummary("Update an address of a contact");
 
         group.MapDelete("/{id:guid}/addresses/{addressId:guid}", DeleteAddress)
+            .RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("DeleteContactAddress")
             .WithSummary("Delete an address (LegalHeadquarters cannot be deleted)");
 
         group.MapDelete("/{id:guid}/persons/{personId:guid}", DeletePerson)
+            .RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("DeleteContactPerson")
             .WithSummary("Delete a contact person (referente)");
     }

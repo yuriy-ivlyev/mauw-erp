@@ -1,3 +1,4 @@
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -13,7 +14,8 @@ public static class GeoEndpoints
     public static void MapGeoEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/geo")
-            .WithName("Geo");
+            .WithName("Geo")
+            .RequireAuthorization(AppPolicies.AnyRole);
 
         group.MapGet("/autocomplete", Autocomplete)
             .WithName("AddressAutocomplete")

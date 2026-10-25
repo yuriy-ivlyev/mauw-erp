@@ -1,3 +1,4 @@
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
@@ -16,13 +17,15 @@ public static class ProductEndpoints
     public static void MapProductEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/products")
-            .WithTags("Products");
+            .WithTags("Products")
+            .RequireAuthorization(AppPolicies.AnyRole);
 
         group.MapPost("/calculate-selling-price", CalculateSellingPrice)
             .WithName("CalculateSellingPrice")
             .WithSummary("Calculate a net selling price for entry only; does not save a pricing policy");
 
         group.MapPost("/", CreateProduct)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("CreateProduct")
             .WithSummary("Create a new product");
 
@@ -51,15 +54,18 @@ public static class ProductEndpoints
             .WithSummary("Get product details by ID");
 
         group.MapPut("/{id}", UpdateProduct)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("UpdateProduct")
             .WithSummary("Update product details");
 
         group.MapDelete("/{id}", DeleteProduct)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("DeleteProduct")
             .WithSummary("Delete a product and its variants");
 
         // Product variant endpoints
         group.MapPost("/{productId}/variants", CreateProductVariant)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("CreateProductVariant")
             .WithSummary("Create a new variant for a product");
 
@@ -68,10 +74,12 @@ public static class ProductEndpoints
             .WithSummary("Get all variants for a product");
 
         group.MapPatch("/{productId}/variants/{variantId}", UpdateProductVariant)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("UpdateProductVariant")
             .WithSummary("Update a product variant");
 
         group.MapDelete("/{productId}/variants/{variantId}", DeleteProductVariant)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("DeleteProductVariant")
             .WithSummary("Delete a product variant");
     }

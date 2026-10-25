@@ -53,8 +53,11 @@ public sealed class InventoryStockEndpointsTests
         builder.Services.AddSingleton(queryService.Object);
         builder.Services.AddScoped<ICompanySettingsService>(_ => throw new NotSupportedException());
         builder.Services.AddScoped<IInventoryStockPdfGenerator>(_ => throw new NotSupportedException());
+        builder.Services.AddTestRoleAuthorization();
         await using var app = builder.Build();
         app.UseDeveloperExceptionPage();
+        app.UseAuthentication();
+        app.UseAuthorization();
         app.MapInventoryStockEndpoints();
         await app.StartAsync();
         var warehouseId = Guid.NewGuid();
@@ -64,7 +67,7 @@ public sealed class InventoryStockEndpointsTests
         {
             var address = app.Services.GetRequiredService<IServer>()
                 .Features.Get<IServerAddressesFeature>()!.Addresses.Single();
-            using var client = new HttpClient { BaseAddress = new Uri(address) };
+            using var client = TestRoleAuthentication.CreateTestClient(new Uri(address), "Admin");
             var pageResponse = await client.GetAsync(
                 "/api/v1/inventory/stocks?page=2&pageSize=50&sortDescending=false" +
                 "&onlyInStock=false&valuationMethod=WeightedAverageCost");

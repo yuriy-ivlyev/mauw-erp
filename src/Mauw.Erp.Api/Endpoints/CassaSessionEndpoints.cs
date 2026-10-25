@@ -1,3 +1,4 @@
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
@@ -10,7 +11,8 @@ public static class CassaSessionEndpoints
     public static void MapCassaSessionEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/cassa/sessions")
-            .WithName("CassaSessions");
+            .WithName("CassaSessions")
+            .RequireAuthorization(AppPolicies.SalesOperations);
 
         group.MapPost("/", CreateSession)
             .WithName("CreateCassaSession")

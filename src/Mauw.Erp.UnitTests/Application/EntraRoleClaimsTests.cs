@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Api.Extensions;
 using Mauw.Erp.Api.Services;
 using Microsoft.AspNetCore.Authentication;
@@ -40,7 +41,7 @@ public class EntraRoleClaimsTests
     [InlineData("Admin", true, true)]
     [InlineData("Sales", true, true)]
     [InlineData("Accounting", true, false)]
-    [InlineData("Cashier", true, false)]
+    [InlineData("Cashier", false, false)]
     [InlineData("Warehouse", true, false)]
     [InlineData("Other", false, false)]
     [InlineData(null, false, false)]
@@ -56,7 +57,7 @@ public class EntraRoleClaimsTests
                 ["AzureAd:TenantId"] = "test-tenant",
                 ["AzureAd:ClientId"] = "test-client"
             }).Build());
-        services.AddAuthorization();
+        services.AddAppAuthorization();
         await using var provider = services.BuildServiceProvider();
         var options = provider.GetRequiredService<IOptionsMonitor<OpenIdConnectOptions>>()
             .Get(OpenIdConnectDefaults.AuthenticationScheme);
@@ -88,9 +89,9 @@ public class EntraRoleClaimsTests
         if (role is not null)
             Assert.True(user.HasRole(role));
         var authorization = provider.GetRequiredService<IAuthorizationService>();
-        var readPolicy = new AuthorizationPolicyBuilder()
-            .RequireRole("Admin", "Sales", "Accounting", "Cashier", "Warehouse").Build();
-        var writePolicy = new AuthorizationPolicyBuilder().RequireRole("Admin", "Sales").Build();
+        var policies = provider.GetRequiredService<IAuthorizationPolicyProvider>();
+        var readPolicy = (await policies.GetPolicyAsync(AppPolicies.AnyRole))!;
+        var writePolicy = (await policies.GetPolicyAsync(AppPolicies.SalesOperations))!;
         Assert.Equal(canRead, (await authorization.AuthorizeAsync(context.User, null, readPolicy)).Succeeded);
         Assert.Equal(canConfigure, (await authorization.AuthorizeAsync(context.User, null, writePolicy)).Succeeded);
     }

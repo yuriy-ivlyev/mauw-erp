@@ -19,6 +19,7 @@ builder.AddObservability();
 
 // Microsoft Entra ID SSO (BFF pattern — HttpOnly cookie session)
 builder.Services.AddMicrosoftEntraAuth(builder.Configuration);
+builder.Services.AddAppAuthorization();
 
 // Configure PostgreSQL connection
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ??

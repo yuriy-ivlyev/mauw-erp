@@ -1,3 +1,4 @@
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -6,7 +7,7 @@ namespace Mauw.Erp.Api.Endpoints;
 
 /// <summary>Variante vetrina: la variante le cui immagini rappresentano il prodotto nelle liste.</summary>
 [ApiController]
-[Authorize]
+[Authorize(Policy = AppPolicies.CatalogManagement)]
 [Route("api/v1/products/{productId:guid}/variants/{variantId:guid}/vetrina")]
 public sealed class ProductVariantsController(IProductService productService) : ControllerBase
 {

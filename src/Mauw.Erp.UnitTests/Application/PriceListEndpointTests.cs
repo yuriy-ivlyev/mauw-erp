@@ -52,6 +52,7 @@ public class PriceListEndpointTests(PostgreSqlContainerFixture postgres)
     {
         await using var fixture = await Fixture.CreateAsync(postgres);
         using var client = fixture.CreateClient("Sales");
+        using var warehouse = fixture.CreateClient("Warehouse");
         var calculation = await client.PostAsJsonAsync("/api/v1/products/calculate-selling-price",
             new { purchaseCost = 0.00000005m, markupRate = 10m });
         Assert.Equal(HttpStatusCode.OK, calculation.StatusCode);
@@ -60,7 +61,8 @@ public class PriceListEndpointTests(PostgreSqlContainerFixture postgres)
             "/api/v1/products/calculate-selling-price", new { purchaseCost = 10m })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(
             "/api/v1/products/calculate-selling-price", new { purchaseCost = 10m, markupRate = -1m })).StatusCode);
-        var created = await client.PostAsJsonAsync("/api/v1/products", new
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/v1/products", new { })).StatusCode);
+        var created = await warehouse.PostAsJsonAsync("/api/v1/products", new
         {
             supplierId = Guid.NewGuid(), supplierCode = "SUP", barcode = "NEW",
             name = "Nuovo", sellingPrice = 18.12345678m, vatRate = 22m,
@@ -151,7 +153,7 @@ public class PriceListEndpointTests(PostgreSqlContainerFixture postgres)
     [Theory]
     [InlineData(null, 401)]
     [InlineData("Warehouse", 403)]
-    [InlineData("Cashier", 403)]
+    [InlineData("Accounting", 403)]
     public async Task ConfigurationRequiresAuthorizedSalesRole(string? role, int status)
     {
         await using var fixture = await Fixture.CreateAsync(postgres);
@@ -161,7 +163,7 @@ public class PriceListEndpointTests(PostgreSqlContainerFixture postgres)
     }
 
     [Fact]
-    public async Task InvalidInputReturnsProblemDetailsAndReadAccessWorksForCashier()
+    public async Task InvalidInputReturnsProblemDetailsAndReadAccessWorksForReadOnlyRoles()
     {
         await using var fixture = await Fixture.CreateAsync(postgres);
         using var sales = fixture.CreateClient("Sales");
@@ -170,8 +172,8 @@ public class PriceListEndpointTests(PostgreSqlContainerFixture postgres)
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType!.MediaType);
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(400, problem.GetProperty("status").GetInt32());
-        using var cashier = fixture.CreateClient("Cashier");
-        Assert.Equal(HttpStatusCode.OK, (await cashier.GetAsync("/api/v1/price-lists")).StatusCode);
+        using var accounting = fixture.CreateClient("Accounting");
+        Assert.Equal(HttpStatusCode.OK, (await accounting.GetAsync("/api/v1/price-lists")).StatusCode);
         var notFound = await sales.GetAsync($"/api/v1/price-lists/{Guid.NewGuid()}");
         Assert.Equal(HttpStatusCode.NotFound, notFound.StatusCode);
         Assert.Equal("application/problem+json", notFound.Content.Headers.ContentType!.MediaType);
@@ -225,7 +227,7 @@ public class PriceListEndpointTests(PostgreSqlContainerFixture postgres)
             builder.Services.AddScoped<IValidator<CreateProductRequest>, CreateProductRequestValidator>();
             builder.Services.AddAuthentication("PricingTests")
                 .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>("PricingTests", _ => { });
-            builder.Services.AddAuthorization();
+            builder.Services.AddAppAuthorization();
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(options => options.SwaggerDoc("v1", new() { Title = "Pricing tests", Version = "v1" }));
             var app = builder.Build();

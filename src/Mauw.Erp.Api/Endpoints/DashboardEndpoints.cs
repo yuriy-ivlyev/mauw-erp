@@ -1,3 +1,4 @@
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Domain.Enums;
 using Mauw.Erp.Infrastructure.DbContext;
@@ -12,7 +13,7 @@ public static class DashboardEndpoints
     {
         app.MapGroup("/api/v1/dashboard")
             .WithTags("Dashboard")
-            .RequireAuthorization(policy => policy.RequireRole("Admin"))
+            .RequireAuthorization(AppPolicies.AdminOnly)
             .MapGet("/", GetStatistics)
             .WithName("GetDashboardStatistics")
             .WithSummary("Get sales, contact, location, inventory, and movement statistics");

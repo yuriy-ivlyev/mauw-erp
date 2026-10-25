@@ -1,3 +1,4 @@
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
@@ -17,22 +18,28 @@ public static class InvoiceEndpoints
             .WithName("Invoices");
 
         group.MapPost("/", CreateInvoice)
+            .RequireAuthorization(AppPolicies.Billing)
             .WithName("CreateInvoice")
             .WithSummary("Create a new invoice");
 
+        // Read-only linked document: also needed by Warehouse for shipments.
         group.MapGet("/{id}", GetInvoice)
+            .RequireAuthorization(AppPolicies.AnyRole)
             .WithName("GetInvoice")
             .WithSummary("Get invoice details by ID");
 
         group.MapGet("/", ListInvoices)
+            .RequireAuthorization(AppPolicies.Billing)
             .WithName("ListInvoices")
             .WithSummary("List invoices with pagination");
 
         group.MapPost("/{id}/payments", RecordPayment)
+            .RequireAuthorization(AppPolicies.Billing)
             .WithName("RecordPayment")
             .WithSummary("Record a payment on an invoice (triggers commission accrual when paid)");
 
         group.MapGet("/{id}/pdf", GetInvoicePdf)
+            .RequireAuthorization(AppPolicies.Billing)
             .WithName("GetInvoicePdf")
             .WithSummary("Generate and download invoice PDF");
     }

@@ -15,7 +15,7 @@ Le finestre temporali sono inclusive e memorizzate in UTC.
 - [API e richieste di esempio](../src/Mauw.Erp.Api/PriceLists.http):
   CRUD `/api/v1/price-lists`, azione `/activation` e quotazione batch `/resolve`.
   La configurazione richiede Admin/Sales; lettura e quotazione sono disponibili
-  anche ai ruoli operativi Accounting/Cashier/Warehouse.
+  anche ai ruoli operativi Accounting/Warehouse (il ruolo `Cashier` e stato unificato in `Sales`).
   Il mapping OIDC Entra usa `MapInboundClaims=true` e `ClaimTypes.Role` sia per
   l'autorizzazione API sia per i ruoli restituiti da `/api/auth/user`.
   Dopo aggiornamenti del mapping o delle assegnazioni Entra occorre uscire e

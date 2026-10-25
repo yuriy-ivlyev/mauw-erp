@@ -1,3 +1,4 @@
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Pricing;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -9,7 +10,7 @@ public static class PriceListEndpoints
     public static void MapPriceListEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/price-lists").WithTags("Listini")
-            .RequireAuthorization(policy => policy.RequireRole("Admin", "Sales", "Accounting", "Cashier", "Warehouse"));
+            .RequireAuthorization(AppPolicies.AnyRole);
 
         group.MapGet("/", async (IPriceListService service, CancellationToken ct) =>
             TypedResults.Ok(await service.GetAllAsync(ct)))
@@ -28,7 +29,7 @@ public static class PriceListEndpoints
             return result.Success
                 ? TypedResults.Created($"/api/v1/price-lists/{result.Data!.Id}", result.Data)
                 : Error(result.Error);
-        }).RequireAuthorization(policy => policy.RequireRole("Admin", "Sales"))
+        }).RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("CreatePriceList").WithSummary("Crea un listino EUR.");
 
         group.MapPut("/{id:guid}", async Task<Results<Ok<PriceListResponse>, ProblemHttpResult>> (
@@ -36,7 +37,7 @@ public static class PriceListEndpoints
         {
             var result = await service.SaveAsync(id, request, ct);
             return result.Success ? TypedResults.Ok(result.Data!) : Error(result.Error);
-        }).RequireAuthorization(policy => policy.RequireRole("Admin", "Sales"))
+        }).RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("UpdatePriceList").WithSummary("Aggiorna il listino senza modificare gli snapshot documentali.");
 
         group.MapPatch("/{id:guid}/activation", async Task<Results<Ok<PriceListResponse>, ProblemHttpResult>> (
@@ -44,7 +45,7 @@ public static class PriceListEndpoints
         {
             var result = await service.SetActivationAsync(id, request.IsActive, ct);
             return result.Success ? TypedResults.Ok(result.Data!) : Error(result.Error);
-        }).RequireAuthorization(policy => policy.RequireRole("Admin", "Sales"))
+        }).RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("ActivatePriceList").WithSummary("Attiva o disattiva un listino.");
 
         group.MapDelete("/{id:guid}", async Task<Results<NoContent, ProblemHttpResult>> (
@@ -52,7 +53,7 @@ public static class PriceListEndpoints
         {
             var result = await service.DeleteAsync(id, ct);
             return result.Success ? TypedResults.NoContent() : Error(result.Error);
-        }).RequireAuthorization(policy => policy.RequireRole("Admin", "Sales"))
+        }).RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("DeletePriceList").WithSummary("Elimina il listino e scollega i clienti, mantenendo gli snapshot.");
 
         group.MapPost("/resolve", async Task<Results<Ok<ResolvedPricesResponse>, ProblemHttpResult>> (

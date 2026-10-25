@@ -1,3 +1,4 @@
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Domain.Repositories;
@@ -14,7 +15,8 @@ public static class LookupsEndpoints
     public static void MapLookupsEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/lookups")
-            .WithName("Lookups");
+            .WithName("Lookups")
+            .RequireAuthorization(AppPolicies.AnyRole);
 
         group.MapGet("/countries", GetCountries)
             .WithName("GetCountries")

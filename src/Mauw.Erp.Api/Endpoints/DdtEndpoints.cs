@@ -1,3 +1,4 @@
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
@@ -17,26 +18,32 @@ public static class DdtEndpoints
             .WithName("DDTs");
 
         group.MapPost("/", CreateDdt)
+            .RequireAuthorization(AppPolicies.DdtDocuments)
             .WithName("CreateDdt")
             .WithSummary("Create a new transport document (DDT)");
 
         group.MapGet("/{id}", GetDdt)
+            .RequireAuthorization(AppPolicies.DdtDocuments)
             .WithName("GetDdt")
             .WithSummary("Get DDT details by ID");
 
         group.MapGet("/", ListDdts)
+            .RequireAuthorization(AppPolicies.WarehouseOperations)
             .WithName("ListDdts")
             .WithSummary("List DDTs with pagination");
 
         group.MapGet("/{id}/pdf", GetDdtPdf)
+            .RequireAuthorization(AppPolicies.DdtDocuments)
             .WithName("GetDdtPdf")
             .WithSummary("Generate and download DDT PDF");
 
         group.MapPost("/{id}/items", AddDdtItem)
+            .RequireAuthorization(AppPolicies.DdtDocuments)
             .WithName("AddDdtItem")
             .WithSummary("Add an item to a DDT");
 
         group.MapDelete("/{id}", DeleteDdt)
+            .RequireAuthorization(AppPolicies.WarehouseOperations)
             .WithName("DeleteDdt")
             .WithSummary("Delete a DDT");
     }

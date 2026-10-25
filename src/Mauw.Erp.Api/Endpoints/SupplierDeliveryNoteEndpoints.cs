@@ -1,3 +1,4 @@
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
@@ -17,7 +18,7 @@ public static class SupplierDeliveryNoteEndpoints
     private static void MapGroup(WebApplication app, string path)
     {
         var group = app.MapGroup(path).WithTags("Supplier delivery notes")
-            .RequireAuthorization(policy => policy.RequireRole("Admin", "Warehouse"));
+            .RequireAuthorization(AppPolicies.WarehouseOperations);
         group.MapGet("/", List)
             .WithSummary("Elenca i DDT fornitore");
         group.MapGet("/{id:guid}", async Task<Results<Ok<SupplierDeliveryNoteDto>, NotFound>> (

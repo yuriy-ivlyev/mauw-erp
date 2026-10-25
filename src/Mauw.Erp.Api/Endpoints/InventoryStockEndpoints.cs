@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Enums;
@@ -19,6 +20,7 @@ public static class InventoryStockEndpoints
 
     private static void MapRoutes(RouteGroupBuilder group)
     {
+        group.RequireAuthorization(AppPolicies.InventoryStockRead);
         group.MapGet("/stocks", GetStocks);
         group.MapGet("/stocks/summary", GetStocksSummary);
         group.MapGet("/stocks/export", ExportFile);
@@ -26,7 +28,7 @@ public static class InventoryStockEndpoints
         group.MapGet("/stocks/export.pdf", ExportPdf);
         group.MapGet("/stocks/{warehouseId:guid}/{productVariantId:guid}/movements", GetMovements);
         group.MapGet("/stocks/reconciliation/ambiguous-movements", GetAmbiguousMovements)
-            .RequireAuthorization(policy => policy.RequireRole("Admin"))
+            .RequireAuthorization(AppPolicies.AdminOnly)
             .WithSummary("List ambiguous historical stock movements and suggested deltas");
     }
 

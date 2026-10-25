@@ -1,3 +1,4 @@
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
@@ -11,7 +12,8 @@ public static class WarehouseEndpoints
     public static void MapWarehouseEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/warehouses")
-            .WithName("Warehouses");
+            .WithName("Warehouses")
+            .RequireAuthorization(AppPolicies.AnyRole);
 
         group.MapGet("/", ListWarehouses)
             .WithName("ListWarehouses")
@@ -22,18 +24,22 @@ public static class WarehouseEndpoints
             .WithSummary("Get warehouse detail by ID");
 
         group.MapPost("/", CreateWarehouse)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("CreateWarehouse")
             .WithSummary("Create a new warehouse");
 
         group.MapPut("/{id:guid}", UpdateWarehouse)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("UpdateWarehouse")
             .WithSummary("Update an existing warehouse");
 
         group.MapDelete("/{id:guid}", DeleteWarehouse)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("DeleteWarehouse")
             .WithSummary("Soft-delete a warehouse");
 
         group.MapPatch("/{id:guid}/set-default", SetDefaultWarehouse)
+            .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("SetDefaultWarehouse")
             .WithSummary("Set a warehouse as default");
     }

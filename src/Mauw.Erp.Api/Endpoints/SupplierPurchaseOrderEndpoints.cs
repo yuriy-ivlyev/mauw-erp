@@ -1,3 +1,4 @@
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
@@ -11,7 +12,7 @@ public static class SupplierPurchaseOrderEndpoints
     {
         var group = app.MapGroup("/api/supplier-purchase-orders")
             .WithTags("Supplier purchase orders")
-            .RequireAuthorization(policy => policy.RequireRole("Admin", "Warehouse"));
+            .RequireAuthorization(AppPolicies.WarehouseOperations);
 
         group.MapGet("/", async Task<Ok<IReadOnlyList<SupplierPurchaseOrderDto>>> (
             ISupplierPurchaseOrderService service, CancellationToken ct, Guid? supplierId = null,
