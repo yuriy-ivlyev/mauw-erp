@@ -20,7 +20,7 @@
 | Keep: supplierCode | ✅ | Form field |
 | Keep: barcode | ✅ | Product barcode; used for lookup when the product has no variants |
 | Keep: name | ✅ | Form field (required) |
-| Keep: defaultMarkupRate | ✅ | Form field (number) |
+| Remove: defaultMarkupRate | ✅ | Legacy field removed (migration RemoveLegacyMarkupRates) |
 | Keep: vatRate | ✅ | Form field (number) |
 | Add: categoryId dropdown | ✅ | Select from categories list, nullable |
 | Add: collectionId dropdown | ✅ | Select from collections list, nullable |

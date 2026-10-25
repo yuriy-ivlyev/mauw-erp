@@ -1,4 +1,4 @@
-﻿using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -25,9 +25,6 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.Name)
             .IsRequired()
             .HasMaxLength(255);
-
-        builder.Property(p => p.DefaultMarkupRate)
-            .HasPrecision(6, 2);
 
         builder.Property(p => p.VatRate)
             .HasPrecision(5, 2);

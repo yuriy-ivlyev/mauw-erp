@@ -9,13 +9,12 @@ Accept: application/json
 @productId = 00000000-0000-0000-0000-000000000001
 @variantId = 00000000-0000-0000-0000-000000000002
 
-### Optional entry aid only: calculate a price using decimal, without saving markup
-POST {{baseUrl}}/products/calculate-selling-price
+### Optional entry aid only (Admin): propose a price with the Formula prezzi, without saving anything
+POST {{baseUrl}}/products/price-formula/calculate
 Content-Type: application/json
 
 {
-  "purchaseCost": 10,
-  "markupRate": 30
+  "purchaseCost": 10.00
 }
 
 ### Create a variant parent: prices belong to its SKUs, not the parent
@@ -61,7 +60,7 @@ Content-Type: application/json
   "sellingPrice": 18.83606557
 }
 
-### Update variant: send the definitive selling price, not a markup or policy
+### Update variant: send the definitive selling price, not a formula or policy
 PATCH {{baseUrl}}/products/{{productId}}/variants/{{variantId}}
 Content-Type: application/json
 

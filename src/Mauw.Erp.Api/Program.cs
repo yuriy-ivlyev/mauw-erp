@@ -45,8 +45,6 @@ builder.Services.AddScoped<IValidator<CreateInvoiceRequest>, CreateInvoiceReques
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddPricingApi();
 
-// Register domain services
-builder.Services.AddScoped<Mauw.Erp.Domain.Services.PricingEngine>();
 builder.Services.AddInvoicePdfReporting();
 builder.Services.AddInventoryStockReporting();
 builder.Services.AddCompanyBranding();

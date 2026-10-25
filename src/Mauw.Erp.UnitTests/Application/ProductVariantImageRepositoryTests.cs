@@ -15,8 +15,8 @@ public class ProductVariantImageRepositoryTests(PostgreSqlContainerFixture postg
     {
         using var db = postgres.CreateDbContext();
         var supplier = Guid.NewGuid();
-        var parent = new Product(supplier, "S1", "PARENT", "Con varianti", 0m, 22m, 10m, hasVariants: true);
-        var simple = new Product(supplier, "S2", "SIMPLE", "Semplice", 0m, 22m, 10m, hasVariants: false);
+        var parent = new Product(supplier, "S1", "PARENT", "Con varianti", 22m, 10m, hasVariants: true);
+        var simple = new Product(supplier, "S2", "SIMPLE", "Semplice", 22m, 10m, hasVariants: false);
         db.Products.AddRange(parent, simple);
         await db.SaveChangesAsync();
         var variant = new ProductVariant(parent.Id, "VAR-1", 10m, parent.SupplierId);

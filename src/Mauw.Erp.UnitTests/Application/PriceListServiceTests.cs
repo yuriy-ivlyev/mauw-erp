@@ -71,7 +71,7 @@ public class PriceListServiceTests(PostgreSqlContainerFixture postgres)
         var repository = new Mock<IPriceListRepository>();
         var list = PriceList.Create("Test", "EUR", true,
             [new(null, PriceCalculationType.PercentageDiscount, 10m, MinimumQuantity: 0.25m)]).Data!;
-        var product = new Product(Guid.NewGuid(), "S", "P", "Product", 100m, 22m, 10m);
+        var product = new Product(Guid.NewGuid(), "S", "P", "Product", 22m, 10m);
         var variant = new ProductVariant(product.Id, "SKU", 10m, product.SupplierId)
         {
             SellingPrice = 20m,
@@ -518,7 +518,7 @@ public class PriceListServiceTests(PostgreSqlContainerFixture postgres)
             Db = postgres.CreateDbContext();
             Customer.EnableAsCustomer();
             Db.Add(Customer);
-            var product = new Product(Guid.NewGuid(), "S", "P", "Articolo", 0m, 22m, 10m);
+            var product = new Product(Guid.NewGuid(), "S", "P", "Articolo", 22m, 10m);
             Db.Add(product);
             Variant = new(product.Id, "SKU", 10m, product.SupplierId) { Product = product, SellingPrice = 10m };
             Db.Add(Variant);

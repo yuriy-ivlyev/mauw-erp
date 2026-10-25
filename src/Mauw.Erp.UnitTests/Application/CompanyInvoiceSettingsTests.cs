@@ -151,7 +151,7 @@ public class CompanyInvoiceSettingsTests(PostgreSqlContainerFixture postgres)
         var company = new Contact("Mauw") { IsInternalCompany = true };
         db.AddRange(company, customer, agent);
         customer.CustomerProfile!.DefaultAgentId = hasAgent ? agent.Id : null;
-        var product = new Product(Guid.NewGuid(), "SUP", "SKU", "Articolo", 0m, 22m, 10m);
+        var product = new Product(Guid.NewGuid(), "SUP", "SKU", "Articolo", 22m, 10m);
         db.Add(product);
         var variant = new ProductVariant(product.Id, "123", 10.00m, product.SupplierId);
         db.Add(variant);

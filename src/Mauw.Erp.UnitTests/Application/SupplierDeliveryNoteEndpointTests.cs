@@ -217,7 +217,7 @@ public class SupplierDeliveryNoteEndpointTests(PostgreSqlContainerFixture postgr
         {
             using var scope = app.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<MauwDbContext>();
-            var product = new Product(supplierId, "SHIRT-HTTP", "SHIRT-HTTP", "Maglia HTTP", 0m, 22m, 10m);
+            var product = new Product(supplierId, "SHIRT-HTTP", "SHIRT-HTTP", "Maglia HTTP", 22m, 10m);
             var variant = new ProductVariant(product.Id, barcode, 10m, supplierId, supplierCode: "SUP+M")
             {
                 Product = product

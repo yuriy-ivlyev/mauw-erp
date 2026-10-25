@@ -3,6 +3,7 @@ using Mauw.Erp.Application.Services;
 using Mauw.Erp.Application.Validation;
 using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Domain.Pricing;
 using Mauw.Erp.Domain.Services;
 using Mauw.Erp.Infrastructure.DbContext;
 using Mauw.Erp.Infrastructure.Repositories;
@@ -18,7 +19,8 @@ public class ProductSellingPriceTests(PostgreSqlContainerFixture postgres)
     public async Task OnlyDefinitivePriceIsSavedAndCostChangesNeverRepriceVariants()
     {
         using var fixture = new Fixture(postgres);
-        var entered = new CatalogPriceCalculator().FromMarkup(10m, 30m).Data!.Value;
+        var entered = new PriceFormulaCalculator().Calculate(10m,
+            new PriceFormulaDefinition([new("Ricarico", 30m)], 0.01m)).Data!.FinalPrice;
         var created = await fixture.Service.CreateProductAsync(Request(entered));
         Assert.True(created.Success, created.Error);
         var productId = created.Data!.Id;
@@ -30,8 +32,6 @@ public class ProductSellingPriceTests(PostgreSqlContainerFixture postgres)
             new(null, null, "SKU", 90m, SellingPrice: entered));
         Assert.True(updated.Success, updated.Error);
         Assert.Equal(13m, updated.Data!.SellingPrice);
-        Assert.Null((await fixture.Db.ProductVariants.FindAsync(variantId))!.MarkupRate);
-        Assert.Equal(0m, (await fixture.Db.Products.FindAsync(productId))!.DefaultMarkupRate);
         await fixture.Service.UpdateProductAsync(productId, Request(500m) with { BasePurchaseCost = 99m });
         fixture.Db.ChangeTracker.Clear();
         var reloaded = await fixture.Service.GetProductAsync(productId);
@@ -159,7 +159,7 @@ public class ProductSellingPriceTests(PostgreSqlContainerFixture postgres)
     public async Task LegacyMissingPricesRemainEditableButCannotBeUsedForSales()
     {
         using var fixture = new Fixture(postgres);
-        var product = new Product(Guid.NewGuid(), "S", "P", "Test", 30m, 22m, 10m);
+        var product = new Product(Guid.NewGuid(), "S", "P", "Test", 22m, 10m);
         var variant = new ProductVariant(product.Id, "OLD", 10m, product.SupplierId) { Product = product };
         fixture.Db.AddRange(product, variant);
         await fixture.Db.SaveChangesAsync();

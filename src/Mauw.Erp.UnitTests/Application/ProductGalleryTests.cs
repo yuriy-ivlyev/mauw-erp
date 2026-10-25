@@ -33,7 +33,7 @@ public class ProductGalleryTests : IDisposable
 
     private async Task<Product> ProductWithVariantsAsync(int variantCount)
     {
-        var product = new Product(Guid.NewGuid(), "S", $"P{Guid.NewGuid():N}"[..10], "Articolo", 0m, 22m, 10m, hasVariants: true);
+        var product = new Product(Guid.NewGuid(), "S", $"P{Guid.NewGuid():N}"[..10], "Articolo", 22m, 10m, hasVariants: true);
         _db.Products.Add(product);
         await _db.SaveChangesAsync();
         for (var i = 0; i < variantCount; i++)
@@ -73,7 +73,7 @@ public class ProductGalleryTests : IDisposable
     [Fact]
     public async Task VarianteVetrinaRejectsSimpleProductsAndUnknownVariants()
     {
-        var simple = new Product(Guid.NewGuid(), "S", "SIMPLE", "Semplice", 0m, 22m, 10m, hasVariants: false);
+        var simple = new Product(Guid.NewGuid(), "S", "SIMPLE", "Semplice", 22m, 10m, hasVariants: false);
         _db.Products.Add(simple);
         await _db.SaveChangesAsync();
         var withVariants = await ProductWithVariantsAsync(1);
@@ -109,8 +109,8 @@ public class ProductGalleryTests : IDisposable
     [Fact]
     public async Task ThumbnailOfSimpleProductUsesItsOwnCoverAndIsOmittedWithoutImages()
     {
-        var simple = new Product(Guid.NewGuid(), "S", "SIMPLE", "Semplice", 0m, 22m, 10m, hasVariants: false);
-        var empty = new Product(Guid.NewGuid(), "S", "EMPTY", "Vuoto", 0m, 22m, 10m, hasVariants: false);
+        var simple = new Product(Guid.NewGuid(), "S", "SIMPLE", "Semplice", 22m, 10m, hasVariants: false);
+        var empty = new Product(Guid.NewGuid(), "S", "EMPTY", "Vuoto", 22m, 10m, hasVariants: false);
         _db.Products.AddRange(simple, empty);
         await _db.SaveChangesAsync();
         await AddImageAsync(simple.Id, ImageCategory.Zoom1, 1);
@@ -125,7 +125,7 @@ public class ProductGalleryTests : IDisposable
     [Fact]
     public async Task ThumbnailFallsBackToLowestSortOrderWhenNoMainExists()
     {
-        var simple = new Product(Guid.NewGuid(), "S", "SIMPLE", "Semplice", 0m, 22m, 10m, hasVariants: false);
+        var simple = new Product(Guid.NewGuid(), "S", "SIMPLE", "Semplice", 22m, 10m, hasVariants: false);
         _db.Products.Add(simple);
         await _db.SaveChangesAsync();
         await AddImageAsync(simple.Id, ImageCategory.Left, 5);

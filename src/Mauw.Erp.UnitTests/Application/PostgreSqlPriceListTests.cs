@@ -19,9 +19,9 @@ public class PostgreSqlPriceListTests(PostgreSqlContainerFixture postgres)
         await using var transaction = await db.Database.BeginTransactionAsync();
         var supplierA = Guid.NewGuid();
         var supplierB = Guid.NewGuid();
-        var productA = new Product(supplierA, "PRODUCT", $"A-{Guid.NewGuid():N}", "Articolo A", 0m, 22m, 10m);
-        var productB = new Product(supplierB, "PRODUCT", $"B-{Guid.NewGuid():N}", "Articolo B", 0m, 22m, 10m);
-        var secondProductA = new Product(supplierA, "PRODUCT-2", $"A2-{Guid.NewGuid():N}", "Articolo A2", 0m, 22m, 10m);
+        var productA = new Product(supplierA, "PRODUCT", $"A-{Guid.NewGuid():N}", "Articolo A", 22m, 10m);
+        var productB = new Product(supplierB, "PRODUCT", $"B-{Guid.NewGuid():N}", "Articolo B", 22m, 10m);
+        var secondProductA = new Product(supplierA, "PRODUCT-2", $"A2-{Guid.NewGuid():N}", "Articolo A2", 22m, 10m);
         db.AddRange(productA, productB, secondProductA);
         await db.SaveChangesAsync();
 
@@ -45,7 +45,7 @@ public class PostgreSqlPriceListTests(PostgreSqlContainerFixture postgres)
         customer.EnableAsCustomer();
         db.Add(customer);
         var code = $"TEST-{Guid.NewGuid():N}";
-        var product = new Product(Guid.NewGuid(), code, code, "Articolo test", 0m, 22m, 10m)
+        var product = new Product(Guid.NewGuid(), code, code, "Articolo test", 22m, 10m)
             { SellingPrice = 23.12345678m };
         db.Add(product);
         var variant = new ProductVariant(product.Id, code, 10m, product.SupplierId)
@@ -60,12 +60,11 @@ public class PostgreSqlPriceListTests(PostgreSqlContainerFixture postgres)
         Assert.True(catalogPrice.Success, catalogPrice.Error);
         Assert.Equal(17.12345678m, catalogPrice.Data!.Value);
         persistedVariant.PurchaseCost = 999m;
-        persistedVariant.Product.DefaultMarkupRate = 200.25m;
+        persistedVariant.Product.Name = "Articolo test aggiornato";
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
         persistedVariant = await db.ProductVariants.Include(item => item.Product).SingleAsync(item => item.Id == variant.Id);
         Assert.Equal(17.12345678m, persistedVariant.SellingPrice);
-        Assert.Null(persistedVariant.MarkupRate);
         Assert.Equal(17.12345678m, new CatalogPriceCalculator().GetStoredPrice(persistedVariant).Data!.Value);
         var calculator = new ItalianAccountingCalculator();
         var repository = new PriceListRepository(db);

@@ -4,7 +4,6 @@ using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Domain.Repositories;
-using Mauw.Erp.Domain.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Mauw.Erp.Api.Endpoints;
@@ -20,10 +19,6 @@ public static class ProductEndpoints
         var group = app.MapGroup("/api/v1/products")
             .WithTags("Products")
             .RequireAuthorization(AppPolicies.AnyRole);
-
-        group.MapPost("/calculate-selling-price", CalculateSellingPrice)
-            .WithName("CalculateSellingPrice")
-            .WithSummary("[Obsoleto: sostituito da price-formula/calculate] Calculate a net selling price for entry only; does not save a pricing policy");
 
         group.MapPost("/", CreateProduct)
             .RequireAuthorization(AppPolicies.CatalogManagement)
@@ -83,17 +78,6 @@ public static class ProductEndpoints
             .RequireAuthorization(AppPolicies.CatalogManagement)
             .WithName("DeleteProductVariant")
             .WithSummary("Delete a product variant");
-    }
-
-    private static Results<Ok<decimal>, BadRequest<string>> CalculateSellingPrice(
-        CalculateSellingPriceRequest request, CatalogPriceCalculator calculator)
-    {
-        if (!request.PurchaseCost.HasValue || !request.MarkupRate.HasValue)
-            return TypedResults.BadRequest("Specificare costo di acquisto e ricarico percentuale.");
-        var result = calculator.FromMarkup(request.PurchaseCost.Value, request.MarkupRate.Value);
-        if (!result.Success)
-            return TypedResults.BadRequest(result.Error);
-        return TypedResults.Ok(result.Data!.Value);
     }
 
     private static async Task<Results<Created<ProductDto>, BadRequest<string>>> CreateProduct(

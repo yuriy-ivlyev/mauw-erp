@@ -19,10 +19,9 @@ Nome nel codice: `PriceFormula` e `PriceFormulaStep`.
 ## Stato attuale (sintesi)
 
 - `Product.SellingPrice` e `ProductVariant.SellingPrice`: `numeric(22,8)`, già fissi.
-- `CatalogPriceCalculator.FromMarkup` + `POST /api/v1/products/calculate-selling-price`:
-  un solo ricarico %, nessuna configurazione, nessun arrotondamento a decimi.
-- `Product.DefaultMarkupRate` e `ProductVariant.MarkupRate`: legacy, non usati.
-- `PricingEngine`: iniettato in `InventoryService` ma mai usato.
+- Rimossi (migrazione `RemoveLegacyMarkupRates`): `CatalogPriceCalculator.FromMarkup`,
+  `POST /api/v1/products/calculate-selling-price`, `Product.DefaultMarkupRate`,
+  `ProductVariant.MarkupRate` e `PricingEngine` (con la sua iniezione in `InventoryService`).
 - `PurchaseCost` della variante è `numeric(18,4)` e cambia solo a mano.
 - Non esistono provvigioni agenzia né sconti fornitore nel modello.
 - Le API `products` e `settings/company` non hanno restrizioni di ruolo lato server.
@@ -61,15 +60,19 @@ Conseguenze delle decisioni:
 - Arrotondare il totale di una fattura non fa parte del calcolo: se serve, l'operatore inserisce a mano uno sconto
   sul totale. Il sistema può proporlo, ma non lo applica da solo. Vedi punto aperto F.
 
-### Dettaglio sulla decisione 8 (candidati alla rimozione)
+### Dettaglio sulla decisione 8 (rimozione eseguita)
+
+Rimossi, con la migrazione `RemoveLegacyMarkupRates` (generata con `dotnet ef migrations add`):
 
 - `Product.DefaultMarkupRate` e `ProductVariant.MarkupRate` (colonne e codice).
 - `PricingEngine` e la sua iniezione in `InventoryService`.
 - `POST /api/v1/products/calculate-selling-price` e `CatalogPriceCalculator.FromMarkup`, sostituiti dal nuovo modulo.
-- Da verificare prima di toccarla: la regola di listino `CostMarkup`, che calcola un prezzo dal costo.
 
-La rimozione delle colonne richiede una migrazione generata con `dotnet ef migrations add`.
-Non deve riscrivere importi o classificazioni di documenti storici.
+La migrazione elimina solo le due colonne e non riscrive importi o classificazioni di documenti storici.
+Il `Down` le ricrea (`default_markup_rate` numeric(6,2) NOT NULL default 0, `markup_rate` numeric(6,2) NULL),
+ma i valori eliminati non sono recuperabili.
+
+Non rimossa: la regola di listino `CostMarkup` (vedi punto G).
 
 ## Matrice dei ruoli (bozza)
 
@@ -121,7 +124,7 @@ richiedono righe esplicite con aliquota e Natura e un castelletto IVA coerente.
 
 ### G. Regola di listino `CostMarkup`
 
-Verificare se è usata in qualche listino. Se non lo è, si rimuove con il resto del legacy.
+Non rimossa nella pulizia del legacy: prima va verificato sul database reale che nessuna regola sia di questo tipo `SELECT COUNT(*) FROM price_list_rules WHERE calculation_type = 'CostMarkup';`. Se il risultato è 0, si potranno rimuovere il tipo di regola e il ramo del resolver.
 
 ### H. Accesso del magazziniere al documento di spedizione
 

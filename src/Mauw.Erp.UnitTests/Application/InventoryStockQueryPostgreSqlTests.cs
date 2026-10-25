@@ -56,7 +56,7 @@ public sealed class InventoryStockQueryPostgreSqlTests(PostgreSqlContainerFixtur
                 address.Id,
                 isSellable: true,
                 isDefault: true);
-            var product = new Product(supplier.Id, code, code, "Articolo valorizzazione", 0m, 22m, 9m);
+            var product = new Product(supplier.Id, code, code, "Articolo valorizzazione", 22m, 9m);
             seed.AddRange(warehouse, product);
             await seed.SaveChangesAsync();
 
@@ -144,7 +144,7 @@ public sealed class InventoryStockQueryPostgreSqlTests(PostgreSqlContainerFixtur
                 address.Id,
                 isSellable: true,
                 isDefault: true);
-            var product = new Product(supplier.Id, code, code, "Articolo mastrino", 0m, 22m, 9m);
+            var product = new Product(supplier.Id, code, code, "Articolo mastrino", 22m, 9m);
             seed.AddRange(warehouse, product);
             await seed.SaveChangesAsync();
 
@@ -231,7 +231,7 @@ public sealed class InventoryStockQueryPostgreSqlTests(PostgreSqlContainerFixtur
                 address.Id,
                 isSellable: true,
                 isDefault: false);
-            var product = new Product(supplier.Id, code, code, "Articolo inventario", 0m, 22m, 8m);
+            var product = new Product(supplier.Id, code, code, "Articolo inventario", 22m, 8m);
             seed.AddRange(warehouse, secondaryWarehouse, product);
             await seed.SaveChangesAsync();
 
@@ -403,7 +403,7 @@ public sealed class InventoryStockQueryPostgreSqlTests(PostgreSqlContainerFixtur
                 address.Id,
                 isSellable: true,
                 isDefault: true);
-            var product = new Product(supplier.Id, code, code, "Articolo riconciliazione", 0m, 22m, 9m);
+            var product = new Product(supplier.Id, code, code, "Articolo riconciliazione", 22m, 9m);
             seed.AddRange(warehouse, product);
             await seed.SaveChangesAsync();
 

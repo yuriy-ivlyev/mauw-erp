@@ -198,7 +198,7 @@ public class SupplierDeliveryNotePostgreSqlTests(PostgreSqlContainerFixture post
         var code = Guid.NewGuid().ToString("N");
         var warehouse = new Warehouse(code[..16], "DDT test", WarehouseType.Standard, address.Id, true);
         db.Add(warehouse);
-        var product = new Product(supplier.Id, code, code, "Maglia M", 0m, 22m, 12m);
+        var product = new Product(supplier.Id, code, code, "Maglia M", 22m, 12m);
         db.Add(product);
         var variant = new ProductVariant(product.Id, code, 12m, product.SupplierId) { Product = product };
         db.Add(variant);

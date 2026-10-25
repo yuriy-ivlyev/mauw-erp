@@ -161,7 +161,7 @@ src/
 │   ├── Repositories/
 │   │   └── IRepositories.cs             ✅ All interfaces
 │   └── Services/
-│       └── PricingEngine.cs             ✅ Domain service
+│       └── CatalogPriceCalculator.cs    ✅ Domain service (PricingEngine removed)
 │
 └── Mauw.Erp.Infrastructure/
     ├── DbContext/

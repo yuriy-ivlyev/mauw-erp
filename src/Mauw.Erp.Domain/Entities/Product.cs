@@ -9,8 +9,6 @@ public class Product : Entity<Guid>
     public string SupplierCode { get; set; }
     public string Barcode { get; set; }
     public string Name { get; set; }
-    // Legacy data only; never used to resolve or update selling prices.
-    public decimal DefaultMarkupRate { get; set; }
     public decimal? SellingPrice { get; set; }
     public decimal VatRate { get; set; }
     public decimal BasePurchaseCost { get; set; }
@@ -30,7 +28,6 @@ public class Product : Entity<Guid>
         string supplierCode,
         string barcode,
         string name,
-        decimal defaultMarkupRate,
         decimal vatRate,
         decimal basePurchaseCost,
         Guid? categoryId = null,
@@ -43,7 +40,6 @@ public class Product : Entity<Guid>
         SupplierCode = supplierCode;
         Barcode = barcode;
         Name = name;
-        DefaultMarkupRate = defaultMarkupRate;
         VatRate = vatRate;
         BasePurchaseCost = basePurchaseCost;
         CategoryId = categoryId;
@@ -57,7 +53,6 @@ public class Product : Entity<Guid>
         string supplierCode,
         string barcode,
         string name,
-        decimal defaultMarkupRate,
         decimal vatRate,
         decimal basePurchaseCost,
         Guid? categoryId = null,
@@ -69,7 +64,6 @@ public class Product : Entity<Guid>
         SupplierCode = supplierCode;
         Barcode = barcode;
         Name = name;
-        DefaultMarkupRate = defaultMarkupRate;
         VatRate = vatRate;
         BasePurchaseCost = basePurchaseCost;
         CategoryId = categoryId;

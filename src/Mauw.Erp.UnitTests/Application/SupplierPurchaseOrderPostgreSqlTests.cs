@@ -34,7 +34,7 @@ public sealed class SupplierPurchaseOrderPostgreSqlTests(PostgreSqlContainerFixt
             var code = Guid.NewGuid().ToString("N");
             var warehouse = new Warehouse(code[..16], "Ordini test", WarehouseType.Standard, address.Id, true);
             seed.Add(warehouse);
-            var product = new Product(supplier.Id, code, code, "Giacca test", 0m, 22m, 10m);
+            var product = new Product(supplier.Id, code, code, "Giacca test", 22m, 10m);
             seed.Add(product);
             var variant = new ProductVariant(product.Id, code, 10m, product.SupplierId) { Product = product };
             seed.Add(variant);

@@ -19,7 +19,6 @@
   - [x] supplierCode
   - [x] barcode (required)
   - [x] name (required)
-  - [x] defaultMarkupRate
   - [x] vatRate
 - [x] Add dropdowns:
   - [x] categoryId (nullable) - select from categories
@@ -176,7 +175,7 @@
 
 ### Scenario 6: Edit Product Details
 1. Edit product, on Dettagli tab
-2. Change name and markup rate
+2. Change name and VAT rate
 3. Select a category
 4. Click "Salva"
 5. Verify: Changes saved, product list updated

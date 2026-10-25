@@ -1,5 +1,6 @@
 using Mauw.Erp.DataGenerator;
 using Mauw.Erp.Domain.Enums;
+using Mauw.Erp.Domain.Pricing;
 using Mauw.Erp.Domain.Services;
 using Mauw.Erp.Infrastructure.DbContext;
 using Mauw.Erp.UnitTests.Application;
@@ -68,8 +69,9 @@ public class SimulationTests(PostgreSqlContainerFixture postgres)
             Assert.Contains(children.Count, new[] { 35, 42 });
             Assert.Equal(7, children.Select(item => item.SizeId).Distinct().Count());
             Assert.InRange(product.BasePurchaseCost, 5m, 40m);
-            var markedUp = new CatalogPriceCalculator().FromMarkup(product.BasePurchaseCost, 40m);
-            Assert.Equal(decimal.Ceiling(markedUp.Data!.Value * 10m) / 10m, product.SellingPrice);
+            var expected = new PriceFormulaCalculator().Calculate(product.BasePurchaseCost,
+                new PriceFormulaDefinition([new("Ricarico", 40m), new("Provvigione", 10m)], 0.10m));
+            Assert.Equal(expected.Data!.FinalPrice, product.SellingPrice);
         }
         var customers = await db.CustomerProfiles.AsNoTracking().ToListAsync();
         Assert.Equal(options.Customers * 3 / 10, customers.Count(item => item.DefaultAgentId.HasValue));
@@ -344,6 +346,6 @@ public class SimulationTests(PostgreSqlContainerFixture postgres)
     private MauwDbContext Context() => postgres.CreateDbContext();
 
     private static SimulationGenerator Generator(MauwDbContext db) => new(
-        db, new ItalianAccountingCalculator(), new CatalogPriceCalculator(),
+        db, new ItalianAccountingCalculator(), new PriceFormulaCalculator(),
         NullLogger<SimulationGenerator>.Instance);
 }

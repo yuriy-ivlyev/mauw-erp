@@ -67,7 +67,6 @@ public sealed class AuthorizationMatrixHost : IAsyncLifetime
         services.AddScoped<IValidator<CreateInvoiceRequest>, CreateInvoiceRequestValidator>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddPricingApi();
-        services.AddScoped<Mauw.Erp.Domain.Services.PricingEngine>();
         services.AddInvoicePdfReporting();
         services.AddInventoryStockReporting();
         services.AddCompanyBranding();
@@ -157,7 +156,6 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
                      $"/api/v1/products/{Id}/variants"
                  })
             Add("GET", read, All);
-        Add("POST", "/api/v1/products/calculate-selling-price", All);
         Add("POST", "/api/v1/products", AdminWarehouse);
         Add("PUT", $"/api/v1/products/{Id}", AdminWarehouse);
         Add("DELETE", $"/api/v1/products/{Id}", AdminWarehouse);

@@ -146,7 +146,8 @@ Idempotenza: seed non e un upsert; rifiuta database gia popolati. A parita di
 --seed, --end-date e opzioni, i dati anagrafici, i prezzi e la distribuzione
 sono identici tra esecuzioni (verificato dai test); cambiano solo Id e timestamp.
 
-Costi netti 5–40 EUR; ricarico 40%, prezzo di vendita per eccesso a 0,10 EUR.
+Costi netti 5–40 EUR; prezzo di vendita netto dalla formula prezzi demo fissa
+(+40% e +10% a cascata, arrotondato per eccesso a 0,10 EUR).
 Esempio coerente: 20,2653 -> 20,30; 19,8679 -> 19,90.
 L'esempio originale 19,8679 -> 20,00 e incompatibile con un passo fisso
 di 0,10: non e stata inventata una soglia commerciale diversa sotto 20 EUR.

@@ -200,15 +200,14 @@ public class InventoryServiceTests
         unitOfWork.SetupGet(work => work.Stock).Returns(stock.Object);
         var service = new InventoryService(
             unitOfWork.Object,
-            new BarcodeScanRequestValidator(),
-            new PricingEngine());
+            new BarcodeScanRequestValidator());
         return (service, unitOfWork, variants, movements, stock);
     }
 
     private static ProductVariant NewVariant(bool withProduct = true)
     {
         var product = new Product(Guid.NewGuid(), "SUP-1", "PRODUCT-1", "Test product",
-            0m, 22m, 10m, hasVariants: true);
+            22m, 10m, hasVariants: true);
         var variant = new ProductVariant(product.Id, "VARIANT-1", 12.34m, product.SupplierId)
         {
             SellingPrice = 15m

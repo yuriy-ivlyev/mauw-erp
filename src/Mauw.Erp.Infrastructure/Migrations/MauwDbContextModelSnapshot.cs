@@ -1908,11 +1908,6 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<decimal>("DefaultMarkupRate")
-                        .HasPrecision(6, 2)
-                        .HasColumnType("numeric(6,2)")
-                        .HasColumnName("default_markup_rate");
-
                     b.Property<bool>("HasVariants")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -2010,11 +2005,6 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<decimal?>("MarkupRate")
-                        .HasPrecision(6, 2)
-                        .HasColumnType("numeric(6,2)")
-                        .HasColumnName("markup_rate");
 
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid")

@@ -15,8 +15,8 @@ public class ProductBarcodeLookupTests(PostgreSqlContainerFixture postgres)
         await using var db = postgres.CreateDbContext();
         var supplierId = Guid.NewGuid();
         var otherSupplierId = Guid.NewGuid();
-        var product = new Product(supplierId, "CODE-SUPPLIER-1", "BARCODE-1", "Prodotto 1", 0m, 22m, 10m);
-        var otherProduct = new Product(otherSupplierId, "CODE-SUPPLIER-2", "BARCODE-2", "Prodotto 2", 0m, 22m, 10m);
+        var product = new Product(supplierId, "CODE-SUPPLIER-1", "BARCODE-1", "Prodotto 1", 22m, 10m);
+        var otherProduct = new Product(otherSupplierId, "CODE-SUPPLIER-2", "BARCODE-2", "Prodotto 2", 22m, 10m);
         db.Products.AddRange(product, otherProduct);
         await db.SaveChangesAsync();
 
@@ -45,10 +45,10 @@ public class ProductBarcodeLookupTests(PostgreSqlContainerFixture postgres)
         await using var db = postgres.CreateDbContext();
         var supplierId = Guid.NewGuid();
         var barcode = "2901234567896";
-        var simpleProduct = new Product(supplierId, "SUP-SIMPLE", barcode, "Prodotto semplice", 0m, 22m, 10m,
+        var simpleProduct = new Product(supplierId, "SUP-SIMPLE", barcode, "Prodotto semplice", 22m, 10m,
             hasVariants: false);
         var productWithVariants = new Product(supplierId, "SUP-VARIANTS", "2901234567889", "Prodotto variabile",
-            0m, 22m, 10m);
+            22m, 10m);
         db.Products.AddRange(simpleProduct, productWithVariants);
         await db.SaveChangesAsync();
         var simpleVariant = new ProductVariant(simpleProduct.Id, "MNVR-LEGACY-SIMPLE", 10m, supplierId)

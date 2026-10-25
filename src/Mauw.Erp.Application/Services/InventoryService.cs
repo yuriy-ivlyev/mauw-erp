@@ -5,7 +5,6 @@ using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Domain.Entities;
 using Mauw.Erp.Domain.Enums;
 using Mauw.Erp.Domain.Repositories;
-using Mauw.Erp.Domain.Services;
 
 namespace Mauw.Erp.Application.Services;
 
@@ -14,12 +13,9 @@ namespace Mauw.Erp.Application.Services;
 /// </summary>
 public class InventoryService(
     IUnitOfWork unitOfWork,
-    IValidator<BarcodeScanRequest> barcodeValidator,
-    PricingEngine pricingEngine)
+    IValidator<BarcodeScanRequest> barcodeValidator)
     : IInventoryService
 {
-    private readonly PricingEngine _pricingEngine = pricingEngine;
-
     public async Task<OperationResult<StockMovementDto>> ScanBarcodeAsync(BarcodeScanRequest request)
     {
         var validationResult = barcodeValidator.Validate(request);

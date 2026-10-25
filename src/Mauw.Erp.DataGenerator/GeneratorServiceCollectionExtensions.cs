@@ -13,7 +13,7 @@ public static class GeneratorServiceCollectionExtensions
     {
         services.AddLogging(builder => builder.AddSimpleConsole(console => console.SingleLine = true));
         services.AddSingleton<ItalianAccountingCalculator>();
-        services.AddSingleton<CatalogPriceCalculator>();
+        services.AddSingleton<PriceFormulaCalculator>();
         services.AddSingleton<GeneratorRunner>();
         return services;
     }

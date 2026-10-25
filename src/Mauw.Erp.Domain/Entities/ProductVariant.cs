@@ -13,8 +13,6 @@ public class ProductVariant : Entity<Guid>
     public string Barcode { get; set; }
     public decimal PurchaseCost { get; set; }
     public decimal? SellingPrice { get; set; }
-    // Legacy data only; never used to resolve or update selling prices.
-    public decimal? MarkupRate { get; set; }
     public decimal? WeightGrams { get; set; }
     /// <summary>Variant whose images represent the product in lists. At most one per product.</summary>
     public bool VarianteVetrina { get; set; }

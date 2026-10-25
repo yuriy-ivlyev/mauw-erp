@@ -243,21 +243,13 @@ public class PriceFormulaEndpointTests(PostgreSqlContainerFixture postgres)
     }
 
     [Fact]
-    public async Task LegacyCalculationIsMarkedObsoleteInOpenApiAndStillWorks()
+    public async Task OpenApiNoLongerExposesTheLegacyCalculationAndDescribesPriceFormula()
     {
         await using var fixture = await Fixture.CreateAsync(postgres);
-        using var sales = fixture.CreateClient("Sales");
         using var anonymous = fixture.CreateClient(null);
 
-        var legacy = await sales.PostAsJsonAsync("/api/v1/products/calculate-selling-price",
-            new { purchaseCost = 10m, markupRate = 10m });
-        Assert.Equal(HttpStatusCode.OK, legacy.StatusCode);
-        Assert.Equal(11m, await legacy.Content.ReadFromJsonAsync<decimal>());
-
         var document = await anonymous.GetFromJsonAsync<JsonElement>("/swagger/v1/swagger.json");
-        var summary = document.GetProperty("paths").GetProperty("/api/v1/products/calculate-selling-price")
-            .GetProperty("post").GetProperty("summary").GetString();
-        Assert.StartsWith("[Obsoleto: sostituito da price-formula/calculate]", summary);
+        Assert.False(document.GetProperty("paths").TryGetProperty("/api/v1/products/calculate-selling-price", out _));
         Assert.True(document.GetProperty("paths").TryGetProperty(CalculatePath, out _));
         Assert.True(document.GetProperty("paths").GetProperty(FormulaPath).TryGetProperty("put", out _));
     }
@@ -308,7 +300,7 @@ public class PriceFormulaEndpointTests(PostgreSqlContainerFixture postgres)
             using (var scope = app.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<MauwDbContext>();
-                var product = new Product(Guid.NewGuid(), "S", "P", "Test", 0m, 22m, 10m);
+                var product = new Product(Guid.NewGuid(), "S", "P", "Test", 22m, 10m);
                 db.Add(product);
                 var variant = new ProductVariant(product.Id, "SKU", 10m, product.SupplierId)
                 {

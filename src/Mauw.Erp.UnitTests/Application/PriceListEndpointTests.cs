@@ -48,19 +48,14 @@ public class PriceListEndpointTests(PostgreSqlContainerFixture postgres)
     }
 
     [Fact]
-    public async Task MarkupIsATransientDecimalCalculationAndProductsOnlySaveTheFinalPrice()
+    public async Task ProductsOnlySaveTheFinalPriceAndTheRemovedMarkupEndpointIsGone()
     {
         await using var fixture = await Fixture.CreateAsync(postgres);
         using var client = fixture.CreateClient("Sales");
         using var warehouse = fixture.CreateClient("Warehouse");
-        var calculation = await client.PostAsJsonAsync("/api/v1/products/calculate-selling-price",
-            new { purchaseCost = 0.00000005m, markupRate = 10m });
-        Assert.Equal(HttpStatusCode.OK, calculation.StatusCode);
-        Assert.Equal(0.00000006m, await calculation.Content.ReadFromJsonAsync<decimal>());
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(
-            "/api/v1/products/calculate-selling-price", new { purchaseCost = 10m })).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(
-            "/api/v1/products/calculate-selling-price", new { purchaseCost = 10m, markupRate = -1m })).StatusCode);
+        var removed = await client.PostAsJsonAsync("/api/v1/products/calculate-selling-price",
+            new { purchaseCost = 10m, markupRate = 10m });
+        Assert.Contains(removed.StatusCode, new[] { HttpStatusCode.NotFound, HttpStatusCode.MethodNotAllowed });
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/v1/products", new { })).StatusCode);
         var created = await warehouse.PostAsJsonAsync("/api/v1/products", new
         {
@@ -242,7 +237,7 @@ public class PriceListEndpointTests(PostgreSqlContainerFixture postgres)
             using (var scope = app.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<MauwDbContext>();
-                var product = new Product(Guid.NewGuid(), "S", "P", "Test", 0m, 22m, 10m);
+                var product = new Product(Guid.NewGuid(), "S", "P", "Test", 22m, 10m);
                 db.Add(product);
                 var variant = new ProductVariant(product.Id, "SKU", 10m, product.SupplierId)
                 {

@@ -75,7 +75,6 @@ public sealed class CostVisibilityHost : IAsyncLifetime
         services.AddScoped<IValidator<CreateInvoiceRequest>, CreateInvoiceRequestValidator>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddPricingApi();
-        services.AddScoped<Mauw.Erp.Domain.Services.PricingEngine>();
         services.AddInvoicePdfReporting();
         services.AddInventoryStockReporting();
         services.AddCompanyBranding();
@@ -136,9 +135,9 @@ public sealed class CostVisibilityHost : IAsyncLifetime
         db.Add(address);
         await db.SaveChangesAsync();
         var warehouse = new Warehouse("COST-1", "Deposito costi", WarehouseType.Standard, address.Id, true, true);
-        var alfa = new Product(supplier.Id, "SA", "PB-A", "Prodotto Alfa", 0m, 22m, 12.34m);
-        var beta = new Product(supplier.Id, "SB", "PB-B", "Prodotto Beta", 0m, 22m, 5m);
-        var gamma = new Product(supplier.Id, "SG", "PB-G", "Prodotto Gamma", 0m, 22m, 21.43m);
+        var alfa = new Product(supplier.Id, "SA", "PB-A", "Prodotto Alfa", 22m, 12.34m);
+        var beta = new Product(supplier.Id, "SB", "PB-B", "Prodotto Beta", 22m, 5m);
+        var gamma = new Product(supplier.Id, "SG", "PB-G", "Prodotto Gamma", 22m, 21.43m);
         db.AddRange(warehouse, alfa, beta, gamma);
         await db.SaveChangesAsync();
 

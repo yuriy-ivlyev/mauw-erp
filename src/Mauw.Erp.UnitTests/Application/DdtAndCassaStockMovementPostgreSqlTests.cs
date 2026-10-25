@@ -272,7 +272,7 @@ public sealed class DdtAndCassaStockMovementPostgreSqlTests(PostgreSqlContainerF
             code[..16], "Magazzino DDT test", WarehouseType.Standard, address.Id,
             isSellable: true, isDefault: true);
         db.Add(warehouse);
-        var product = new Product(contact.Id, code, code, "Maglia test", 0m, 22m, 12m);
+        var product = new Product(contact.Id, code, code, "Maglia test", 22m, 12m);
         db.Add(product);
         var variant = new ProductVariant(product.Id, code, 12m, contact.Id) { Product = product };
         db.Add(variant);

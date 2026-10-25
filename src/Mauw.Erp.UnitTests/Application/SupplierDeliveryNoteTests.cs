@@ -64,7 +64,7 @@ public class SupplierDeliveryNoteTests(PostgreSqlContainerFixture postgres)
     public async Task ParsedLinesUseSupplierMappingAndDoNotGuessBetweenSizes()
     {
         await using var fixture = await Fixture.CreateAsync(postgres);
-        var product = new Product(fixture.Supplier.Id, "SHIRT", "SHIRT", "Maglia", 0m, 22m, 10m);
+        var product = new Product(fixture.Supplier.Id, "SHIRT", "SHIRT", "Maglia", 22m, 10m);
         var small = new ProductVariant(product.Id, "SMALL", 10m, product.SupplierId) { Product = product };
         var large = new ProductVariant(product.Id, "LARGE", 10m, product.SupplierId) { Product = product };
         fixture.Db.AddRange(product, small, large);
@@ -97,7 +97,7 @@ public class SupplierDeliveryNoteTests(PostgreSqlContainerFixture postgres)
     public async Task ParsedLinesMatchUniqueVariantSupplierCodesBeforeLegacyProductCodes()
     {
         await using var fixture = await Fixture.CreateAsync(postgres);
-        var product = new Product(fixture.Supplier.Id, "SHIRT", "SHIRT", "Maglia", 0m, 22m, 10m);
+        var product = new Product(fixture.Supplier.Id, "SHIRT", "SHIRT", "Maglia", 22m, 10m);
         var small = new ProductVariant(product.Id, "SMALL", 10m, product.SupplierId, supplierCode: "SUP-M") { Product = product };
         var large = new ProductVariant(product.Id, "LARGE", 10m, product.SupplierId, supplierCode: "SUP-L") { Product = product };
         fixture.Db.AddRange(product, small, large);
@@ -129,7 +129,7 @@ public class SupplierDeliveryNoteTests(PostgreSqlContainerFixture postgres)
     public async Task LookupMatchesSupplierVariantOrUniqueProductCodeWithoutSaving(string code, bool multipleVariants)
     {
         await using var fixture = await Fixture.CreateAsync(postgres);
-        var product = new Product(fixture.Supplier.Id, "SHIRT", "SHIRT", "Maglia", 0m, 22m, 10m);
+        var product = new Product(fixture.Supplier.Id, "SHIRT", "SHIRT", "Maglia", 22m, 10m);
         var variant = new ProductVariant(product.Id, code.StartsWith("290", StringComparison.Ordinal) ? code : "SMALL",
             10m, product.SupplierId, supplierCode: "SUP-M")
         {
@@ -141,7 +141,7 @@ public class SupplierDeliveryNoteTests(PostgreSqlContainerFixture postgres)
         var otherSupplier = new Contact("Altro fornitore con gli stessi codici");
         otherSupplier.EnableAsSupplier();
         fixture.Db.Add(otherSupplier);
-        var otherProduct = new Product(otherSupplier.Id, "SHIRT", "OTHER-SHIRT", "Altra maglia", 0m, 22m, 10m);
+        var otherProduct = new Product(otherSupplier.Id, "SHIRT", "OTHER-SHIRT", "Altra maglia", 22m, 10m);
         var otherVariant = new ProductVariant(otherProduct.Id, "OTHER-M", 10m, otherSupplier.Id, supplierCode: "SUP-M")
         {
             Product = otherProduct
@@ -171,12 +171,12 @@ public class SupplierDeliveryNoteTests(PostgreSqlContainerFixture postgres)
     public async Task SavingAndParsingMatchVariantBarcodesWithinTheSupplier(bool parsed)
     {
         await using var fixture = await Fixture.CreateAsync(postgres);
-        var product = new Product(fixture.Supplier.Id, "SHIRT", "SHIRT", "Maglia", 0m, 22m, 10m);
+        var product = new Product(fixture.Supplier.Id, "SHIRT", "SHIRT", "Maglia", 22m, 10m);
         var small = new ProductVariant(product.Id, "2900001444804", 10m, product.SupplierId) { Product = product };
         var large = new ProductVariant(product.Id, "2900001450614", 10m, product.SupplierId) { Product = product };
         var otherSupplier = new Contact("Altro fornitore");
         otherSupplier.EnableAsSupplier();
-        var otherProduct = new Product(otherSupplier.Id, "OTHER", "OTHER", "Altro articolo", 0m, 22m, 10m);
+        var otherProduct = new Product(otherSupplier.Id, "OTHER", "OTHER", "Altro articolo", 22m, 10m);
         var otherVariant = new ProductVariant(otherProduct.Id, "OTHER-BARCODE", 10m, otherSupplier.Id) { Product = otherProduct };
         fixture.Db.AddRange(product, small, large, otherSupplier, otherProduct, otherVariant);
         await fixture.Db.SaveChangesAsync();
@@ -208,13 +208,13 @@ public class SupplierDeliveryNoteTests(PostgreSqlContainerFixture postgres)
     public async Task LookupDoesNotGuessAmbiguousCodesOrUseAnotherSuppliersArticles()
     {
         await using var fixture = await Fixture.CreateAsync(postgres);
-        var product = new Product(fixture.Supplier.Id, "SHIRT", "SHIRT", "Maglia", 0m, 22m, 10m);
+        var product = new Product(fixture.Supplier.Id, "SHIRT", "SHIRT", "Maglia", 22m, 10m);
         var small = new ProductVariant(product.Id, "SMALL", 10m, product.SupplierId, supplierCode: "SUP-M") { Product = product };
         var large = new ProductVariant(product.Id, "LARGE", 10m, product.SupplierId, supplierCode: "SUP-L") { Product = product };
         var otherSupplier = new Contact("Altro fornitore");
         otherSupplier.EnableAsSupplier();
         fixture.Db.Add(otherSupplier);
-        var otherProduct = new Product(otherSupplier.Id, "OTHER", "OTHER", "Altro articolo", 0m, 22m, 10m);
+        var otherProduct = new Product(otherSupplier.Id, "OTHER", "OTHER", "Altro articolo", 22m, 10m);
         var otherVariant = new ProductVariant(otherProduct.Id, "OTHER-M", 10m, otherSupplier.Id, supplierCode: "SUP-OTHER")
         {
             Product = otherProduct
@@ -242,10 +242,10 @@ public class SupplierDeliveryNoteTests(PostgreSqlContainerFixture postgres)
         await using var fixture = await Fixture.CreateAsync(postgres);
         const string code = "2900001444804";
         var product = new Product(fixture.Supplier.Id, source == "product" ? code : "SHIRT",
-            "SHIRT", "Maglia", 0m, 22m, 10m);
+            "SHIRT", "Maglia", 22m, 10m);
         var variant = new ProductVariant(product.Id, "SHIRT-M", 10m, product.SupplierId,
             supplierCode: source == "variant" ? code : null) { Product = product };
-        var otherProduct = new Product(fixture.Supplier.Id, "OTHER", "OTHER", "Altro articolo", 0m, 22m, 10m);
+        var otherProduct = new Product(fixture.Supplier.Id, "OTHER", "OTHER", "Altro articolo", 22m, 10m);
         var barcodeVariant = new ProductVariant(otherProduct.Id, code, 10m, otherProduct.SupplierId) { Product = otherProduct };
         fixture.Db.AddRange(product, variant, otherProduct, barcodeVariant);
         if (source == "mapping")
@@ -350,7 +350,7 @@ public class SupplierDeliveryNoteTests(PostgreSqlContainerFixture postgres)
     public async Task CrossSupplierMappingAndTooPrecisePricesAreRejected()
     {
         await using var fixture = await Fixture.CreateAsync(postgres);
-        var product = new Product(Guid.NewGuid(), "OTHER", "OTHER", "Altro", 0m, 22m, 10m);
+        var product = new Product(Guid.NewGuid(), "OTHER", "OTHER", "Altro", 22m, 10m);
         var variant = new ProductVariant(product.Id, "OTHER", 10m, product.SupplierId) { Product = product };
         fixture.Db.AddRange(product, variant);
         await fixture.Db.SaveChangesAsync();

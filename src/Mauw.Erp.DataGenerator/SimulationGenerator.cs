@@ -2,6 +2,7 @@ using Bogus;
 using Mauw.Erp.Domain.Accounting;
 using Mauw.Erp.Domain.Entities;
 using Mauw.Erp.Domain.Enums;
+using Mauw.Erp.Domain.Pricing;
 using Mauw.Erp.Domain.Services;
 using Mauw.Erp.Infrastructure.DbContext;
 using Microsoft.EntityFrameworkCore;
@@ -13,10 +14,13 @@ namespace Mauw.Erp.DataGenerator;
 public sealed class SimulationGenerator(
     MauwDbContext db,
     ItalianAccountingCalculator accounting,
-    CatalogPriceCalculator prices,
+    PriceFormulaCalculator prices,
     ILogger<SimulationGenerator> logger)
 {
     private int pendingEntities;
+    // Fixed demo formula (not read from the database): +40%, +10%, rounded up to 0.10 EUR.
+    private static readonly PriceFormulaDefinition DemoPriceFormula = new(
+        [new PriceFormulaStepDefinition("Ricarico", 40m), new PriceFormulaStepDefinition("Provvigione", 10m)], 0.10m);
     private static readonly string[] SizeCodes = ["XXS", "XS", "S", "M", "L", "XL", "XXL"];
     private static readonly (string Name, string Html)[] Palette =
     [
@@ -260,17 +264,17 @@ public sealed class SimulationGenerator(
         for (var i = 0; i < state.Options.Products; i++)
         {
             var cost = state.Faker.Random.Int(500, 4000) / 100m;
-            var markedUp = prices.FromMarkup(cost, 40m);
-            if (!markedUp.Success)
-                return AccountingResult<SimulationOptions>.Fail(markedUp.Error);
-            var selling = decimal.Ceiling(markedUp.Data!.Value * 10m) / 10m;
+            var priced = prices.Calculate(cost, DemoPriceFormula);
+            if (!priced.Success)
+                return AccountingResult<SimulationOptions>.Fail(priced.Error);
+            var selling = priced.Data!.FinalPrice;
             var supplier = i % 5 != 4
                 ? (i / 5 * 4 + i % 5) % state.DominantCount
                 : state.DominantCount + (i / 5) % (state.Options.Suppliers - state.DominantCount);
             var date = introductions[i] == default ? state.Options.EndDate : introductions[i];
             var product = new Product(state.Suppliers[supplier], $"S{i + 1:D6}",
                 BarcodeFactory.Ean13(InternalProductCodeSequenceStart + i),
-                $"Modello {i + 1:D6}", 40m, 22m, cost) { SellingPrice = selling };
+                $"Modello {i + 1:D6}", 22m, cost) { SellingPrice = selling };
             Track(product, date);
             var variantIds = new List<Guid>();
             var colors = state.Faker.Random.Int(5, 6);
@@ -283,7 +287,6 @@ public sealed class SimulationGenerator(
                     {
                         SupplierCode = $"{product.SupplierCode}-G{color:D2}-{size}",
                         SellingPrice = selling,
-                        MarkupRate = 40m,
                         VarianteVetrina = variantIds.Count == 0
                     };
                     Track(variant, date);

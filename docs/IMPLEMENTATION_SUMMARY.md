@@ -157,11 +157,12 @@ IVA esclusa e prima degli sconti**, persistito a otto decimali sulla SKU e,
 solo per prodotti semplici, anche sul prodotto. Le API ricevono questo valore, non una formula,
 una modalita o una percentuale. Anche zero e un prezzo esplicito valido.
 
-- Il form permette l'inserimento diretto oppure l'azione **Applica ricarico al
-  prezzo**. Quest'ultima usa `POST /api/v1/products/calculate-selling-price` con
-  `purchaseCost` e `markupRate`, calcolati in `decimal` dal backend e arrotondati
-  a otto decimali `AwayFromZero`. E un aiuto transitorio: non salva nulla.
-  Successivamente si salva solo `sellingPrice`; il ricarico non viene ricordato.
+- Il form permette l'inserimento diretto oppure il calcolo dalla Formula prezzi
+  (solo Admin): `POST /api/v1/products/price-formula/calculate` con `purchaseCost`,
+  calcolato in `decimal` dal backend. E un aiuto transitorio: non salva nulla.
+  Successivamente si salva solo `sellingPrice`; la formula non viene ricordata sul prodotto.
+  Il vecchio ricarico (`DefaultMarkupRate`, `MarkupRate`, `calculate-selling-price`)
+  e stato rimosso (migrazione `RemoveLegacyMarkupRates`).
 - `HasVariants` distingue prodotti con colore/taglia (default) e articoli semplici.
   Anche colore singolo e taglia unica sono un prodotto con varianti.
   Sul padre con varianti il prezzo non e richiesto ne mostrato: le scritture
@@ -235,7 +236,7 @@ una modalita o una percentuale. Anche zero e un prezzo esplicito valido.
 Three tabs: Dettagli Prodotto | Varianti | Galleria (last two only show when editing)
 
 #### Tab 1: Dettagli Prodotto (Product Details)
-- Existing fields: Codice Interno, Nome Prodotto, Codice Fornitore, Markup Rate, VAT Rate
+- Existing fields: Codice Interno, Nome Prodotto, Codice Fornitore, VAT Rate
 - New dropdowns:
   - Categoria (nullable)
   - Collezione (nullable)

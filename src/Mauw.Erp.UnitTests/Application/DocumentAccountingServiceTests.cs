@@ -250,7 +250,7 @@ public class DocumentAccountingServiceTests
 
         public Fixture()
         {
-            var product = new Product(Guid.NewGuid(), "SUP", "SKU", "Articolo", 0m, 22m, 10m);
+            var product = new Product(Guid.NewGuid(), "SUP", "SKU", "Articolo", 22m, 10m);
             Variant = new(product.Id, "123", 10m, product.SupplierId);
             Invoice = new(Contact.Id, "INV-TEST");
             UnitOfWork.Setup(work => work.Invoices.GetByIdAsync(Invoice.Id)).ReturnsAsync(Invoice);

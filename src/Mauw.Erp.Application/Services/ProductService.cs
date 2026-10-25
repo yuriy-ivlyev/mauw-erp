@@ -1,4 +1,4 @@
-﻿using Mauw.Erp.Application.Mappers;
+using Mauw.Erp.Application.Mappers;
 using Mauw.Erp.Application.Validation;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
@@ -36,7 +36,6 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             supplierCode: request.SupplierCode,
             barcode: request.Barcode,
             name: request.Name,
-            defaultMarkupRate: 0m,
             vatRate: request.VatRate,
             basePurchaseCost: request.BasePurchaseCost,
             categoryId: request.CategoryId,
@@ -123,7 +122,6 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             supplierCode: request.SupplierCode,
             barcode: request.Barcode,
             name: request.Name,
-            defaultMarkupRate: product.DefaultMarkupRate,
             vatRate: request.VatRate,
             basePurchaseCost: request.BasePurchaseCost,
             categoryId: request.CategoryId,
