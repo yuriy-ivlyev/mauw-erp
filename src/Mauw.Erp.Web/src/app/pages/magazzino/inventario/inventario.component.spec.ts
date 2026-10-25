@@ -15,7 +15,10 @@ import { InventarioComponent } from './inventario.component';
 
 describe('InventarioComponent', () => {
   const authWithRoles = (roles: string[]) =>
-    ({ hasRole: (role: string) => roles.includes(role) }) as unknown as AuthService;
+    ({
+      hasRole: (role: string) => roles.includes(role),
+      canSeeCosts: () => roles.includes('Admin') || roles.includes('Accounting')
+    }) as unknown as AuthService;
   let inventoryService: jasmine.SpyObj<InventoryStockService>;
   let warehouseService: jasmine.SpyObj<WarehouseService>;
   let productService: jasmine.SpyObj<ProductService>;
@@ -274,6 +277,71 @@ describe('InventarioComponent', () => {
         expect(inventoryService.getStocks.calls.mostRecent().args[0].atDate).toBeUndefined();
         expect(inventoryService.getSummary.calls.mostRecent().args[0].atDate).toBeUndefined();
         expect(inventoryService.getMovements.calls.mostRecent().args[2]).toBeUndefined();
+      });
+    }
+  });
+
+  describe('cost visibility', () => {
+    const redactedStock: InventoryStock = { ...stock, unitCost: null, totalValue: null, costSource: null };
+    const redactedMovements: InventoryStockMovementsResponse = {
+      ...movementsResponse, items: [{ ...movementsResponse.items[0], unitCost: null }]
+    };
+    const redactedSummary: InventoryStocksSummary = {
+      ...stockSummary, totals: { ...stockSummary.totals, totalValue: null }
+    };
+
+    function render(roles: string[], redacted: boolean) {
+      TestBed.resetTestingModule();
+      if (redacted) {
+        inventoryService.getStocks.and.returnValue(of({ ...stockPage, items: [redactedStock] }));
+        inventoryService.getSummary.and.returnValue(of(redactedSummary));
+        inventoryService.getMovements.and.returnValue(of(redactedMovements));
+      }
+      TestBed.configureTestingModule({
+        imports: [InventarioComponent],
+        providers: [
+          { provide: InventoryStockService, useValue: inventoryService },
+          { provide: WarehouseService, useValue: warehouseService },
+          { provide: ProductService, useValue: productService },
+          { provide: AuthService, useValue: authWithRoles(roles) }
+        ]
+      });
+      const fixture = TestBed.createComponent(InventarioComponent);
+      fixture.detectChanges();
+      fixture.componentInstance.openMovements(redacted ? redactedStock : stock);
+      fixture.detectChanges();
+      return fixture;
+    }
+
+    for (const role of ['Admin', 'Accounting']) {
+      it(`shows costs, valuation, sort headers and the method selector for ${role}`, () => {
+        const html: HTMLElement = render([role], false).nativeElement;
+        expect(html.textContent).toContain('Valore complessivo');
+        expect(html.textContent).toContain('Valore totale');
+        expect(html.textContent).toContain('Costo unitario');
+        expect(html.textContent).toContain('10.00 €');
+        expect(html.textContent).toContain('50.00 €');
+        expect(html.querySelector('th[appSortHeader="unitCost"]')).not.toBeNull();
+        expect(html.querySelector('th[appSortHeader="totalValue"]')).not.toBeNull();
+        expect(html.querySelector('select[aria-label="Metodo di valorizzazione"]')).not.toBeNull();
+        expect(html.textContent).toContain('Costo da movimenti di carico');
+      });
+    }
+
+    for (const role of ['Sales', 'Warehouse']) {
+      it(`hides every cost and valuation element and survives null values for ${role}`, () => {
+        const html: HTMLElement = render([role], true).nativeElement;
+        expect(html.textContent).toContain('SKU-1');
+        expect(html.textContent).toContain('DDT-1');
+        for (const label of ['Valore complessivo', 'Valore totale', 'Costo unitario', 'Metodo di valorizzazione',
+          'Costo medio ponderato', 'Ultimo costo', 'Costo da movimenti', 'Costo da anagrafica']) {
+          expect(html.textContent).withContext(`${role}: ${label}`).not.toContain(label);
+        }
+        expect(html.querySelector('th[appSortHeader="unitCost"]')).toBeNull();
+        expect(html.querySelector('th[appSortHeader="totalValue"]')).toBeNull();
+        expect(html.querySelector('select[aria-label="Metodo di valorizzazione"]')).toBeNull();
+        expect(html.textContent).not.toMatch(/NaN|\bnull\b|€\s*€/);
+        expect(html.textContent).not.toContain('€');
       });
     }
   });

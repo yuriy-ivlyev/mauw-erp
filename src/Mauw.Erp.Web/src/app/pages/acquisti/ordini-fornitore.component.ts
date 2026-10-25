@@ -83,7 +83,7 @@ import {
                 class="block w-full border-b p-3 text-left hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
                 (click)="addVariant(variant)">
                 <span class="block font-medium">{{ variant.productName }}<ng-container *ngIf="variant.colorName || variant.sizeName"> · {{ variant.colorName }} / {{ variant.sizeName }}</ng-container></span>
-                <span class="text-xs text-gray-500">SKU: {{ variant.sku || variant.barcode }} · Cod. fornitore: {{ variant.supplierCode || '—' }} · Costo: {{ variant.purchaseCost }}</span>
+                <span class="text-xs text-gray-500">SKU: {{ variant.sku || variant.barcode }} · Cod. fornitore: {{ variant.supplierCode || '—' }}{{ variant.purchaseCost != null ? ' · Costo: ' + variant.purchaseCost : '' }}</span>
               </button>
             </div>
             <p *ngIf="searchDone && !variants.length" class="py-6 text-center text-sm text-gray-500">
@@ -284,7 +284,7 @@ export class OrdiniFornitoreComponent implements OnInit, OnDestroy {
       articleVariantId: variant.variantId,
       articleDescription: details ? `${variant.productName} - ${details}` : variant.productName,
       quantityOrdered: 1,
-      unitCost: variant.purchaseCost.toString()
+      unitCost: variant.purchaseCost?.toString() ?? ''
     });
     this.closeArticleSearch();
   }

@@ -29,6 +29,8 @@ import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.dir
 })
 export class InventarioComponent implements OnInit, OnDestroy {
   readonly canFilterByDate: boolean;
+  // Costi e valorizzazioni sono omessi dal server per i ruoli diversi da Admin e Accounting.
+  readonly canSeeCosts: boolean;
   readonly stockItems = signal<InventoryStock[]>([]);
   readonly warehouses = signal<WarehouseSummary[]>([]);
   readonly categories = signal<CategoryDto[]>([]);
@@ -105,6 +107,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
   ) {
     // Il server risponde 403 alle richieste storiche (atDate) per ruoli diversi da Admin e Accounting.
     this.canFilterByDate = this.auth.hasRole('Admin') || this.auth.hasRole('Accounting');
+    this.canSeeCosts = this.auth.canSeeCosts();
   }
 
   ngOnInit(): void {

@@ -35,6 +35,16 @@ export class AuthService {
     return this.userSignal().roles?.includes(role) ?? false;
   }
 
+  /** Costi e valorizzazioni: solo Admin e Accounting (il server li omette agli altri ruoli). */
+  canSeeCosts(): boolean {
+    return this.hasRole('Admin') || this.hasRole('Accounting');
+  }
+
+  /** Margini e ricarico sul costo: solo Admin. */
+  canSeeMargins(): boolean {
+    return this.hasRole('Admin');
+  }
+
   get primaryRole(): string {
     return this.userSignal().roles?.[0] ?? '';
   }

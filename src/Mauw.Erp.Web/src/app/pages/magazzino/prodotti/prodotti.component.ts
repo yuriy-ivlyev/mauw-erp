@@ -1,4 +1,4 @@
-﻿import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
@@ -57,7 +57,7 @@ interface PriceFeedback {
               <th appSortHeader="name" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold">Nome Prodotto</th>
               <th appSortHeader="supplierCode" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold">Fornitore Codice</th>
               <th appSortHeader="variants" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold">Varianti</th>
-              <th appSortHeader="purchaseCost" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold">Prezzo Acquisto</th>
+              <th *ngIf="canSeeCosts" appSortHeader="purchaseCost" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold">Prezzo Acquisto</th>
               <th appSortHeader="sellingPrice" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-6 py-3 text-left text-sm font-semibold">Vendita netta (EUR)</th>
               <th class="px-6 py-3 text-left text-sm font-semibold">Azioni</th>
             </tr>
@@ -87,9 +87,9 @@ interface PriceFeedback {
               <td class="px-6 py-3 text-sm">
                 <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">{{ product.variants.length }}</span>
               </td>
-              <td class="px-6 py-3 text-sm">
+              <td *ngIf="canSeeCosts" class="px-6 py-3 text-sm">
                 <span *ngIf="product.variants.length > 0">
-                  &euro;{{ product.variants[0].purchaseCost.toFixed(2) }}
+                  {{ costLabel(product.variants[0].purchaseCost) }}
                 </span>
               </td>
               <td class="px-6 py-3 text-sm space-x-2">
@@ -106,7 +106,7 @@ interface PriceFeedback {
               </td>
             </tr>
             <tr *ngIf="products.length === 0">
-              <td colspan="8" class="px-6 py-8 text-center text-gray-500">Nessun prodotto trovato</td>
+              <td [attr.colspan]="canSeeCosts ? 8 : 7" class="px-6 py-8 text-center text-gray-500">Nessun prodotto trovato</td>
             </tr>
           </tbody>
         </table>
@@ -191,7 +191,7 @@ interface PriceFeedback {
                   <ng-container *ngTemplateOutlet="priceFeedbackTpl; context: { target: 'product' }"></ng-container>
                   <p class="text-xs text-gray-500">Si salva solo il prezzo netto.</p>
                 </div>
-                <div>
+                <div *ngIf="canSeeCosts || !editingProductId">
                   <label class="block text-sm font-medium mb-1">Prezzo Base Fornitore *</label>
                   <input [(ngModel)]="formData.basePurchaseCost" type="number" step="0.01" min="0"
                     class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -250,7 +250,7 @@ interface PriceFeedback {
                         <th class="px-4 py-3 text-left font-medium">Taglia</th>
                         <th class="px-4 py-3 text-left font-medium">Codice fornitore</th>
                         <th class="px-4 py-3 text-left font-medium">Barcode</th>
-                        <th class="px-4 py-3 text-left font-medium">Costo Acquisto</th>
+                        <th class="px-4 py-3 text-left font-medium">{{ canSeeCosts ? 'Costo Acquisto' : 'Prezzo vendita' }}</th>
                         <th class="px-4 py-3 text-left font-medium">Peso (g)</th>
                         <th class="px-4 py-3 text-center font-medium">Azioni</th>
                       </tr>
@@ -272,7 +272,7 @@ interface PriceFeedback {
                           <td class="px-4 py-3">{{ variant.supplierCode || '—' }}</td>
                           <td class="px-4 py-3">{{ variant.barcode }}</td>
                           <td class="px-4 py-3">
-                            <div>Acquisto: &euro;{{ variant.purchaseCost.toFixed(2) }}</div>
+                            <div *ngIf="canSeeCosts">Acquisto: {{ costLabel(variant.purchaseCost) }}</div>
                             <div class="text-blue-700" *ngIf="variant.sellingPrice != null">Vendita netta: &euro;{{ variant.sellingPrice | number:'1.2-8' }}</div>
                             <div class="text-red-700" *ngIf="variant.sellingPrice == null">Prezzo da completare</div>
                           </td>
@@ -323,7 +323,8 @@ interface PriceFeedback {
                               class="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                           </td>
                           <td class="px-4 py-3">
-                            <input [(ngModel)]="editingVariantForm.purchaseCost" type="number" step="0.01"
+                            <input *ngIf="canSeeCosts" [(ngModel)]="editingVariantForm.purchaseCost" type="number" step="0.01"
+                              aria-label="Costo acquisto variante"
                               class="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                             <label class="block text-xs mt-2">Prezzo vendita netto</label>
                             <input aria-label="Prezzo vendita variante netto" [disabled]="calculatingPrice"
@@ -563,6 +564,15 @@ export class ProdottiComponent implements OnInit, OnDestroy {
     return this.authService.hasRole('Admin');
   }
 
+  // Warehouse puo inserire un costo alla creazione (solo scrittura) ma non lo vede mai.
+  get canSeeCosts(): boolean {
+    return this.authService.canSeeCosts();
+  }
+
+  costLabel(value: number | null | undefined): string {
+    return value == null || !Number.isFinite(value) ? '—' : `€${value.toFixed(2)}`;
+  }
+
   ngOnInit(): void {
     this.loadSupportData();
     this.loadProducts();
@@ -691,14 +701,14 @@ export class ProdottiComponent implements OnInit, OnDestroy {
       name: product.name,
       sellingPrice: product.hasVariants ? null : product.sellingPrice,
       vatRate: product.vatRate,
-      basePurchaseCost: product.basePurchaseCost,
+      basePurchaseCost: product.basePurchaseCost ?? 0,
       hasVariants: product.hasVariants ?? true,
       categoryId: product.categoryId,
       collectionId: product.collectionId,
       materialId: product.materialId
     };
     
-    this.newVariantForm = this.initializeVariantForm(product.basePurchaseCost);
+    this.newVariantForm = this.initializeVariantForm(product.basePurchaseCost ?? 0);
     
     this.activeTab = 'details';
     this.formError = null;
@@ -739,7 +749,8 @@ export class ProdottiComponent implements OnInit, OnDestroy {
       this.formError = 'Completa i campi obbligatori (Nome e Barcode)';
       return;
     }
-    if (this.formData.basePurchaseCost == null || this.formData.basePurchaseCost < 0) {
+    const costRequired = this.canSeeCosts || !this.editingProductId;
+    if (costRequired && (this.formData.basePurchaseCost == null || this.formData.basePurchaseCost < 0)) {
       this.formError = 'Il Prezzo Base Fornitore è obbligatorio';
       return;
     }
@@ -752,7 +763,13 @@ export class ProdottiComponent implements OnInit, OnDestroy {
     }
 
     this.savingProduct = true;
-    const request = { ...this.formData, sellingPrice: this.formData.hasVariants ? null : this.formData.sellingPrice };
+    // Chi non vede i costi in modifica invia 0: il server conserva il costo salvato.
+    const basePurchaseCost = this.editingProductId && !this.canSeeCosts ? 0 : this.formData.basePurchaseCost;
+    const request = {
+      ...this.formData,
+      basePurchaseCost,
+      sellingPrice: this.formData.hasVariants ? null : this.formData.sellingPrice
+    };
     const operation = this.editingProductId
       ? this.productService.updateProduct(this.editingProductId, request)
       : this.productService.createProduct(request);
@@ -763,7 +780,7 @@ export class ProdottiComponent implements OnInit, OnDestroy {
         if (!this.editingProductId) {
           this.editingProductId = product.id;
           this.galleryProduct = { ...product };
-          this.newVariantForm = this.initializeVariantForm(product.basePurchaseCost);
+          this.newVariantForm = this.initializeVariantForm(product.basePurchaseCost ?? this.formData.basePurchaseCost ?? 0);
           if (product.hasVariants) this.activeTab = 'variants';
           else this.closeModal();
         } else {
@@ -849,7 +866,7 @@ export class ProdottiComponent implements OnInit, OnDestroy {
       sizeId: variant.sizeId || '',
       supplierCode: variant.supplierCode || '',
       barcode: variant.barcode,
-      purchaseCost: variant.purchaseCost,
+      purchaseCost: variant.purchaseCost ?? 0,
       sellingPrice: variant.sellingPrice,
       weightGrams: variant.weightGrams ?? null
     };
@@ -867,7 +884,7 @@ export class ProdottiComponent implements OnInit, OnDestroy {
       sizeId: this.editingVariantForm.sizeId || null,
       supplierCode: this.editingVariantForm.supplierCode.trim(),
       barcode: this.editingVariantForm.barcode,
-      purchaseCost: this.editingVariantForm.purchaseCost,
+      purchaseCost: this.canSeeCosts ? this.editingVariantForm.purchaseCost : 0,
       sellingPrice: this.editingVariantForm.sellingPrice,
       weightGrams: this.editingVariantForm.weightGrams || null
     };

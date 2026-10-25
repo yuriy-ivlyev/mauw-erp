@@ -64,16 +64,18 @@
         }
       </p>
     </div>
-    <div class="rounded-lg border bg-white p-4">
-      <p class="text-sm text-gray-500">Valore complessivo</p>
-      <p class="mt-1 text-xl font-semibold text-indigo-700">
-        @if (hasLoadedSummary()) {
-          {{ totals().totalValue | number:'1.2-2' }} €
-        } @else {
-          <span class="inline-block h-6 w-16 animate-pulse rounded bg-gray-200" aria-hidden="true"></span>
-        }
-      </p>
-    </div>
+    @if (canSeeCosts) {
+      <div class="rounded-lg border bg-white p-4">
+        <p class="text-sm text-gray-500">Valore complessivo</p>
+        <p class="mt-1 text-xl font-semibold text-indigo-700">
+          @if (hasLoadedSummary()) {
+            {{ totals().totalValue != null ? ((totals().totalValue | number:'1.2-2') + ' €') : '—' }}
+          } @else {
+            <span class="inline-block h-6 w-16 animate-pulse rounded bg-gray-200" aria-hidden="true"></span>
+          }
+        </p>
+      </div>
+    }
   </section>
 
   @if (allocationNote()) {
@@ -103,14 +105,16 @@
       }
     </select>
 
-    <label class="flex items-center gap-2 text-sm text-gray-700">
-      <span>Metodo di valorizzazione</span>
-      <select [ngModel]="valuationMethod()" (ngModelChange)="valuationMethod.set($event); onFilterChange()"
-        aria-label="Metodo di valorizzazione" class="rounded-lg border border-gray-300 px-3 py-2">
-        <option value="WeightedAverageCost">Costo medio ponderato</option>
-        <option value="LastPurchaseCost">Ultimo costo</option>
-      </select>
-    </label>
+    @if (canSeeCosts) {
+      <label class="flex items-center gap-2 text-sm text-gray-700">
+        <span>Metodo di valorizzazione</span>
+        <select [ngModel]="valuationMethod()" (ngModelChange)="valuationMethod.set($event); onFilterChange()"
+          aria-label="Metodo di valorizzazione" class="rounded-lg border border-gray-300 px-3 py-2">
+          <option value="WeightedAverageCost">Costo medio ponderato</option>
+          <option value="LastPurchaseCost">Ultimo costo</option>
+        </select>
+      </label>
+    }
 
     <label class="flex items-center gap-2 text-sm text-gray-700">
       <input type="checkbox" [ngModel]="onlyInStock()" (ngModelChange)="onlyInStock.set($event); onFilterChange()"
@@ -171,10 +175,12 @@
               class="px-4 py-3 text-right font-semibold text-gray-700">In arrivo</th>
             <th appSortHeader="quantityAvailable" [activeSortBy]="sortBy()" [sortDescending]="sortDescending()" (sortChange)="onSortChange($event)"
               class="px-4 py-3 text-right font-semibold text-gray-700">Disponibile</th>
-            <th appSortHeader="unitCost" [activeSortBy]="sortBy()" [sortDescending]="sortDescending()" (sortChange)="onSortChange($event)"
-              class="px-4 py-3 text-right font-semibold text-gray-700">{{ valuationMethodLabel() }}</th>
-            <th appSortHeader="totalValue" [activeSortBy]="sortBy()" [sortDescending]="sortDescending()" (sortChange)="onSortChange($event)"
-              class="px-4 py-3 text-right font-semibold text-gray-700">Valore totale</th>
+            @if (canSeeCosts) {
+              <th appSortHeader="unitCost" [activeSortBy]="sortBy()" [sortDescending]="sortDescending()" (sortChange)="onSortChange($event)"
+                class="px-4 py-3 text-right font-semibold text-gray-700">{{ valuationMethodLabel() }}</th>
+              <th appSortHeader="totalValue" [activeSortBy]="sortBy()" [sortDescending]="sortDescending()" (sortChange)="onSortChange($event)"
+                class="px-4 py-3 text-right font-semibold text-gray-700">Valore totale</th>
+            }
           </tr>
         </thead>
         <tbody>
@@ -204,19 +210,21 @@
                   {{ stock.quantityAvailable | number:'1.0-3' }}
                 </span>
               </td>
-              <td class="whitespace-nowrap px-4 py-3 text-right text-gray-600"
-                [attr.title]="costSourceLabel(stock)" [attr.aria-label]="costSourceLabel(stock)">
-                {{ stock.unitCost != null ? (stock.unitCost | number:'1.2-8') + ' €' : '—' }}
-                <span class="sr-only"> — {{ costSourceLabel(stock) }}</span>
-              </td>
-              <td class="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-800">
-                {{ stock.totalValue != null ? (stock.totalValue | number:'1.2-2') + ' €' : '—' }}
-              </td>
+              @if (canSeeCosts) {
+                <td class="whitespace-nowrap px-4 py-3 text-right text-gray-600"
+                  [attr.title]="costSourceLabel(stock)" [attr.aria-label]="costSourceLabel(stock)">
+                  {{ stock.unitCost != null ? (stock.unitCost | number:'1.2-8') + ' €' : '—' }}
+                  <span class="sr-only"> — {{ costSourceLabel(stock) }}</span>
+                </td>
+                <td class="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-800">
+                  {{ stock.totalValue != null ? (stock.totalValue | number:'1.2-2') + ' €' : '—' }}
+                </td>
+              }
             </tr>
           } @empty {
             @if (!loading()) {
               <tr>
-                <td colspan="10" class="px-6 py-10 text-center text-gray-400">Nessuna giacenza trovata.</td>
+                <td [attr.colspan]="canSeeCosts ? 10 : 8" class="px-6 py-10 text-center text-gray-400">Nessuna giacenza trovata.</td>
               </tr>
             }
           }
@@ -228,8 +236,12 @@
               <td class="px-4 py-3 text-right text-orange-700">{{ totals().totalReservedQuantity | number:'1.0-3' }}</td>
               <td class="px-4 py-3 text-right text-blue-700">{{ totals().totalIncomingQuantity | number:'1.0-3' }}</td>
               <td class="px-4 py-3 text-right">{{ totals().totalAvailableQuantity | number:'1.0-3' }}</td>
-              <td></td>
-              <td class="px-4 py-3 text-right text-indigo-700">{{ totals().totalValue | number:'1.2-2' }} €</td>
+              @if (canSeeCosts) {
+                <td></td>
+                <td class="px-4 py-3 text-right text-indigo-700">
+                  {{ totals().totalValue != null ? ((totals().totalValue | number:'1.2-2') + ' €') : '—' }}
+                </td>
+              }
             </tr>
           }
         </tbody>
@@ -272,7 +284,9 @@
                 <th class="p-3 text-left">Tipo / causale</th>
                 <th class="p-3 text-right">Quantità</th>
                 <th class="p-3 text-right">Saldo progressivo</th>
-                <th class="p-3 text-right">Costo unitario</th>
+                @if (canSeeCosts) {
+                  <th class="p-3 text-right">Costo unitario</th>
+                }
                 <th class="p-3 text-left">Documento / note</th>
               </tr>
             </thead>
@@ -289,12 +303,16 @@
                   <td class="whitespace-nowrap p-3 text-right">
                     {{ movement.runningBalance != null ? (movement.runningBalance | number:'1.0-3') : 'Non disponibile' }}
                   </td>
-                  <td class="whitespace-nowrap p-3 text-right">{{ movement.unitCost | number:'1.2-8' }} €</td>
+                  @if (canSeeCosts) {
+                    <td class="whitespace-nowrap p-3 text-right">
+                      {{ movement.unitCost != null ? ((movement.unitCost | number:'1.2-8') + ' €') : '—' }}
+                    </td>
+                  }
                   <td class="p-3">{{ movement.documentReference || movement.notes || '—' }}</td>
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="6" class="p-6 text-center text-gray-500">Nessun movimento registrato per questa variante.</td>
+                  <td [attr.colspan]="canSeeCosts ? 6 : 5" class="p-6 text-center text-gray-500">Nessun movimento registrato per questa variante.</td>
                 </tr>
               }
             </tbody>

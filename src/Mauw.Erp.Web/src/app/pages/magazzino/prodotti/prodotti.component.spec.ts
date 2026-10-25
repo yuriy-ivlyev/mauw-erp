@@ -12,7 +12,7 @@ import { ProductDto, ProductVariantDto } from '../../../models/product.model';
 describe('ProdottiComponent stored selling prices', () => {
   let service: jasmine.SpyObj<ProductService>;
   let formulaService: jasmine.SpyObj<PriceFormulaService>;
-  let isAdmin: boolean;
+  let roles: string[];
   let auth: AuthService;
   let component: ProdottiComponent;
   const calculation: PriceFormulaCalculation = {
@@ -52,8 +52,11 @@ describe('ProdottiComponent stored selling prices', () => {
       ['getProducts', 'getProductVariants', 'getColors', 'getSizes', 'getCategories', 'getCollections', 'getMaterials',
         'createProduct', 'updateProduct', 'createProductVariant', 'updateProductVariant']);
     formulaService = jasmine.createSpyObj<PriceFormulaService>('PriceFormulaService', ['calculate']);
-    isAdmin = true;
-    auth = { hasRole: (role: string) => isAdmin && role === 'Admin' } as unknown as AuthService;
+    roles = ['Admin'];
+    auth = {
+      hasRole: (role: string) => roles.includes(role),
+      canSeeCosts: () => roles.includes('Admin') || roles.includes('Accounting')
+    } as unknown as AuthService;
     service.getProducts.and.returnValue(of({ items: [product], pageNumber: 1, pageSize: 20, totalCount: 1, totalPages: 1 }));
     service.getProductVariants.and.returnValue(of([variant]));
     service.getColors.and.returnValue(of([]));
@@ -181,7 +184,7 @@ describe('ProdottiComponent stored selling prices', () => {
   });
 
   it('never calls the calculation for non-admin roles', () => {
-    isAdmin = false;
+    roles = ['Warehouse'];
     component.editProduct({ ...product, hasVariants: false });
     expect(component.canCalculateFromCost).toBeFalse();
     component.calculateFromCost('product');
@@ -242,7 +245,7 @@ describe('ProdottiComponent stored selling prices', () => {
   });
 
   it('hides the calculation buttons from non-admin users and has no markup inputs', async () => {
-    isAdmin = false;
+    roles = ['Warehouse'];
     await TestBed.configureTestingModule({ imports: [ProdottiComponent], providers: providers() }).compileComponents();
     const fixture = TestBed.createComponent(ProdottiComponent);
     fixture.componentInstance.editProduct({ ...product, hasVariants: false });
@@ -345,5 +348,153 @@ describe('ProdottiComponent stored selling prices', () => {
     expect(priceCell.textContent).not.toContain('Da');
     expect(priceCell.textContent).toContain('20.00');
     fixture.destroy();
+  });
+
+  describe('cost visibility', () => {
+    const redactedVariant: ProductVariantDto = { ...variant, purchaseCost: null };
+    const redactedProduct: ProductDto = { ...product, basePurchaseCost: null, variants: [redactedVariant] };
+
+    async function render(role: string, listed: ProductDto = product) {
+      roles = [role];
+      service.getProducts.and.returnValue(of({ items: [listed], pageNumber: 1, pageSize: 20, totalCount: 1, totalPages: 1 }));
+      service.getProductVariants.and.returnValue(of([listed.variants[0]]));
+      await TestBed.configureTestingModule({ imports: [ProdottiComponent], providers: providers() }).compileComponents();
+      const fixture = TestBed.createComponent(ProdottiComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      return fixture;
+    }
+
+    it('shows purchase costs in the list, variants table and edit row to Admin and Accounting', async () => {
+      for (const role of ['Admin', 'Accounting']) {
+        TestBed.resetTestingModule();
+        const fixture = await render(role);
+        const html: HTMLElement = fixture.nativeElement;
+        expect(html.textContent).withContext(role).toContain('Prezzo Acquisto');
+        expect(html.querySelector('th[appSortHeader="purchaseCost"]'))
+          .withContext(role).not.toBeNull();
+        expect(html.querySelector('tbody tr td:nth-child(6)')?.textContent).withContext(role).toContain('€10.00');
+        fixture.componentInstance.editProduct(product);
+        fixture.componentInstance.activeTab = 'variants';
+        fixture.detectChanges();
+        expect(html.textContent).withContext(role).toContain('Costo Acquisto');
+        expect(html.textContent).withContext(role).toContain('Acquisto: €10.00');
+        fixture.componentInstance.startEditVariant(variant);
+        fixture.detectChanges();
+        expect(html.querySelector('[aria-label="Costo acquisto variante"]')).withContext(role).not.toBeNull();
+        fixture.componentInstance.activeTab = 'details';
+        fixture.detectChanges();
+        expect(html.textContent).withContext(role).toContain('Prezzo Base Fornitore');
+        fixture.destroy();
+      }
+    });
+
+    it('hides every cost from Warehouse when costs are null and nothing crashes', async () => {
+      const fixture = await render('Warehouse', redactedProduct);
+      const html: HTMLElement = fixture.nativeElement;
+      expect(html.textContent).not.toContain('Prezzo Acquisto');
+      expect(html.querySelector('th[appSortHeader="purchaseCost"]')).toBeNull();
+      expect(html.textContent).toContain('Vendita netta');
+      expect(html.textContent).not.toMatch(/\bnull\b|NaN|€undefined/);
+      fixture.componentInstance.editProduct(redactedProduct);
+      fixture.detectChanges();
+      expect(html.textContent).not.toContain('Prezzo Base Fornitore');
+      fixture.componentInstance.activeTab = 'variants';
+      fixture.detectChanges();
+      const headers = Array.from(html.querySelectorAll('thead th')).map(th => th.textContent?.trim());
+      expect(headers).not.toContain('Costo Acquisto');
+      expect(headers).toContain('Prezzo vendita');
+      expect(html.textContent).not.toContain('Acquisto:');
+      expect(html.textContent).toContain('Vendita netta: €18.12345678');
+      fixture.componentInstance.startEditVariant(redactedVariant);
+      fixture.detectChanges();
+      expect(html.querySelector('[aria-label="Costo acquisto variante"]')).toBeNull();
+      expect(html.querySelector('[aria-label="Prezzo vendita variante netto"]')).not.toBeNull();
+      expect(html.textContent).not.toMatch(/NaN|€null/);
+      fixture.destroy();
+    });
+
+    it('keeps the write-only purchase cost inputs for Warehouse on create', async () => {
+      const fixture = await render('Warehouse', redactedProduct);
+      const html: HTMLElement = fixture.nativeElement;
+      fixture.componentInstance.openNewProductModal();
+      fixture.detectChanges();
+      expect(html.textContent).toContain('Prezzo Base Fornitore *');
+      fixture.componentInstance.editProduct(redactedProduct);
+      fixture.componentInstance.activeTab = 'variants';
+      fixture.detectChanges();
+      expect(html.textContent).toContain('Costo Acquisto *');
+      fixture.destroy();
+    });
+
+    it('requires and sends the typed cost when Warehouse creates a product, then reuses it for variants', () => {
+      roles = ['Warehouse'];
+      service.createProduct.and.returnValue(of(redactedProduct));
+      component.openNewProductModal();
+      component.formData = { ...component.formData, barcode: 'P', name: 'Scarpa', supplierCode: 'S',
+        basePurchaseCost: null as unknown as number };
+      component.saveProduct();
+      expect(component.formError).toContain('Prezzo Base Fornitore');
+      expect(service.createProduct).not.toHaveBeenCalled();
+      component.formData.basePurchaseCost = 12.5;
+      component.saveProduct();
+      expect(service.createProduct.calls.mostRecent().args[0].basePurchaseCost).toBe(12.5);
+      expect(component.newVariantForm.purchaseCost).toBe(12.5);
+    });
+
+    it('requires a cost on a Warehouse variant create and sends it', () => {
+      roles = ['Warehouse'];
+      component.editProduct(redactedProduct);
+      component.newVariantForm = { ...component.newVariantForm, barcode: 'NEW', colorId: 'RED', sizeId: 'M',
+        sellingPrice: 10, purchaseCost: null as unknown as number };
+      component.addVariant();
+      expect(component.variantError).toBeTruthy();
+      expect(service.createProductVariant).not.toHaveBeenCalled();
+      component.newVariantForm.purchaseCost = 7.25;
+      component.addVariant();
+      expect(service.createProductVariant.calls.mostRecent().args[0].purchaseCost).toBe(7.25);
+    });
+
+    it('lets Warehouse edit without a cost and sends 0 meaning unchanged', () => {
+      roles = ['Warehouse'];
+      component.editProduct(redactedProduct);
+      expect(component.formData.basePurchaseCost).toBe(0);
+      component.formData.name = 'Rinominato';
+      component.saveProduct();
+      expect(component.formError).toBeNull();
+      expect(service.updateProduct.calls.mostRecent().args[1].basePurchaseCost).toBe(0);
+      component.editProduct(redactedProduct);
+      component.formData.basePurchaseCost = 99;
+      component.saveProduct();
+      expect(service.updateProduct.calls.mostRecent().args[1].basePurchaseCost).toBe(0);
+      component.editProduct(redactedProduct);
+      component.startEditVariant(redactedVariant);
+      component.editingVariantForm.purchaseCost = 99;
+      component.saveVariantEdit();
+      expect(service.updateProductVariant.calls.mostRecent().args[2].purchaseCost).toBe(0);
+    });
+
+    it('sends the visible cost when Admin or Accounting edit', () => {
+      for (const role of ['Admin', 'Accounting']) {
+        roles = [role];
+        component.editProduct(product);
+        component.formData.basePurchaseCost = 11;
+        component.saveProduct();
+        expect(service.updateProduct.calls.mostRecent().args[1].basePurchaseCost).withContext(role).toBe(11);
+        component.editProduct(product);
+        component.startEditVariant(variant);
+        component.editingVariantForm.purchaseCost = 12;
+        component.saveVariantEdit();
+        expect(service.updateProductVariant.calls.mostRecent().args[2].purchaseCost).withContext(role).toBe(12);
+      }
+    });
+
+    it('formats missing costs without throwing', () => {
+      expect(component.costLabel(null)).toBe('—');
+      expect(component.costLabel(undefined)).toBe('—');
+      expect(component.costLabel(NaN)).toBe('—');
+      expect(component.costLabel(10)).toBe('€10.00');
+    });
   });
 });

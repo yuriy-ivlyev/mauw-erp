@@ -94,6 +94,16 @@ describe('OrdiniFornitoreComponent', () => {
     expect(component.articleSearchOpen).toBeFalse();
   });
 
+  it('leaves the unit cost empty when the article cost is hidden for the role', () => {
+    component.addVariant({
+      variantId: 'variant-3', productId: 'product-1', productName: 'Scarpa',
+      sku: 'SKU-3', barcode: 'SKU-3', colorName: null, sizeName: null,
+      currentStock: 0, supplierCode: 'FORN-22', purchaseCost: null
+    });
+
+    expect(component.draftLines[0].unitCost).toBe('');
+  });
+
   it('passes the selected supplier to article search', () => {
     component.supplierId = order.supplierId;
     component.variantQuery = 'FORN-22';

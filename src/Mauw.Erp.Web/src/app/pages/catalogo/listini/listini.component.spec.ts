@@ -90,6 +90,47 @@ describe('ListiniComponent', () => {
     expect(service.create).not.toHaveBeenCalled();
     expect(component.rules.at(0).touched).toBeTrue();
   });
+  it('shows an Admin cost markup value as a number and sends it back', () => {
+    const markup = { ...list, rules: [{ id: 'm', calculationType: 'CostMarkup' as const, value: 40, minimumQuantity: 1, priority: 0 }] };
+    const fixture = TestBed.createComponent(ListiniComponent);
+    fixture.componentInstance.edit(markup);
+    fixture.detectChanges();
+    const html: HTMLElement = fixture.nativeElement;
+    expect(html.querySelector('.value-reserved')).toBeNull();
+    expect((html.querySelector('input[formControlName="value"]') as HTMLInputElement).value).toBe('40');
+    fixture.componentInstance.editId = 'list';
+    fixture.componentInstance.save();
+    expect(service.update.calls.mostRecent().args[1].rules[0].value).toBe(40);
+  });
+  it('shows "riservato" for a hidden cost markup and lets Sales save the list with value null', () => {
+    const hidden = { ...list, rules: [
+      { id: 'm', calculationType: 'CostMarkup' as const, value: null, minimumQuantity: 1, priority: 3 },
+      { ...list.rules[0], productId: null }
+    ] };
+    const fixture = TestBed.createComponent(ListiniComponent);
+    fixture.componentInstance.edit(hidden);
+    fixture.detectChanges();
+    const html: HTMLElement = fixture.nativeElement;
+    const reserved = html.querySelectorAll('.value-reserved');
+    expect(reserved.length).toBe(1);
+    expect(reserved[0].textContent).toContain('riservato');
+    expect(html.querySelectorAll('input[formControlName="value"]').length).toBe(1);
+    expect(html.textContent).not.toMatch(/NaN|\bnull\b/);
+    fixture.componentInstance.form.controls.name.setValue('Rivenditori');
+    fixture.componentInstance.editId = 'list';
+    fixture.componentInstance.save();
+    const rules = service.update.calls.mostRecent().args[1].rules;
+    expect(rules[0]).toEqual(jasmine.objectContaining({ id: 'm', calculationType: 'CostMarkup', value: null }));
+    expect(rules[1].value).toBe(15.5);
+  });
+  it('still validates non-reserved rules in a list that contains a hidden cost markup', () => {
+    component.edit({ ...list, rules: [
+      { id: 'm', calculationType: 'CostMarkup', value: null, minimumQuantity: 1, priority: 0 },
+      { ...list.rules[0], value: -1 }
+    ] });
+    component.save();
+    expect(service.update).not.toHaveBeenCalled();
+  });
   it('shows API errors and retains unsaved changes', () => {
     service.update.and.returnValue(throwError(() => new HttpErrorResponse({
       status: 400, error: { detail: 'Regole ambigue' }

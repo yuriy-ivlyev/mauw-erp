@@ -17,9 +17,9 @@ export interface InventoryStock {
   quantityIncoming: number;
   quantityAvailable: number;
   unitOfMeasure: string;
-  unitCost: number | null;
-  totalValue: number | null;
-  costSource: InventoryStockCostSource;
+  unitCost?: number | null;
+  totalValue?: number | null;
+  costSource?: InventoryStockCostSource | null;
 }
 
 export interface InventoryStockTotals {
@@ -27,7 +27,7 @@ export interface InventoryStockTotals {
   totalReservedQuantity: number;
   totalIncomingQuantity: number;
   totalAvailableQuantity: number;
-  totalValue: number;
+  totalValue?: number | null;
 }
 
 export interface InventoryStocksPage {
@@ -53,7 +53,7 @@ export interface InventoryStockMovement {
   reason: string | null;
   quantity: number;
   quantityDelta: number | null;
-  unitCost: number;
+  unitCost?: number | null;
   documentReference: string | null;
   notes: string | null;
   runningBalance: number | null;

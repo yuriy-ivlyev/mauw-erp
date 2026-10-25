@@ -49,7 +49,7 @@ export interface ProductVariantDto {
   color: string;
   barcode: string;
   supplierCode?: string | null;
-  purchaseCost: number;
+  purchaseCost?: number | null;
   stockQuantity: number;
   listPrice: number | null;
   finalNetPrice: number | null;
@@ -78,7 +78,7 @@ export interface ProductDto {
   barcode: string;
   name: string;
   vatRate: number;
-  basePurchaseCost: number;
+  basePurchaseCost?: number | null;
   hasVariants: boolean;
   categoryId?: string;
   categoryName?: string;
@@ -138,7 +138,7 @@ export interface VariantSearchDto {
   sizeName: string | null;
   currentStock: number;
   supplierCode: string | null;
-  purchaseCost: number;
+  purchaseCost?: number | null;
 }
 
 export interface MatrixSizeDto {
