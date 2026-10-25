@@ -118,13 +118,15 @@
       Solo articoli con giacenza &gt; 0
     </label>
 
-    <label class="flex items-center gap-2 text-sm text-gray-700">
-      <span>Giacenza alla data</span>
-      <input type="date" [ngModel]="filterAtDate()" (ngModelChange)="filterAtDate.set($event); onFilterChange()"
-        aria-label="Giacenza alla data" class="rounded-lg border border-gray-300 px-3 py-2">
-    </label>
+    @if (canFilterByDate) {
+      <label class="flex items-center gap-2 text-sm text-gray-700">
+        <span>Giacenza alla data</span>
+        <input type="date" [ngModel]="filterAtDate()" (ngModelChange)="filterAtDate.set($event); onFilterChange()"
+          aria-label="Giacenza alla data" class="rounded-lg border border-gray-300 px-3 py-2">
+      </label>
+    }
 
-    @if (filterAtDate()) {
+    @if (canFilterByDate && filterAtDate()) {
       <button type="button" (click)="clearDateFilter()"
         class="rounded-lg px-3 py-2 text-sm text-blue-700 hover:bg-blue-50">
         Tempo reale

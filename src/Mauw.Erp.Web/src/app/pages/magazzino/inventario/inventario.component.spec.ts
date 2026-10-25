@@ -1,6 +1,7 @@
-import { fakeAsync, tick } from '@angular/core/testing';
+import { fakeAsync, tick, TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Subject, of, throwError } from 'rxjs';
+import { AuthService } from '../../../services/auth.service';
 import { InventoryStockService } from '../../../services/inventory-stock.service';
 import { ProductService } from '../../../services/product.service';
 import { WarehouseService } from '../../../services/warehouse.service';
@@ -13,6 +14,8 @@ import {
 import { InventarioComponent } from './inventario.component';
 
 describe('InventarioComponent', () => {
+  const authWithRoles = (roles: string[]) =>
+    ({ hasRole: (role: string) => roles.includes(role) }) as unknown as AuthService;
   let inventoryService: jasmine.SpyObj<InventoryStockService>;
   let warehouseService: jasmine.SpyObj<WarehouseService>;
   let productService: jasmine.SpyObj<ProductService>;
@@ -92,7 +95,7 @@ describe('InventarioComponent', () => {
     inventoryService.getMovements.and.returnValue(of(movementsResponse));
     warehouseService.getList.and.returnValue(of({ items: [] }) as never);
     productService.getCategories.and.returnValue(of([]));
-    component = new InventarioComponent(inventoryService, warehouseService, productService);
+    component = new InventarioComponent(inventoryService, warehouseService, productService, authWithRoles(['Admin']));
   });
 
   afterEach(() => component.ngOnDestroy());
@@ -221,5 +224,57 @@ describe('InventarioComponent', () => {
     expect(component.selectedStock()).toBe(stock);
     expect(component.movements()).toEqual(movementsResponse.items);
     expect(component.movementTotalCount()).toBe(1);
+  });
+
+  describe('historical date filter', () => {
+    const dateInput = (fixture: { nativeElement: HTMLElement }) =>
+      fixture.nativeElement.querySelector('input[type="date"]');
+
+    function render(roles: string[]) {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        imports: [InventarioComponent],
+        providers: [
+          { provide: InventoryStockService, useValue: inventoryService },
+          { provide: WarehouseService, useValue: warehouseService },
+          { provide: ProductService, useValue: productService },
+          { provide: AuthService, useValue: authWithRoles(roles) }
+        ]
+      });
+      const fixture = TestBed.createComponent(InventarioComponent);
+      fixture.detectChanges();
+      return fixture;
+    }
+
+    for (const role of ['Admin', 'Accounting']) {
+      it(`shows the date control and sends atDate for ${role}`, () => {
+        const fixture = render([role]);
+        expect(dateInput(fixture)).not.toBeNull();
+
+        fixture.componentInstance.filterAtDate.set('2026-10-20');
+        fixture.componentInstance.onFilterChange();
+        fixture.componentInstance.openMovements(stock);
+
+        expect(inventoryService.getStocks.calls.mostRecent().args[0].atDate).toBeDefined();
+        expect(inventoryService.getSummary.calls.mostRecent().args[0].atDate).toBeDefined();
+        expect(inventoryService.getMovements.calls.mostRecent().args[2]).toBeDefined();
+      });
+    }
+
+    for (const role of ['Sales', 'Warehouse']) {
+      it(`hides the date control and never sends atDate for ${role}`, () => {
+        const fixture = render([role]);
+        expect(dateInput(fixture)).toBeNull();
+        expect(fixture.nativeElement.textContent).not.toContain('Giacenza alla data');
+
+        fixture.componentInstance.filterAtDate.set('2026-10-20');
+        fixture.componentInstance.onFilterChange();
+        fixture.componentInstance.openMovements(stock);
+
+        expect(inventoryService.getStocks.calls.mostRecent().args[0].atDate).toBeUndefined();
+        expect(inventoryService.getSummary.calls.mostRecent().args[0].atDate).toBeUndefined();
+        expect(inventoryService.getMovements.calls.mostRecent().args[2]).toBeUndefined();
+      });
+    }
   });
 });

@@ -39,8 +39,8 @@ export class MenuService {
       icon: ICONS.cart,
       isCollapsed: false,
       children: [
-        { label: 'Cassa',      route: '/vendite/cassa',          icon: ICONS.cash,     roles: ['Admin', 'Cashier'] },
-        { label: 'Ordini',     route: '/ordini/elenco',          icon: ICONS.orders,   roles: ['Admin', 'Sales', 'Cashier'] },
+        { label: 'Cassa',      route: '/vendite/cassa',          icon: ICONS.cash,     roles: ['Admin', 'Sales'] },
+        { label: 'Ordini',     route: '/ordini/elenco',          icon: ICONS.orders,   roles: ['Admin', 'Sales'] },
         { label: 'Preventivi', route: '/fatturazione/preventivi', icon: ICONS.quote,   roles: ['Admin', 'Sales', 'Accounting'] },
         { label: 'Contatti',   route: '/anagrafiche/elenco',     icon: ICONS.contacts, roles: ['Admin', 'Sales', 'Accounting'] }
       ]
@@ -75,10 +75,10 @@ export class MenuService {
       label: 'Magazzino',
       icon: ICONS.box,
       isCollapsed: true,
-      roles: ['Admin', 'Warehouse'],
+      roles: ['Admin', 'Sales', 'Warehouse'],
       children: [
         { label: 'Magazzini', route: '/magazzino/magazzini',  icon: ICONS.warehouse, roles: ['Admin', 'Warehouse'] },
-        { label: 'Giacenze',  route: '/magazzino/inventario', icon: ICONS.inventory, roles: ['Admin', 'Warehouse'] },
+        { label: 'Giacenze',  route: '/magazzino/inventario', icon: ICONS.inventory, roles: ['Admin', 'Sales', 'Warehouse'] },
         { label: 'Movimenti', route: '/magazzino/movimenti',  icon: ICONS.movements, roles: ['Admin', 'Warehouse'] },
         { label: 'DDT',       route: '/ddt/elenco',           icon: ICONS.ddt,       roles: ['Admin', 'Warehouse'] }
       ]
@@ -87,10 +87,10 @@ export class MenuService {
       label: 'Fiscale',
       icon: ICONS.invoice,
       isCollapsed: true,
-      roles: ['Admin', 'Accounting'],
+      roles: ['Admin', 'Sales', 'Accounting'],
       children: [
-        { label: 'Fatture',      route: '/fatturazione/fatture',      icon: ICONS.invoice,    roles: ['Admin', 'Accounting'] },
-        { label: 'Note Credito', route: '/fatturazione/nota-credito', icon: ICONS.creditNote, roles: ['Admin', 'Accounting'] }
+        { label: 'Fatture',      route: '/fatturazione/fatture',      icon: ICONS.invoice,    roles: ['Admin', 'Sales', 'Accounting'] },
+        { label: 'Note Credito', route: '/fatturazione/nota-credito', icon: ICONS.creditNote, roles: ['Admin', 'Sales', 'Accounting'] }
       ]
     },
     {

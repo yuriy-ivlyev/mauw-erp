@@ -5,6 +5,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../../services/api.service';
+import { AuthService } from '../../../services/auth.service';
 import { ProductService } from '../../../services/product.service';
 import { ProductMatrixModalComponent, MatrixSelection } from './product-matrix-modal.component';
 import { ProductParentDto, ProductMatrixDto } from '../../../models/product.model';
@@ -545,7 +546,8 @@ export class BancoCassaComponent implements OnInit, OnDestroy {
     private productService: ProductService,
     private router: Router,
     private prices: PriceListService,
-    protected sessionService: CassaSessionService
+    protected sessionService: CassaSessionService,
+    private auth: AuthService
   ) {}
 
   ngOnInit(): void {
@@ -874,7 +876,13 @@ export class BancoCassaComponent implements OnInit, OnDestroy {
     this.cart = [];
     this.documentNumber = '';
     this.currentSessionCode = null;
-    this.router.navigate([type === 'ddt' ? '/ddt/elenco' : '/fatturazione/fatture']);
+    this.router.navigate([this.destinationAfterGeneration(type)]);
+  }
+
+  // La lista DDT non e accessibile al ruolo Sales: viene reindirizzato all'elenco ordini.
+  private destinationAfterGeneration(type: 'ddt' | 'invoice'): string {
+    if (type === 'invoice') return '/fatturazione/fatture';
+    return this.auth.hasRole('Admin') || this.auth.hasRole('Warehouse') ? '/ddt/elenco' : '/ordini/elenco';
   }
 
   // ── Session management ─────────────────────────────────────

@@ -6,4 +6,4 @@ export interface UserInfo {
   roles?:    string[];
 }
 
-export type AppRole = 'Admin' | 'Cashier' | 'Warehouse' | 'Sales' | 'Accounting';
+export type AppRole = 'Admin' | 'Warehouse' | 'Sales' | 'Accounting';

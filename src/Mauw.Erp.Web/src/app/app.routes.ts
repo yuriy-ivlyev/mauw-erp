@@ -51,7 +51,7 @@ export const routes: Routes = [
       { path: 'dashboard/magazzino', loadComponent: () => import('./pages/dashboard/dashboard-analytics.component').then(m => m.DashboardAnalyticsComponent), canActivate: [roleGuard], data: { roles: ['Admin'], dashboardSection: 'warehouse' }, title: 'Dashboard Magazzino | Mauw ERP' },
 
       // Vendite
-      { path: 'vendite/cassa', component: BancoCassaComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Cashier'] }, title: 'Banco / Cassa | Mauw ERP' },
+      { path: 'vendite/cassa', component: BancoCassaComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales'] }, title: 'Banco / Cassa | Mauw ERP' },
 
       // Acquisti
       { path: 'acquisti/ordini-fornitore', loadComponent: () => import('./pages/acquisti/ordini-fornitore.component').then(m => m.OrdiniFornitoreComponent), canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Ordini Fornitore | Mauw ERP' },
@@ -61,13 +61,13 @@ export const routes: Routes = [
       { path: 'acquisti/carico-merce', redirectTo: 'acquisti/ddt-fornitore', pathMatch: 'full' },
 
       // Ordini
-      { path: 'ordini/elenco', component: OrdiniElencoComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Cashier'] }, title: 'Elenco Ordini | Mauw ERP' },
-      { path: 'ordini/nuovo',  component: OrdiniNuovoComponent,  canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Cashier'] }, title: 'Nuovo Ordine | Mauw ERP' },
+      { path: 'ordini/elenco', component: OrdiniElencoComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales'] }, title: 'Elenco Ordini | Mauw ERP' },
+      { path: 'ordini/nuovo',  component: OrdiniNuovoComponent,  canActivate: [roleGuard], data: { roles: ['Admin', 'Sales'] }, title: 'Nuovo Ordine | Mauw ERP' },
 
       // Fatturazione
-      { path: 'fatturazione/fatture',      component: FattureComponent,     canActivate: [roleGuard], data: { roles: ['Admin', 'Accounting'] }, title: 'Fatture | Mauw ERP' },
+      { path: 'fatturazione/fatture',      component: FattureComponent,     canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Accounting'] }, title: 'Fatture | Mauw ERP' },
       { path: 'fatturazione/preventivi',   component: PreventiviComponent,  canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Accounting'] }, title: 'Preventivi | Mauw ERP' },
-      { path: 'fatturazione/nota-credito', component: NotaCreditoComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Accounting'] }, title: 'Nota Credito | Mauw ERP' },
+      { path: 'fatturazione/nota-credito', component: NotaCreditoComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Accounting'] }, title: 'Nota Credito | Mauw ERP' },
 
       // DDT
       { path: 'ddt/elenco', component: DdtElencoComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Elenco DDT | Mauw ERP' },
@@ -77,7 +77,7 @@ export const routes: Routes = [
       { path: 'magazzino/magazzini',       component: MagazziniComponent,      canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Magazzini | Mauw ERP' },
       { path: 'magazzino/prodotti',        component: ProdottiComponent,       canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Prodotti | Mauw ERP' },
       { path: 'magazzino/movimenti',       component: MovimentiComponent,      canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Movimenti | Mauw ERP' },
-      { path: 'magazzino/inventario',      loadComponent: () => import('./pages/magazzino/inventario/inventario.component').then(m => m.InventarioComponent), canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Inventario | Mauw ERP' },
+      { path: 'magazzino/inventario',      loadComponent: () => import('./pages/magazzino/inventario/inventario.component').then(m => m.InventarioComponent), canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Warehouse'] }, title: 'Inventario | Mauw ERP' },
       { path: 'magazzino/categorie',       component: CategorieComponent,      canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Categorie | Mauw ERP' },
       { path: 'magazzino/colori',          component: ColoriComponent,         canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Colori | Mauw ERP' },
       { path: 'magazzino/taglie',          component: TaglieComponent,         canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Taglie | Mauw ERP' },
@@ -89,7 +89,7 @@ export const routes: Routes = [
       { path: 'anagrafiche/nuovo',        component: AnagraficaModificaComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales'] }, title: 'Nuova Anagrafica | Mauw ERP' },
       { path: 'anagrafiche/:id/modifica', component: AnagraficaModificaComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales'] }, title: 'Modifica Anagrafica | Mauw ERP' },
 
-      // Impostazioni — solo Admin
+      // Impostazioni â€” solo Admin
       { path: 'impostazioni/azienda', component: ImpostazioniAziendaComponent, canActivate: [roleGuard], data: { roles: ['Admin'] }, title: 'Impostazioni Azienda | Mauw ERP' },
 
       // Catalogo

@@ -6,6 +6,7 @@ import { EMPTY, Subject, catchError, debounceTime, finalize, switchMap, takeUnti
 import { WarehouseService } from '../../../services/warehouse.service';
 import { InventoryStockService } from '../../../services/inventory-stock.service';
 import { ProductService } from '../../../services/product.service';
+import { AuthService } from '../../../services/auth.service';
 import {
   InventoryStock,
   InventoryStockFilters,
@@ -27,6 +28,7 @@ import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.dir
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class InventarioComponent implements OnInit, OnDestroy {
+  readonly canFilterByDate: boolean;
   readonly stockItems = signal<InventoryStock[]>([]);
   readonly warehouses = signal<WarehouseSummary[]>([]);
   readonly categories = signal<CategoryDto[]>([]);
@@ -98,8 +100,12 @@ export class InventarioComponent implements OnInit, OnDestroy {
   constructor(
     private readonly inventoryStockService: InventoryStockService,
     private readonly warehouseService: WarehouseService,
-    private readonly productService: ProductService
-  ) {}
+    private readonly productService: ProductService,
+    private readonly auth: AuthService
+  ) {
+    // Il server risponde 403 alle richieste storiche (atDate) per ruoli diversi da Admin e Accounting.
+    this.canFilterByDate = this.auth.hasRole('Admin') || this.auth.hasRole('Accounting');
+  }
 
   ngOnInit(): void {
     this.searchChanges.pipe(
@@ -305,6 +311,7 @@ export class InventarioComponent implements OnInit, OnDestroy {
   }
 
   private atDateIso(): string | undefined {
+    if (!this.canFilterByDate) return undefined;
     const date = this.filterAtDate();
     if (!date) return undefined;
     const [year, month, day] = date.split('-').map(Number);

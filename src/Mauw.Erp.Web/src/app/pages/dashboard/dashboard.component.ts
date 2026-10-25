@@ -59,7 +59,6 @@ export class DashboardComponent implements OnInit {
   get roleLabel(): string {
     const labels: Record<string, string> = {
       Admin: 'Amministratore',
-      Cashier: 'Cassa',
       Warehouse: 'Magazzino',
       Sales: 'Vendite',
       Accounting: 'Amministrazione'

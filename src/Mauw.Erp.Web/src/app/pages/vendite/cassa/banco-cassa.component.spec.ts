@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { ApiService } from '../../../services/api.service';
 import { ProductService } from '../../../services/product.service';
 import { PriceListService } from '../../../services/price-list.service';
+import { AuthService } from '../../../services/auth.service';
 import { CartItem, CassaPreview, CassaPreviewLine, CassaSessionService } from '../../../services/cassa-session.service';
 import { BancoCassaComponent } from './banco-cassa.component';
 
@@ -40,7 +41,8 @@ async function setup(cart: CartItem[], data: CassaPreview | null = null) {
       { provide: ProductService, useValue: {} },
       { provide: Router, useValue: {} },
       { provide: PriceListService, useValue: { getAll: () => of([]) } },
-      { provide: CassaSessionService, useValue: sessionService }
+      { provide: CassaSessionService, useValue: sessionService },
+      { provide: AuthService, useValue: { hasRole: () => true } }
     ]
   }).compileComponents();
   const fixture = TestBed.createComponent(BancoCassaComponent);
@@ -69,6 +71,7 @@ describe('BancoCassaComponent fiscal footer', () => {
         { provide: ApiService, useValue: api },
         { provide: ProductService, useValue: {} },
         { provide: Router, useValue: {} },
+        { provide: AuthService, useValue: { hasRole: () => true } },
         { provide: PriceListService, useValue: { getAll: () => of([]) } },
         { provide: CassaSessionService, useValue: {
           snapshot: state, state$: of(state), pricing$: of({ pending: false, error: null }),
@@ -224,5 +227,45 @@ describe('BancoCassaComponent line discounts', () => {
     expect(element.querySelector('app-discount-dialog')).toBeNull();
     expect(item.cashDiscount).toBeUndefined();
     expect(sessionService.setCart).not.toHaveBeenCalled();
+  });
+});
+
+describe('BancoCassaComponent navigation after generation', () => {
+  function navigateAfter(type: 'ddt' | 'invoice', roles: string[]): string[] {
+    const navigate = jasmine.createSpy('navigate');
+    TestBed.resetTestingModule();
+    const state = { sessionId: null, sessionCode: null, cart: [], selectedContact: null, documentNumber: '' };
+    TestBed.configureTestingModule({
+      imports: [BancoCassaComponent],
+      providers: [
+        { provide: ApiService, useValue: { get: () => of({ items: [] }) } },
+        { provide: ProductService, useValue: {} },
+        { provide: Router, useValue: { navigate } },
+        { provide: AuthService, useValue: { hasRole: (role: string) => roles.includes(role) } },
+        { provide: PriceListService, useValue: { getAll: () => of([]) } },
+        { provide: CassaSessionService, useValue: {
+          snapshot: state, state$: of(state), pricing$: of({ pending: false, error: null }),
+          preview$: of({ data: null, error: null }), canSubmit: true, clearSession: () => undefined
+        } }
+      ]
+    });
+    const component = TestBed.createComponent(BancoCassaComponent).componentInstance as unknown as {
+      finalizeAfterGeneration(type: 'ddt' | 'invoice'): void;
+    };
+    component.finalizeAfterGeneration(type);
+    return navigate.calls.mostRecent().args[0];
+  }
+
+  it('sends Admin and Warehouse to the DDT list after a DDT', () => {
+    expect(navigateAfter('ddt', ['Admin'])).toEqual(['/ddt/elenco']);
+    expect(navigateAfter('ddt', ['Warehouse'])).toEqual(['/ddt/elenco']);
+  });
+
+  it('sends Sales, who cannot open the DDT list, to the orders list after a DDT', () => {
+    expect(navigateAfter('ddt', ['Sales'])).toEqual(['/ordini/elenco']);
+  });
+
+  it('sends everyone to the invoices list after an invoice', () => {
+    expect(navigateAfter('invoice', ['Sales'])).toEqual(['/fatturazione/fatture']);
   });
 });
