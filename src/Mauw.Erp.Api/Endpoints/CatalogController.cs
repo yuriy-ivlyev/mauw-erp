@@ -1,3 +1,4 @@
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Microsoft.AspNetCore.Authorization;
@@ -7,7 +8,7 @@ namespace Mauw.Erp.Api.Endpoints;
 
 /// <summary>Helper del catalogo per l'app mobile.</summary>
 [ApiController]
-[Authorize]
+[Authorize(Policy = AppPolicies.AnyRole)]
 [Route("api/catalog")]
 public sealed class CatalogController(IImageApplicationService imageService) : ControllerBase
 {

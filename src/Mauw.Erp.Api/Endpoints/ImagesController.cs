@@ -1,3 +1,4 @@
+using Mauw.Erp.Api.Authorization;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
@@ -9,7 +10,7 @@ namespace Mauw.Erp.Api.Endpoints;
 
 /// <summary>Proxy autenticato e upload delle immagini di prodotti e varianti (storage S3).</summary>
 [ApiController]
-[Authorize]
+[Authorize(Policy = AppPolicies.AnyRole)]
 [Route("api/images")]
 public sealed class ImagesController(
     IImageStorageService storage,
@@ -33,6 +34,7 @@ public sealed class ImagesController(
     [ProducesResponseType<ImageDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Policy = AppPolicies.CatalogManagement)]
     public async Task<IActionResult> SetCategory(
         Guid targetId, Guid imageId, SetImageCategoryRequest request, CancellationToken ct)
     {
@@ -49,6 +51,7 @@ public sealed class ImagesController(
     [HttpDelete("{targetId:guid}/{imageId:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Policy = AppPolicies.CatalogManagement)]
     public async Task<IActionResult> DeleteImage(Guid targetId, Guid imageId, CancellationToken ct)
     {
         var result = await imageService.DeleteAsync(targetId, imageId, ct);
@@ -91,6 +94,7 @@ public sealed class ImagesController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    [Authorize(Policy = AppPolicies.CatalogManagement)]
     public async Task<IActionResult> UploadImage(
         Guid targetId, IFormFile file, [FromForm] ImageCategory? category, CancellationToken ct)
     {

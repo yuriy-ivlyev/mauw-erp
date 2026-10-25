@@ -270,6 +270,12 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
         Add("PATCH", $"/api/v1/price-lists/{Id}/activation", AdminSales);
         Add("DELETE", $"/api/v1/price-lists/{Id}", AdminSales);
 
+        // Immagini e catalogo mobile: lettura a ogni ruolo, scrittura immagini solo Admin e Warehouse
+        Add("GET", "/api/catalog/resolve-sku/SKU", All);
+        Add("GET", $"/api/images/{Id}", All);
+        Add("PUT", $"/api/images/{Id}/{Id2}/category", AdminWarehouse);
+        Add("DELETE", $"/api/images/{Id}/{Id2}", AdminWarehouse);
+
         // Formula prezzi: solo Admin
         Add("GET", "/api/v1/settings/price-formula", AdminOnly);
         Add("PUT", "/api/v1/settings/price-formula", AdminOnly);
@@ -398,6 +404,30 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
             Assert.True(status is not HttpStatusCode.Unauthorized and not HttpStatusCode.Forbidden,
                 $"{role} {method} {path} returned {(int)status}");
         }
+    }
+
+    [Theory]
+    [InlineData(Admin, true)]
+    [InlineData(Warehouse, true)]
+    [InlineData(Sales, false)]
+    [InlineData(Accounting, false)]
+    [InlineData("Cashier", false)]
+    [InlineData(null, false)]
+    public async Task ImageUploadRequiresCatalogManagementRoles(string? role, bool allowed)
+    {
+        using var client = host.CreateClient(role);
+        using var form = new MultipartFormDataContent
+        {
+            { new ByteArrayContent([1, 2, 3]), "file", "photo.jpg" }
+        };
+
+        using var response = await client.PostAsync($"/api/images/{Id}", form);
+
+        if (allowed)
+            Assert.True(response.StatusCode is not HttpStatusCode.Unauthorized and not HttpStatusCode.Forbidden,
+                $"{role} returned {(int)response.StatusCode}");
+        else
+            Assert.Equal(role is null ? HttpStatusCode.Unauthorized : HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
