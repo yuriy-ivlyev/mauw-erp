@@ -1,0 +1,154 @@
+# Formula prezzi (Price Calculator): analisi e decisioni
+
+Documento di lavoro. Si aggiorna man mano che le decisioni vengono prese.
+Stato: **solo analisi, nessuna modifica al codice**.
+
+## Obiettivo
+
+Il prezzo di vendita è un valore **fisso salvato** su prodotto e variante (`SellingPrice`).
+Un modulo `PriceCalculator` lo propone partendo dal costo di acquisto, con una catena di
+ricarichi configurabili da database e da UI, e un arrotondamento finale. L'amministratore
+può sempre scrivere il prezzo a mano, senza alcun calcolo.
+
+Il calcolo avviene **solo su richiesta** (mai in fase di vendita). Il documento emesso
+conserva il proprio prezzo.
+
+Nome in interfaccia: **Formula prezzi** (Impostazioni > Formula prezzi).
+Nome nel codice: `PriceFormula` e `PriceFormulaStep`.
+
+## Stato attuale (sintesi)
+
+- `Product.SellingPrice` e `ProductVariant.SellingPrice`: `numeric(22,8)`, già fissi.
+- `CatalogPriceCalculator.FromMarkup` + `POST /api/v1/products/calculate-selling-price`:
+  un solo ricarico %, nessuna configurazione, nessun arrotondamento a decimi.
+- `Product.DefaultMarkupRate` e `ProductVariant.MarkupRate`: legacy, non usati.
+- `PricingEngine`: iniettato in `InventoryService` ma mai usato.
+- `PurchaseCost` della variante è `numeric(18,4)` e cambia solo a mano.
+- Non esistono provvigioni agenzia né sconti fornitore nel modello.
+- Le API `products` e `settings/company` non hanno restrizioni di ruolo lato server.
+- I ruoli arrivano dai claim di Entra e il codice li legge senza trasformarli. Non c'è una tabella utenti/ruoli nel database.
+
+## Decisioni prese
+
+| # | Tema | Decisione |
+|---|------|-----------|
+| 1 | Base dei prezzi | Tutti i prezzi e i movimenti interni sono **IVA esclusa** (imponibile): costo di acquisto, prezzo di vendita, valorizzazione di magazzino. Il listino fornitore è già netto. Il gestionale non è un programma di contabilità completa. |
+| 1 | Quando si applica l'IVA | Solo in vendita, in fattura, in base al cliente. Italia: IVA applicata. Cessioni intracomunitarie ed estero: non imponibili (art. 41 e simili), con Natura e classificazione esplicita. |
+| 2 | Ricarichi | A cascata: ogni percentuale si applica al risultato del passo precedente. Es. 40% poi 10% dà costo × 1,40 × 1,10. |
+| 3 | Provvigione | È un passo della catena, applicato sempre. Non dipende dalla presenza di un agente: genera margine extra o compensa la provvigione che si pagherà all'agente. Non serve un legame con un agente. |
+| 4 | Sconti fornitore | Non esistono: il prezzo di acquisto è complessivo. Nessun passo "sconto fornitore" nel calcolo. |
+| 5 | Costo di partenza | `PurchaseCost` del prodotto o della variante. Non cambia nel tempo: un riassortimento con costo diverso è un articolo diverso. Il calcolo non usa i movimenti di magazzino. |
+| 6 | Ricalcolo | Nessun ricalcolo automatico al cambio costo. Il calcolo è solo su richiesta. Un prezzo cambia solo per correggere un errore di inserimento. |
+| 7 | Sicurezza | Protezione per ruolo **lato API** obbligatoria, anche sugli endpoint esistenti. Le nuove API di configurazione e calcolo richiedono `Admin`. Vedi matrice dei ruoli. |
+| 8 | Legacy | Si rimuove ciò che non è usato. |
+| A | Formula unica | **Una sola formula per tutto il catalogo** (nessuna formula per categoria o fornitore, per ora). Si chiama "Formula prezzi". La struttura dati resta pronta a crescere verso formule per categoria. |
+| B | Arrotondamento | **Sempre per eccesso**, a passi di 0,10 € (dieci centesimi), sul netto, **solo nella generazione del prezzo**. Esempio: 45,5789 → 45,60; 45,60 resta 45,60. Mai in fattura né nel calcolo dell'IVA. |
+| C | Precisione del costo | Il listino fornitore ha sempre 2 decimali. Nessuna modifica alla precisione di `PurchaseCost`, nessuna migrazione. La UI impone 2 decimali in inserimento. |
+| D | Prezzi errati già fatturati | Rinviato: se ne riparla. |
+| E | Unificazione ruoli | `Cashier` e `Sales` sono lo stesso ruolo. Si **tiene `Sales`** e si elimina `Cashier`. `Sales` è il più radicato (preventivi, anagrafiche, listini, ordini, menu). Ruoli finali: `Admin`, `Sales`, `Warehouse`, `Accounting`. |
+| E | Magazziniere e prezzi dei DDT | Se un DDT fornitore riporta il prezzo, il magazziniere lo vede. Va bene così per ora, da rivalutare. |
+| E | Magazziniere e spedizioni | Spedendo la merce vede la fattura o il DDT allegato (sola lettura). Non vede costi né valorizzazioni. Non gli serve la giacenza storica, per ora. |
+| E | Commercialista | Rinviato: per ora non ci si preoccupa del ruolo. Idea di partenza: sola lettura, con il costo della merce invenduta per il bilancio. |
+
+Conseguenze delle decisioni:
+
+- Il calcolatore lavora solo su importi netti. Non serve passare l'aliquota IVA né uno scorporo.
+- In cassa, l'importo ivato è derivato dal netto in fase di vendita, dal calcolatore contabile condiviso.
+  Poiché si arrotonda il netto, il lordo mostrato non sarà un valore tondo. Questo è accettato.
+- L'aliquota IVA oggi vive su `Product.VatRate`, mentre la decisione dice che dipende dal cliente.
+  Da verificare come il codice gestisce oggi l'aliquota per cliente: tema separato, fuori dal calcolo prezzi.
+- Il prezzo generato ha al massimo 1 decimale. I prezzi inseriti a mano restano liberi (fino a 8 decimali, come oggi).
+- Arrotondare il totale di una fattura non fa parte del calcolo: se serve, l'operatore inserisce a mano uno sconto
+  sul totale. Il sistema può proporlo, ma non lo applica da solo. Vedi punto aperto F.
+
+### Dettaglio sulla decisione 8 (candidati alla rimozione)
+
+- `Product.DefaultMarkupRate` e `ProductVariant.MarkupRate` (colonne e codice).
+- `PricingEngine` e la sua iniezione in `InventoryService`.
+- `POST /api/v1/products/calculate-selling-price` e `CatalogPriceCalculator.FromMarkup`, sostituiti dal nuovo modulo.
+- Da verificare prima di toccarla: la regola di listino `CostMarkup`, che calcola un prezzo dal costo.
+
+La rimozione delle colonne richiede una migrazione generata con `dotnet ef migrations add`.
+Non deve riscrivere importi o classificazioni di documenti storici.
+
+## Matrice dei ruoli (bozza)
+
+Oggi la restrizione per ruolo esiste quasi solo nel frontend (guardie delle rotte). Le API sono in gran parte
+aperte a qualunque utente autenticato. L'obiettivo è che ogni gruppo di endpoint verifichi il ruolo lato server.
+
+| Ruolo | Accesso previsto |
+|-------|------------------|
+| `Admin` | Tutto: formula prezzi, catalogo con costi, giacenza storica, riconciliazione, impostazioni. |
+| `Sales` (commessa) | Cassa, fatture, note di credito, ordini, giacenza **attuale** (solo quantità), più quello che ha già oggi (preventivi, anagrafiche, listini). Vede solo il prezzo finito; l'IVA si aggiunge se dovuta. **Non vede** costo di acquisto, margine né calcoli della formula. |
+| `Warehouse` (magazziniere) | Riceve e spedisce la merce: carichi, magazzino, movimenti, giacenze. Vede **solo le quantità**, senza costo unitario né valore. Vede in sola lettura la fattura o il DDT allegato alla spedizione. Vede il prezzo delle righe di un DDT fornitore, se presente. |
+| `Accounting` (commercialista) | Rinviato. Mantiene l'accesso di oggi. In prospettiva: sola lettura, costo della merce invenduta per il bilancio. |
+
+### Dati sensibili per ruolo (bozza)
+
+| Dato | Admin | Accounting | Sales | Warehouse |
+|------|-------|------------|-------|-----------|
+| Costo di acquisto nell'anagrafica prodotto o variante | sì | sì (lettura) | no | no |
+| Prezzo delle righe di un DDT fornitore | sì | sì (lettura) | no | sì, per ora |
+| Margine e passi della formula | sì | rinviato | no | no |
+| Valorizzazione di magazzino (costo unitario, valore totale) | sì | sì (lettura, per il bilancio) | no | no |
+| Quantità attuali | sì | sì | sì | sì |
+| Giacenza storica (alla data) | sì | sì (proposta, serve al bilancio) | no | no, per ora |
+| Fattura o DDT collegato a una spedizione | sì | sì | sì (fatture) | sì, sola lettura |
+
+Impatti previsti rispetto a oggi:
+
+- **Eliminare `Cashier`.** I ruoli arrivano dai claim di Entra: va tolto il ruolo dell'app in Entra e vanno riassegnate
+  le commesse a `Sales` **prima del rilascio**, altrimenti perdono l'accesso alla cassa. Nel codice cambiano
+  il tipo `AppRole` in `auth.model.ts`, la rotta `/vendite/cassa` (oggi solo `Admin` e `Cashier`), il menu e i controlli lato API.
+  Un'analisi precedente indica che le API dei listini ammettono anche `Cashier`: da verificare in fase di implementazione.
+- Il filtro dei dati sensibili va fatto **lato server**, nel mapping delle risposte, non nascondendo i campi nella UI.
+  Oggi le risposte di prodotti, varianti, giacenze, listini e documenti contengono costi e valorizzazioni.
+- Le fatture e le note di credito oggi sono visibili solo ad `Admin` e `Accounting` nel frontend: per `Sales` vanno aperte.
+  Il magazziniere deve poter leggere solo il documento collegato alla spedizione, non l'elenco delle fatture.
+- I listini sono visibili a `Sales`. Le regole `CostMarkup` mostrano i ricarichi, cioè il margine: se la regola viene
+  rimossa (punto G) il problema sparisce, altrimenti vanno nascoste.
+- La giacenza storica (parametro data) e la riconciliazione dei movimenti ambigui vanno limitate ai ruoli previsti.
+- Serve una policy per ruolo applicata a tutti i gruppi di endpoint, con test che verificano 401 e 403
+  e test che verificano l'assenza dei campi sensibili nelle risposte dei ruoli senza permesso.
+
+## Punti aperti
+
+### F. Sconto sul totale per arrotondare in fattura
+
+Funzione separata dal calcolo prezzi. L'operatore decide e inserisce lo sconto a mano, il sistema può solo
+proporlo. Da progettare: come si rappresenta uno sconto sul totale nel documento, perché le regole contabili
+richiedono righe esplicite con aliquota e Natura e un castelletto IVA coerente.
+
+### G. Regola di listino `CostMarkup`
+
+Verificare se è usata in qualche listino. Se non lo è, si rimuove con il resto del legacy.
+
+### H. Accesso del magazziniere al documento di spedizione
+
+Da progettare: come vede la fattura o il DDT allegato. Proposta: dalla schermata della spedizione, solo il documento
+collegato, in sola lettura, senza accesso all'elenco delle fatture.
+
+### I. Ruolo `Accounting`
+
+Rinviato. Da definire in seguito quali dati servono al commercialista (inventario valorizzato per il bilancio,
+documenti, anagrafiche), e se vede margine e formula.
+
+### D. Prezzi errati già fatturati
+
+Rinviato.
+
+## Punti chiusi
+
+- Netto o lordo: tutto netto, arrotondamento sul netto.
+- Sconti fornitore: non ci sono.
+- Modalità di arrotondamento: sempre per eccesso, passo 0,10 €.
+- Precisione del costo di acquisto: 2 decimali, nessuna migrazione.
+- Quante formule: una sola, "Formula prezzi".
+- `Cashier` e `Sales`: unificati in `Sales`.
+- Magazziniere: vede solo quantità, più prezzi dei DDT fornitore se presenti, più il documento allegato alla spedizione.
+- Protezione per ruolo: decisa, anche sulle API esistenti, con filtro dei dati sensibili lato server.
+
+## Prossimi passi
+
+1. Verificare G e decidere su F.
+2. Preparare il piano a task (dominio, database, API, UI, ruoli) e i test obbligatori per le modifiche contabili.
