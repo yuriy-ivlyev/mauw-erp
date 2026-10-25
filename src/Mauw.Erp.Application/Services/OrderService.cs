@@ -1,3 +1,4 @@
+using System.Data;
 using System.Globalization;
 using Mauw.Erp.Application.Diagnostics;
 using Mauw.Erp.Application.Mappers;
@@ -203,15 +204,76 @@ public partial class OrderService(
         if (order == null)
             return OperationResult<OrderDto>.Fail("Order not found");
 
+        var isCassaSale = order.OrderType == OrderType.CassaSession;
+        Warehouse? warehouse = null;
+        if (isCassaSale)
+        {
+            if (order.Status is OrderStatus.Confirmed or OrderStatus.Terminated)
+                return OperationResult<OrderDto>.Fail("La sessione cassa è già chiusa.");
+            if (order.Items.Any(item => item.Quantity == int.MinValue || item.Quantity == 0))
+                return OperationResult<OrderDto>.Fail("Una riga della sessione cassa ha una quantità non valida.");
+
+            warehouse = await unitOfWork.Warehouses.GetDefaultWarehouseAsync();
+            if (warehouse is null || !warehouse.IsActive || !warehouse.IsSellable)
+                return OperationResult<OrderDto>.Fail(
+                    "Non è disponibile un magazzino predefinito attivo e abilitato alla vendita.");
+        }
+
         try
         {
+            if (isCassaSale)
+                await unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
+
+            if (isCassaSale)
+            {
+                var stockDeltas = order.Items
+                    .GroupBy(item => item.VariantId)
+                    .Select(group => new
+                    {
+                        VariantId = group.Key,
+                        Delta = group.Sum(item =>
+                            item.PricingSnapshot?.IsCustomerReturn == true || item.Quantity < 0
+                                ? Math.Abs((decimal)item.Quantity)
+                                : -Math.Abs((decimal)item.Quantity))
+                    });
+                foreach (var stockDelta in stockDeltas.Where(item => item.Delta < 0))
+                {
+                    var available = await unitOfWork.Stock.GetAvailableQtyAsync(warehouse!.Id, stockDelta.VariantId);
+                    if (available < -stockDelta.Delta)
+                    {
+                        await unitOfWork.RollbackAsync();
+                        return OperationResult<OrderDto>.Fail(
+                            $"Giacenza insufficiente per la variante {stockDelta.VariantId}: disponibili {available}.");
+                    }
+                }
+            }
+
             order.Confirm();
+            if (isCassaSale)
+            {
+                foreach (var item in order.Items)
+                {
+                    var movement = StockMovement.FromCassaItem(order, item, warehouse!.Id);
+                    await unitOfWork.Stock.RecordMovementAsync(movement, movement.QuantityDelta!.Value);
+                }
+            }
+
             await unitOfWork.Orders.UpdateAsync(order);
             await unitOfWork.SaveChangesAsync();
+            if (isCassaSale)
+                await unitOfWork.CommitAsync();
         }
         catch (InvalidOperationException ex)
         {
+            if (isCassaSale)
+                await unitOfWork.RollbackAsync();
             return OperationResult<OrderDto>.Fail(ex.Message);
+        }
+        catch
+        {
+            if (isCassaSale)
+                await unitOfWork.RollbackAsync();
+            throw;
         }
 
         logger.LogInformation("Order {OrderId} confirmed", orderId);

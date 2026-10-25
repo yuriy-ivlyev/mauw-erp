@@ -20,6 +20,7 @@ namespace Mauw.Erp.Infrastructure.Migrations
                 .HasAnnotation("ProductVersion", "10.0.4")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.HasSequence("supplier_purchase_order_number_seq");
@@ -1111,6 +1112,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("vat_total");
 
+                    b.Property<Guid?>("WarehouseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("warehouse_id");
+
                     b.HasKey("Id")
                         .HasName("p_k_ddt_documents");
 
@@ -1118,6 +1123,9 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .IsUnique();
 
                     b.HasIndex("OrderId");
+
+                    b.HasIndex("WarehouseId")
+                        .HasDatabaseName("i_x_ddt_documents_warehouse_id");
 
                     b.HasIndex("ContactId", "DdtDate")
                         .IsDescending(false, true);
@@ -1871,6 +1879,18 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasIndex("MaterialId")
                         .HasDatabaseName("i_x_products_material_id");
 
+                    b.HasIndex("Name")
+                        .HasDatabaseName("i_x_products_name_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Name"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Name"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex("SupplierCode")
+                        .HasDatabaseName("i_x_products_supplier_code_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SupplierCode"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("SupplierCode"), new[] { "gin_trgm_ops" });
+
                     b.HasIndex("SupplierId", "SupplierCode")
                         .IsUnique();
 
@@ -1963,6 +1983,12 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
                     b.HasIndex("SizeId")
                         .HasDatabaseName("i_x_product_variants_size_id");
+
+                    b.HasIndex("SupplierCode")
+                        .HasDatabaseName("i_x_product_variants_supplier_code_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SupplierCode"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("SupplierCode"), new[] { "gin_trgm_ops" });
 
                     b.HasIndex("SupplierId", "SupplierCode")
                         .IsUnique();
@@ -2140,6 +2166,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("quantity");
 
+                    b.Property<decimal?>("QuantityDelta")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)")
+                        .HasColumnName("quantity_delta");
+
                     b.Property<int?>("Reason")
                         .HasColumnType("integer")
                         .HasColumnName("reason");
@@ -2185,14 +2216,31 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
                     b.HasIndex("MovementDateUtc");
 
+                    b.HasIndex("ReferenceId")
+                        .HasDatabaseName("i_x_stock_movements_reference_id");
+
                     b.HasIndex("SupplierDeliveryNoteLineId")
                         .IsUnique()
                         .HasDatabaseName("i_x_stock_movements_supplier_delivery_note_line_id");
+
+                    b.HasIndex("WarehouseId", "MovementDateUtc")
+                        .HasDatabaseName("i_x_stock_movements_warehouse_id_movement_date_utc");
 
                     b.HasIndex("WarehouseId", "VariantId");
 
                     b.HasIndex("VariantId", "CreatedAt", "Id")
                         .IsDescending(false, true, true);
+
+                    b.HasIndex("WarehouseId", "VariantId", "MovementDateUtc")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("i_x_stock_movements_warehouse_variant_movement_date_utc");
+
+                    b.HasIndex("WarehouseId", "VariantId", "MovementDateUtc", "Id")
+                        .IsDescending(false, false, true, true)
+                        .HasDatabaseName("i_x_stock_movements_cost_warehouse_variant_date")
+                        .HasFilter("warehouse_id IS NOT NULL AND quantity_delta IS NOT NULL AND quantity_delta > 0 AND unit_cost > 0");
+
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("WarehouseId", "VariantId", "MovementDateUtc", "Id"), new[] { "QuantityDelta", "Quantity", "Type", "UnitCost" });
 
                     b.ToTable("stock_movements");
                 });
@@ -2807,7 +2855,15 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("f_k_ddt_documents_contacts_contact_id");
 
+                    b.HasOne("Mauw.Erp.Domain.Entities.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("f_k_ddt_documents__warehouses_warehouse_id");
+
                     b.Navigation("Contact");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.DdtItem", b =>

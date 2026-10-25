@@ -1,3 +1,4 @@
+using System.Data;
 using System.Globalization;
 using Mauw.Erp.Application.Mappers;
 using Mauw.Erp.Application.Validation;
@@ -28,15 +29,22 @@ public class DdtService(
 
     public async Task<OperationResult<DdtDto>> CreateDdtAsync(CreateDdtRequest request)
     {
+        if (request.WarehouseId == Guid.Empty)
+            return OperationResult<DdtDto>.Fail("Il magazzino del DDT è obbligatorio.");
+
         var contact = await unitOfWork.Contacts.GetByIdAsync(request.ContactId);
         if (contact == null)
             return OperationResult<DdtDto>.Fail("Contact not found");
+
+        var warehouse = await unitOfWork.Warehouses.GetByIdAsync(request.WarehouseId);
+        if (warehouse is null || !warehouse.IsActive || !warehouse.IsSellable)
+            return OperationResult<DdtDto>.Fail("Il magazzino non esiste, non è attivo o non è abilitato alla vendita.");
 
         var existing = await unitOfWork.DdtDocuments.GetByNumberAsync(request.DdtNumber);
         if (existing is not null)
             return OperationResult<DdtDto>.Fail($"Un DDT con numero '{request.DdtNumber}' esiste già.");
 
-        var ddt = new DdtDocument(request.ContactId, request.DdtNumber);
+        var ddt = new DdtDocument(request.ContactId, request.DdtNumber, request.WarehouseId);
 
         await unitOfWork.DdtDocuments.AddAsync(ddt);
         await unitOfWork.SaveChangesAsync();
@@ -74,6 +82,14 @@ public class DdtService(
         var ddt = await unitOfWork.DdtDocuments.GetByIdAsync(ddtId);
         if (ddt == null)
             return OperationResult<DdtDto>.Fail("DDT not found");
+        if (!ddt.WarehouseId.HasValue)
+            return OperationResult<DdtDto>.Fail("Il DDT storico non ha un magazzino assegnato.");
+        if (request.Quantity == int.MinValue)
+            return OperationResult<DdtDto>.Fail("La quantità non è rappresentabile nel movimento di magazzino.");
+
+        var warehouse = await unitOfWork.Warehouses.GetByIdAsync(ddt.WarehouseId.Value);
+        if (warehouse is null || !warehouse.IsActive || !warehouse.IsSellable)
+            return OperationResult<DdtDto>.Fail("Il magazzino del DDT non esiste, non è attivo o non è abilitato alla vendita.");
 
         var variant = await unitOfWork.ProductVariants.GetByIdAsync(request.VariantId);
         if (variant == null)
@@ -103,12 +119,39 @@ public class DdtService(
             natureCode: line.NatureCode,
             discountPercent: line.DiscountPercent) { PricingSnapshot = prepared.Snapshot };
 
-        var accounting = ddt.AddItem(item, accountingCalculator);
-        if (!accounting.Success)
-            return OperationResult<DdtDto>.Fail(accounting.Error);
+        var movement = StockMovement.FromDdtItem(ddt, item, ddt.WarehouseId.Value);
+        await unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
+        try
+        {
+            if (movement.QuantityDelta < 0)
+            {
+                var available = await unitOfWork.Stock.GetAvailableQtyAsync(
+                    movement.WarehouseId!.Value, movement.VariantId);
+                if (available < -movement.QuantityDelta.Value)
+                {
+                    await unitOfWork.RollbackAsync();
+                    return OperationResult<DdtDto>.Fail(
+                        $"Giacenza insufficiente per la variante {movement.VariantId}: disponibili {available}.");
+                }
+            }
 
-        await unitOfWork.DdtDocuments.UpdateAsync(ddt);
-        await unitOfWork.SaveChangesAsync();
+            var accounting = ddt.AddItem(item, accountingCalculator);
+            if (!accounting.Success)
+            {
+                await unitOfWork.RollbackAsync();
+                return OperationResult<DdtDto>.Fail(accounting.Error);
+            }
+
+            await unitOfWork.Stock.RecordMovementAsync(movement, movement.QuantityDelta!.Value);
+            await unitOfWork.DdtDocuments.UpdateAsync(ddt);
+            await unitOfWork.SaveChangesAsync();
+            await unitOfWork.CommitAsync();
+        }
+        catch
+        {
+            await unitOfWork.RollbackAsync();
+            throw;
+        }
 
         return OperationResult<DdtDto>.Ok(DdtMapper.MapToDto(ddt));
     }
@@ -119,8 +162,48 @@ public class DdtService(
         if (ddt == null)
             return OperationResult<bool>.Fail("DDT not found");
 
-        await unitOfWork.DdtDocuments.DeleteAsync(ddt);
-        await unitOfWork.SaveChangesAsync();
+        var movements = (await unitOfWork.StockMovements.GetByReferenceIdAsync(ddt.Id)).ToList();
+        var reversals = new List<StockMovement>(movements.Count);
+        foreach (var movement in movements)
+        {
+            if (!movement.WarehouseId.HasValue || !movement.GetEffectiveQuantityDelta().HasValue)
+                return OperationResult<bool>.Fail(
+                    "Il DDT contiene un movimento storico non stornabile; il documento non è stato eliminato.");
+            reversals.Add(StockMovement.FromDdtReversal(ddt, movement));
+        }
+
+        await unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
+        try
+        {
+            foreach (var group in movements
+                         .Where(movement => movement.GetEffectiveQuantityDelta() > 0)
+                         .GroupBy(movement => (
+                             WarehouseId: movement.WarehouseId!.Value,
+                             VariantId: movement.VariantId)))
+            {
+                var available = await unitOfWork.Stock.GetAvailableQtyAsync(
+                    group.Key.WarehouseId, group.Key.VariantId);
+                var required = group.Sum(movement => movement.GetEffectiveQuantityDelta()!.Value);
+                if (available < required)
+                {
+                    await unitOfWork.RollbackAsync();
+                    return OperationResult<bool>.Fail(
+                        $"Giacenza insufficiente per stornare il reso DDT della variante {group.Key.VariantId}.");
+                }
+            }
+
+            foreach (var reversal in reversals)
+                await unitOfWork.Stock.RecordMovementAsync(reversal, reversal.QuantityDelta!.Value);
+
+            await unitOfWork.DdtDocuments.DeleteAsync(ddt);
+            await unitOfWork.SaveChangesAsync();
+            await unitOfWork.CommitAsync();
+        }
+        catch
+        {
+            await unitOfWork.RollbackAsync();
+            throw;
+        }
 
         return OperationResult<bool>.Ok(true);
     }

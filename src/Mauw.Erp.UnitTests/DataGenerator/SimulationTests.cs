@@ -87,6 +87,9 @@ public class SimulationTests(PostgreSqlContainerFixture postgres)
             .Select(item => item.DefaultAgentId).Distinct().Count());
 
         var movements = await db.StockMovements.AsNoTracking().OrderBy(item => item.MovementDateUtc).ToListAsync();
+        Assert.All(movements, movement =>
+            Assert.Equal((decimal?)movement.Quantity, movement.QuantityDelta));
+
         var stock = await db.StockItems.AsNoTracking().ToListAsync();
         foreach (var group in movements.GroupBy(item => (item.WarehouseId, item.VariantId)))
         {

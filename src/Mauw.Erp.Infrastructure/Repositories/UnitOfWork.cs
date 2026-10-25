@@ -1,3 +1,4 @@
+using System.Data;
 using Mauw.Erp.Domain.Repositories;
 using Mauw.Erp.Domain.Exceptions;
 using Mauw.Erp.Infrastructure.DbContext;
@@ -61,9 +62,9 @@ public class UnitOfWork(MauwDbContext dbContext, IMemoryCache _cache) : IUnitOfW
         }
     }
 
-    public async Task BeginTransactionAsync()
+    public async Task BeginTransactionAsync(IsolationLevel isolationLevel = IsolationLevel.ReadCommitted)
     {
-        await dbContext.Database.BeginTransactionAsync();
+        await dbContext.Database.BeginTransactionAsync(isolationLevel);
     }
 
     public async Task CommitAsync()

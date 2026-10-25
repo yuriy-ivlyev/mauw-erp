@@ -1,94 +1,307 @@
 <div class="p-6">
-  <div class="mb-6 flex justify-between items-center">
-    <h1 class="text-3xl font-bold">Giacenze Magazzino</h1>
-    <span class="text-sm text-gray-500">{{ totalCount }} articoli</span>
+  <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-bold">Giacenze di magazzino</h1>
+      <p class="mt-1 text-sm text-gray-500">
+        @if (hasLoadedStocks()) {
+          {{ totalCount() }} righe inventariali
+        } @else {
+          Caricamento giacenze…
+        }
+      </p>
+    </div>
+    <div class="flex gap-2">
+      <button type="button" (click)="exportCsv()" [disabled]="exporting() !== null"
+        class="rounded-lg bg-emerald-700 px-4 py-2 font-medium text-white hover:bg-emerald-800 disabled:opacity-50">
+        {{ exporting() === 'csv' ? 'Esportazione…' : 'Esporta Excel' }}
+      </button>
+      <button type="button" (click)="exportPdf()" [disabled]="exporting() !== null"
+        class="rounded-lg bg-slate-700 px-4 py-2 font-medium text-white hover:bg-slate-800 disabled:opacity-50">
+        {{ exporting() === 'pdf' ? 'Preparazione…' : 'Stampa / Scarica PDF' }}
+      </button>
+    </div>
   </div>
 
-  <!-- Filters -->
-  <div class="mb-4 flex flex-wrap gap-3">
-    <select [(ngModel)]="filterWarehouseId" (change)="onFilterChange()"
-      class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-      <option value="">Tutti i magazzini</option>
-      <option *ngFor="let w of warehouses" [value]="w.id">{{ w.code }} – {{ w.name }}</option>
+  <section class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Totali inventario"
+    [attr.aria-busy]="!hasLoadedSummary()">
+    <div class="rounded-lg border bg-white p-4">
+      <p class="text-sm text-gray-500">Pezzi fisici</p>
+      <p class="mt-1 text-xl font-semibold">
+        @if (hasLoadedSummary()) {
+          {{ totals().totalPhysicalQuantity | number:'1.0-3' }}
+        } @else {
+          <span class="inline-block h-6 w-16 animate-pulse rounded bg-gray-200" aria-hidden="true"></span>
+        }
+      </p>
+    </div>
+    <div class="rounded-lg border bg-white p-4">
+      <p class="text-sm text-gray-500">Impegnati</p>
+      <p class="mt-1 text-xl font-semibold text-orange-700">
+        @if (hasLoadedSummary()) {
+          {{ totals().totalReservedQuantity | number:'1.0-3' }}
+        } @else {
+          <span class="inline-block h-6 w-16 animate-pulse rounded bg-gray-200" aria-hidden="true"></span>
+        }
+      </p>
+    </div>
+    <div class="rounded-lg border bg-white p-4">
+      <p class="text-sm text-gray-500">In arrivo</p>
+      <p class="mt-1 text-xl font-semibold text-blue-700">
+        @if (hasLoadedSummary()) {
+          {{ totals().totalIncomingQuantity | number:'1.0-3' }}
+        } @else {
+          <span class="inline-block h-6 w-16 animate-pulse rounded bg-gray-200" aria-hidden="true"></span>
+        }
+      </p>
+    </div>
+    <div class="rounded-lg border bg-white p-4">
+      <p class="text-sm text-gray-500">Disponibile netto</p>
+      <p class="mt-1 text-xl font-semibold">
+        @if (hasLoadedSummary()) {
+          {{ totals().totalAvailableQuantity | number:'1.0-3' }}
+        } @else {
+          <span class="inline-block h-6 w-16 animate-pulse rounded bg-gray-200" aria-hidden="true"></span>
+        }
+      </p>
+    </div>
+    <div class="rounded-lg border bg-white p-4">
+      <p class="text-sm text-gray-500">Valore complessivo</p>
+      <p class="mt-1 text-xl font-semibold text-indigo-700">
+        @if (hasLoadedSummary()) {
+          {{ totals().totalValue | number:'1.2-2' }} €
+        } @else {
+          <span class="inline-block h-6 w-16 animate-pulse rounded bg-gray-200" aria-hidden="true"></span>
+        }
+      </p>
+    </div>
+  </section>
+
+  @if (allocationNote()) {
+    <div class="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+      {{ allocationNote() }}
+    </div>
+  }
+
+  <div class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border bg-white p-4">
+    <input type="search" [ngModel]="search()" (ngModelChange)="search.set($event); onSearchChange()"
+      placeholder="Cerca SKU, descrizione o barcode…" aria-label="Cerca articolo"
+      class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-72">
+
+    <select [ngModel]="filterWarehouseId()" (ngModelChange)="filterWarehouseId.set($event); onFilterChange()"
+      aria-label="Deposito" class="rounded-lg border border-gray-300 px-3 py-2">
+      <option value="">Tutti i depositi</option>
+      @for (warehouse of warehouses(); track warehouse.id) {
+        <option [value]="warehouse.id">{{ warehouse.code }} – {{ warehouse.name }}</option>
+      }
     </select>
 
-    <input type="text" [(ngModel)]="search" (keyup.enter)="onSearch()"
-      placeholder="Cerca prodotto o barcode..."
-      class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-64">
+    <select [ngModel]="filterCategoryId()" (ngModelChange)="filterCategoryId.set($event); onFilterChange()"
+      aria-label="Categoria" class="rounded-lg border border-gray-300 px-3 py-2">
+      <option value="">Tutte le categorie</option>
+      @for (category of categories(); track category.id) {
+        <option [value]="category.id">{{ category.name }}</option>
+      }
+    </select>
 
-    <button (click)="onSearch()"
-      class="bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded font-medium">
-      Cerca
-    </button>
+    <label class="flex items-center gap-2 text-sm text-gray-700">
+      <span>Metodo di valorizzazione</span>
+      <select [ngModel]="valuationMethod()" (ngModelChange)="valuationMethod.set($event); onFilterChange()"
+        aria-label="Metodo di valorizzazione" class="rounded-lg border border-gray-300 px-3 py-2">
+        <option value="WeightedAverageCost">Costo medio ponderato</option>
+        <option value="LastPurchaseCost">Ultimo costo</option>
+      </select>
+    </label>
+
+    <label class="flex items-center gap-2 text-sm text-gray-700">
+      <input type="checkbox" [ngModel]="onlyInStock()" (ngModelChange)="onlyInStock.set($event); onFilterChange()"
+        class="rounded border-gray-300">
+      Solo articoli con giacenza &gt; 0
+    </label>
+
+    <label class="flex items-center gap-2 text-sm text-gray-700">
+      <span>Giacenza alla data</span>
+      <input type="date" [ngModel]="filterAtDate()" (ngModelChange)="filterAtDate.set($event); onFilterChange()"
+        aria-label="Giacenza alla data" class="rounded-lg border border-gray-300 px-3 py-2">
+    </label>
+
+    @if (filterAtDate()) {
+      <button type="button" (click)="clearDateFilter()"
+        class="rounded-lg px-3 py-2 text-sm text-blue-700 hover:bg-blue-50">
+        Tempo reale
+      </button>
+    }
   </div>
 
-  <!-- Error -->
-  <div *ngIf="errorMessage" class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-    {{ errorMessage }}
-  </div>
-
-  <!-- Table -->
-  <div class="bg-white rounded-lg shadow overflow-x-auto">
-    <div *ngIf="loading && stockItems.length === 0" class="p-8 text-center text-gray-400">
-      Caricamento giacenze...
+  @if (filterAtDate()) {
+    <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+      La giacenza fisica è ricostruita alla fine della data selezionata. Impegni cliente e quantità in arrivo riflettono
+      lo stato corrente degli ordini, poiché il sistema non conserva lo storico delle variazioni di stato.
     </div>
+  }
 
-    <table *ngIf="!loading || stockItems.length > 0" class="w-full text-sm">
-      <thead class="bg-gray-50 border-b">
-        <tr>
-          <th appSortHeader="barcode" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left font-semibold text-gray-700">Barcode</th>
-          <th appSortHeader="productName" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left font-semibold text-gray-700">Prodotto</th>
-          <th appSortHeader="colorSize" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left font-semibold text-gray-700">Colore / Taglia</th>
-          <th appSortHeader="warehouseCode" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-left font-semibold text-gray-700">Magazzino</th>
-          <th appSortHeader="quantityOnHand" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-right font-semibold text-gray-700">Fisica</th>
-          <th appSortHeader="quantityReserved" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-right font-semibold text-gray-700">Impegnata</th>
-          <th appSortHeader="quantityAvailable" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-right font-semibold text-gray-700">Disponibile</th>
-          <th appSortHeader="unitCost" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-right font-semibold text-gray-700">Costo Unit.</th>
-          <th appSortHeader="estimatedValue" [activeSortBy]="sortBy" [sortDescending]="sortDescending" (sortChange)="onSortChange($event)" class="px-4 py-3 text-right font-semibold text-gray-700">Valore Est.</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let s of stockItems" class="border-b hover:bg-gray-50">
-          <td class="px-4 py-3 font-mono text-xs text-gray-600">{{ s.barcode }}</td>
-          <td class="px-4 py-3 font-medium text-gray-900">{{ s.productName }}</td>
-          <td class="px-4 py-3 text-gray-600">
-            <span *ngIf="s.color" class="inline-block bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-xs mr-1">{{ s.color }}</span>
-            <span *ngIf="s.size" class="inline-block bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-xs">{{ s.size }}</span>
-            <span *ngIf="!s.color && !s.size" class="text-gray-400">–</span>
-          </td>
-          <td class="px-4 py-3">
-            <span class="bg-indigo-50 text-indigo-700 text-xs font-mono px-2 py-0.5 rounded">{{ s.warehouseCode }}</span>
-          </td>
-          <td class="px-4 py-3 text-right">{{ s.quantityOnHand | number:'1.0-3' }}</td>
-          <td class="px-4 py-3 text-right text-orange-600">{{ s.quantityReserved | number:'1.0-3' }}</td>
-          <td class="px-4 py-3 text-right" [class]="stockClass(s.quantityAvailable)">
-            {{ s.quantityAvailable | number:'1.0-3' }}
-          </td>
-          <td class="px-4 py-3 text-right text-gray-600">
-            {{ s.unitCost != null ? (s.unitCost | number:'1.2-2') + ' €' : '–' }}
-          </td>
-          <td class="px-4 py-3 text-right font-semibold text-gray-800">
-            {{ s.estimatedValue != null ? (s.estimatedValue | number:'1.2-2') + ' €' : '–' }}
-          </td>
-        </tr>
+  @if (errorMessage()) {
+    <div role="alert" class="mb-4 rounded border border-red-300 bg-red-50 p-4 text-red-800">
+      {{ errorMessage() }}
+    </div>
+  }
 
-        <!-- Totale stimato -->
-        <tr *ngIf="stockItems.length > 0" class="bg-gray-50 font-semibold">
-          <td colspan="8" class="px-4 py-3 text-right text-gray-600">Valore Stimato Totale (pagina):</td>
-          <td class="px-4 py-3 text-right text-blue-700">{{ totalEstimatedValue() | number:'1.2-2' }} €</td>
-        </tr>
+  <div class="overflow-x-auto rounded-lg bg-white shadow">
+    @if (loading() && stockItems().length === 0) {
+      <div class="p-8 text-center text-gray-500">Caricamento giacenze…</div>
+    }
 
-        <tr *ngIf="stockItems.length === 0 && !loading">
-          <td colspan="9" class="px-6 py-10 text-center text-gray-400">
-            Nessuna giacenza trovata. Registra un movimento per popolare l'inventario.
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    @if (!loading() || stockItems().length > 0) {
+      <table class="w-full text-sm">
+        <thead class="border-b bg-gray-50">
+          <tr>
+            <th appSortHeader="sku" [activeSortBy]="sortBy()" [sortDescending]="sortDescending()" (sortChange)="onSortChange($event)"
+              class="px-4 py-3 text-left font-semibold text-gray-700">SKU</th>
+            <th appSortHeader="description" [activeSortBy]="sortBy()" [sortDescending]="sortDescending()" (sortChange)="onSortChange($event)"
+              class="px-4 py-3 text-left font-semibold text-gray-700">Descrizione</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-700">Taglia / Colore</th>
+            <th appSortHeader="warehouseCode" [activeSortBy]="sortBy()" [sortDescending]="sortDescending()" (sortChange)="onSortChange($event)"
+              class="px-4 py-3 text-left font-semibold text-gray-700">Deposito</th>
+            <th appSortHeader="quantityOnHand" [activeSortBy]="sortBy()" [sortDescending]="sortDescending()" (sortChange)="onSortChange($event)"
+              class="px-4 py-3 text-right font-semibold text-gray-700">Fisica</th>
+            <th appSortHeader="quantityReserved" [activeSortBy]="sortBy()" [sortDescending]="sortDescending()" (sortChange)="onSortChange($event)"
+              class="px-4 py-3 text-right font-semibold text-gray-700">Impegnata</th>
+            <th appSortHeader="quantityIncoming" [activeSortBy]="sortBy()" [sortDescending]="sortDescending()" (sortChange)="onSortChange($event)"
+              class="px-4 py-3 text-right font-semibold text-gray-700">In arrivo</th>
+            <th appSortHeader="quantityAvailable" [activeSortBy]="sortBy()" [sortDescending]="sortDescending()" (sortChange)="onSortChange($event)"
+              class="px-4 py-3 text-right font-semibold text-gray-700">Disponibile</th>
+            <th appSortHeader="unitCost" [activeSortBy]="sortBy()" [sortDescending]="sortDescending()" (sortChange)="onSortChange($event)"
+              class="px-4 py-3 text-right font-semibold text-gray-700">{{ valuationMethodLabel() }}</th>
+            <th appSortHeader="totalValue" [activeSortBy]="sortBy()" [sortDescending]="sortDescending()" (sortChange)="onSortChange($event)"
+              class="px-4 py-3 text-right font-semibold text-gray-700">Valore totale</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (stock of stockItems(); track stock.productVariantId + stock.warehouseId) {
+            <tr (click)="openMovements(stock)" tabindex="0" (keydown.enter)="openMovements(stock)" (keydown.space)="openMovements(stock)"
+              class="cursor-pointer border-b hover:bg-blue-50 focus:bg-blue-50">
+              <td class="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-600">
+                {{ stock.sku }}<div class="text-gray-400">{{ stock.barcode }}</div>
+              </td>
+              <td class="px-4 py-3 font-medium text-gray-900">{{ stock.description }}</td>
+              <td class="px-4 py-3 text-gray-600">
+                @if (stock.size || stock.color) {
+                  {{ stock.size }}{{ stock.size && stock.color ? ' / ' : '' }}{{ stock.color }}
+                } @else {
+                  <span class="text-gray-400">—</span>
+                }
+              </td>
+              <td class="whitespace-nowrap px-4 py-3">
+                <span class="rounded bg-indigo-50 px-2 py-0.5 font-mono text-xs text-indigo-700">{{ stock.warehouseCode }}</span>
+                <div class="text-xs text-gray-500">{{ stock.warehouseName }}</div>
+              </td>
+              <td class="px-4 py-3 text-right">{{ stock.quantityOnHand | number:'1.0-3' }} {{ stock.unitOfMeasure }}</td>
+              <td class="px-4 py-3 text-right text-orange-700">{{ stock.quantityReserved | number:'1.0-3' }}</td>
+              <td class="px-4 py-3 text-right text-blue-700">{{ stock.quantityIncoming | number:'1.0-3' }}</td>
+              <td class="px-4 py-3 text-right">
+                <span class="rounded px-2 py-1 font-semibold" [ngClass]="stockClass(stock.quantityAvailable)">
+                  {{ stock.quantityAvailable | number:'1.0-3' }}
+                </span>
+              </td>
+              <td class="whitespace-nowrap px-4 py-3 text-right text-gray-600"
+                [attr.title]="costSourceLabel(stock)" [attr.aria-label]="costSourceLabel(stock)">
+                {{ stock.unitCost != null ? (stock.unitCost | number:'1.2-8') + ' €' : '—' }}
+                <span class="sr-only"> — {{ costSourceLabel(stock) }}</span>
+              </td>
+              <td class="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-800">
+                {{ stock.totalValue != null ? (stock.totalValue | number:'1.2-2') + ' €' : '—' }}
+              </td>
+            </tr>
+          } @empty {
+            @if (!loading()) {
+              <tr>
+                <td colspan="10" class="px-6 py-10 text-center text-gray-400">Nessuna giacenza trovata.</td>
+              </tr>
+            }
+          }
+
+          @if (stockItems().length > 0 && hasLoadedSummary()) {
+            <tr class="border-t-2 bg-gray-50 font-semibold">
+              <td colspan="4" class="px-4 py-3 text-right text-gray-700">Totali per i filtri selezionati:</td>
+              <td class="px-4 py-3 text-right">{{ totals().totalPhysicalQuantity | number:'1.0-3' }}</td>
+              <td class="px-4 py-3 text-right text-orange-700">{{ totals().totalReservedQuantity | number:'1.0-3' }}</td>
+              <td class="px-4 py-3 text-right text-blue-700">{{ totals().totalIncomingQuantity | number:'1.0-3' }}</td>
+              <td class="px-4 py-3 text-right">{{ totals().totalAvailableQuantity | number:'1.0-3' }}</td>
+              <td></td>
+              <td class="px-4 py-3 text-right text-indigo-700">{{ totals().totalValue | number:'1.2-2' }} €</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
   </div>
 
-  <!-- Pagination -->
-  <app-pagination [page]="page" [pageSize]="pageSize" [totalCount]="totalCount"
+  <app-pagination [page]="page()" [pageSize]="pageSize()" [totalCount]="totalCount()"
     (pageChange)="goToPage($event)" (pageSizeChange)="onPageSizeChange($event)">
   </app-pagination>
 </div>
+
+@if (selectedStock(); as stock) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    role="presentation" (click)="closeMovements()">
+    <section role="dialog" aria-modal="true" aria-labelledby="movements-title"
+      class="max-h-[85vh] w-full max-w-5xl overflow-hidden rounded-xl bg-white shadow-xl"
+      (click)="$event.stopPropagation()">
+      <header class="flex items-start justify-between border-b p-5">
+        <div>
+          <h2 id="movements-title" class="text-xl font-semibold">Mastrino movimenti</h2>
+          <p class="mt-1 text-sm text-gray-600">{{ stock.sku }} · {{ stock.description }} · {{ stock.warehouseName }}</p>
+        </div>
+        <button type="button" (click)="closeMovements()" aria-label="Chiudi"
+          class="rounded px-3 py-1 text-xl text-gray-500 hover:bg-gray-100">×</button>
+      </header>
+      <div class="max-h-[65vh] overflow-auto p-5">
+        @if (movementsError()) {
+          <p role="alert" class="mb-3 rounded border border-red-300 bg-red-50 p-3 text-red-800">
+            {{ movementsError() }}
+          </p>
+        }
+        @if (movementsLoading()) {
+          <p class="py-6 text-center text-gray-500">Caricamento movimenti…</p>
+        } @else {
+          <table class="w-full text-sm">
+            <thead class="sticky top-0 bg-gray-50">
+              <tr>
+                <th class="p-3 text-left">Data / ora</th>
+                <th class="p-3 text-left">Tipo / causale</th>
+                <th class="p-3 text-right">Quantità</th>
+                <th class="p-3 text-right">Saldo progressivo</th>
+                <th class="p-3 text-right">Costo unitario</th>
+                <th class="p-3 text-left">Documento / note</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (movement of movements(); track movement.id) {
+                <tr class="border-t">
+                  <td class="whitespace-nowrap p-3">{{ movement.movementDateUtc | date:'dd/MM/yyyy HH:mm:ss' }}</td>
+                  <td class="p-3">{{ movement.reason || movement.movementType }}</td>
+                  <td class="p-3 text-right font-medium"
+                    [class.text-green-700]="movement.quantityDelta != null && movement.quantityDelta > 0"
+                    [class.text-red-700]="movement.quantityDelta != null && movement.quantityDelta < 0">
+                    {{ movementLabel(movement) }}
+                  </td>
+                  <td class="whitespace-nowrap p-3 text-right">
+                    {{ movement.runningBalance != null ? (movement.runningBalance | number:'1.0-3') : 'Non disponibile' }}
+                  </td>
+                  <td class="whitespace-nowrap p-3 text-right">{{ movement.unitCost | number:'1.2-8' }} €</td>
+                  <td class="p-3">{{ movement.documentReference || movement.notes || '—' }}</td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="6" class="p-6 text-center text-gray-500">Nessun movimento registrato per questa variante.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+      <app-pagination [page]="movementPage()" [pageSize]="movementPageSize()" [totalCount]="movementTotalCount()"
+        (pageChange)="goToMovementPage($event)">
+      </app-pagination>
+    </section>
+  </div>
+}

@@ -19,6 +19,10 @@ public class StockMovementConfiguration : IEntityTypeConfiguration<StockMovement
         builder.Property(sm => sm.Quantity)
             .IsRequired();
 
+        builder.Property(sm => sm.QuantityDelta)
+            .HasPrecision(18, 3)
+            .IsRequired(false);
+
         builder.Property(sm => sm.UnitCost)
             .HasPrecision(23, 8);
 
@@ -60,6 +64,18 @@ public class StockMovementConfiguration : IEntityTypeConfiguration<StockMovement
         builder.HasIndex(sm => new { sm.VariantId, sm.CreatedAt, sm.Id })
             .IsDescending(false, true, true);
         builder.HasIndex(sm => new { sm.WarehouseId, sm.VariantId });
+        builder.HasIndex(sm => new { sm.WarehouseId, sm.MovementDateUtc })
+            .HasDatabaseName("i_x_stock_movements_warehouse_id_movement_date_utc");
+        builder.HasIndex(sm => new { sm.WarehouseId, sm.VariantId, sm.MovementDateUtc })
+            .IsDescending(false, false, true)
+            .HasDatabaseName("i_x_stock_movements_warehouse_variant_movement_date_utc");
+        builder.HasIndex(sm => new { sm.WarehouseId, sm.VariantId, sm.MovementDateUtc, sm.Id })
+            .IsDescending(false, false, true, true)
+            .HasDatabaseName("i_x_stock_movements_cost_warehouse_variant_date")
+            .HasFilter("warehouse_id IS NOT NULL AND quantity_delta IS NOT NULL AND quantity_delta > 0 AND unit_cost > 0")
+            .IncludeProperties(sm => new { sm.QuantityDelta, sm.Quantity, sm.Type, sm.UnitCost });
+        builder.HasIndex(sm => sm.ReferenceId)
+            .HasDatabaseName("i_x_stock_movements_reference_id");
         builder.HasIndex(sm => sm.MovementDateUtc);
         builder.HasOne(sm => sm.SupplierDeliveryNoteLine)
             .WithOne(line => line.StockMovement)

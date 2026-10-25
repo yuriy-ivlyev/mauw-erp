@@ -42,6 +42,12 @@ La catena di migrazioni riparte da un database vuoto (la migrazione
 RefactorCassaSessionToOrder usa DROP TABLE IF EXISTS): il ciclo
 reset -> database update -> seed e percorribile. Il generatore non usa
 EnsureCreated e non corregge migrazioni applicative.
+Il generatore salva anche il delta firmato di ogni movimento e verifica
+questa coerenza prima di dichiarare completato il seed. Se il database contiene
+dati sintetici creati prima dell'introduzione di quantity_delta, database update
+aggiunge la colonna nullable ma non puo ricostruire in sicurezza tutte le
+rettifiche storiche: per riavere uno scenario coerente usare reset -> database
+update -> seed, non migrare in-place il vecchio dataset.
 
 Non conservare password nel repository o nella cronologia della shell.
 Impostare MAUW_LOADTEST_CONNECTION nel proprio secret manager/ambiente:

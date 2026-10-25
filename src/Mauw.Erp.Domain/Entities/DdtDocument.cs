@@ -10,6 +10,7 @@ namespace Mauw.Erp.Domain.Entities;
 public class DdtDocument : Entity<Guid>
 {
     public Guid ContactId { get; set; }
+    public Guid? WarehouseId { get; set; }
     public Guid? OrderId { get; set; }
     public string DdtNumber { get; set; }
     public DateTime DdtDate { get; set; }
@@ -19,14 +20,17 @@ public class DdtDocument : Entity<Guid>
 
     // Navigation
     public Contact Contact { get; set; } = null!;
+    public Warehouse? Warehouse { get; set; }
     public ICollection<DdtItem> Items { get; set; } = [];
 
     public DdtDocument(
         Guid contactId,
-        string ddtNumber
+        string ddtNumber,
+        Guid? warehouseId = null
     ) : base()
     {
         ContactId = contactId;
+        WarehouseId = warehouseId;
         DdtNumber = ddtNumber;
         DdtDate = DateTime.UtcNow;
         TaxableTotal = 0;

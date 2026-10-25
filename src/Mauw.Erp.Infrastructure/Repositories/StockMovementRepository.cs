@@ -39,4 +39,11 @@ public class StockMovementRepository(MauwDbContext dbContext)
 
         return (items, total);
     }
+
+    public async Task<IEnumerable<StockMovement>> GetByReferenceIdAsync(Guid referenceId) =>
+        await _dbSet
+            .Where(sm => sm.ReferenceId == referenceId)
+            .OrderBy(sm => sm.MovementDateUtc)
+            .ThenBy(sm => sm.Id)
+            .ToListAsync();
 }

@@ -22,7 +22,6 @@ import { DdtNuovoComponent } from './pages/ddt/nuovo/ddt-nuovo.component';
 import { MagazziniComponent } from './pages/magazzino/magazzini/magazzini.component';
 import { ProdottiComponent } from './pages/magazzino/prodotti/prodotti.component';
 import { MovimentiComponent } from './pages/magazzino/movimenti/movimenti.component';
-import { InventarioComponent } from './pages/magazzino/inventario/inventario.component';
 import { CategorieComponent } from './pages/magazzino/categorie/categorie.component';
 import { ColoriComponent } from './pages/magazzino/colori/colori.component';
 import { TaglieComponent } from './pages/magazzino/taglie/taglie.component';
@@ -78,7 +77,7 @@ export const routes: Routes = [
       { path: 'magazzino/magazzini',       component: MagazziniComponent,      canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Magazzini | Mauw ERP' },
       { path: 'magazzino/prodotti',        component: ProdottiComponent,       canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Prodotti | Mauw ERP' },
       { path: 'magazzino/movimenti',       component: MovimentiComponent,      canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Movimenti | Mauw ERP' },
-      { path: 'magazzino/inventario',      component: InventarioComponent,     canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Inventario | Mauw ERP' },
+      { path: 'magazzino/inventario',      loadComponent: () => import('./pages/magazzino/inventario/inventario.component').then(m => m.InventarioComponent), canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Inventario | Mauw ERP' },
       { path: 'magazzino/categorie',       component: CategorieComponent,      canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Categorie | Mauw ERP' },
       { path: 'magazzino/colori',          component: ColoriComponent,         canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Colori | Mauw ERP' },
       { path: 'magazzino/taglie',          component: TaglieComponent,         canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Taglie | Mauw ERP' },

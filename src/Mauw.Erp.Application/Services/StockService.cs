@@ -172,7 +172,7 @@ public class StockService(
             new PagedResult<StockMovementDetailDto>(dtos, page, pageSize, total));
     }
 
-    private static string? GetReasonLabel(StockMovementReason? reason) => reason switch
+    public static string? GetReasonLabel(StockMovementReason? reason) => reason switch
     {
         StockMovementReason.SupplierReceipt     => "Carico Fornitore",
         StockMovementReason.ShowroomSale        => "Vendita Cassa",

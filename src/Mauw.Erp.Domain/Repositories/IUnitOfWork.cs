@@ -1,3 +1,5 @@
+using System.Data;
+
 namespace Mauw.Erp.Domain.Repositories;
 
 /// <summary>
@@ -24,7 +26,7 @@ public interface IUnitOfWork : IDisposable
     IWarehouseRepository Warehouses { get; }
 
     Task SaveChangesAsync();
-    Task BeginTransactionAsync();
+    Task BeginTransactionAsync(IsolationLevel isolationLevel = IsolationLevel.ReadCommitted);
     Task CommitAsync();
     Task RollbackAsync();
 }

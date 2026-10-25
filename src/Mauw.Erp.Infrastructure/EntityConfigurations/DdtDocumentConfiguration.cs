@@ -15,6 +15,9 @@ public class DdtDocumentConfiguration : IEntityTypeConfiguration<DdtDocument>
 
         builder.Property(d => d.OrderId);
 
+        builder.Property(d => d.WarehouseId)
+            .IsRequired(false);
+
         builder.Property(d => d.DdtNumber)
             .IsRequired()
             .HasMaxLength(50);
@@ -44,12 +47,19 @@ public class DdtDocumentConfiguration : IEntityTypeConfiguration<DdtDocument>
             .HasForeignKey(d => d.ContactId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(d => d.Warehouse)
+            .WithMany()
+            .HasForeignKey(d => d.WarehouseId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasMany(d => d.Items)
             .WithOne(di => di.DdtDocument)
             .HasForeignKey(di => di.DdtDocumentId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(d => d.OrderId);
+        builder.HasIndex(d => d.WarehouseId)
+            .HasDatabaseName("i_x_ddt_documents_warehouse_id");
         builder.HasIndex(d => new { d.ContactId, d.DdtDate })
             .IsDescending(false, true);
         builder.HasIndex(d => d.DdtNumber)

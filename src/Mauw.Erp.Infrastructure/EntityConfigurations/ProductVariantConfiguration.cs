@@ -65,5 +65,10 @@ public class ProductVariantConfiguration : IEntityTypeConfiguration<ProductVaria
         // Unique case-insensitive index on Barcode
         builder.HasIndex(v => v.Barcode)
             .IsUnique();
+
+        builder.HasIndex(v => v.SupplierCode)
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops")
+            .HasDatabaseName("i_x_product_variants_supplier_code_trgm");
     }
 }

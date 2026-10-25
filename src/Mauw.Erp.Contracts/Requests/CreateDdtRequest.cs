@@ -7,4 +7,5 @@ public class CreateDdtRequest
 {
     public Guid ContactId { get; set; }
     public string DdtNumber { get; set; } = "";
+    public Guid WarehouseId { get; set; }
 }

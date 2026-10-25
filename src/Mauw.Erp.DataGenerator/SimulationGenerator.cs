@@ -130,6 +130,14 @@ public sealed class SimulationGenerator(
             var defectiveMovements = await db.StockMovements.AsNoTracking()
                 .Where(item => item.WarehouseId == state.DefectiveWarehouse)
                 .SumAsync(item => (long)item.Quantity, token);
+            var hasInvalidMovementLedger = await db.StockMovements.AsNoTracking()
+                .AnyAsync(item =>
+                    !item.QuantityDelta.HasValue ||
+                    item.QuantityDelta.Value != item.Quantity,
+                    token);
+            if (hasInvalidMovementLedger)
+                return Fail("Generated stock movements must persist a signed quantity delta matching their quantity.");
+
             var reconciled = state.Purchased == state.Returned + state.RegularSold +
                 state.Liquidated + commercial + defective &&
                 defective == state.Defects && commercial == persistedCommercial &&
@@ -427,7 +435,7 @@ public sealed class SimulationGenerator(
     private void AddMovement(RunState state, Guid variant, Guid warehouse, int delta,
         decimal cost, DateOnly date, StockMovementType type, StockMovementReason reason, string reference)
     {
-        // The warehouse-aware domain constructor discards signs and dates; set mapped properties explicitly.
+        // Keep the legacy quantity signed for reconciliation; the constructor persists the same ledger delta.
         var movement = new StockMovement(variant, warehouse, reason, delta, documentReference: reference)
         {
             Type = type,

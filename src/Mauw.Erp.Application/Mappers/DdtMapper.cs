@@ -14,6 +14,7 @@ public static class DdtMapper
             Id: ddt.Id,
             DdtNumber: ddt.DdtNumber,
             ContactId: ddt.ContactId,
+            WarehouseId: ddt.WarehouseId,
             DdtDate: ddt.DdtDate,
             TaxableTotal: ddt.TaxableTotal,
             VatTotal: ddt.VatTotal,

@@ -47,6 +47,7 @@ builder.Services.AddPricingApi();
 // Register domain services
 builder.Services.AddScoped<Mauw.Erp.Domain.Services.PricingEngine>();
 builder.Services.AddInvoicePdfReporting();
+builder.Services.AddInventoryStockReporting();
 builder.Services.AddCompanyBranding();
 builder.Services.AddImageStorage(builder.Configuration);
 builder.Services.AddSupplierDeliveryNotes();
@@ -142,6 +143,7 @@ app.MapControllers();
 app.MapProductEndpoints();
 app.MapSupportEndpoints();
 app.MapInventoryEndpoints();
+app.MapInventoryStockEndpoints();
 app.MapContactEndpoints();
 app.MapWarehouseEndpoints();
 app.MapCompanySettingsEndpoints();

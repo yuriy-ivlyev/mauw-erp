@@ -7,6 +7,7 @@ public record DdtDto(
     Guid Id,
     string DdtNumber,
     Guid ContactId,
+    Guid? WarehouseId,
     DateTime DdtDate,
     decimal TaxableTotal,
     decimal VatTotal,

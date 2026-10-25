@@ -52,6 +52,7 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.HasSequence<long>("supplier_purchase_order_number_seq");
+        modelBuilder.HasPostgresExtension("pg_trgm");
 
         var converter = new SnakeCaseNameConverter();
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
@@ -117,6 +118,7 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
         modelBuilder.ApplyConfiguration(new SupplierPurchaseOrderLineConfiguration());
         modelBuilder.ApplyConfiguration(new SupplierReturnDraftConfiguration());
         modelBuilder.ApplyConfiguration(new SupplierReturnDraftLineConfiguration());
+
     }
 
     /// <summary>

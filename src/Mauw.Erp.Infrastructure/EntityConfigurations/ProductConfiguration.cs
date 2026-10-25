@@ -70,5 +70,15 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         // Unique index for SupplierCode per Supplier
         builder.HasIndex(p => new { p.SupplierId, p.SupplierCode })
             .IsUnique();
+
+        builder.HasIndex(p => p.SupplierCode)
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops")
+            .HasDatabaseName("i_x_products_supplier_code_trgm");
+
+        builder.HasIndex(p => p.Name)
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops")
+            .HasDatabaseName("i_x_products_name_trgm");
     }
 }
