@@ -13,7 +13,7 @@ namespace Mauw.Erp.Infrastructure.Migrations
         /// <summary>
         /// Baseline squashed from the previous 42 migrations. It reproduces their resulting schema exactly,
         /// including the missing FKs on ddt_items/invoice_items/order_items/stock_movements.variant_id
-        /// (the EF model declares them, but the squashed schema never had them): add them with a dedicated migration.
+        /// (the EF model declares them, but the squashed schema never had them): added by AddVariantForeignKeys.
         /// </summary>
         protected override void Up(MigrationBuilder migrationBuilder)
         {

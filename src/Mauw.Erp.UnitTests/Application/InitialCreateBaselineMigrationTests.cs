@@ -10,13 +10,14 @@ namespace Mauw.Erp.UnitTests.Application;
 public class InitialCreateBaselineMigrationTests(PostgreSqlContainerFixture postgres)
 {
     [Fact]
-    public async Task BaselineIsTheOnlyMigrationAndMatchesTheModel()
+    public async Task BaselineIsFollowedByVariantForeignKeysAndMatchesTheModel()
     {
         await using var db = await MigratedDbAsync();
 
         var migrations = db.Database.GetMigrations().ToList();
-        Assert.Single(migrations);
+        Assert.Equal(2, migrations.Count);
         Assert.EndsWith("_InitialCreate", migrations[0]);
+        Assert.EndsWith("_AddVariantForeignKeys", migrations[1]);
         Assert.Equal(migrations, await db.Database.GetAppliedMigrationsAsync());
         Assert.Empty(await db.Database.GetPendingMigrationsAsync());
         Assert.False(db.Database.HasPendingModelChanges());

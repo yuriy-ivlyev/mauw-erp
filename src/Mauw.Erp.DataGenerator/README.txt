@@ -38,11 +38,13 @@ Preparazione (Bash; dalla radice del repository)
 ----------------------------------------------
 Richiesti SDK .NET 10, PostgreSQL e strumento dotnet-ef compatibile con la
 versione EF di Directory.Packages.props. Non sono richieste nuove migrazioni.
-Le migrazioni storiche sono riunite in un'unica baseline (InitialCreate), che
-crea da zero l'intero schema: il ciclo reset -> database update -> seed e
+Le migrazioni storiche sono riunite in una baseline (InitialCreate), che
+crea da zero l'intero schema, seguita da AddVariantForeignKeys (aggiunge le FK
+su variant_id di ddt_items, invoice_items, order_items e stock_movements, che
+la baseline non creava): il ciclo reset -> database update -> seed e
 percorribile su un database vuoto. Un database creato con le vecchie migrazioni
-va ricreato oppure la sua tabella __EFMigrationsHistory va allineata (una sola
-riga con l'id di InitialCreate). Il generatore non usa EnsureCreated e non
+va ricreato oppure la sua tabella __EFMigrationsHistory va allineata (riga con
+l'id di InitialCreate), poi database update applica AddVariantForeignKeys. Il generatore non usa EnsureCreated e non
 corregge migrazioni applicative.
 Il generatore salva anche il delta firmato di ogni movimento e verifica
 questa coerenza prima di dichiarare completato il seed. Se il database contiene
