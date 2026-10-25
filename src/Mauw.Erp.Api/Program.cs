@@ -157,6 +157,7 @@ app.MapInvoiceEndpoints();
 app.MapDdtEndpoints();
 app.MapCassaSessionEndpoints();
 app.MapPriceListEndpoints();
+app.MapPriceFormulaEndpoints();
 app.MapSupplierDeliveryNoteEndpoints();
 app.MapSupplierPurchaseOrderEndpoints();
 

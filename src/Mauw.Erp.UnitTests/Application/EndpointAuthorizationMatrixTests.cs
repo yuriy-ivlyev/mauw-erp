@@ -106,6 +106,7 @@ public sealed class AuthorizationMatrixHost : IAsyncLifetime
         _app.MapDdtEndpoints();
         _app.MapCassaSessionEndpoints();
         _app.MapPriceListEndpoints();
+        _app.MapPriceFormulaEndpoints();
         _app.MapSupplierDeliveryNoteEndpoints();
         _app.MapSupplierPurchaseOrderEndpoints();
         // Endpoint without any authorization metadata: it must fall under the fallback policy.
@@ -270,6 +271,11 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
         Add("PUT", $"/api/v1/price-lists/{Id}", AdminSales);
         Add("PATCH", $"/api/v1/price-lists/{Id}/activation", AdminSales);
         Add("DELETE", $"/api/v1/price-lists/{Id}", AdminSales);
+
+        // Formula prezzi: solo Admin
+        Add("GET", "/api/v1/settings/price-formula", AdminOnly);
+        Add("PUT", "/api/v1/settings/price-formula", AdminOnly);
+        Add("POST", "/api/v1/products/price-formula/calculate", AdminOnly);
 
         // Supplier documents
         foreach (var prefix in new[] { "/api/supplier-delivery-notes", "/api/v1/supplier-delivery-notes" })

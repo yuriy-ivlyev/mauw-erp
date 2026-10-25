@@ -22,7 +22,7 @@ public static class ProductEndpoints
 
         group.MapPost("/calculate-selling-price", CalculateSellingPrice)
             .WithName("CalculateSellingPrice")
-            .WithSummary("Calculate a net selling price for entry only; does not save a pricing policy");
+            .WithSummary("[Obsoleto: sostituito da price-formula/calculate] Calculate a net selling price for entry only; does not save a pricing policy");
 
         group.MapPost("/", CreateProduct)
             .RequireAuthorization(AppPolicies.CatalogManagement)

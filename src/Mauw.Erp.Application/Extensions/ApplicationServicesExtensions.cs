@@ -14,6 +14,7 @@ public static class ApplicationServicesExtensions
         services.AddSingleton<CatalogPriceCalculator>();
         services.AddSingleton<PriceFormulaCalculator>();
         services.AddScoped<IPriceListService, PriceListService>();
+        services.AddScoped<IPriceFormulaService, PriceFormulaService>();
         services.AddScoped<IDocumentPricingService, DocumentPricingService>();
         services.AddScoped<OrderService>();
         services.AddScoped<IOrderService>(sp =>
