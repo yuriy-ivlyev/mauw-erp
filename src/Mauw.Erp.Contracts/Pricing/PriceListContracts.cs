@@ -9,7 +9,7 @@ public sealed record PriceRuleRequest
     public Guid? Id { get; init; }
     [JsonConverter(typeof(JsonStringEnumConverter<PriceCalculationType>))]
     public PriceCalculationType CalculationType { get; init; }
-    /// <summary>Null in responses for CostMarkup rules when the caller cannot see margins (non-Admin); null on save keeps the stored value of an existing hidden rule.</summary>
+    /// <summary>Null in responses for CostMarkup rules when the caller cannot see margins (non-Admin); for those callers the stored value of an existing CostMarkup rule is always kept and the sent one ignored.</summary>
     [CostSensitive]
     public decimal? Value { get; init; }
     public Guid? VariantId { get; init; }

@@ -26,12 +26,15 @@ public sealed class PriceListService(IPriceListRepository repository, PriceListR
             return OperationResult<PriceListResponse>.Fail("Listino non trovato.");
         if (request.Rules is null || request.Rules.Any(rule => rule is null))
             return OperationResult<PriceListResponse>.Fail("Le regole non possono essere null.");
+        if (request.Rules.Any(rule => rule.Id.HasValue && (list is null || list.Rules.All(old => old.Id != rule.Id))))
+            return OperationResult<PriceListResponse>.Fail("Identificativo regola estraneo al listino.");
+        if (keepHiddenMargins && request.Rules.Any(rule => ChangesMarginRule(list, rule)))
+            return OperationResult<PriceListResponse>.Fail(
+                "Le regole di ricarico sul costo sono riservate all'amministratore e non possono essere create o modificate.");
         var rules = request.Rules.Select(rule => new PriceRuleDefinition(
             rule.Id, rule.CalculationType, RuleValue(list, rule, keepHiddenMargins), rule.VariantId, rule.ProductId,
             rule.CategoryId, rule.MinimumQuantity, rule.ValidFrom, rule.ValidTo, rule.Priority,
             rule.Description)).ToList();
-        if (rules.Any(rule => rule.Id.HasValue && (list is null || list.Rules.All(old => old.Id != rule.Id))))
-            return OperationResult<PriceListResponse>.Fail("Identificativo regola estraneo al listino.");
 
         var validation = PriceList.Create(request.Name, request.Currency, request.IsActive, rules);
         if (!validation.Success)
@@ -119,13 +122,24 @@ public sealed class PriceListService(IPriceListRepository repository, PriceListR
 
     private static decimal RuleValue(PriceList? list, PriceRuleRequest rule, bool keepHiddenMargins)
     {
-        if (rule.Value.HasValue)
-            return rule.Value.Value;
-        var stored = keepHiddenMargins && rule.CalculationType == PriceCalculationType.CostMarkup && rule.Id.HasValue
-            ? list?.Rules.FirstOrDefault(old =>
-                old.Id == rule.Id && old.CalculationType == PriceCalculationType.CostMarkup)
-            : null;
-        return stored?.Value ?? 0m;
+        // Callers without margin visibility never set a CostMarkup value: the stored one always wins.
+        if (keepHiddenMargins && rule.Id.HasValue && rule.CalculationType == PriceCalculationType.CostMarkup)
+        {
+            var stored = list?.Rules.FirstOrDefault(old =>
+                old.Id == rule.Id && old.CalculationType == PriceCalculationType.CostMarkup);
+            if (stored is not null)
+                return stored.Value;
+        }
+        return rule.Value ?? 0m;
+    }
+
+    /// <summary>True when the rule is a new CostMarkup rule or changes the type to or from CostMarkup.</summary>
+    private static bool ChangesMarginRule(PriceList? list, PriceRuleRequest rule)
+    {
+        var stored = rule.Id.HasValue ? list?.Rules.FirstOrDefault(old => old.Id == rule.Id) : null;
+        var wasMarkup = stored?.CalculationType == PriceCalculationType.CostMarkup;
+        var isMarkup = rule.CalculationType == PriceCalculationType.CostMarkup;
+        return stored is null ? isMarkup : wasMarkup != isMarkup;
     }
 
     private static PriceListResponse Map(PriceList list) => new(

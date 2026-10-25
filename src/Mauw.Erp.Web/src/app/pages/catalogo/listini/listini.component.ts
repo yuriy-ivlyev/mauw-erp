@@ -4,6 +4,7 @@ import { FormArray, FormBuilder, ReactiveFormsModule, Validators } from '@angula
 import { finalize } from 'rxjs';
 import { PriceList, PriceListRequest, PriceRule, PriceCalculationType } from '../../../models/price-list.model';
 import { PriceListService, priceError } from '../../../services/price-list.service';
+import { AuthService } from '../../../services/auth.service';
 import { decimal8, priceRuleValidator } from '../../../services/price-list.validators';
 import { PriceRuleTargetComponent } from './price-rule-target.component';
 import { PaginationComponent } from '../../../shared/pagination/pagination.component';
@@ -71,7 +72,7 @@ function localDate(value?: string | null): string {
                 (selected)="rule.controls.targetId.setValue($event)"></app-price-rule-target>
               <label>Tipo<select formControlName="calculationType" class="border p-2 w-full">
                 <option value="FixedPrice">Prezzo fisso netto EUR</option><option value="PercentageDiscount">Sconto %</option>
-                <option value="CostMarkup">Ricarico sul costo %</option></select></label>
+                <option *ngIf="canSeeMargins() || rule.controls.reserved.value" value="CostMarkup">Ricarico sul costo %</option></select></label>
               <label>Valore
                 <input *ngIf="!rule.controls.reserved.value" type="number" min="0" step="0.00000001" formControlName="value" class="border p-2 w-full">
                 <span *ngIf="rule.controls.reserved.value" class="value-reserved block p-2 italic text-gray-500"
@@ -101,6 +102,9 @@ function localDate(value?: string | null): string {
 export class ListiniComponent implements OnInit {
   private fb = inject(FormBuilder);
   private service = inject(PriceListService);
+  private auth = inject(AuthService);
+  // Il server rifiuta ai non-Admin la creazione e il cambio di tipo delle regole di ricarico.
+  canSeeMargins(): boolean { return this.auth.canSeeMargins(); }
   lists: PriceList[] = [];
   page = 1;
   pageSize = 20;

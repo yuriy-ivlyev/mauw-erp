@@ -1,8 +1,10 @@
 using Mauw.Erp.Api.Authorization;
+using Mauw.Erp.Application.Constants;
 using Mauw.Erp.Application.Costs;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
+using Mauw.Erp.Domain.Enums;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Mauw.Erp.Api.Endpoints;
@@ -97,11 +99,26 @@ public static class InventoryEndpoints
         return TypedResults.Ok(costs.Redact(result.Data!));
     }
 
-    private static async Task<Results<Ok<StockItemDto>, BadRequest<string>, NotFound>> ExecuteMovement(
+    private static async Task<Results<Ok<StockItemDto>, BadRequest<string>, NotFound, ForbidHttpResult>> ExecuteMovement(
         CreateStockMovementCommand command,
         IStockService stockService,
-        ICostVisibility costs)
+        ICostVisibility costs,
+        ICurrentUserService currentUser)
     {
+        // Sales only records what the showroom cash desk does: sales go out, customer returns come in.
+        // Undefined reasons fall through to the service, which rejects them with a validation error.
+        if (!currentUser.HasRole(AppRoles.Admin) && !currentUser.HasRole(AppRoles.Warehouse)
+            && Enum.IsDefined(typeof(StockMovementReason), command.Reason))
+        {
+            var reason = (StockMovementReason)command.Reason;
+            if (reason is not (StockMovementReason.ShowroomSale or StockMovementReason.CustomerReturn))
+                return TypedResults.Forbid();
+            if (command.Quantity != 0m && (command.Quantity < 0m) != (reason == StockMovementReason.ShowroomSale))
+                return TypedResults.BadRequest(reason == StockMovementReason.ShowroomSale
+                    ? "Una vendita deve avere quantita negativa"
+                    : "Un reso cliente deve avere quantita positiva");
+        }
+
         var result = await stockService.ExecuteMovementAsync(command);
 
         if (!result.Success)

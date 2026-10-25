@@ -7,8 +7,9 @@ public interface IPriceListService
     Task<IReadOnlyList<PriceListResponse>> GetAllAsync(CancellationToken ct);
     Task<PriceListResponse?> GetAsync(Guid id, CancellationToken ct);
     /// <param name="keepHiddenMargins">
-    /// True when the caller cannot see margins: a CostMarkup rule sent without Value keeps its stored value,
-    /// so saving a list read with nulled margins does not overwrite them.
+    /// True when the caller cannot see margins: existing CostMarkup rules always keep their stored value
+    /// (the sent one is ignored), and creating a CostMarkup rule or changing a rule type to or from
+    /// CostMarkup is rejected.
     /// </param>
     Task<OperationResult<PriceListResponse>> SaveAsync(
         Guid? id, SavePriceListRequest request, CancellationToken ct, bool keepHiddenMargins = false);

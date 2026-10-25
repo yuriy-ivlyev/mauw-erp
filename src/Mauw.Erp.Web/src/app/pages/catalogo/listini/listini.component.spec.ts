@@ -4,10 +4,12 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ListiniComponent } from './listini.component';
 import { PriceListService } from '../../../services/price-list.service';
 import { PriceList } from '../../../models/price-list.model';
+import { AuthService } from '../../../services/auth.service';
 
 describe('ListiniComponent', () => {
   let service: jasmine.SpyObj<PriceListService>;
   let component: ListiniComponent;
+  let roles: string[];
   const list: PriceList = {
     id: 'list', name: 'Rivenditori', currency: 'EUR', isActive: true,
     rules: [{
@@ -24,7 +26,11 @@ describe('ListiniComponent', () => {
     service.create.and.returnValue(of(list));
     service.activate.and.returnValue(of(undefined));
     service.delete.and.returnValue(of(undefined));
-    TestBed.configureTestingModule({ providers: [{ provide: PriceListService, useValue: service }] });
+    roles = ['Admin'];
+    const auth = { canSeeMargins: () => roles.includes('Admin') } as unknown as AuthService;
+    TestBed.configureTestingModule({
+      providers: [{ provide: PriceListService, useValue: service }, { provide: AuthService, useValue: auth }]
+    });
     component = TestBed.runInInjectionContext(() => new ListiniComponent());
   });
   it('loads a detail and preserves IDs, precision and UTC dates on save', () => {
@@ -103,6 +109,7 @@ describe('ListiniComponent', () => {
     expect(service.update.calls.mostRecent().args[1].rules[0].value).toBe(40);
   });
   it('shows "riservato" for a hidden cost markup and lets Sales save the list with value null', () => {
+    roles = ['Sales'];
     const hidden = { ...list, rules: [
       { id: 'm', calculationType: 'CostMarkup' as const, value: null, minimumQuantity: 1, priority: 3 },
       { ...list.rules[0], productId: null }
@@ -122,6 +129,21 @@ describe('ListiniComponent', () => {
     const rules = service.update.calls.mostRecent().args[1].rules;
     expect(rules[0]).toEqual(jasmine.objectContaining({ id: 'm', calculationType: 'CostMarkup', value: null }));
     expect(rules[1].value).toBe(15.5);
+  });
+  it('offers the cost markup type only to roles that can see margins', () => {
+    const options = (role: string, rules: PriceList['rules']) => {
+      roles = [role];
+      const fixture = TestBed.createComponent(ListiniComponent);
+      fixture.componentInstance.edit({ ...list, rules });
+      fixture.detectChanges();
+      return Array.from((fixture.nativeElement as HTMLElement)
+        .querySelectorAll('select[formControlName="calculationType"] option')).map(o => (o as HTMLOptionElement).value);
+    };
+    const global = [{ ...list.rules[0], productId: null }];
+    expect(options('Admin', global)).toContain('CostMarkup');
+    expect(options('Sales', global)).toEqual(['FixedPrice', 'PercentageDiscount']);
+    const hidden = [{ id: 'm', calculationType: 'CostMarkup' as const, value: null, minimumQuantity: 1, priority: 0 }];
+    expect(options('Sales', hidden)).toContain('CostMarkup');
   });
   it('still validates non-reserved rules in a list that contains a hidden cost markup', () => {
     component.edit({ ...list, rules: [

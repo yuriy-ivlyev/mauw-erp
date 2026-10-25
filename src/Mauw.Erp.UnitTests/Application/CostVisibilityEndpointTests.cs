@@ -447,33 +447,152 @@ public sealed class CostVisibilityEndpointTests(CostVisibilityHost host) : IClas
         Assert.Equal(admin, Regex.IsMatch(singleBody, @"""value"":35(\.0+)?[,}]"));
     }
 
-    [Fact]
-    public async Task PriceListSavedByNonAdmin_KeepsTheStoredMarkupWhenItIsSentBackNull()
+    private async Task<(Guid ListId, Guid MarkupId, Guid FixedId)> CreateAdminListAsync(decimal markup)
     {
-        using var sales = host.CreateClient("Sales");
-        var created = await sales.PostAsJsonAsync("/api/v1/price-lists", new
+        using var admin = host.CreateClient("Admin");
+        var created = await admin.PostAsJsonAsync("/api/v1/price-lists", new
         {
-            name = "Listino vendite", currency = "EUR", isActive = true,
-            rules = new object[] { new { calculationType = "CostMarkup", value = 40m } }
+            name = $"Listino {Guid.NewGuid():N}", currency = "EUR", isActive = true,
+            rules = new object[]
+            {
+                new { calculationType = "CostMarkup", value = markup, priority = 5 },
+                new { calculationType = "FixedPrice", value = 15m, variantId = host.AlfaVariantId, priority = 10 }
+            }
         });
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-        var createdBody = await created.Content.ReadFromJsonAsync<JsonElement>();
-        var id = createdBody.GetProperty("id").GetGuid();
-        var rule = createdBody.GetProperty("rules")[0];
-        Assert.Null(Num(rule, "value"));
+        var body = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var rules = body.GetProperty("rules").EnumerateArray().ToArray();
+        return (body.GetProperty("id").GetGuid(),
+            rules.Single(rule => rule.GetProperty("calculationType").GetString() == "CostMarkup").GetProperty("id").GetGuid(),
+            rules.Single(rule => rule.GetProperty("calculationType").GetString() == "FixedPrice").GetProperty("id").GetGuid());
+    }
 
-        // Round trip of what Sales received: the rule has no value, the stored one must survive.
-        var updated = await sales.PutAsJsonAsync($"/api/v1/price-lists/{id}", new
+    private async Task<decimal?> StoredMarkupAsync(Guid listId)
+    {
+        using var admin = host.CreateClient("Admin");
+        var stored = await admin.GetFromJsonAsync<JsonElement>($"/api/v1/price-lists/{listId}");
+        return Num(stored.GetProperty("rules").EnumerateArray()
+            .Single(rule => rule.GetProperty("calculationType").GetString() == "CostMarkup"), "value");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(99)]
+    public async Task PriceListSavedByNonAdmin_AlwaysKeepsTheStoredMarkup(int? sentValue)
+    {
+        var (listId, markupId, fixedId) = await CreateAdminListAsync(40m);
+        using var sales = host.CreateClient("Sales");
+
+        var updated = await sales.PutAsJsonAsync($"/api/v1/price-lists/{listId}", new
         {
             name = "Listino vendite 2", currency = "EUR", isActive = true,
-            rules = new object[] { new { id = rule.GetProperty("id").GetGuid(), calculationType = "CostMarkup", value = (decimal?)null } }
+            rules = new object[]
+            {
+                new { id = markupId, calculationType = "CostMarkup", value = (decimal?)sentValue, priority = 5 },
+                new { id = fixedId, calculationType = "FixedPrice", value = 16m, variantId = host.AlfaVariantId, priority = 10 }
+            }
         });
-        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
 
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        var body = await updated.Content.ReadAsStringAsync();
+        Assert.Null(Num(JsonDocument.Parse(body).RootElement.GetProperty("rules").EnumerateArray()
+            .Single(rule => rule.GetProperty("calculationType").GetString() == "CostMarkup"), "value"));
+        Assert.Equal(40m, await StoredMarkupAsync(listId));
         using var admin = host.CreateClient("Admin");
-        var stored = await admin.GetFromJsonAsync<JsonElement>($"/api/v1/price-lists/{id}");
+        var stored = await admin.GetFromJsonAsync<JsonElement>($"/api/v1/price-lists/{listId}");
         Assert.Equal("Listino vendite 2", stored.GetProperty("name").GetString());
-        Assert.Equal(40m, Num(stored.GetProperty("rules")[0], "value"));
+        Assert.Equal(16m, Num(stored.GetProperty("rules").EnumerateArray()
+            .Single(rule => rule.GetProperty("calculationType").GetString() == "FixedPrice"), "value"));
+    }
+
+    [Fact]
+    public async Task SalesCannotCreateACostMarkupRuleAndNeverResolvesToTheCost()
+    {
+        using var sales = host.CreateClient("Sales");
+
+        var created = await sales.PostAsJsonAsync("/api/v1/price-lists", new
+        {
+            name = "Listino costo", currency = "EUR", isActive = true,
+            rules = new object[] { new { calculationType = "CostMarkup", value = 0m } }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, created.StatusCode);
+        var problem = await created.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Contains("ricarico", problem.GetProperty("detail").GetString());
+        using var admin = host.CreateClient("Admin");
+        var lists = await admin.GetFromJsonAsync<JsonElement>("/api/v1/price-lists");
+        Assert.DoesNotContain(lists.EnumerateArray(), list => list.GetProperty("name").GetString() == "Listino costo");
+    }
+
+    [Fact]
+    public async Task SalesCannotAddACostMarkupRuleToAnExistingList()
+    {
+        var (listId, markupId, fixedId) = await CreateAdminListAsync(40m);
+        using var sales = host.CreateClient("Sales");
+
+        var updated = await sales.PutAsJsonAsync($"/api/v1/price-lists/{listId}", new
+        {
+            name = "Listino", currency = "EUR", isActive = true,
+            rules = new object[]
+            {
+                new { id = markupId, calculationType = "CostMarkup", priority = 5 },
+                new { id = fixedId, calculationType = "FixedPrice", value = 15m, variantId = host.AlfaVariantId, priority = 10 },
+                new { calculationType = "CostMarkup", value = 0m, priority = 20 }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, updated.StatusCode);
+        using var admin = host.CreateClient("Admin");
+        var stored = await admin.GetFromJsonAsync<JsonElement>($"/api/v1/price-lists/{listId}");
+        Assert.Equal(2, stored.GetProperty("rules").GetArrayLength());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task SalesCannotChangeARuleTypeToOrFromCostMarkup(bool fromMarkup)
+    {
+        var (listId, markupId, fixedId) = await CreateAdminListAsync(40m);
+        using var sales = host.CreateClient("Sales");
+        object[] rules = fromMarkup
+            ? [new { id = markupId, calculationType = "FixedPrice", value = 10m, variantId = host.AlfaVariantId },
+               new { id = fixedId, calculationType = "FixedPrice", value = 15m, variantId = host.AlfaVariantId }]
+            : [new { id = markupId, calculationType = "CostMarkup", value = (decimal?)null, variantId = (Guid?)null },
+               new { id = fixedId, calculationType = "CostMarkup", value = 0m, variantId = (Guid?)host.AlfaVariantId }];
+
+        var updated = await sales.PutAsJsonAsync($"/api/v1/price-lists/{listId}", new
+        {
+            name = "Listino", currency = "EUR", isActive = true, rules
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, updated.StatusCode);
+        Assert.Equal(40m, await StoredMarkupAsync(listId));
+    }
+
+    [Fact]
+    public async Task AdminCanStillCreateAndUpdateCostMarkupRules()
+    {
+        var (listId, markupId, fixedId) = await CreateAdminListAsync(40m);
+        using var admin = host.CreateClient("Admin");
+
+        var updated = await admin.PutAsJsonAsync($"/api/v1/price-lists/{listId}", new
+        {
+            name = "Listino admin", currency = "EUR", isActive = true,
+            rules = new object[]
+            {
+                new { id = markupId, calculationType = "CostMarkup", value = 55m, priority = 5 },
+                new { id = fixedId, calculationType = "FixedPrice", value = 15m, variantId = host.AlfaVariantId, priority = 10 },
+                new { calculationType = "CostMarkup", value = 10m, priority = 1 }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        var rules = (await updated.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("rules").EnumerateArray()
+            .Where(rule => rule.GetProperty("calculationType").GetString() == "CostMarkup")
+            .Select(rule => Num(rule, "value")).Order().ToArray();
+        Assert.Equal([10m, 55m], rules);
     }
 
     [Theory]
