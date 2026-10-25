@@ -29,14 +29,16 @@ describe('Price list rule validation', () => {
     form.patchValue({ target: 'global' });
     expect(form.hasError('target')).toBeTrue();
   });
-  it('limits percentage discount but permits cost markup above 100 percent', () => {
+  it('limits percentage discount to 100 percent', () => {
     const form = rule();
     form.patchValue({ calculationType: 'PercentageDiscount', value: 101 });
     expect(form.hasError('calculationType')).toBeTrue();
     form.patchValue({ value: 100 });
     expect(form.valid).toBeTrue();
-    form.patchValue({ calculationType: 'CostMarkup', value: 150 });
+    form.patchValue({ calculationType: 'FixedPrice', value: 150 });
     expect(form.valid).toBeTrue();
+    form.patchValue({ calculationType: 'Unknown' as never });
+    expect(form.hasError('calculationType')).toBeTrue();
   });
   it('validates inclusive windows and rejects invalid or reversed dates', () => {
     const form = rule();

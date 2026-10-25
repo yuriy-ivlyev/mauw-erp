@@ -9,7 +9,7 @@ public sealed class PriceListResolver(ItalianAccountingCalculator calculator)
     public AccountingResult<ResolvedPrice> Resolve(PriceList? list, PriceResolutionInput input)
     {
         if (input.VariantId == Guid.Empty || input.ProductId == Guid.Empty ||
-            input.Quantity <= 0m || input.BaseUnitPrice < 0m || input.BaseCost < 0m ||
+            input.Quantity <= 0m || input.BaseUnitPrice < 0m ||
             decimal.Round(input.Quantity, 8, MidpointRounding.AwayFromZero) != input.Quantity ||
             decimal.Round(input.BaseUnitPrice, 8, MidpointRounding.AwayFromZero) != input.BaseUnitPrice)
             return AccountingResult<ResolvedPrice>.Fail("Dati di risoluzione del prezzo non validi.");
@@ -35,8 +35,6 @@ public sealed class PriceListResolver(ItalianAccountingCalculator calculator)
             var unitPrice = selected?.CalculationType switch
             {
                 PriceCalculationType.FixedPrice => selected.Value,
-                PriceCalculationType.CostMarkup => decimal.Round(
-                    input.BaseCost * (1m + selected.Value / 100m), 8, MidpointRounding.AwayFromZero),
                 _ => input.BaseUnitPrice
             };
             var discount = selected?.CalculationType == PriceCalculationType.PercentageDiscount

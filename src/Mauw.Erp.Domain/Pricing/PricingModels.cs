@@ -5,8 +5,7 @@ using System.Text.Json.Serialization;
 public enum PriceCalculationType
 {
     FixedPrice,
-    PercentageDiscount,
-    CostMarkup
+    PercentageDiscount
 }
 
 public sealed record PriceRuleDefinition(
@@ -24,7 +23,7 @@ public sealed record PriceRuleDefinition(
 
 public sealed record PriceResolutionInput(
     Guid VariantId, Guid ProductId, Guid? CategoryId,
-    decimal Quantity, decimal BaseUnitPrice, decimal BaseCost, DateTimeOffset At);
+    decimal Quantity, decimal BaseUnitPrice, DateTimeOffset At);
 
 public sealed record ResolvedPrice(
     Guid? PriceListId, Guid? RuleId, decimal ListUnitPrice,

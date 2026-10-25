@@ -1,10 +1,10 @@
-export type PriceCalculationType = 'FixedPrice' | 'PercentageDiscount' | 'CostMarkup';
+export type PriceCalculationType = 'FixedPrice' | 'PercentageDiscount';
 
 export interface PriceRule {
   id?: string;
   calculationType: PriceCalculationType;
-  /** Null per le regole CostMarkup se il ruolo non e Admin: il server conserva il valore salvato. */
-  value: number | null;
+  value: number;
+
   variantId?: string | null;
   productId?: string | null;
   categoryId?: string | null;

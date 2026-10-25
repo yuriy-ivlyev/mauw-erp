@@ -4,7 +4,6 @@ import { FormArray, FormBuilder, ReactiveFormsModule, Validators } from '@angula
 import { finalize } from 'rxjs';
 import { PriceList, PriceListRequest, PriceRule, PriceCalculationType } from '../../../models/price-list.model';
 import { PriceListService, priceError } from '../../../services/price-list.service';
-import { AuthService } from '../../../services/auth.service';
 import { decimal8, priceRuleValidator } from '../../../services/price-list.validators';
 import { PriceRuleTargetComponent } from './price-rule-target.component';
 import { PaginationComponent } from '../../../shared/pagination/pagination.component';
@@ -71,12 +70,9 @@ function localDate(value?: string | null): string {
                 [target]="rule.controls.target.value" [targetId]="rule.controls.targetId.value"
                 (selected)="rule.controls.targetId.setValue($event)"></app-price-rule-target>
               <label>Tipo<select formControlName="calculationType" class="border p-2 w-full">
-                <option value="FixedPrice">Prezzo fisso netto EUR</option><option value="PercentageDiscount">Sconto %</option>
-                <option *ngIf="canSeeMargins() || rule.controls.reserved.value" value="CostMarkup">Ricarico sul costo %</option></select></label>
+                <option value="FixedPrice">Prezzo fisso netto EUR</option><option value="PercentageDiscount">Sconto %</option></select></label>
               <label>Valore
-                <input *ngIf="!rule.controls.reserved.value" type="number" min="0" step="0.00000001" formControlName="value" class="border p-2 w-full">
-                <span *ngIf="rule.controls.reserved.value" class="value-reserved block p-2 italic text-gray-500"
-                  title="Il ricarico sul costo è visibile solo agli amministratori">riservato</span></label>
+                <input type="number" min="0" step="0.00000001" formControlName="value" class="border p-2 w-full"></label>
               <label>Quantità minima<input type="number" min="0.00000001" step="0.00000001" formControlName="minimumQuantity" class="border p-2 w-full"></label>
               <label>Priorità<input type="number" step="1" formControlName="priority" class="border p-2 w-full"></label>
               <label class="md:col-span-3">Causale sconto (mostrata in cassa e sui documenti)
@@ -102,9 +98,7 @@ function localDate(value?: string | null): string {
 export class ListiniComponent implements OnInit {
   private fb = inject(FormBuilder);
   private service = inject(PriceListService);
-  private auth = inject(AuthService);
-  // Il server rifiuta ai non-Admin la creazione e il cambio di tipo delle regole di ricarico.
-  canSeeMargins(): boolean { return this.auth.canSeeMargins(); }
+
   lists: PriceList[] = [];
   page = 1;
   pageSize = 20;
@@ -148,18 +142,12 @@ export class ListiniComponent implements OnInit {
   }
   ruleForm(rule?: PriceRule) {
     const target = rule?.variantId ? 'variantId' : rule?.productId ? 'productId' : rule?.categoryId ? 'categoryId' : 'global';
-    // Il server nasconde il ricarico (valore null) ai non-Admin e conserva quello salvato se si rinvia null.
-    const reserved = rule?.calculationType === 'CostMarkup' && rule.value == null;
     return this.fb.nonNullable.group({
       id: rule?.id ?? '',
-      reserved,
       target,
       targetId: rule?.variantId ?? rule?.productId ?? rule?.categoryId ?? '',
-      calculationType: this.fb.nonNullable.control<PriceCalculationType>(
-        { value: rule?.calculationType ?? 'FixedPrice', disabled: reserved }),
-      value: this.fb.nonNullable.control<number | null>(
-        { value: reserved ? null : (rule?.value ?? 0), disabled: reserved },
-        [Validators.required, Validators.min(0), decimal8]),
+      calculationType: this.fb.nonNullable.control<PriceCalculationType>(rule?.calculationType ?? 'FixedPrice'),
+      value: [rule?.value ?? 0, [Validators.required, Validators.min(0), decimal8]],
       minimumQuantity: [rule?.minimumQuantity ?? 1, [Validators.required, Validators.min(0.00000001), decimal8]],
       priority: [rule?.priority ?? 0, [Validators.required, Validators.min(-2147483648), Validators.max(2147483647), Validators.pattern(/^-?\d+$/)]],
       description: [rule?.description ?? '', [Validators.maxLength(200)]],
@@ -186,7 +174,7 @@ export class ListiniComponent implements OnInit {
       name: value.name.trim(), currency: 'EUR', isActive: value.isActive,
       rules: value.rules.map(rule => ({
         ...(rule.id ? { id: rule.id } : {}),
-        calculationType: rule.calculationType, value: rule.reserved ? null : rule.value, minimumQuantity: rule.minimumQuantity,
+        calculationType: rule.calculationType, value: rule.value, minimumQuantity: rule.minimumQuantity,
         priority: rule.priority,
         description: rule.description.trim() || null,
         variantId: rule.target === 'variantId' ? rule.targetId : null,

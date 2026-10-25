@@ -1,7 +1,5 @@
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
-using Mauw.Erp.Contracts.Pricing;
-using Mauw.Erp.Domain.Pricing;
 
 namespace Mauw.Erp.Application.Costs;
 
@@ -16,7 +14,7 @@ public static class CostRedaction
     [
         typeof(ProductDto), typeof(ProductVariantDto), typeof(VariantSearchDto), typeof(StockMovementDto),
         typeof(StockItemDto), typeof(InventoryStockDto), typeof(InventoryStockTotalsDto),
-        typeof(InventoryStockMovementDto), typeof(PriceRuleRequest)
+        typeof(InventoryStockMovementDto)
     ];
 
     private static readonly HashSet<string> CostSortKeys = new(StringComparer.OrdinalIgnoreCase)
@@ -96,15 +94,4 @@ public static class CostRedaction
         costs.CanSeeCosts
             ? response
             : response with { Items = response.Items.Select(dto => costs.Redact(dto)).ToList() };
-
-    /// <summary>Price list rules of type CostMarkup expose the margin: the rule is kept but its Value is nulled.</summary>
-    public static PriceRuleRequest Redact(this ICostVisibility costs, PriceRuleRequest rule) =>
-        costs.CanSeeMargins || rule.CalculationType != PriceCalculationType.CostMarkup ? rule : rule with { Value = null };
-
-    public static PriceListResponse Redact(this ICostVisibility costs, PriceListResponse list) =>
-        costs.CanSeeMargins ? list : list with { Rules = list.Rules.Select(rule => costs.Redact(rule)).ToList() };
-
-    public static IReadOnlyList<PriceListResponse> Redact(
-        this ICostVisibility costs, IReadOnlyList<PriceListResponse> lists) =>
-        costs.CanSeeMargins ? lists : lists.Select(list => costs.Redact(list)).ToList();
 }

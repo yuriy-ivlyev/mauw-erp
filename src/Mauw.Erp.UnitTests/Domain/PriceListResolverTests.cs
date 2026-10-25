@@ -65,8 +65,7 @@ public class PriceListResolverTests
     public static TheoryData<PriceCalculationType, decimal, decimal, decimal> Formulas => new()
     {
         { PriceCalculationType.FixedPrice, 12.12345678m, 12.12345678m, 0m },
-        { PriceCalculationType.PercentageDiscount, 10m, 45.11111110m, 10m },
-        { PriceCalculationType.CostMarkup, 150m, 25.30864198m, 0m }
+        { PriceCalculationType.PercentageDiscount, 10m, 45.11111110m, 10m }
     };
 
     [Theory]
@@ -81,6 +80,25 @@ public class PriceListResolverTests
         Assert.Equal(expectedDiscount, result.Data.DiscountPercent);
         if (type == PriceCalculationType.PercentageDiscount)
             Assert.Equal(50.12345678m, result.Data.ListUnitPrice);
+    }
+
+    [Fact]
+    public void ListWithFixedPriceAndPercentageDiscountRulesStillResolvesEachRule()
+    {
+        var list = Create(
+            new(null, PriceCalculationType.FixedPrice, 20m, VariantId: Variant),
+            new(null, PriceCalculationType.PercentageDiscount, 10m, CategoryId: Category));
+
+        var fixedPrice = _resolver.Resolve(list, Input());
+        Assert.True(fixedPrice.Success, fixedPrice.Error);
+        Assert.Equal(20m, fixedPrice.Data!.AgreedUnitNetPrice);
+        Assert.Equal(0m, fixedPrice.Data.DiscountPercent);
+
+        var discount = _resolver.Resolve(list, Input() with { VariantId = Guid.NewGuid() });
+        Assert.True(discount.Success, discount.Error);
+        Assert.Equal(50.12345678m, discount.Data!.ListUnitPrice);
+        Assert.Equal(10m, discount.Data.DiscountPercent);
+        Assert.Equal(45.11111110m, discount.Data.AgreedUnitNetPrice);
     }
 
     [Fact]
@@ -103,7 +121,7 @@ public class PriceListResolverTests
         new(null, PriceCalculationType.FixedPrice, 1m, VariantId: Variant, ProductId: Product),
         new(null, PriceCalculationType.FixedPrice, 1m, ValidFrom: At, ValidTo: At.AddDays(-1)),
         new(null, (PriceCalculationType)999, 1m),
-        new(null, PriceCalculationType.CostMarkup, decimal.MaxValue)
+        new(null, PriceCalculationType.FixedPrice, decimal.MaxValue)
     };
 
     [Theory]
@@ -125,11 +143,10 @@ public class PriceListResolverTests
     {
         Assert.False(_resolver.Resolve(null, Input() with { Quantity = 0m }).Success);
         Assert.False(_resolver.Resolve(null, Input() with { BaseUnitPrice = -1m }).Success);
-        var list = Create(new PriceRuleDefinition(null, PriceCalculationType.CostMarkup, 99999999999999m));
-        Assert.False(_resolver.Resolve(list, Input() with { BaseCost = decimal.MaxValue }).Success);
+
         Assert.False(PriceList.Create("Test", "USD", true, []).Success);
     }
 
     private static PriceList Create(params PriceRuleDefinition[] rules) => PriceList.Create("Test", "EUR", true, rules).Data!;
-    private static PriceResolutionInput Input() => new(Variant, Product, Category, 1m, 50.12345678m, 10.12345679m, At);
+    private static PriceResolutionInput Input() => new(Variant, Product, Category, 1m, 50.12345678m, At);
 }

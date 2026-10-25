@@ -1,5 +1,4 @@
 using Mauw.Erp.Api.Authorization;
-using Mauw.Erp.Application.Costs;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Pricing;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -13,39 +12,39 @@ public static class PriceListEndpoints
         var group = app.MapGroup("/api/v1/price-lists").WithTags("Listini")
             .RequireAuthorization(AppPolicies.AnyRole);
 
-        group.MapGet("/", async (IPriceListService service, ICostVisibility costs, CancellationToken ct) =>
-            TypedResults.Ok(costs.Redact(await service.GetAllAsync(ct))))
-            .WithName("GetPriceLists").WithSummary("Elenca i listini e le regole (il valore delle regole CostMarkup solo ad Admin).");
+        group.MapGet("/", async (IPriceListService service, CancellationToken ct) =>
+            TypedResults.Ok(await service.GetAllAsync(ct)))
+            .WithName("GetPriceLists").WithSummary("Elenca i listini e le regole.");
         group.MapGet("/{id:guid}", async Task<Results<Ok<PriceListResponse>, ProblemHttpResult>> (
-            Guid id, IPriceListService service, ICostVisibility costs, CancellationToken ct) =>
+            Guid id, IPriceListService service, CancellationToken ct) =>
         {
             var list = await service.GetAsync(id, ct);
-            return list is null ? Error("Listino non trovato.") : TypedResults.Ok(costs.Redact(list));
+            return list is null ? Error("Listino non trovato.") : TypedResults.Ok(list);
         }).WithName("GetPriceList").WithSummary("Legge un listino con le sue regole.");
 
         group.MapPost("/", async Task<Results<Created<PriceListResponse>, ProblemHttpResult>> (
-            SavePriceListRequest request, IPriceListService service, ICostVisibility costs, CancellationToken ct) =>
+            SavePriceListRequest request, IPriceListService service, CancellationToken ct) =>
         {
-            var result = await service.SaveAsync(null, request, ct, !costs.CanSeeMargins);
+            var result = await service.SaveAsync(null, request, ct);
             return result.Success
-                ? TypedResults.Created($"/api/v1/price-lists/{result.Data!.Id}", costs.Redact(result.Data!))
+                ? TypedResults.Created($"/api/v1/price-lists/{result.Data!.Id}", result.Data!)
                 : Error(result.Error);
         }).RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("CreatePriceList").WithSummary("Crea un listino EUR.");
 
         group.MapPut("/{id:guid}", async Task<Results<Ok<PriceListResponse>, ProblemHttpResult>> (
-            Guid id, SavePriceListRequest request, IPriceListService service, ICostVisibility costs, CancellationToken ct) =>
+            Guid id, SavePriceListRequest request, IPriceListService service, CancellationToken ct) =>
         {
-            var result = await service.SaveAsync(id, request, ct, !costs.CanSeeMargins);
-            return result.Success ? TypedResults.Ok(costs.Redact(result.Data!)) : Error(result.Error);
+            var result = await service.SaveAsync(id, request, ct);
+            return result.Success ? TypedResults.Ok(result.Data!) : Error(result.Error);
         }).RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("UpdatePriceList").WithSummary("Aggiorna il listino senza modificare gli snapshot documentali.");
 
         group.MapPatch("/{id:guid}/activation", async Task<Results<Ok<PriceListResponse>, ProblemHttpResult>> (
-            Guid id, PriceListActivationRequest request, IPriceListService service, ICostVisibility costs, CancellationToken ct) =>
+            Guid id, PriceListActivationRequest request, IPriceListService service, CancellationToken ct) =>
         {
             var result = await service.SetActivationAsync(id, request.IsActive, ct);
-            return result.Success ? TypedResults.Ok(costs.Redact(result.Data!)) : Error(result.Error);
+            return result.Success ? TypedResults.Ok(result.Data!) : Error(result.Error);
         }).RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("ActivatePriceList").WithSummary("Attiva o disattiva un listino.");
 

@@ -4,12 +4,10 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ListiniComponent } from './listini.component';
 import { PriceListService } from '../../../services/price-list.service';
 import { PriceList } from '../../../models/price-list.model';
-import { AuthService } from '../../../services/auth.service';
 
 describe('ListiniComponent', () => {
   let service: jasmine.SpyObj<PriceListService>;
   let component: ListiniComponent;
-  let roles: string[];
   const list: PriceList = {
     id: 'list', name: 'Rivenditori', currency: 'EUR', isActive: true,
     rules: [{
@@ -26,10 +24,8 @@ describe('ListiniComponent', () => {
     service.create.and.returnValue(of(list));
     service.activate.and.returnValue(of(undefined));
     service.delete.and.returnValue(of(undefined));
-    roles = ['Admin'];
-    const auth = { canSeeMargins: () => roles.includes('Admin') } as unknown as AuthService;
     TestBed.configureTestingModule({
-      providers: [{ provide: PriceListService, useValue: service }, { provide: AuthService, useValue: auth }]
+      providers: [{ provide: PriceListService, useValue: service }]
     });
     component = TestBed.runInInjectionContext(() => new ListiniComponent());
   });
@@ -96,62 +92,13 @@ describe('ListiniComponent', () => {
     expect(service.create).not.toHaveBeenCalled();
     expect(component.rules.at(0).touched).toBeTrue();
   });
-  it('shows an Admin cost markup value as a number and sends it back', () => {
-    const markup = { ...list, rules: [{ id: 'm', calculationType: 'CostMarkup' as const, value: 40, minimumQuantity: 1, priority: 0 }] };
+  it('offers only the fixed price and percentage discount rule types', () => {
     const fixture = TestBed.createComponent(ListiniComponent);
-    fixture.componentInstance.edit(markup);
+    fixture.componentInstance.edit({ ...list, rules: [{ ...list.rules[0], productId: null }] });
     fixture.detectChanges();
-    const html: HTMLElement = fixture.nativeElement;
-    expect(html.querySelector('.value-reserved')).toBeNull();
-    expect((html.querySelector('input[formControlName="value"]') as HTMLInputElement).value).toBe('40');
-    fixture.componentInstance.editId = 'list';
-    fixture.componentInstance.save();
-    expect(service.update.calls.mostRecent().args[1].rules[0].value).toBe(40);
-  });
-  it('shows "riservato" for a hidden cost markup and lets Sales save the list with value null', () => {
-    roles = ['Sales'];
-    const hidden = { ...list, rules: [
-      { id: 'm', calculationType: 'CostMarkup' as const, value: null, minimumQuantity: 1, priority: 3 },
-      { ...list.rules[0], productId: null }
-    ] };
-    const fixture = TestBed.createComponent(ListiniComponent);
-    fixture.componentInstance.edit(hidden);
-    fixture.detectChanges();
-    const html: HTMLElement = fixture.nativeElement;
-    const reserved = html.querySelectorAll('.value-reserved');
-    expect(reserved.length).toBe(1);
-    expect(reserved[0].textContent).toContain('riservato');
-    expect(html.querySelectorAll('input[formControlName="value"]').length).toBe(1);
-    expect(html.textContent).not.toMatch(/NaN|\bnull\b/);
-    fixture.componentInstance.form.controls.name.setValue('Rivenditori');
-    fixture.componentInstance.editId = 'list';
-    fixture.componentInstance.save();
-    const rules = service.update.calls.mostRecent().args[1].rules;
-    expect(rules[0]).toEqual(jasmine.objectContaining({ id: 'm', calculationType: 'CostMarkup', value: null }));
-    expect(rules[1].value).toBe(15.5);
-  });
-  it('offers the cost markup type only to roles that can see margins', () => {
-    const options = (role: string, rules: PriceList['rules']) => {
-      roles = [role];
-      const fixture = TestBed.createComponent(ListiniComponent);
-      fixture.componentInstance.edit({ ...list, rules });
-      fixture.detectChanges();
-      return Array.from((fixture.nativeElement as HTMLElement)
-        .querySelectorAll('select[formControlName="calculationType"] option')).map(o => (o as HTMLOptionElement).value);
-    };
-    const global = [{ ...list.rules[0], productId: null }];
-    expect(options('Admin', global)).toContain('CostMarkup');
-    expect(options('Sales', global)).toEqual(['FixedPrice', 'PercentageDiscount']);
-    const hidden = [{ id: 'm', calculationType: 'CostMarkup' as const, value: null, minimumQuantity: 1, priority: 0 }];
-    expect(options('Sales', hidden)).toContain('CostMarkup');
-  });
-  it('still validates non-reserved rules in a list that contains a hidden cost markup', () => {
-    component.edit({ ...list, rules: [
-      { id: 'm', calculationType: 'CostMarkup', value: null, minimumQuantity: 1, priority: 0 },
-      { ...list.rules[0], value: -1 }
-    ] });
-    component.save();
-    expect(service.update).not.toHaveBeenCalled();
+    const options = Array.from((fixture.nativeElement as HTMLElement)
+      .querySelectorAll('select[formControlName="calculationType"] option')).map(o => (o as HTMLOptionElement).value);
+    expect(options).toEqual(['FixedPrice', 'PercentageDiscount']);
   });
   it('shows API errors and retains unsaved changes', () => {
     service.update.and.returnValue(throwError(() => new HttpErrorResponse({

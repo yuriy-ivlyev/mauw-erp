@@ -11,14 +11,14 @@ Implementato:
 - Endpoint: `GET` e `PUT /api/v1/settings/price-formula` (lettura e salvataggio della formula), `POST /api/v1/products/price-formula/calculate` (calcolo dal costo, senza salvare). Tutti con policy `Admin`.
 - Pulsante "Calcola da costo" nelle schermate di prodotto e variante (solo `Admin`): propone il prezzo, non lo salva da solo.
 - Ruoli lato server: policy per gruppo di endpoint (`Admin`, `Sales`, `Warehouse`, `Accounting`), con test 401/403 nella matrice di autorizzazione. `Cashier` non ha più accesso.
-- Redazione dei costi: costi e valorizzazioni solo ad `Admin` e `Accounting`; margini (`CostMarkup`) solo ad `Admin`. Ai ruoli senza margini le regole `CostMarkup` esistenti mantengono sempre il valore salvato e non se ne possono creare né cambiare il tipo.
+- Redazione dei costi: costi e valorizzazioni solo ad `Admin` e `Accounting`; margine e passi della formula solo ad `Admin` (endpoint con policy `Admin`).
 - Movimenti di magazzino: `Sales` può registrare solo vendite showroom (quantità negativa) e resi cliente (quantità positiva); gli altri motivi richiedono `Admin` o `Warehouse`.
 - Rimozione del legacy (`DefaultMarkupRate`, `MarkupRate`, `PricingEngine`, `calculate-selling-price`).
+- Rimossa la regola di listino `CostMarkup` (codice, API, interfaccia e test): i listini mantengono `FixedPrice` e `PercentageDiscount`. Nessuna migrazione elimina le righe esistenti (punto G).
 - Migrazioni: `AddPriceFormula` e `RemoveLegacyMarkupRates`.
 
 Ancora aperto:
 
-- Regola di listino `CostMarkup` mantenuta finché l'utente non conferma il conteggio sul database: `SELECT COUNT(*) FROM price_list_rules WHERE calculation_type = 'CostMarkup';` (punto G).
 - Sconto sul totale in fattura (punto F).
 - Accesso del magazziniere al documento di spedizione (punto H).
 - Ruolo `Accounting` (punto I).
@@ -98,7 +98,7 @@ La migrazione elimina solo le due colonne e non riscrive importi o classificazio
 Il `Down` le ricrea (`default_markup_rate` numeric(6,2) NOT NULL default 0, `markup_rate` numeric(6,2) NULL),
 ma i valori eliminati non sono recuperabili.
 
-Non rimossa: la regola di listino `CostMarkup` (vedi punto G).
+La regola di listino `CostMarkup` è stata rimossa separatamente (vedi punto G).
 
 ## Matrice dei ruoli (bozza)
 
@@ -134,8 +134,8 @@ Impatti previsti rispetto a oggi:
   Oggi le risposte di prodotti, varianti, giacenze, listini e documenti contengono costi e valorizzazioni.
 - Le fatture e le note di credito oggi sono visibili solo ad `Admin` e `Accounting` nel frontend: per `Sales` vanno aperte.
   Il magazziniere deve poter leggere solo il documento collegato alla spedizione, non l'elenco delle fatture.
-- I listini sono visibili a `Sales`. Le regole `CostMarkup` mostrano i ricarichi, cioè il margine: se la regola viene
-  rimossa (punto G) il problema sparisce, altrimenti vanno nascoste.
+- I listini sono visibili a `Sales`. La regola `CostMarkup`, che mostrava il margine, è stata rimossa (punto G):
+  i listini non contengono più dati di margine.
 - La giacenza storica (parametro data) e la riconciliazione dei movimenti ambigui vanno limitate ai ruoli previsti.
 - Serve una policy per ruolo applicata a tutti i gruppi di endpoint, con test che verificano 401 e 403
   e test che verificano l'assenza dei campi sensibili nelle risposte dei ruoli senza permesso.
@@ -148,9 +148,14 @@ Funzione separata dal calcolo prezzi. L'operatore decide e inserisce lo sconto a
 proporlo. Da progettare: come si rappresenta uno sconto sul totale nel documento, perché le regole contabili
 richiedono righe esplicite con aliquota e Natura e un castelletto IVA coerente.
 
-### G. Regola di listino `CostMarkup`
+### G. Regola di listino `CostMarkup` (rimossa)
 
-Non rimossa nella pulizia del legacy: prima va verificato sul database reale che nessuna regola sia di questo tipo `SELECT COUNT(*) FROM price_list_rules WHERE calculation_type = 'CostMarkup';`. Se il risultato è 0, si potranno rimuovere il tipo di regola e il ramo del resolver.
+Rimossi il tipo `PriceCalculationType.CostMarkup`, il ramo del resolver (e `PriceResolutionInput.BaseCost`), la redazione e il
+blocco dei valori nascosti nei listini, l'opzione "Ricarico sul costo %" e i test relativi. La "Formula prezzi" la sostituisce.
+
+Nessuna migrazione elimina le righe esistenti (le migrazioni potrebbero essere riunite in una sola). Il tipo è salvato come stringa:
+in un database di sviluppo con righe `CostMarkup` la lettura dei listini fallisce. Va ricreato il database oppure eseguito
+`DELETE FROM price_list_rules WHERE calculation_type = 'CostMarkup';`.
 
 ### H. Accesso del magazziniere al documento di spedizione
 

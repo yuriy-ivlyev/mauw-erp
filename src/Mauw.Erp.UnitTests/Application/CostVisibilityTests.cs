@@ -4,8 +4,6 @@ using Mauw.Erp.Application.Costs;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts;
 using Mauw.Erp.Contracts.Dtos;
-using Mauw.Erp.Contracts.Pricing;
-using Mauw.Erp.Domain.Pricing;
 using Moq;
 
 namespace Mauw.Erp.UnitTests.Application;
@@ -24,22 +22,21 @@ public sealed class CostVisibilityTests
     private static readonly ICostVisibility Sales = For(AppRoles.Sales);
     private static readonly ICostVisibility Warehouse = For(AppRoles.Warehouse);
 
-    public static TheoryData<string, bool, bool> RoleRules => new()
+    public static TheoryData<string, bool> RoleRules => new()
     {
-        { AppRoles.Admin, true, true },
-        { AppRoles.Accounting, true, false },
-        { AppRoles.Sales, false, false },
-        { AppRoles.Warehouse, false, false },
-        { "Unknown", false, false }
+        { AppRoles.Admin, true },
+        { AppRoles.Accounting, true },
+        { AppRoles.Sales, false },
+        { AppRoles.Warehouse, false },
+        { "Unknown", false }
     };
 
     [Theory]
     [MemberData(nameof(RoleRules))]
-    public void Visibility_FollowsTheRoleRules(string role, bool costs, bool margins)
+    public void Visibility_FollowsTheRoleRules(string role, bool costs)
     {
         var visibility = For(role);
         Assert.Equal(costs, visibility.CanSeeCosts);
-        Assert.Equal(margins, visibility.CanSeeMargins);
     }
 
     [Fact]
@@ -47,7 +44,6 @@ public sealed class CostVisibilityTests
     {
         var visibility = For();
         Assert.False(visibility.CanSeeCosts);
-        Assert.False(visibility.CanSeeMargins);
     }
 
     private static ProductVariantDto Variant() => new(
@@ -129,26 +125,6 @@ public sealed class CostVisibilityTests
         var legacy = new StockMovementDto(Guid.NewGuid(), Guid.NewGuid(), "In", 1, 12.34m, null, DateTime.UtcNow);
         Assert.Null(Sales.Redact(legacy).UnitCost);
         Assert.Equal(12.34m, Accounting.Redact(legacy).UnitCost);
-    }
-
-    [Fact]
-    public void Redact_PriceList_KeepsCostMarkupRuleButNullsItsValueUnlessAdmin()
-    {
-        var markup = new PriceRuleRequest { Id = Guid.NewGuid(), CalculationType = PriceCalculationType.CostMarkup, Value = 35m };
-        var fixedPrice = new PriceRuleRequest { Id = Guid.NewGuid(), CalculationType = PriceCalculationType.FixedPrice, Value = 15m };
-        var list = new PriceListResponse(Guid.NewGuid(), "Listino", "EUR", true, [markup, fixedPrice]);
-
-        Assert.Same(list, Admin.Redact(list));
-        foreach (var visibility in new[] { Accounting, Sales, Warehouse })
-        {
-            var redacted = visibility.Redact(list);
-            Assert.Equal(2, redacted.Rules.Count);
-            Assert.Null(redacted.Rules[0].Value);
-            Assert.Equal(PriceCalculationType.CostMarkup, redacted.Rules[0].CalculationType);
-            Assert.Equal(markup.Id, redacted.Rules[0].Id);
-            Assert.Equal(15m, redacted.Rules[1].Value);
-        }
-        Assert.Equal(35m, markup.Value);
     }
 
     public static TheoryData<string> CostSortKeys => new()

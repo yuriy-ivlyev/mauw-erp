@@ -23,7 +23,7 @@ export const priceRuleValidator: ValidatorFn = (control: AbstractControl): Valid
   if (!['global', 'variantId', 'productId', 'categoryId'].includes(target) ||
     (target !== 'global' && (!guidPattern.test(targetId) || /^0{8}-0{4}-0{4}-0{4}-0{12}$/.test(targetId))) ||
     (target === 'global' && !!targetId)) errors['target'] = true;
-  if (!['FixedPrice', 'PercentageDiscount', 'CostMarkup'].includes(type) ||
+  if (!['FixedPrice', 'PercentageDiscount'].includes(type) ||
     (type === 'PercentageDiscount' && value > 100)) errors['calculationType'] = true;
   if ((from && !Number.isFinite(Date.parse(from))) || (to && !Number.isFinite(Date.parse(to))) ||
     (from && to && Date.parse(from) > Date.parse(to))) errors['dateWindow'] = true;

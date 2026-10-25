@@ -6,7 +6,7 @@ Il modulo usa un aggregato `PriceList`, regole condizionali e un risolutore puro
 registrato tramite DI. La cascata e SKU, prodotto, categoria, globale, prezzo
 base del catalogo. Il prezzo base del catalogo e il prezzo di vendita salvato
 sulla variante, mai ricalcolato dal costo. Le regole possono fissare un
-prezzo, scontare il prezzo base oppure applicare un ricarico al costo variante.
+prezzo oppure scontare il prezzo base (la formula dal costo e nel modulo Formula prezzi).
 Non si cumulano regole: entro il livello piu specifico vince la priorita numerica
 maggiore; una parita applicabile restituisce un errore esplicito. Le soglie
 quantita si applicano alla singola riga quotata, non alla somma del documento.
