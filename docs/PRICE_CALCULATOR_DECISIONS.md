@@ -1,7 +1,33 @@
 # Formula prezzi (Price Calculator): analisi e decisioni
 
 Documento di lavoro. Si aggiorna man mano che le decisioni vengono prese.
-Stato: **solo analisi, nessuna modifica al codice**.
+Stato: **funzionalità implementata** (analisi, decisioni e codice); restano i punti aperti elencati in "Stato implementazione".
+
+## Stato implementazione
+
+Implementato:
+
+- Pagina **Formula prezzi** in Impostazioni > Formula prezzi (solo `Admin`): passi percentuali a cascata, passo di arrotondamento sempre per eccesso, simulatore dal costo.
+- Endpoint: `GET` e `PUT /api/v1/settings/price-formula` (lettura e salvataggio della formula), `POST /api/v1/products/price-formula/calculate` (calcolo dal costo, senza salvare). Tutti con policy `Admin`.
+- Pulsante "Calcola da costo" nelle schermate di prodotto e variante (solo `Admin`): propone il prezzo, non lo salva da solo.
+- Ruoli lato server: policy per gruppo di endpoint (`Admin`, `Sales`, `Warehouse`, `Accounting`), con test 401/403 nella matrice di autorizzazione. `Cashier` non ha più accesso.
+- Redazione dei costi: costi e valorizzazioni solo ad `Admin` e `Accounting`; margini (`CostMarkup`) solo ad `Admin`. Ai ruoli senza margini le regole `CostMarkup` esistenti mantengono sempre il valore salvato e non se ne possono creare né cambiare il tipo.
+- Movimenti di magazzino: `Sales` può registrare solo vendite showroom (quantità negativa) e resi cliente (quantità positiva); gli altri motivi richiedono `Admin` o `Warehouse`.
+- Rimozione del legacy (`DefaultMarkupRate`, `MarkupRate`, `PricingEngine`, `calculate-selling-price`).
+- Migrazioni: `AddPriceFormula` e `RemoveLegacyMarkupRates`.
+
+Ancora aperto:
+
+- Regola di listino `CostMarkup` mantenuta finché l'utente non conferma il conteggio sul database: `SELECT COUNT(*) FROM price_list_rules WHERE calculation_type = 'CostMarkup';` (punto G).
+- Sconto sul totale in fattura (punto F).
+- Accesso del magazziniere al documento di spedizione (punto H).
+- Ruolo `Accounting` (punto I).
+- Prezzi errati già fatturati (punto D).
+- Passo manuale in Entra, **prima del rilascio**: rimuovere il ruolo dell'app `Cashier` (Cassiere Showroom) e riassegnare i cassieri a `Sales` (Commerciale).
+- Applicare le migrazioni con `dotnet ef database update`.
+- Configurare la formula nell'interfaccia prima del primo utilizzo: senza formula il calcolo risponde "Formula prezzi non configurata".
+- Per decisione, `Warehouse` può ancora leggere il prezzo delle righe del DDT fornitore e degli ordini di acquisto.
+- Ruoli dell'app mobile per le immagini non verificati: `ImagesController` e `CatalogController` richiedono ora un ruolo (lettura: qualunque ruolo; caricamento, categoria ed eliminazione: `Admin` e `Warehouse`).
 
 ## Obiettivo
 
@@ -42,7 +68,7 @@ Nome nel codice: `PriceFormula` e `PriceFormulaStep`.
 | 8 | Legacy | Si rimuove ciò che non è usato. |
 | A | Formula unica | **Una sola formula per tutto il catalogo** (nessuna formula per categoria o fornitore, per ora). Si chiama "Formula prezzi". La struttura dati resta pronta a crescere verso formule per categoria. |
 | B | Arrotondamento | **Sempre per eccesso**, a passi di 0,10 € (dieci centesimi), sul netto, **solo nella generazione del prezzo**. Esempio: 45,5789 → 45,60; 45,60 resta 45,60. Mai in fattura né nel calcolo dell'IVA. |
-| C | Precisione del costo | Il listino fornitore ha sempre 2 decimali. Nessuna modifica alla precisione di `PurchaseCost`, nessuna migrazione. La UI impone 2 decimali in inserimento. |
+| C | Precisione del costo | Il listino fornitore ha sempre 2 decimali: i costi di acquisto si inseriscono con 2 decimali (la UI lo impone in inserimento). Il calcolatore tollera fino a 4 decimali, la scala memorizzata di `PurchaseCost` (`numeric(18,4)`). Nessuna migrazione. |
 | D | Prezzi errati già fatturati | Rinviato: se ne riparla. |
 | E | Unificazione ruoli | `Cashier` e `Sales` sono lo stesso ruolo. Si **tiene `Sales`** e si elimina `Cashier`. `Sales` è il più radicato (preventivi, anagrafiche, listini, ordini, menu). Ruoli finali: `Admin`, `Sales`, `Warehouse`, `Accounting`. |
 | E | Magazziniere e prezzi dei DDT | Se un DDT fornitore riporta il prezzo, il magazziniere lo vede. Va bene così per ora, da rivalutare. |
@@ -145,7 +171,7 @@ Rinviato.
 - Netto o lordo: tutto netto, arrotondamento sul netto.
 - Sconti fornitore: non ci sono.
 - Modalità di arrotondamento: sempre per eccesso, passo 0,10 €.
-- Precisione del costo di acquisto: 2 decimali, nessuna migrazione.
+- Precisione del costo di acquisto: inserimento a 2 decimali, il calcolatore accetta fino a 4 (scala memorizzata), nessuna migrazione.
 - Quante formule: una sola, "Formula prezzi".
 - `Cashier` e `Sales`: unificati in `Sales`.
 - Magazziniere: vede solo quantità, più prezzi dei DDT fornitore se presenti, più il documento allegato alla spedizione.
