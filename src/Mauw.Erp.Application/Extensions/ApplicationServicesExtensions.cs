@@ -12,6 +12,7 @@ public static class ApplicationServicesExtensions
         services.AddSingleton<ItalianAccountingCalculator>();
         services.AddSingleton<PriceListResolver>();
         services.AddSingleton<CatalogPriceCalculator>();
+        services.AddSingleton<PriceFormulaCalculator>();
         services.AddScoped<IPriceListService, PriceListService>();
         services.AddScoped<IDocumentPricingService, DocumentPricingService>();
         services.AddScoped<OrderService>();
