@@ -137,11 +137,9 @@ La factory EF accetta `ConnectionStrings__DefaultConnection`, anche per database
 di test isolati. Eventuali vecchi riferimenti cliente a listini inesistenti devono
 essere revisionati prima di introdurre la FK: non vengono corretti automaticamente.
 
-Il bootstrap di un database completamente vuoto incontra un problema precedente
-al modulo: `RefactorCassaSessionToOrder` elimina `cassa_sessions`, che non viene
-creata dalla catena di migrazioni presente. La verifica PostgreSQL del modulo usa
-un database isolato con tale tabella legacy vuota come fixture; nessuna migrazione
-storica e stata modificata.
+Il bootstrap di un database completamente vuoto funziona: le migrazioni storiche
+(compresa `RefactorCassaSessionToOrder`, che eliminava `cassa_sessions` senza averla
+creata) sono state riunite nella baseline `InitialCreate`, che crea l'intero schema.
 
 I test xUnit coprono cascata, priorita/ambiguita, soglie e date, formule/precisione,
 immutabilita, caricamento batch di 1000 righe, sconti di cassa, resi e copia degli

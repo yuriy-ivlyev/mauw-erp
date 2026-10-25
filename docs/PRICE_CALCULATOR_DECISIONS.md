@@ -15,7 +15,8 @@ Implementato:
 - Movimenti di magazzino: `Sales` può registrare solo vendite showroom (quantità negativa) e resi cliente (quantità positiva); gli altri motivi richiedono `Admin` o `Warehouse`.
 - Rimozione del legacy (`DefaultMarkupRate`, `MarkupRate`, `PricingEngine`, `calculate-selling-price`).
 - Rimossa la regola di listino `CostMarkup` (codice, API, interfaccia e test): i listini mantengono `FixedPrice` e `PercentageDiscount`. Nessuna migrazione elimina le righe esistenti (punto G).
-- Migrazioni: `AddPriceFormula` e `RemoveLegacyMarkupRates`.
+- Migrazioni `AddPriceFormula` e `RemoveLegacyMarkupRates`: poi riunite nella baseline `InitialCreate` (riga successiva).
+- Le 42 migrazioni EF sono state riunite in un'unica baseline `InitialCreate` (schema identico, dati seed equivalenti). I database locali vanno ricreati (`dotnet ef database update` su un database vuoto) oppure va allineata la loro `__EFMigrationsHistory` (una sola riga con l'id di `InitialCreate`). Alla baseline mancano, come negli schemi precedenti, le FK su `variant_id` di `ddt_items`, `invoice_items`, `order_items` e `stock_movements`: aggiungerle con una migrazione dedicata.
 
 Ancora aperto:
 

@@ -2074,6 +2074,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasIndex("SupplierId", "SupplierCode")
                         .IsUnique();
 
+                    b.HasIndex(new[] { "Barcode" }, "i_x_product_variants_barcode_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "Barcode" }, "i_x_product_variants_barcode_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "Barcode" }, "i_x_product_variants_barcode_trgm"), new[] { "gin_trgm_ops" });
+
                     b.ToTable("product_variants");
                 });
 

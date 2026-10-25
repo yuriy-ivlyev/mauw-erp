@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Mauw.Erp.Infrastructure.Migrations
 {
     [DbContext(typeof(MauwDbContext))]
-    [Migration("20261025141209_AddPriceFormula")]
-    partial class AddPriceFormula
+    [Migration("20261025191133_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -1911,11 +1911,6 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<decimal>("DefaultMarkupRate")
-                        .HasPrecision(6, 2)
-                        .HasColumnType("numeric(6,2)")
-                        .HasColumnName("default_markup_rate");
-
                     b.Property<bool>("HasVariants")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -2014,11 +2009,6 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<decimal?>("MarkupRate")
-                        .HasPrecision(6, 2)
-                        .HasColumnType("numeric(6,2)")
-                        .HasColumnName("markup_rate");
-
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid")
                         .HasColumnName("product_id");
@@ -2086,6 +2076,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
                     b.HasIndex("SupplierId", "SupplierCode")
                         .IsUnique();
+
+                    b.HasIndex(new[] { "Barcode" }, "i_x_product_variants_barcode_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "Barcode" }, "i_x_product_variants_barcode_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "Barcode" }, "i_x_product_variants_barcode_trgm"), new[] { "gin_trgm_ops" });
 
                     b.ToTable("product_variants");
                 });

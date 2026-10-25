@@ -38,10 +38,12 @@ Preparazione (Bash; dalla radice del repository)
 ----------------------------------------------
 Richiesti SDK .NET 10, PostgreSQL e strumento dotnet-ef compatibile con la
 versione EF di Directory.Packages.props. Non sono richieste nuove migrazioni.
-La catena di migrazioni riparte da un database vuoto (la migrazione
-RefactorCassaSessionToOrder usa DROP TABLE IF EXISTS): il ciclo
-reset -> database update -> seed e percorribile. Il generatore non usa
-EnsureCreated e non corregge migrazioni applicative.
+Le migrazioni storiche sono riunite in un'unica baseline (InitialCreate), che
+crea da zero l'intero schema: il ciclo reset -> database update -> seed e
+percorribile su un database vuoto. Un database creato con le vecchie migrazioni
+va ricreato oppure la sua tabella __EFMigrationsHistory va allineata (una sola
+riga con l'id di InitialCreate). Il generatore non usa EnsureCreated e non
+corregge migrazioni applicative.
 Il generatore salva anche il delta firmato di ogni movimento e verifica
 questa coerenza prima di dichiarare completato il seed. Se il database contiene
 dati sintetici creati prima dell'introduzione di quantity_delta, database update

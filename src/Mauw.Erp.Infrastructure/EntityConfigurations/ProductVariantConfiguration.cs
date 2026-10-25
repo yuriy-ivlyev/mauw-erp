@@ -69,5 +69,9 @@ public class ProductVariantConfiguration : IEntityTypeConfiguration<ProductVaria
             .HasMethod("gin")
             .HasOperators("gin_trgm_ops")
             .HasDatabaseName("i_x_product_variants_supplier_code_trgm");
+
+        builder.HasIndex(v => v.Barcode, "i_x_product_variants_barcode_trgm")
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops");
     }
 }
