@@ -940,9 +940,9 @@ export class ProdottiComponent implements OnInit, OnDestroy {
     if (!this.canCalculateFromCost) return;
     const form = target === 'product' ? null : target === 'newVariant' ? this.newVariantForm : this.editingVariantForm;
     const cost = form ? form.purchaseCost : this.formData.basePurchaseCost;
-    if (cost == null || !Number.isFinite(cost) || cost < 0 || !/^\d+(?:\.\d{1,2})?$/.test(String(cost))) {
+    if (cost == null || !Number.isFinite(cost) || cost < 0 || !/^\d+(?:\.\d{1,4})?$/.test(String(cost))) {
       this.priceFeedback = {
-        target, error: 'Specificare un costo di acquisto valido (non negativo, massimo 2 decimali).'
+        target, error: 'Specificare un costo di acquisto valido (non negativo, massimo 4 decimali).'
       };
       return;
     }

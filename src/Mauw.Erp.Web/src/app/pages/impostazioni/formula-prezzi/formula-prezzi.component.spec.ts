@@ -254,13 +254,15 @@ describe('FormulaPrezziComponent', () => {
 
   it('validates the purchase cost and does not call the backend when invalid', async () => {
     await create();
-    for (const cost of [null, -1, 1.234]) {
+    for (const cost of [null, -1, 1.23456]) {
       component.updatePurchaseCost(cost);
       expect(component.costError()).not.toBeNull();
       component.simulate();
     }
     expect(service.calculate).not.toHaveBeenCalled();
     component.updatePurchaseCost(0);
+    expect(component.costError()).toBeNull();
+    component.updatePurchaseCost(12.3456);
     expect(component.costError()).toBeNull();
   });
 

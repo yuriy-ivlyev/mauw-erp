@@ -31,6 +31,11 @@ function hasMaxTwoDecimals(value: number): boolean {
   return /^\d+(?:\.\d{1,2})?$/.test(String(value));
 }
 
+// Il costo simulato puo avere la scala memorizzata (4 decimali); l'inserimento dei costi resta a 2.
+function hasMaxFourDecimals(value: number): boolean {
+  return /^\d+(?:\.\d{1,4})?$/.test(String(value));
+}
+
 @Component({
   selector: 'app-formula-prezzi',
   standalone: true,
@@ -99,7 +104,7 @@ export class FormulaPrezziComponent implements OnInit {
     const cost = this.purchaseCost();
     if (cost == null || !Number.isFinite(cost)) return 'Indicare il costo di acquisto.';
     if (cost < 0) return 'Il costo di acquisto non può essere negativo.';
-    if (!hasMaxTwoDecimals(cost)) return 'Il costo di acquisto ammette al massimo 2 decimali.';
+    if (!hasMaxFourDecimals(cost)) return 'Il costo di acquisto ammette al massimo 4 decimali.';
     return null;
   });
 

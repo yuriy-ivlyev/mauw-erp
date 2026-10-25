@@ -27,7 +27,7 @@ public class PriceFormulaServiceTests
 
     public static TheoryData<decimal> InvalidPercentages => new() { -0.01m, 9999.01m, 1.001m };
 
-    public static TheoryData<decimal> InvalidCosts => new() { -0.01m, 10.005m };
+    public static TheoryData<decimal> InvalidCosts => new() { -0.01m, 10.00005m };
 
     [Fact]
     public async Task GetWithoutFormulaReturnsTheUnconfiguredDefault()

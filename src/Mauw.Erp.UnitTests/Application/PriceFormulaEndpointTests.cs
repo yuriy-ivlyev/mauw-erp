@@ -52,7 +52,7 @@ public class PriceFormulaEndpointTests(PostgreSqlContainerFixture postgres)
         { "rounding step with three decimals", new() { Steps = [new("A", 10m)], RoundingStep = 0.105m } }
     };
 
-    public static TheoryData<decimal> InvalidCosts => new() { -0.01m, 10.005m, 100000000000000m };
+    public static TheoryData<decimal> InvalidCosts => new() { -0.01m, 10.00005m, 100000000000000m };
 
     [Fact]
     public async Task GetBeforeConfigurationReturnsAnUnconfiguredDefault()
@@ -172,6 +172,21 @@ public class PriceFormulaEndpointTests(PostgreSqlContainerFixture postgres)
         Assert.Equal(["Ricarico", "Provvigione", "Sconto cliente"], steps.Select(s => s.GetProperty("label").GetString()));
         Assert.Equal([40m, 10m, 5m], steps.Select(s => s.GetProperty("percentage").GetDecimal()));
         Assert.Equal([28.00m, 30.80m, 32.34m], steps.Select(s => s.GetProperty("runningValue").GetDecimal()));
+    }
+
+    [Fact]
+    public async Task CalculateAcceptsTheStoredFourDecimalCostScale()
+    {
+        await using var fixture = await Fixture.CreateAsync(postgres);
+        using var admin = fixture.CreateClient("Admin");
+        Assert.Equal(HttpStatusCode.OK, (await admin.PutAsJsonAsync(FormulaPath, ValidFormula)).StatusCode);
+
+        var response = await admin.PostAsJsonAsync(CalculatePath, new CalculatePriceRequest { PurchaseCost = 12.3456m });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(12.3456m, body.GetProperty("purchaseCost").GetDecimal());
+        Assert.Equal(20.00m, body.GetProperty("finalPrice").GetDecimal());
     }
 
     [Theory]

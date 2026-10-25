@@ -174,7 +174,7 @@ describe('ProdottiComponent stored selling prices', () => {
 
   it('rejects invalid costs client-side without calling the backend', () => {
     component.editProduct({ ...product, hasVariants: false });
-    for (const cost of [-1, 1.234, null as unknown as number]) {
+    for (const cost of [-1, 1.23456, null as unknown as number]) {
       component.formData.basePurchaseCost = cost;
       component.calculateFromCost('product');
       expect(component.priceFeedback?.error).toContain('costo di acquisto valido');

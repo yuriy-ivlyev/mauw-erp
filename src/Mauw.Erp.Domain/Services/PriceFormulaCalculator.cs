@@ -6,12 +6,14 @@ namespace Mauw.Erp.Domain.Services;
 /// <summary>
 /// Formula prezzi: costo d'acquisto netto IVA, passi percentuali a cascata (non arrotondati)
 /// e arrotondamento finale sempre per eccesso a un multiplo del passo. Nessun calcolo IVA.
+/// Il costo accetta fino a 4 decimali (scala di ProductVariant.PurchaseCost); il prezzo finale ha 2 decimali.
 /// </summary>
 public sealed class PriceFormulaCalculator
 {
     public const int MaxSteps = 20;
     public const int MaxLabelLength = 100;
-    public const decimal MaxPurchaseCost = 99999999999999.99m;
+    public const int PurchaseCostScale = 4;
+    public const decimal MaxPurchaseCost = 99999999999999.9999m;
     public const decimal MaxPercentage = 9999m;
     public const decimal MaxRoundingStep = 100.00m;
     public const decimal MaxFinalPrice = 99999999999999.99999999m;
@@ -48,9 +50,9 @@ public sealed class PriceFormulaCalculator
 
     public AccountingResult<PriceFormulaResult> Calculate(decimal purchaseCost, PriceFormulaDefinition formula)
     {
-        if (purchaseCost < 0m || purchaseCost > MaxPurchaseCost || !HasMaxDecimals(purchaseCost, 2))
+        if (purchaseCost < 0m || purchaseCost > MaxPurchaseCost || !HasMaxDecimals(purchaseCost, PurchaseCostScale))
             return AccountingResult<PriceFormulaResult>.Fail(
-                "Il costo d'acquisto deve essere non negativo, al massimo 99999999999999.99 e con massimo 2 decimali.");
+                "Il costo d'acquisto deve essere non negativo, al massimo 99999999999999.9999 e con massimo 4 decimali.");
 
         var validation = Validate(formula);
         if (!validation.Success)

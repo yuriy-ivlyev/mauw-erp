@@ -143,7 +143,26 @@ public class PriceFormulaCalculatorTests
     }
 
     public static TheoryData<decimal> InvalidCosts => new()
-        { -0.01m, -1m, 1.001m, 0.005m, 100000000000000.00m };
+        { -0.01m, -1m, 1.00001m, 0.00005m, 99999999999999.99995m, 100000000000000.00m };
+
+    public static TheoryData<decimal, decimal, decimal> StoredScaleCosts => new()
+    {
+        { 12.3456m, 0.10m, 13.60m },
+        { 0.0001m, 0.01m, 0.01m },
+        { 19.9999m, 0.01m, 22.00m },
+        { 12.34m, 0.10m, 13.60m }
+    };
+
+    [Theory]
+    [MemberData(nameof(StoredScaleCosts))]
+    public void CostWithUpToFourDecimalsIsAcceptedAndFinalPriceKeepsTwoDecimals(decimal cost, decimal step, decimal expected)
+    {
+        var result = _calculator.Calculate(cost, Formula(step, 10m));
+        Assert.True(result.Success, result.Error);
+        Assert.Equal(cost, result.Data!.PurchaseCost);
+        Assert.Equal(expected, result.Data.FinalPrice);
+        Assert.Equal(2, decimal.GetBits(result.Data.FinalPrice)[3] >> 16 & 0xFF);
+    }
 
     [Theory]
     [MemberData(nameof(InvalidCosts))]

@@ -19,7 +19,7 @@ public sealed record SavePriceFormulaRequest
 
 public sealed record CalculatePriceRequest
 {
-    /// <summary>Costo d'acquisto netto IVA, non negativo, al massimo 2 decimali.</summary>
+    /// <summary>Costo d'acquisto netto IVA, non negativo, al massimo 4 decimali (scala memorizzata di PurchaseCost).</summary>
     public decimal PurchaseCost { get; init; }
 }
 
