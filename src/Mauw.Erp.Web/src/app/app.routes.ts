@@ -91,6 +91,7 @@ export const routes: Routes = [
 
       // Impostazioni â€” solo Admin
       { path: 'impostazioni/azienda', component: ImpostazioniAziendaComponent, canActivate: [roleGuard], data: { roles: ['Admin'] }, title: 'Impostazioni Azienda | Mauw ERP' },
+      { path: 'impostazioni/formula-prezzi', loadComponent: () => import('./pages/impostazioni/formula-prezzi/formula-prezzi.component').then(m => m.FormulaPrezziComponent), canActivate: [roleGuard], data: { roles: ['Admin'] }, title: 'Formula prezzi | Mauw ERP' },
 
       // Catalogo
       { path: 'catalogo/listini', component: ListiniComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales'] }, title: 'Listini Prezzi | Mauw ERP' }

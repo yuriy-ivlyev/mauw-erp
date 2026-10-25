@@ -30,10 +30,6 @@ export class ProductService {
   constructor(private apiService: ApiService) { }
 
   // Products CRUD
-  calculateSellingPrice(purchaseCost: number, markupRate: number): Observable<number> {
-    return this.apiService.post<number>(`${this.endpoint}/calculate-selling-price`, { purchaseCost, markupRate });
-  }
-
   getProducts(
     page: number = 1,
     pageSize: number = 20,

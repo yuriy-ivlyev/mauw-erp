@@ -1,9 +1,15 @@
 ﻿import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
 import { ProductImageGalleryComponent } from '../../../components/product-image-gallery/product-image-gallery.component';
 import { FormsModule } from '@angular/forms';
 import { ProductService } from '../../../services/product.service';
+import {
+  PriceFormulaService, isPriceFormulaNotConfigured, priceFormulaErrorMessage
+} from '../../../services/price-formula.service';
+import { PriceFormulaCalculation } from '../../../models/price-formula.model';
+import { AuthService } from '../../../services/auth.service';
 import { hasDecimal8Precision } from '../../../services/price-list.validators';
 import { PaginationComponent } from '../../../shared/pagination/pagination.component';
 import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
@@ -13,10 +19,19 @@ import {
   CreateProductRequest, CreateProductVariantRequest, ProductVariantDto
 } from '../../../models/product.model';
 
+type PriceTarget = 'product' | 'newVariant' | 'editVariant';
+
+interface PriceFeedback {
+  target: PriceTarget;
+  breakdown?: string;
+  error?: string;
+  notConfigured?: boolean;
+}
+
 @Component({
   selector: 'app-prodotti',
   standalone: true,
-  imports: [CommonModule, FormsModule, ConfirmDeleteModalComponent, ProductImageGalleryComponent, PaginationComponent, SortHeaderDirective],
+  imports: [CommonModule, FormsModule, RouterLink, ConfirmDeleteModalComponent, ProductImageGalleryComponent, PaginationComponent, SortHeaderDirective],
   template: `
     <div class="p-6">
       <div class="flex justify-between items-center mb-6">
@@ -168,12 +183,13 @@ import {
                   <input aria-label="Prezzo vendita prodotto netto" [disabled]="calculatingPrice"
                     [(ngModel)]="formData.sellingPrice" type="number" step="0.00000001" min="0"
                     class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  <label class="block text-xs mt-2">Aiuto al calcolo: ricarico sul costo (%)</label>
-                  <input aria-label="Ricarico prodotto (%)" [(ngModel)]="productMarkupRate"
-                    type="number" step="0.01" min="0" max="9999" class="w-full px-3 py-2 border rounded" />
-                  <button type="button" (click)="applyMarkup('product')" [disabled]="calculatingPrice"
-                    class="text-blue-600 text-sm">Applica ricarico al prezzo</button>
-                  <p class="text-xs text-gray-500">Si salva solo il prezzo netto, non il ricarico.</p>
+                  <button *ngIf="canCalculateFromCost" type="button" (click)="calculateFromCost('product')"
+                    [disabled]="calculatingPrice" aria-label="Calcola prezzo prodotto da costo"
+                    class="text-blue-600 text-sm disabled:opacity-50">
+                    {{ calculatingPrice ? 'Calcolo...' : 'Calcola da costo' }}
+                  </button>
+                  <ng-container *ngTemplateOutlet="priceFeedbackTpl; context: { target: 'product' }"></ng-container>
+                  <p class="text-xs text-gray-500">Si salva solo il prezzo netto.</p>
                 </div>
                 <div>
                   <label class="block text-sm font-medium mb-1">Prezzo Base Fornitore *</label>
@@ -313,12 +329,12 @@ import {
                             <input aria-label="Prezzo vendita variante netto" [disabled]="calculatingPrice"
                               [(ngModel)]="editingVariantForm.sellingPrice" type="number" min="0" step="0.00000001"
                               class="w-full border rounded" />
-                            <label class="block text-xs mt-2">Aiuto: ricarico (%)</label>
-                            <input aria-label="Ricarico variante (%)"
-                              [(ngModel)]="editingVariantForm.markupRate" type="number" min="0" max="9999" step="0.01"
-                              class="w-full border rounded" />
-                            <button type="button" (click)="applyMarkup('editVariant')" [disabled]="calculatingPrice"
-                              class="text-blue-600 text-xs">Applica ricarico al prezzo</button>
+                            <button *ngIf="canCalculateFromCost" type="button" (click)="calculateFromCost('editVariant')"
+                              [disabled]="calculatingPrice" aria-label="Calcola prezzo variante da costo"
+                              class="text-blue-600 text-xs disabled:opacity-50">
+                              {{ calculatingPrice ? 'Calcolo...' : 'Calcola da costo' }}
+                            </button>
+                            <ng-container *ngTemplateOutlet="priceFeedbackTpl; context: { target: 'editVariant' }"></ng-container>
                           </td>
                           <td class="px-4 py-3">
                             <input [(ngModel)]="editingVariantForm.weightGrams" type="number" step="1" min="0" placeholder="g"
@@ -393,12 +409,12 @@ import {
                       <input aria-label="Nuovo prezzo vendita variante netto" [disabled]="calculatingPrice"
                         [(ngModel)]="newVariantForm.sellingPrice" type="number" min="0" step="0.00000001"
                         class="w-full px-3 py-2 border rounded" />
-                      <label class="block text-xs mt-2">Aiuto: ricarico (%)</label>
-                      <input aria-label="Nuovo ricarico variante (%)"
-                        [(ngModel)]="newVariantForm.markupRate" type="number" min="0" max="9999" step="0.01"
-                        class="w-full px-3 py-2 border rounded" />
-                      <button type="button" (click)="applyMarkup('newVariant')" [disabled]="calculatingPrice"
-                        class="text-blue-600 text-sm">Applica ricarico al prezzo</button>
+                      <button *ngIf="canCalculateFromCost" type="button" (click)="calculateFromCost('newVariant')"
+                        [disabled]="calculatingPrice" aria-label="Calcola prezzo nuova variante da costo"
+                        class="text-blue-600 text-sm disabled:opacity-50">
+                        {{ calculatingPrice ? 'Calcolo...' : 'Calcola da costo' }}
+                      </button>
+                      <ng-container *ngTemplateOutlet="priceFeedbackTpl; context: { target: 'newVariant' }"></ng-container>
                     </div>
                     <div>
                       <label class="block text-sm font-medium mb-1">Peso (grammi)</label>
@@ -450,6 +466,20 @@ import {
       (confirmed)="onDeleteConfirmed()"
       (cancelled)="onDeleteCancelled()">
     </app-confirm-delete-modal>
+
+    <ng-template #priceFeedbackTpl let-target="target">
+      <ng-container *ngIf="priceFeedback && priceFeedback.target === target">
+        <p *ngIf="priceFeedback.breakdown" data-testid="price-breakdown" class="text-xs text-gray-600 mt-1">
+          {{ priceFeedback.breakdown }}
+        </p>
+        <p *ngIf="priceFeedback.error" data-testid="price-error" class="text-xs text-red-600 mt-1">
+          {{ priceFeedback.error }}
+          <ng-container *ngIf="priceFeedback.notConfigured">
+            <a routerLink="/impostazioni/formula-prezzi" class="underline">Impostazioni &gt; Formula prezzi</a>
+          </ng-container>
+        </p>
+      </ng-container>
+    </ng-template>
     </div>
   `
 })
@@ -481,8 +511,8 @@ export class ProdottiComponent implements OnInit, OnDestroy {
   savingProduct = false;
   formError: string | null = null;
   formData: CreateProductRequest = this.initializeProductForm();
-  productMarkupRate = 0;
   calculatingPrice = false;
+  priceFeedback: PriceFeedback | null = null;
   private priceCalculation?: import('rxjs').Subscription;
 
   confirmDeleteId: string | null = null;
@@ -522,7 +552,16 @@ export class ProdottiComponent implements OnInit, OnDestroy {
   // Gallery (now within modal)
   galleryProduct: ProductDto | null = null;
 
-  constructor(private productService: ProductService) { }
+  constructor(
+    private productService: ProductService,
+    private priceFormulaService: PriceFormulaService,
+    private authService: AuthService
+  ) { }
+
+  // L'endpoint di calcolo è riservato agli Admin: il magazzino non vede il pulsante.
+  get canCalculateFromCost(): boolean {
+    return this.authService.hasRole('Admin');
+  }
 
   ngOnInit(): void {
     this.loadSupportData();
@@ -575,7 +614,6 @@ export class ProdottiComponent implements OnInit, OnDestroy {
       barcode: '',
       purchaseCost: defaultPurchaseCost,
       sellingPrice,
-      markupRate: 0,
       weightGrams: null as number | null
     };
   }
@@ -634,7 +672,6 @@ export class ProdottiComponent implements OnInit, OnDestroy {
     this.cancelPriceCalculation();
     this.editingProductId = null;
     this.formData = this.initializeProductForm();
-    this.productMarkupRate = 0;
     this.newVariantForm = this.initializeVariantForm();
     this.productVariants = [];
     this.activeTab = 'details';
@@ -647,7 +684,6 @@ export class ProdottiComponent implements OnInit, OnDestroy {
   editProduct(product: ProductDto): void {
     this.cancelPriceCalculation();
     this.editingProductId = product.id;
-    this.productMarkupRate = 0;
     this.formData = {
       supplierId: product.supplierId,
       supplierCode: product.supplierCode,
@@ -677,7 +713,6 @@ export class ProdottiComponent implements OnInit, OnDestroy {
     this.editingProductId = null;
     this.formData = this.initializeProductForm();
     this.cancelPriceCalculation();
-    this.productMarkupRate = 0;
     this.newVariantForm = this.initializeVariantForm();
     this.productVariants = [];
     this.galleryProduct = null;
@@ -816,7 +851,6 @@ export class ProdottiComponent implements OnInit, OnDestroy {
       barcode: variant.barcode,
       purchaseCost: variant.purchaseCost,
       sellingPrice: variant.sellingPrice,
-      markupRate: 0,
       weightGrams: variant.weightGrams ?? null
     };
     this.variantError = null;
@@ -884,38 +918,48 @@ export class ProdottiComponent implements OnInit, OnDestroy {
     this.variantError = null;
   }
 
-  applyMarkup(target: 'product' | 'newVariant' | 'editVariant'): void {
+  calculateFromCost(target: PriceTarget): void {
     this.cancelPriceCalculation();
+    if (!this.canCalculateFromCost) return;
     const form = target === 'product' ? null : target === 'newVariant' ? this.newVariantForm : this.editingVariantForm;
     const cost = form ? form.purchaseCost : this.formData.basePurchaseCost;
-    const markup = form ? form.markupRate : this.productMarkupRate;
-    if (!Number.isFinite(cost) || cost == null || cost < 0 ||
-      !Number.isFinite(markup) || markup == null || markup < 0 || markup > 9999 ||
-      !/^\d+(?:\.\d{1,2})?$/.test(String(markup))) {
-      if (form) this.variantError = 'Specificare costo e ricarico validi (0-9999, massimo 2 decimali).';
-      else this.formError = 'Specificare costo e ricarico validi (0-9999, massimo 2 decimali).';
+    if (cost == null || !Number.isFinite(cost) || cost < 0 || !/^\d+(?:\.\d{1,2})?$/.test(String(cost))) {
+      this.priceFeedback = {
+        target, error: 'Specificare un costo di acquisto valido (non negativo, massimo 2 decimali).'
+      };
       return;
     }
     this.calculatingPrice = true;
-    this.priceCalculation = this.productService.calculateSellingPrice(cost, markup).subscribe({
-      next: price => {
-        if (form) { form.sellingPrice = price; this.variantError = null; }
-        else { this.formData.sellingPrice = price; this.formError = null; }
+    this.priceCalculation = this.priceFormulaService.calculate(cost).subscribe({
+      next: result => {
+        if (form) form.sellingPrice = result.finalPrice;
+        else this.formData.sellingPrice = result.finalPrice;
+        this.priceFeedback = { target, breakdown: this.formatBreakdown(result) };
         this.calculatingPrice = false;
       },
-      error: (err) => {
-        const message = typeof err?.error === 'string' ? err.error : 'Errore nel calcolo del prezzo di vendita.';
-        if (form) this.variantError = message;
-        else this.formError = message;
+      error: err => {
+        const message = priceFormulaErrorMessage(err, 'Errore nel calcolo del prezzo di vendita.');
+        this.priceFeedback = { target, error: message, notConfigured: isPriceFormulaNotConfigured(message) };
         this.calculatingPrice = false;
       }
     });
   }
 
+  private formatBreakdown(result: PriceFormulaCalculation): string {
+    const format = (value: number) => value.toLocaleString('en-US', {
+      minimumFractionDigits: 2, maximumFractionDigits: 4, useGrouping: false
+    });
+    const values = [result.purchaseCost, ...result.steps.map(step => step.runningValue)].map(format);
+    return `${values.join(' → ')} → arrotondato ${result.finalPrice.toFixed(2)}`;
+  }
+
   private cancelPriceCalculation(): void {
     this.priceCalculation?.unsubscribe();
     this.calculatingPrice = false;
+    this.priceFeedback = null;
   }
+
+
 
   deleteProduct(productId: string): void {
     this.loading = true;

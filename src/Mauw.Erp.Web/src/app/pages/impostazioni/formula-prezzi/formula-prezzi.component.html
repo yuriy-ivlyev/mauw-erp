@@ -1,0 +1,190 @@
+<div class="p-6 max-w-5xl mx-auto">
+
+  <div class="flex justify-between items-center mb-6 gap-4">
+    <div class="flex items-center gap-3">
+      <h1 class="text-3xl font-bold">Formula prezzi</h1>
+      @if (hasUnsavedChanges()) {
+        <span data-testid="unsaved-indicator"
+          class="px-2 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-800 border border-yellow-300">
+          Modifiche non salvate
+        </span>
+      }
+    </div>
+    <button type="button" (click)="save()" [disabled]="!canSave()" data-testid="save-button"
+      class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-5 py-2 rounded font-medium">
+      {{ saving() ? 'Salvataggio…' : 'Salva formula' }}
+    </button>
+  </div>
+
+  <p class="text-sm text-gray-600 mb-6">
+    Il costo di acquisto è al netto dell'IVA. I passaggi si applicano in cascata: ogni percentuale
+    viene calcolata sul risultato del passaggio precedente (anche la provvigione è un passaggio come gli altri).
+    Il prezzo finale viene sempre arrotondato per eccesso al multiplo del passo di arrotondamento.
+  </p>
+
+  @if (loading()) {
+    <div class="p-10 text-center text-gray-500">Caricamento…</div>
+  } @else {
+    @if (loadError()) {
+      <div role="alert" data-testid="load-error"
+        class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded flex justify-between items-center">
+        <span>{{ loadError() }}</span>
+        <button type="button" (click)="load()" class="underline">Riprova</button>
+      </div>
+    } @else {
+      @if (!isConfigured()) {
+        <div data-testid="not-configured"
+          class="mb-4 p-4 bg-yellow-50 border border-yellow-300 text-yellow-800 rounded">
+          Formula prezzi non ancora configurata. Aggiungere almeno un passaggio e salvare per poter
+          calcolare i prezzi di vendita dai costi di acquisto.
+        </div>
+      }
+
+      @if (saveSuccess()) {
+        <div role="status" data-testid="save-success"
+          class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">{{ saveSuccess() }}</div>
+      }
+      @if (saveError()) {
+        <div role="alert" data-testid="save-error"
+          class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">{{ saveError() }}</div>
+      }
+
+      <section class="bg-white rounded-lg shadow p-6 mb-8">
+        <h2 class="text-xl font-semibold mb-4 text-gray-800">Passaggi</h2>
+
+        @if (stepsError(); as message) {
+          <p data-testid="steps-error" class="text-sm text-red-600 mb-3">{{ message }}</p>
+        }
+
+        <ol class="space-y-3">
+          @for (step of steps(); track step.id; let i = $index; let first = $first; let last = $last) {
+            <li data-testid="step-row" class="flex flex-wrap items-start gap-3">
+              <span class="w-6 pt-2 text-sm text-gray-500">{{ i + 1 }}.</span>
+              <div class="flex-1 min-w-48">
+                <input type="text" [attr.aria-label]="'Nome passaggio ' + (i + 1)" [maxlength]="maxLabelLength"
+                  [ngModel]="step.label" (ngModelChange)="updateLabel(i, $event)" placeholder="es. Ricarico, Provvigione"
+                  class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" />
+                @if (stepErrors()[i].label; as message) {
+                  <p class="text-xs text-red-600 mt-1">{{ message }}</p>
+                }
+              </div>
+              <div class="w-40">
+                <div class="flex items-center gap-1">
+                  <input type="number" [attr.aria-label]="'Percentuale passaggio ' + (i + 1)" min="0" max="9999" step="0.01"
+                    [ngModel]="step.percentage" (ngModelChange)="updatePercentage(i, $event)"
+                    class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" />
+                  <span class="text-gray-600">%</span>
+                </div>
+                @if (stepErrors()[i].percentage; as message) {
+                  <p class="text-xs text-red-600 mt-1">{{ message }}</p>
+                }
+              </div>
+              <div class="flex items-center gap-1 pt-1">
+                <button type="button" (click)="moveStep(i, -1)" [disabled]="first"
+                  [attr.aria-label]="'Sposta su passaggio ' + (i + 1)"
+                  class="px-2 py-1 border rounded hover:bg-gray-50 disabled:opacity-40">↑</button>
+                <button type="button" (click)="moveStep(i, 1)" [disabled]="last"
+                  [attr.aria-label]="'Sposta giù passaggio ' + (i + 1)"
+                  class="px-2 py-1 border rounded hover:bg-gray-50 disabled:opacity-40">↓</button>
+                <button type="button" (click)="removeStep(i)"
+                  [attr.aria-label]="'Rimuovi passaggio ' + (i + 1)"
+                  class="px-2 py-1 text-red-600 hover:text-red-800">Rimuovi</button>
+              </div>
+            </li>
+          }
+        </ol>
+
+        <button type="button" (click)="addStep()" [disabled]="steps().length >= maxSteps" data-testid="add-step"
+          class="mt-4 text-blue-600 hover:text-blue-800 disabled:opacity-40">+ Aggiungi passaggio</button>
+        <span class="ml-2 text-xs text-gray-500">({{ steps().length }}/{{ maxSteps }})</span>
+
+        <div class="mt-6 max-w-xs">
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="rounding-step">
+            Passo di arrotondamento (per eccesso)
+          </label>
+          <input id="rounding-step" type="number" min="0.01" max="100" step="0.01"
+            [ngModel]="roundingStep()" (ngModelChange)="updateRoundingStep($event)"
+            class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" />
+          @if (roundingError(); as message) {
+            <p data-testid="rounding-error" class="text-xs text-red-600 mt-1">{{ message }}</p>
+          }
+        </div>
+      </section>
+
+      <section class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-xl font-semibold mb-2 text-gray-800">Simulatore</h2>
+        <p class="text-sm text-gray-600 mb-4">
+          Il calcolo usa la formula <strong>salvata</strong>, non quella in modifica.
+        </p>
+
+        @if (hasUnsavedChanges()) {
+          <div data-testid="simulator-hint"
+            class="mb-4 p-3 bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm rounded">
+            Ci sono modifiche non salvate: la simulazione non le tiene in considerazione. Salvare la formula prima di simulare.
+          </div>
+        }
+
+        <div class="flex flex-wrap items-start gap-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1" for="purchase-cost">
+              Costo di acquisto (IVA esclusa)
+            </label>
+            <input id="purchase-cost" type="number" min="0" step="0.01"
+              [ngModel]="purchaseCost()" (ngModelChange)="updatePurchaseCost($event)"
+              class="w-48 px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <button type="button" (click)="simulate()" [disabled]="!canSimulate()" data-testid="simulate-button"
+            class="mt-6 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-5 py-2 rounded font-medium">
+            {{ calculating() ? 'Calcolo…' : 'Simula' }}
+          </button>
+        </div>
+        @if (purchaseCost() !== null && costError(); as message) {
+          <p data-testid="cost-error" class="text-xs text-red-600 mt-1">{{ message }}</p>
+        }
+
+        @if (calculationError()) {
+          <div role="alert" data-testid="calculation-error"
+            class="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">{{ calculationError() }}</div>
+        }
+
+        @if (calculation(); as result) {
+          <table class="mt-6 w-full text-sm" data-testid="calculation-table">
+            <thead>
+              <tr class="text-left text-gray-600 border-b">
+                <th class="py-2">Passaggio</th>
+                <th class="py-2 text-right">%</th>
+                <th class="py-2 text-right">Valore</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-b">
+                <td class="py-2">Costo di acquisto</td>
+                <td class="py-2 text-right"></td>
+                <td class="py-2 text-right">{{ result.purchaseCost | number:'1.2-4' }}</td>
+              </tr>
+              @for (row of result.steps; track $index) {
+                <tr class="border-b" data-testid="calculation-row">
+                  <td class="py-2">{{ row.label }}</td>
+                  <td class="py-2 text-right">{{ row.percentage | number:'1.0-2' }}%</td>
+                  <td class="py-2 text-right">{{ row.runningValue | number:'1.2-4' }}</td>
+                </tr>
+              }
+              <tr class="border-b">
+                <td class="py-2" colspan="2">Prezzo non arrotondato</td>
+                <td class="py-2 text-right" data-testid="unrounded-price">{{ result.unroundedPrice | number:'1.2-4' }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="mt-4 p-4 bg-blue-50 border border-blue-300 rounded flex justify-between items-center">
+            <span class="text-sm text-gray-700">
+              Prezzo finale (arrotondato per eccesso a {{ result.roundingStep | number:'1.2-2' }})
+            </span>
+            <span data-testid="final-price" class="text-2xl font-bold text-blue-800">
+              {{ result.finalPrice | number:'1.2-2' }}
+            </span>
+          </div>
+        }
+      </section>
+    }
+  }
+</div>

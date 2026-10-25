@@ -105,7 +105,8 @@ export class MenuService {
         { label: 'Anagrafiche', route: '/dashboard/anagrafiche', icon: ICONS.contacts, roles: ['Admin'] },
         { label: 'Magazzino', route: '/dashboard/magazzino', icon: ICONS.movements, roles: ['Admin'] },
         { label: 'Impostazioni', icon: '', isSeparator: true },
-        { label: 'Azienda', route: '/impostazioni/azienda', icon: ICONS.company, roles: ['Admin'] }
+        { label: 'Azienda', route: '/impostazioni/azienda', icon: ICONS.company, roles: ['Admin'] },
+        { label: 'Formula prezzi', route: '/impostazioni/formula-prezzi', icon: ICONS.priceList, roles: ['Admin'] }
       ]
     }
   ];
