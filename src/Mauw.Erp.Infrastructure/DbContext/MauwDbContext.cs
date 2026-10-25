@@ -13,6 +13,8 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
     public DbSet<CustomerProfile> CustomerProfiles { get; set; }
     public DbSet<PriceList> PriceLists { get; set; }
     public DbSet<PriceListRule> PriceListRules { get; set; }
+    public DbSet<PriceFormula> PriceFormulas { get; set; }
+    public DbSet<PriceFormulaStep> PriceFormulaSteps { get; set; }
     public DbSet<SupplierProfile> SupplierProfiles { get; set; }
     public DbSet<AgentProfile> AgentProfiles { get; set; }
     public DbSet<ContactAddress> ContactAddresses { get; set; }
@@ -84,6 +86,8 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
         modelBuilder.ApplyConfiguration(new CustomerProfileConfiguration());
         modelBuilder.ApplyConfiguration(new PriceListConfiguration());
         modelBuilder.ApplyConfiguration(new PriceListRuleConfiguration());
+        modelBuilder.ApplyConfiguration(new PriceFormulaConfiguration());
+        modelBuilder.ApplyConfiguration(new PriceFormulaStepConfiguration());
         modelBuilder.ApplyConfiguration(new SupplierProfileConfiguration());
         modelBuilder.ApplyConfiguration(new AgentProfileConfiguration());
         modelBuilder.ApplyConfiguration(new ContactAddressConfiguration());

@@ -10,6 +10,7 @@ public static class PricingExtensions
     public static IServiceCollection AddPricingApi(this IServiceCollection services)
     {
         services.AddScoped<IPriceListRepository, PriceListRepository>();
+        services.AddScoped<IPriceFormulaRepository, PriceFormulaRepository>();
         services.ConfigureHttpJsonOptions(options =>
             options.SerializerOptions.Converters.Add(new JsonStringEnumConverter<PriceCalculationType>()));
         services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options =>

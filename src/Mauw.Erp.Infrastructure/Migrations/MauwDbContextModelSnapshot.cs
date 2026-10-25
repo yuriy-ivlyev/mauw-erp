@@ -1668,6 +1668,97 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.ToTable("payments");
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.PriceFormula", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsSingleton")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_singleton");
+
+                    b.Property<decimal>("RoundingStep")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("rounding_step");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("updated_by_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_price_formulas");
+
+                    b.HasIndex("IsSingleton")
+                        .IsUnique()
+                        .HasDatabaseName("ux_price_formulas_is_singleton");
+
+                    b.ToTable("price_formulas", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_price_formulas_is_singleton", "is_singleton");
+                        });
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.PriceFormulaStep", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("FormulaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("price_formula_id");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("label");
+
+                    b.Property<decimal>("Percentage")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("numeric(6,2)")
+                        .HasColumnName("percentage");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_price_formula_steps");
+
+                    b.HasIndex("FormulaId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ux_price_formula_steps_price_formula_id_position");
+
+                    b.ToTable("price_formula_steps", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_price_formula_steps_percentage", "percentage >= 0 AND percentage <= 9999");
+
+                            t.HasCheckConstraint("ck_price_formula_steps_position", "\"position\" >= 1");
+                        });
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.PriceList", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3139,6 +3230,16 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Navigation("Invoice");
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.PriceFormulaStep", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.PriceFormula", null)
+                        .WithMany("Steps")
+                        .HasForeignKey("FormulaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_price_formula_steps_price_formulas_price_formula_id");
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.PriceListRule", b =>
                 {
                     b.HasOne("Mauw.Erp.Domain.Entities.Category", null)
@@ -3495,6 +3596,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Order", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.PriceFormula", b =>
+                {
+                    b.Navigation("Steps");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.PriceList", b =>
