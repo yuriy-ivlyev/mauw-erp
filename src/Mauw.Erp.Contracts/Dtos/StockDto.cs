@@ -13,8 +13,8 @@ public record StockItemDto(
     decimal QuantityOnHand,
     decimal QuantityReserved,
     decimal QuantityAvailable,
-    decimal? UnitCost,
-    decimal? EstimatedValue);
+    [property: CostSensitive] decimal? UnitCost,
+    [property: CostSensitive] decimal? EstimatedValue);
 
 public record StockMovementDetailDto(
     Guid Id,

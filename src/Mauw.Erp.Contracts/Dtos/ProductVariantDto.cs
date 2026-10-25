@@ -11,7 +11,7 @@ public record ProductVariantDto(
     string? Color,
     string? Size,
     string Barcode,
-    decimal PurchaseCost,
+    [property: CostSensitive] decimal? PurchaseCost,
     int StockQuantity,
     decimal? ListPrice,
     decimal? FinalNetPrice,

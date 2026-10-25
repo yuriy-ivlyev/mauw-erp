@@ -8,7 +8,7 @@ public record StockMovementDto(
     Guid VariantId,
     string Type,
     int Quantity,
-    decimal UnitCost,
+    [property: CostSensitive] decimal? UnitCost,
     string? ReferenceDoc,
     DateTime CreatedAt
 );

@@ -1,3 +1,4 @@
+using Mauw.Erp.Application.Costs;
 using Mauw.Erp.Application.Decorators;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Domain.Services;
@@ -9,6 +10,7 @@ public static class ApplicationServicesExtensions
 {
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
+        services.AddCostVisibility();
         services.AddSingleton<ItalianAccountingCalculator>();
         services.AddSingleton<PriceListResolver>();
         services.AddSingleton<CatalogPriceCalculator>();

@@ -18,16 +18,16 @@ public sealed record InventoryStockDto(
     decimal QuantityIncoming,
     decimal QuantityAvailable,
     string UnitOfMeasure,
-    decimal? UnitCost,
-    decimal? TotalValue,
-    string CostSource);
+    [property: CostSensitive] decimal? UnitCost,
+    [property: CostSensitive] decimal? TotalValue,
+    [property: CostSensitive] string? CostSource);
 
 public sealed record InventoryStockTotalsDto(
     decimal TotalPhysicalQuantity,
     decimal TotalReservedQuantity,
     decimal TotalIncomingQuantity,
     decimal TotalAvailableQuantity,
-    decimal TotalValue);
+    [property: CostSensitive] decimal? TotalValue);
 
 public sealed record InventoryStocksResponseDto(
     IReadOnlyList<InventoryStockDto> Items,
@@ -47,7 +47,12 @@ public sealed record InventoryStockExportDto(
     DateTime? AtDate,
     string? AllocationNote,
     ValuationMethod ValuationMethod = ValuationMethod.WeightedAverageCost,
-    InventoryStockFilterSummaryDto? Filters = null);
+    InventoryStockFilterSummaryDto? Filters = null)
+{
+    /// <summary>False for exports redacted for roles without cost visibility: no cost/value columns or totals.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IncludesCosts => Totals.TotalValue.HasValue;
+}
 
 public sealed record InventoryStockMovementDto(
     Guid Id,
@@ -56,7 +61,7 @@ public sealed record InventoryStockMovementDto(
     string? Reason,
     decimal Quantity,
     decimal? QuantityDelta,
-    decimal UnitCost,
+    [property: CostSensitive] decimal? UnitCost,
     string? DocumentReference,
     string? Notes,
     decimal? RunningBalance);

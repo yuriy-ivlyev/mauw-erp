@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Mauw.Erp.Api.Authorization;
+using Mauw.Erp.Application.Costs;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Enums;
@@ -37,24 +38,27 @@ public static class InventoryStockEndpoints
         IInventoryStockQueryService service,
         ICompanySettingsService companySettings,
         IInventoryStockPdfGenerator pdfGenerator,
+        ICostVisibility costs,
         CancellationToken cancellationToken,
         string format = "csv")
     {
         if (string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase))
-            return await ExportCsv(request, service, companySettings, cancellationToken);
+            return await ExportCsv(request, service, companySettings, costs, cancellationToken);
         if (string.Equals(format, "pdf", StringComparison.OrdinalIgnoreCase))
-            return await ExportPdf(request, service, companySettings, pdfGenerator, cancellationToken);
+            return await ExportPdf(request, service, companySettings, pdfGenerator, costs, cancellationToken);
         return TypedResults.BadRequest("Formato non supportato. Usare format=csv oppure format=pdf.");
     }
 
     private static async Task<Results<Ok<InventoryStocksPageDto>, BadRequest<string>, Conflict<string>>> GetStocks(
         [AsParameters] InventoryStockFilterRequest request,
         IInventoryStockQueryService service,
+        ICostVisibility costs,
         CancellationToken cancellationToken)
     {
+        ApplySortPolicy(request, costs);
         var result = await service.GetStocksPageAsync(request, cancellationToken);
         if (result.Success)
-            return TypedResults.Ok(result.Data!);
+            return TypedResults.Ok(costs.Redact(result.Data!));
         return IsHistoricalDataConflict(result.Error)
             ? TypedResults.Conflict(result.Error!)
             : TypedResults.BadRequest(result.Error ?? "Richiesta giacenze non valida.");
@@ -62,6 +66,7 @@ public static class InventoryStockEndpoints
 
     private static async Task<Results<Ok<InventoryStocksSummaryDto>, BadRequest<string>, Conflict<string>>> GetStocksSummary(
         IInventoryStockQueryService service,
+        ICostVisibility costs,
         CancellationToken cancellationToken,
         string? search = null,
         Guid? warehouseId = null,
@@ -84,7 +89,7 @@ public static class InventoryStockEndpoints
         };
         var result = await service.GetStocksSummaryAsync(request, cancellationToken);
         if (result.Success)
-            return TypedResults.Ok(result.Data!);
+            return TypedResults.Ok(costs.Redact(result.Data!));
         return IsHistoricalDataConflict(result.Error)
             ? TypedResults.Conflict(result.Error!)
             : TypedResults.BadRequest(result.Error ?? "Riepilogo giacenze non valido.");
@@ -94,8 +99,10 @@ public static class InventoryStockEndpoints
         [AsParameters] InventoryStockFilterRequest request,
         IInventoryStockQueryService service,
         ICompanySettingsService companySettings,
+        ICostVisibility costs,
         CancellationToken cancellationToken)
     {
+        ApplySortPolicy(request, costs);
         var result = await service.GetExportAsync(request, cancellationToken);
         if (!result.Success)
             return IsHistoricalDataConflict(result.Error)
@@ -106,7 +113,7 @@ public static class InventoryStockEndpoints
         if (!company.Success)
             return TypedResults.BadRequest(company.Error ?? "Configurare i dati aziendali prima di esportare.");
 
-        var content = BuildCsv(result.Data!, company.Data!);
+        var content = BuildCsv(costs.Redact(result.Data!), company.Data!);
         var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
         var bytes = encoding.GetPreamble().Concat(encoding.GetBytes(content)).ToArray();
         return TypedResults.File(
@@ -120,8 +127,10 @@ public static class InventoryStockEndpoints
         IInventoryStockQueryService service,
         ICompanySettingsService companySettings,
         IInventoryStockPdfGenerator pdfGenerator,
+        ICostVisibility costs,
         CancellationToken cancellationToken)
     {
+        ApplySortPolicy(request, costs);
         var result = await service.GetExportAsync(request, cancellationToken);
         if (!result.Success)
             return IsHistoricalDataConflict(result.Error)
@@ -133,7 +142,7 @@ public static class InventoryStockEndpoints
             return TypedResults.BadRequest(company.Error ?? "Configurare i dati aziendali prima di esportare.");
 
         return TypedResults.File(
-            pdfGenerator.Generate(result.Data!, company.Data!),
+            pdfGenerator.Generate(costs.Redact(result.Data!), company.Data!),
             "application/pdf",
             $"giacenze-{DateTime.UtcNow:yyyyMMdd-HHmmss}.pdf");
     }
@@ -143,6 +152,7 @@ public static class InventoryStockEndpoints
         Guid productVariantId,
         DateTime? atDate,
         IInventoryStockQueryService service,
+        ICostVisibility costs,
         CancellationToken cancellationToken,
         int page = 1,
         int pageSize = 20)
@@ -154,7 +164,7 @@ public static class InventoryStockEndpoints
             page,
             pageSize,
             cancellationToken);
-        return TypedResults.Ok(result.Data!);
+        return TypedResults.Ok(costs.Redact(result.Data!));
     }
 
     private static async Task<Ok<InventoryMovementReconciliationResponseDto>> GetAmbiguousMovements(
@@ -185,7 +195,11 @@ public static class InventoryStockEndpoints
         if (!string.IsNullOrWhiteSpace(report.AllocationNote))
             builder.Append("Criterio di allocazione;").AppendLine(CsvText(report.AllocationNote));
 
-        builder.AppendLine($"SKU;Descrizione;Taglia;Colore;Deposito;Giacenza fisica;UM;{InventoryStockValuationLabels.GetLabel(report.ValuationMethod)};Valore totale");
+        var includeCosts = report.IncludesCosts;
+        builder.Append("SKU;Descrizione;Taglia;Colore;Deposito;Giacenza fisica;UM");
+        if (includeCosts)
+            builder.Append($";{InventoryStockValuationLabels.GetLabel(report.ValuationMethod)};Valore totale");
+        builder.AppendLine();
         foreach (var item in report.Items)
         {
             builder.Append(CsvText(item.Sku)).Append(';')
@@ -194,17 +208,24 @@ public static class InventoryStockEndpoints
                 .Append(CsvText(item.Color ?? string.Empty)).Append(';')
                 .Append(CsvText($"{item.WarehouseCode} - {item.WarehouseName}")).Append(';')
                 .Append(item.QuantityOnHand.ToString("0.###", CultureInfo.InvariantCulture)).Append(';')
-                .Append(CsvText(item.UnitOfMeasure)).Append(';')
-                .Append(item.UnitCost?.ToString("0.00######", CultureInfo.InvariantCulture) ?? string.Empty).Append(';')
-                .AppendLine(item.TotalValue?.ToString("0.00", CultureInfo.InvariantCulture) ?? string.Empty);
+                .Append(CsvText(item.UnitOfMeasure));
+            if (includeCosts)
+                builder.Append(';')
+                    .Append(item.UnitCost?.ToString("0.00######", CultureInfo.InvariantCulture) ?? string.Empty).Append(';')
+                    .Append(item.TotalValue?.ToString("0.00", CultureInfo.InvariantCulture) ?? string.Empty);
+            builder.AppendLine();
         }
 
         builder.Append("TOTALI;;;;;")
-            .Append(report.Totals.TotalPhysicalQuantity.ToString("0.###", CultureInfo.InvariantCulture))
-            .Append(";;;")
-            .AppendLine(report.Totals.TotalValue.ToString("0.00", CultureInfo.InvariantCulture));
+            .Append(report.Totals.TotalPhysicalQuantity.ToString("0.###", CultureInfo.InvariantCulture));
+        if (includeCosts)
+            builder.Append(";;;").Append(report.Totals.TotalValue!.Value.ToString("0.00", CultureInfo.InvariantCulture));
+        builder.AppendLine();
         return builder.ToString();
     }
+
+    private static void ApplySortPolicy(InventoryStockFilterRequest request, ICostVisibility costs) =>
+        (request.SortBy, request.SortDescending) = costs.Sort(request.SortBy, request.SortDescending);
 
     private static string CsvText(string value)
     {

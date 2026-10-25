@@ -1,6 +1,10 @@
 using Mauw.Erp.Api.Authorization;
+using Mauw.Erp.Api.Services;
 using Mauw.Erp.Application.Constants;
+using Mauw.Erp.Application.Costs;
+using Mauw.Erp.Application.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Mauw.Erp.Api.Extensions;
 
@@ -13,6 +17,10 @@ public static class AuthorizationExtensions
     public static IServiceCollection AddAppAuthorization(this IServiceCollection services)
     {
         services.AddSingleton<IAuthorizationHandler, HistoricalStockAccessHandler>();
+        // Cost visibility is role based: make sure it can be resolved wherever the role policies are used.
+        services.AddHttpContextAccessor();
+        services.TryAddScoped<ICurrentUserService, CurrentUserService>();
+        services.AddCostVisibility();
 
         services.AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())

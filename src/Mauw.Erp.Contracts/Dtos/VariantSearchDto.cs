@@ -11,5 +11,5 @@ public record VariantSearchDto(
     string? SizeName,
     decimal CurrentStock,  // giacenza disponibile nel magazzino richiesto (0 se non specificato)
     string? SupplierCode,
-    decimal PurchaseCost
+    [property: CostSensitive] decimal? PurchaseCost
 );

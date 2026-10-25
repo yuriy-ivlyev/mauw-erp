@@ -65,7 +65,9 @@ public sealed class MigraDocInventoryStockPdfGenerator : IInventoryStockPdfGener
         section.AddParagraph($"Generato il {report.GeneratedAtUtc.ToString("dd/MM/yyyy HH:mm:ss", ItalianCulture)} UTC");
         if (report.AtDate.HasValue)
             section.AddParagraph($"Giacenza fisica al {report.AtDate.Value.ToString("dd/MM/yyyy HH:mm:ss", ItalianCulture)} UTC");
-        section.AddParagraph($"Criterio di valorizzazione: {InventoryStockValuationLabels.GetLabel(report.ValuationMethod)}");
+        var includeCosts = report.IncludesCosts;
+        if (includeCosts)
+            section.AddParagraph($"Criterio di valorizzazione: {InventoryStockValuationLabels.GetLabel(report.ValuationMethod)}");
         section.AddParagraph(FormatFilters(report.Filters));
         if (!string.IsNullOrWhiteSpace(report.AllocationNote))
             section.AddParagraph(report.AllocationNote);
@@ -78,10 +80,9 @@ public sealed class MigraDocInventoryStockPdfGenerator : IInventoryStockPdfGener
         table.TopPadding = Unit.FromPoint(1.5);
         table.BottomPadding = Unit.FromPoint(1.5);
 
-        var widths = new[]
-        {
-            2.1, 10.0, 2.6, 2.0, 2.1, 1.1, 2.2, 2.3
-        };
+        var widths = includeCosts
+            ? new[] { 2.1, 10.0, 2.6, 2.0, 2.1, 1.1, 2.2, 2.3 }
+            : new[] { 2.1, 15.0, 3.6, 2.6, 2.6, 1.4 };
         foreach (var width in widths)
             table.AddColumn(Unit.FromCentimeter(width));
 
@@ -91,18 +92,21 @@ public sealed class MigraDocInventoryStockPdfGenerator : IInventoryStockPdfGener
         header.Format.Font.Color = Colors.White;
         header.Format.Font.Bold = true;
         header.Format.Font.Size = Unit.FromPoint(7);
-        var headings = new[]
+        var headings = new List<string>
         {
             "SKU",
             "Descrizione",
             "Taglia / Colore",
             "Deposito",
             "Giacenza fisica",
-            "UM",
-            InventoryStockValuationLabels.GetLabel(report.ValuationMethod),
-            "Valore totale"
+            "UM"
         };
-        for (var i = 0; i < headings.Length; i++)
+        if (includeCosts)
+        {
+            headings.Add(InventoryStockValuationLabels.GetLabel(report.ValuationMethod));
+            headings.Add("Valore totale");
+        }
+        for (var i = 0; i < headings.Count; i++)
             header.Cells[i].AddParagraph(headings[i]);
 
         foreach (var item in report.Items)
@@ -114,9 +118,11 @@ public sealed class MigraDocInventoryStockPdfGenerator : IInventoryStockPdfGener
             row.Cells[3].AddParagraph(item.WarehouseCode);
             row.Cells[4].AddParagraph(FormatQuantity(item.QuantityOnHand));
             row.Cells[5].AddParagraph(item.UnitOfMeasure);
+            row.Cells[4].Format.Alignment = ParagraphAlignment.Right;
+            if (!includeCosts)
+                continue;
             row.Cells[6].AddParagraph(FormatUnitCost(item.UnitCost));
             row.Cells[7].AddParagraph(FormatMoney(item.TotalValue));
-            row.Cells[4].Format.Alignment = ParagraphAlignment.Right;
             row.Cells[6].Format.Alignment = ParagraphAlignment.Right;
             row.Cells[7].Format.Alignment = ParagraphAlignment.Right;
         }
@@ -127,8 +133,11 @@ public sealed class MigraDocInventoryStockPdfGenerator : IInventoryStockPdfGener
         total.Cells[0].AddParagraph("TOTALI");
         total.Cells[4].AddParagraph(FormatQuantity(report.Totals.TotalPhysicalQuantity));
         total.Cells[4].Format.Alignment = ParagraphAlignment.Right;
-        total.Cells[7].AddParagraph(FormatMoney(report.Totals.TotalValue));
-        total.Cells[7].Format.Alignment = ParagraphAlignment.Right;
+        if (includeCosts)
+        {
+            total.Cells[7].AddParagraph(FormatMoney(report.Totals.TotalValue));
+            total.Cells[7].Format.Alignment = ParagraphAlignment.Right;
+        }
 
         var renderer = new PdfDocumentRenderer { Document = document };
         renderer.RenderDocument();

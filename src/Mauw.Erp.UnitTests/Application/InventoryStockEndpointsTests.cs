@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Mauw.Erp.Api.Endpoints;
+using Mauw.Erp.Application.Costs;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Interfaces;
@@ -131,6 +132,7 @@ public sealed class InventoryStockEndpointsTests
         builder.Services.AddScoped<IInventoryStockQueryService, InventoryStockQueryService>();
         builder.Services.AddScoped<ICompanySettingsService>(_ => throw new NotSupportedException());
         builder.Services.AddScoped<IInventoryStockPdfGenerator>(_ => throw new NotSupportedException());
+        builder.Services.AddCostVisibility();
         await using var app = builder.Build();
 
         app.MapInventoryStockEndpoints();

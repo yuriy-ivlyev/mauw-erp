@@ -1,4 +1,5 @@
 using Mauw.Erp.Api.Authorization;
+using Mauw.Erp.Application.Costs;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
@@ -56,7 +57,8 @@ public static class InventoryEndpoints
 
     private static async Task<Results<Ok<StockMovementDto>, BadRequest<string>, NotFound>> ScanBarcode(
         BarcodeScanRequest request,
-        IInventoryService inventoryService)
+        IInventoryService inventoryService,
+        ICostVisibility costs)
     {
         var result = await inventoryService.ScanBarcodeAsync(request);
         
@@ -67,19 +69,21 @@ public static class InventoryEndpoints
             return TypedResults.BadRequest(result.Error);
         }
 
-        return TypedResults.Ok(result.Data!);
+        return TypedResults.Ok(costs.Redact(result.Data!));
     }
 
     private static async Task<Ok<List<StockMovementDto>>> GetStockMovements(
         Guid variantId,
-        IInventoryService inventoryService)
+        IInventoryService inventoryService,
+        ICostVisibility costs)
     {
         var result = await inventoryService.GetMovementsAsync(variantId, 1, 1000);
-        return TypedResults.Ok(result.Data!.Items);
+        return TypedResults.Ok(costs.Redact(result.Data!.Items));
     }
 
     private static async Task<Ok<PagedResult<StockItemDto>>> GetStockSummary(
         IStockService stockService,
+        ICostVisibility costs,
         Guid? warehouseId,
         string? search,
         int page = 1,
@@ -87,13 +91,16 @@ public static class InventoryEndpoints
         string? sortBy = null,
         bool sortDescending = false)
     {
-        var result = await stockService.GetStockSummaryPagedAsync(new StockFilterRequest(warehouseId, search, page, pageSize, sortBy, sortDescending));
-        return TypedResults.Ok(result.Data!);
+        var (allowedSortBy, allowedDescending) = costs.Sort(sortBy, sortDescending);
+        var result = await stockService.GetStockSummaryPagedAsync(
+            new StockFilterRequest(warehouseId, search, page, pageSize, allowedSortBy, allowedDescending));
+        return TypedResults.Ok(costs.Redact(result.Data!));
     }
 
     private static async Task<Results<Ok<StockItemDto>, BadRequest<string>, NotFound>> ExecuteMovement(
         CreateStockMovementCommand command,
-        IStockService stockService)
+        IStockService stockService,
+        ICostVisibility costs)
     {
         var result = await stockService.ExecuteMovementAsync(command);
 
@@ -105,7 +112,7 @@ public static class InventoryEndpoints
             return TypedResults.BadRequest(result.Error);
         }
 
-        return TypedResults.Ok(result.Data!);
+        return TypedResults.Ok(costs.Redact(result.Data!));
     }
 
     private static async Task<Results<Ok<bool>, BadRequest<string>, NotFound>> Transfer(

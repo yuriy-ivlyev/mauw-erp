@@ -19,7 +19,7 @@ public sealed class PriceListService(IPriceListRepository repository, PriceListR
     }
 
     public async Task<OperationResult<PriceListResponse>> SaveAsync(
-        Guid? id, SavePriceListRequest request, CancellationToken ct)
+        Guid? id, SavePriceListRequest request, CancellationToken ct, bool keepHiddenMargins = false)
     {
         var list = id.HasValue ? await repository.GetAsync(id.Value, ct) : null;
         if (id.HasValue && list is null)
@@ -27,7 +27,7 @@ public sealed class PriceListService(IPriceListRepository repository, PriceListR
         if (request.Rules is null || request.Rules.Any(rule => rule is null))
             return OperationResult<PriceListResponse>.Fail("Le regole non possono essere null.");
         var rules = request.Rules.Select(rule => new PriceRuleDefinition(
-            rule.Id, rule.CalculationType, rule.Value, rule.VariantId, rule.ProductId,
+            rule.Id, rule.CalculationType, RuleValue(list, rule, keepHiddenMargins), rule.VariantId, rule.ProductId,
             rule.CategoryId, rule.MinimumQuantity, rule.ValidFrom, rule.ValidTo, rule.Priority,
             rule.Description)).ToList();
         if (rules.Any(rule => rule.Id.HasValue && (list is null || list.Rules.All(old => old.Id != rule.Id))))
@@ -115,6 +115,17 @@ public sealed class PriceListService(IPriceListRepository repository, PriceListR
                 price.DiscountReason));
         }
         return OperationResult<ResolvedPricesResponse>.Ok(new ResolvedPricesResponse(priceListId, results));
+    }
+
+    private static decimal RuleValue(PriceList? list, PriceRuleRequest rule, bool keepHiddenMargins)
+    {
+        if (rule.Value.HasValue)
+            return rule.Value.Value;
+        var stored = keepHiddenMargins && rule.CalculationType == PriceCalculationType.CostMarkup && rule.Id.HasValue
+            ? list?.Rules.FirstOrDefault(old =>
+                old.Id == rule.Id && old.CalculationType == PriceCalculationType.CostMarkup)
+            : null;
+        return stored?.Value ?? 0m;
     }
 
     private static PriceListResponse Map(PriceList list) => new(

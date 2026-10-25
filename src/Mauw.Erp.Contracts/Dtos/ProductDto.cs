@@ -11,7 +11,7 @@ public record ProductDto(
     string Name,
     decimal? SellingPrice,
     decimal VatRate,
-    decimal BasePurchaseCost,
+    [property: CostSensitive] decimal? BasePurchaseCost,
     List<ProductVariantDto> Variants,
     bool HasVariants = true,
     Guid? CategoryId = null,

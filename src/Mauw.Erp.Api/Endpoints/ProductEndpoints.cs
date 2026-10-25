@@ -1,4 +1,5 @@
 using Mauw.Erp.Api.Authorization;
+using Mauw.Erp.Application.Costs;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
@@ -97,41 +98,45 @@ public static class ProductEndpoints
 
     private static async Task<Results<Created<ProductDto>, BadRequest<string>>> CreateProduct(
         CreateProductRequest request,
-        IProductService productService)
+        IProductService productService,
+        ICostVisibility costs)
     {
         var result = await productService.CreateProductAsync(request);
         
         if (!result.Success)
             return TypedResults.BadRequest(result.Error);
 
-        return TypedResults.Created($"/api/v1/products/{result.Data!.Id}", result.Data);
+        return TypedResults.Created($"/api/v1/products/{result.Data!.Id}", costs.Redact(result.Data!));
     }
 
     private static async Task<Results<Ok<PagedResult<ProductDto>>, BadRequest<string>>> GetProducts(
         IProductService productService,
+        ICostVisibility costs,
         int page = 1,
         int pageSize = 20,
         string? search = null,
         string? sortBy = null,
         bool sortDescending = false)
     {
+        var (allowedSortBy, allowedDescending) = costs.Sort(sortBy, sortDescending);
         var paging = new PageSortRequest
         {
             Page = page,
             PageSize = pageSize,
-            SortBy = sortBy,
-            SortDescending = sortDescending
+            SortBy = allowedSortBy,
+            SortDescending = allowedDescending
         };
         var result = await productService.GetProductsAsync(
             paging.Page, paging.PageSize, search, paging.SortBy, paging.SortDescending);
         if (!result.Success)
             return TypedResults.BadRequest(result.Error);
-        return TypedResults.Ok(result.Data!);
+        return TypedResults.Ok(costs.Redact(result.Data!));
     }
 
     private static async Task<Results<Ok<ProductDto>, BadRequest<string>, NotFound>> GetProduct(
         Guid id,
-        IProductService productService)
+        IProductService productService,
+        ICostVisibility costs)
     {
         var result = await productService.GetProductAsync(id);
         
@@ -140,13 +145,14 @@ public static class ProductEndpoints
                 ? TypedResults.NotFound()
                 : TypedResults.BadRequest(result.Error);
 
-        return TypedResults.Ok(result.Data!);
+        return TypedResults.Ok(costs.Redact(result.Data!));
     }
 
     private static async Task<Ok<List<VariantSearchDto>>> SearchVariants(
         string? q,
         IUnitOfWork unitOfWork,
         IStockService stockService,
+        ICostVisibility costs,
         Guid? warehouseId = null,
         Guid? supplierId = null,
         int limit = 10)
@@ -176,7 +182,7 @@ public static class ProductEndpoints
                 PurchaseCost: v.PurchaseCost));
         }
 
-        return TypedResults.Ok(results);
+        return TypedResults.Ok(costs.Redact(results));
     }
 
     private static async Task<Results<Ok<BarcodeVariantDto>, BadRequest<string>, NotFound>> GetVariantByBarcode(
@@ -196,8 +202,20 @@ public static class ProductEndpoints
     private static async Task<Results<Ok<ProductDto>, BadRequest<string>, NotFound>> UpdateProduct(
         Guid id,
         CreateProductRequest request,
-        IProductService productService)
+        IProductService productService,
+        ICostVisibility costs)
     {
+        if (!costs.CanSeeCosts)
+        {
+            // The caller never saw the cost, so the cost sent back is not meaningful: keep the stored one.
+            var current = await productService.GetProductAsync(id);
+            if (!current.Success)
+                return current.Error == "Product not found"
+                    ? TypedResults.NotFound()
+                    : TypedResults.BadRequest(current.Error);
+            request = request with { BasePurchaseCost = current.Data!.BasePurchaseCost ?? request.BasePurchaseCost };
+        }
+
         var result = await productService.UpdateProductAsync(id, request);
         
         if (!result.Success)
@@ -207,7 +225,7 @@ public static class ProductEndpoints
             return TypedResults.BadRequest(result.Error);
         }
 
-        return TypedResults.Ok(result.Data!);
+        return TypedResults.Ok(costs.Redact(result.Data!));
     }
 
     private static async Task<Results<NoContent, NotFound>> DeleteProduct(
@@ -225,7 +243,8 @@ public static class ProductEndpoints
     private static async Task<Results<Created<ProductVariantDto>, BadRequest<string>, NotFound>> CreateProductVariant(
         Guid productId,
         CreateProductVariantRequest request,
-        IProductService productService)
+        IProductService productService,
+        ICostVisibility costs)
     {
         var result = await productService.CreateProductVariantAsync(productId, request);
 
@@ -238,12 +257,13 @@ public static class ProductEndpoints
 
         return TypedResults.Created(
             $"/api/v1/products/{productId}/variants/{result.Data!.Id}",
-            result.Data);
+            costs.Redact(result.Data!));
     }
 
     private static async Task<Results<Ok<List<ProductVariantDto>>, BadRequest<string>, NotFound>> GetProductVariants(
         Guid productId,
-        IProductService productService)
+        IProductService productService,
+        ICostVisibility costs)
     {
         var result = await productService.GetProductVariantsAsync(productId);
 
@@ -252,15 +272,30 @@ public static class ProductEndpoints
                 ? TypedResults.NotFound()
                 : TypedResults.BadRequest(result.Error);
 
-        return TypedResults.Ok(result.Data!);
+        return TypedResults.Ok(costs.Redact(result.Data!));
     }
 
     private static async Task<Results<Ok<ProductVariantDto>, BadRequest<string>, NotFound>> UpdateProductVariant(
         Guid productId,
         Guid variantId,
         UpdateProductVariantRequest request,
-        IProductService productService)
+        IProductService productService,
+        ICostVisibility costs)
     {
+        if (!costs.CanSeeCosts)
+        {
+            // The caller never saw the cost, so the cost sent back is not meaningful: keep the stored one.
+            var current = await productService.GetProductVariantsAsync(productId);
+            if (!current.Success)
+                return current.Error == "Product not found"
+                    ? TypedResults.NotFound()
+                    : TypedResults.BadRequest(current.Error);
+            var existing = current.Data!.FirstOrDefault(variant => variant.Id == variantId);
+            if (existing is null)
+                return TypedResults.NotFound();
+            request = request with { PurchaseCost = existing.PurchaseCost ?? request.PurchaseCost };
+        }
+
         var result = await productService.UpdateProductVariantAsync(productId, variantId, request);
 
         if (!result.Success)
@@ -270,7 +305,7 @@ public static class ProductEndpoints
             return TypedResults.BadRequest(result.Error ?? "Failed to update variant");
         }
 
-        return TypedResults.Ok(result.Data!);
+        return TypedResults.Ok(costs.Redact(result.Data!));
     }
 
     private static async Task<Results<NoContent, BadRequest<string>, NotFound>> DeleteProductVariant(
