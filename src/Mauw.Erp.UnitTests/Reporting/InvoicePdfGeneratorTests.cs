@@ -134,6 +134,10 @@ public class InvoicePdfGeneratorTests
         var footerCapital = Assert.Single(footerWords, word => word.Text == "Capitale");
         var footerRegistry = Assert.Single(footerWords, word => word.Text == "REA");
         Assert.InRange(Math.Abs(footerCapital.BoundingBox.Top - footerRegistry.BoundingBox.Top), 0, 1);
+        Assert.DoesNotContain("Bold", footerCapital.FontName, StringComparison.OrdinalIgnoreCase);
+        var headerCapital = Assert.Single(pdf.GetPage(1).GetWords(),
+            word => word.Text == "Capitale" && word.BoundingBox.Top > 65);
+        Assert.DoesNotContain("Bold", headerCapital.FontName, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
