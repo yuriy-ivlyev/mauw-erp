@@ -41,7 +41,7 @@ public class PriceListResolverTests
             new(null, PriceCalculationType.FixedPrice, 8m, MinimumQuantity: 5m, ValidFrom: At, ValidTo: At, Priority: 10),
             new(null, PriceCalculationType.FixedPrice, 10m));
         Assert.Equal(8m, _resolver.Resolve(list, Input() with { Quantity = 5m }).Data!.ListUnitPrice);
-        Assert.Equal(10m, _resolver.Resolve(list, Input() with { Quantity = 4.99m }).Data!.ListUnitPrice);
+        Assert.Equal(10m, _resolver.Resolve(list, Input() with { Quantity = 4m }).Data!.ListUnitPrice);
         Assert.Equal(10m, _resolver.Resolve(list, Input() with { Quantity = 5m, At = At.AddTicks(1) }).Data!.ListUnitPrice);
     }
 
@@ -102,14 +102,11 @@ public class PriceListResolverTests
     }
 
     [Fact]
-    public void FractionalQuantityIsSupportedAndResolutionIsDeterministic()
+    public void FractionalQuantitiesAreRejected()
     {
-        var list = Create(new PriceRuleDefinition(null, PriceCalculationType.FixedPrice, 3.12345678m, MinimumQuantity: 0.25m));
-        var input = Input() with { Quantity = 0.25m };
-        var first = _resolver.Resolve(list, input);
-        Assert.True(first.Success, first.Error);
-        Assert.Equal(first.Data, _resolver.Resolve(list, input).Data);
-        Assert.Single(list.Rules);
+        Assert.False(PriceList.Create("Test", "EUR", true,
+            [new PriceRuleDefinition(null, PriceCalculationType.FixedPrice, 3.12345678m, MinimumQuantity: 0.25m)]).Success);
+        Assert.False(_resolver.Resolve(null, Input() with { Quantity = 0.25m }).Success);
     }
 
     public static TheoryData<PriceRuleDefinition> InvalidRules => new()
@@ -118,6 +115,7 @@ public class PriceListResolverTests
         new(null, PriceCalculationType.PercentageDiscount, 100.01m),
         new(null, PriceCalculationType.FixedPrice, 1.123456789m),
         new(null, PriceCalculationType.FixedPrice, 1m, MinimumQuantity: 0m),
+        new(null, PriceCalculationType.FixedPrice, 1m, MinimumQuantity: 0.25m),
         new(null, PriceCalculationType.FixedPrice, 1m, VariantId: Variant, ProductId: Product),
         new(null, PriceCalculationType.FixedPrice, 1m, ValidFrom: At, ValidTo: At.AddDays(-1)),
         new(null, (PriceCalculationType)999, 1m),

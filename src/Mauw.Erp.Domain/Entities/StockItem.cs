@@ -1,3 +1,5 @@
+using Mauw.Erp.Domain.Exceptions;
+
 namespace Mauw.Erp.Domain.Entities;
 
 public class StockItem : Entity<Guid>
@@ -21,6 +23,7 @@ public class StockItem : Entity<Guid>
         decimal quantityOnHand = 0,
         decimal? unitCost = null) : base()
     {
+        EnsureWholeQuantity(quantityOnHand);
         WarehouseId = warehouseId;
         ProductVariantId = productVariantId;
         QuantityOnHand = quantityOnHand;
@@ -29,18 +32,21 @@ public class StockItem : Entity<Guid>
 
     public void ApplyMovement(decimal delta)
     {
+        EnsureWholeQuantity(delta);
         QuantityOnHand += delta;
         UpdateTimestamp();
     }
 
     public void Reserve(decimal qty)
     {
+        EnsureWholeQuantity(qty);
         QuantityReserved += qty;
         UpdateTimestamp();
     }
 
     public void ReleaseReservation(decimal qty)
     {
+        EnsureWholeQuantity(qty);
         QuantityReserved = Math.Max(0, QuantityReserved - qty);
         UpdateTimestamp();
     }
@@ -49,5 +55,11 @@ public class StockItem : Entity<Guid>
     {
         UnitCost = cost;
         UpdateTimestamp();
+    }
+
+    private static void EnsureWholeQuantity(decimal quantity)
+    {
+        if (quantity != decimal.Truncate(quantity))
+            throw new DomainException("La quantita di merce deve essere un numero intero.");
     }
 }

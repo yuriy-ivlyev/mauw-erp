@@ -51,13 +51,13 @@
     <div class="analytics__metrics" *ngIf="showWarehouse">
       <article class="metric-card">
         <span>Giacenza totale</span>
-        <strong>{{ formatNumber(stats.inventory.quantityOnHand, 2) }}</strong>
+        <strong>{{ formatNumber(stats.inventory.quantityOnHand, 0) }}</strong>
         <small>unità fisiche in magazzino</small>
       </article>
       <article class="metric-card">
         <span>Quantità prenotata</span>
-        <strong>{{ formatNumber(stats.inventory.quantityReserved, 2) }}</strong>
-        <small>{{ formatNumber(stats.inventory.quantityAvailable, 2) }} disponibili</small>
+        <strong>{{ formatNumber(stats.inventory.quantityReserved, 0) }}</strong>
+        <small>{{ formatNumber(stats.inventory.quantityAvailable, 0) }} disponibili</small>
       </article>
       <article class="metric-card">
         <span>Magazzini attivi</span>

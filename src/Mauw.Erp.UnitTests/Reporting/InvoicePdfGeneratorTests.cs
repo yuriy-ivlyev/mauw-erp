@@ -88,6 +88,94 @@ public class InvoicePdfGeneratorTests
         Assert.NotNull(resolver.ResolveTypeface("Courier New", false, false));
     }
 
+    [Fact]
+    public async Task RendersSellerLegalDetailsCourtesyNoticeAndPaymentSummary()
+    {
+        var services = CreateServices();
+        services.AddInvoicePdfReporting();
+        using var provider = services.BuildServiceProvider();
+        var generator = provider.GetRequiredService<IInvoicePdfGenerator>();
+        var model = new InvoicePdfModel(
+            "F-2026-001", "TD01", new DateOnly(2026, 10, 25), "EUR",
+            new("MAUW S.R.L.", "01234567890", "01234567890", "Via Roma 1", "Bologna", "40100", "BO",
+                "BO-591450", "10.000,00", "RF01", null, null, true,
+                "BO", "Società a responsabilità limitata", true, false),
+            new("Cliente", null, null, "Via Milano 2", "Roma", "00100", "RM", null, null),
+            new("A vista", "MP01", new DateOnly(2026, 10, 25), null, null, null, 122.20m),
+            [new("MODEL-1", "Articolo", null, 12, 18.85245902m, null, 22m, 122.20m,
+                ModelCode: "MODEL-1", Color: "Navy", Size: "M")],
+            [new(22m, 100m, 22m)],
+            new(12, 100m, 22m, 122.20m));
+
+        var bytes = await generator.GenerateInvoicePdfAsync(model);
+        using var pdf = UglyToad.PdfPig.PdfDocument.Open(bytes);
+        var words = pdf.GetPages().SelectMany(page => page.GetWords()).Select(word => word.Text).ToArray();
+        var text = string.Join(" ", words);
+        Assert.Contains("Società a responsabilità limitata", text);
+        Assert.Contains("socio unico", text);
+        Assert.Contains("non in liquidazione", text);
+        Assert.Contains("BO-591450", text);
+        Assert.Contains("BO - REA BO-591450", text);
+        Assert.Contains("10.000,00", text);
+        Assert.Contains("Copia di cortesia priva di valenza fiscale", text);
+        Assert.Contains("21 D.P.R. 633/72", text);
+        Assert.Contains("Agenzia delle Entrate.", text);
+        Assert.Contains("Data scadenza rata / quietanza", text);
+        Assert.Contains("25/10/2026", text);
+        Assert.Contains("122,20", text);
+        Assert.Contains("MP01 - A vista", text);
+        Assert.Contains(words, word => word == "12");
+        Assert.DoesNotContain("12,00", words);
+        Assert.Contains(words, word => word == "18,85");
+
+        var footerWords = pdf.GetPage(pdf.NumberOfPages).GetWords()
+            .Where(word => word.BoundingBox.Top < 65)
+            .ToArray();
+        var footerCapital = Assert.Single(footerWords, word => word.Text == "Capitale");
+        var footerRegistry = Assert.Single(footerWords, word => word.Text == "REA");
+        Assert.InRange(Math.Abs(footerCapital.BoundingBox.Top - footerRegistry.BoundingBox.Top), 0, 1);
+    }
+
+    [Fact]
+    public async Task OrdersInvoiceLinesByModelColorAndStandardSize()
+    {
+        var services = CreateServices();
+        services.AddInvoicePdfReporting();
+        using var provider = services.BuildServiceProvider();
+        var generator = provider.GetRequiredService<IInvoicePdfGenerator>();
+        var lines = new[]
+        {
+            new InvoicePdfLineModel("B-1", "MARKER-B", null, 1, 1m, null, 22m, 1m,
+                ModelCode: "B", Color: "Black", Size: "M"),
+            new InvoicePdfLineModel("A-3", "MARKER-XXL", null, 1, 1m, null, 22m, 1m,
+                ModelCode: "A", Color: "Navy", Size: "XXL"),
+            new InvoicePdfLineModel("A-2", "MARKER-M", null, 1, 1m, null, 22m, 1m,
+                ModelCode: "A", Color: "Navy", Size: "M"),
+            new InvoicePdfLineModel("A-1", "MARKER-S", null, 1, 1m, null, 22m, 1m,
+                ModelCode: "A", Color: "Black", Size: "S"),
+            new InvoicePdfLineModel("A-0", "MARKER-XS", null, 1, 1m, null, 22m, 1m,
+                ModelCode: "A", Color: "Navy", Size: "XS")
+        };
+        var model = new InvoicePdfModel(
+            "F-ORDER", "TD01", new DateOnly(2026, 10, 25), "EUR",
+            new("MAUW S.R.L.", "01234567890", null, "Via Roma 1", "Bologna", "40100", "BO",
+                null, null, "RF01", null, null),
+            new("Cliente", null, null, "Via Milano 2", "Roma", "00100", "RM", null, null),
+            new("A vista", "MP01", null, null, null, null),
+            lines.ToList(), [new(22m, 5m, 1.10m)], new(5, 5m, 1.10m, 6.10m));
+
+        var bytes = await generator.GenerateInvoicePdfAsync(model);
+        using var pdf = UglyToad.PdfPig.PdfDocument.Open(bytes);
+        var page = pdf.GetPage(1);
+        var markers = page.GetWords()
+            .Where(word => word.Text.StartsWith("MARKER-", StringComparison.Ordinal))
+            .OrderByDescending(word => word.BoundingBox.Top)
+            .Select(word => word.Text)
+            .ToArray();
+
+        Assert.Equal(["MARKER-S", "MARKER-XS", "MARKER-M", "MARKER-XXL", "MARKER-B"], markers);
+    }
+
     [Theory]
     [InlineData("ORDINE", 1, false)]
     [InlineData("TD01", 26, false)]

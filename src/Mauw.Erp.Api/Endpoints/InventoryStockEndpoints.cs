@@ -108,6 +108,8 @@ public static class InventoryStockEndpoints
             return IsHistoricalDataConflict(result.Error)
                 ? TypedResults.Conflict(result.Error!)
                 : TypedResults.BadRequest(result.Error ?? "Esportazione non riuscita.");
+        if (HasFractionalQuantities(result.Data!))
+            return TypedResults.Conflict("La giacenza contiene quantita frazionarie: correggere i dati prima dell'esportazione.");
 
         var company = await companySettings.GetCompanyAsync();
         if (!company.Success)
@@ -136,6 +138,8 @@ public static class InventoryStockEndpoints
             return IsHistoricalDataConflict(result.Error)
                 ? TypedResults.Conflict(result.Error!)
                 : TypedResults.BadRequest(result.Error ?? "Esportazione non riuscita.");
+        if (HasFractionalQuantities(result.Data!))
+            return TypedResults.Conflict("La giacenza contiene quantita frazionarie: correggere i dati prima dell'esportazione.");
 
         var company = await companySettings.GetCompanyAsync();
         if (!company.Success)
@@ -207,7 +211,7 @@ public static class InventoryStockEndpoints
                 .Append(CsvText(item.Size ?? string.Empty)).Append(';')
                 .Append(CsvText(item.Color ?? string.Empty)).Append(';')
                 .Append(CsvText($"{item.WarehouseCode} - {item.WarehouseName}")).Append(';')
-                .Append(item.QuantityOnHand.ToString("0.###", CultureInfo.InvariantCulture)).Append(';')
+                .Append(item.QuantityOnHand.ToString("0", CultureInfo.InvariantCulture)).Append(';')
                 .Append(CsvText(item.UnitOfMeasure));
             if (includeCosts)
                 builder.Append(';')
@@ -217,7 +221,7 @@ public static class InventoryStockEndpoints
         }
 
         builder.Append("TOTALI;;;;;")
-            .Append(report.Totals.TotalPhysicalQuantity.ToString("0.###", CultureInfo.InvariantCulture));
+            .Append(report.Totals.TotalPhysicalQuantity.ToString("0", CultureInfo.InvariantCulture));
         if (includeCosts)
             builder.Append(";;;").Append(report.Totals.TotalValue!.Value.ToString("0.00", CultureInfo.InvariantCulture));
         builder.AppendLine();
@@ -237,4 +241,15 @@ public static class InventoryStockEndpoints
 
     private static bool IsHistoricalDataConflict(string? error) =>
         error?.StartsWith("Impossibile ricostruire la giacenza alla data richiesta", StringComparison.Ordinal) == true;
+
+    private static bool HasFractionalQuantities(InventoryStockExportDto report) =>
+        report.Items.Any(item =>
+            item.QuantityOnHand != decimal.Truncate(item.QuantityOnHand) ||
+            item.QuantityReserved != decimal.Truncate(item.QuantityReserved) ||
+            item.QuantityIncoming != decimal.Truncate(item.QuantityIncoming) ||
+            item.QuantityAvailable != decimal.Truncate(item.QuantityAvailable)) ||
+        report.Totals.TotalPhysicalQuantity != decimal.Truncate(report.Totals.TotalPhysicalQuantity) ||
+        report.Totals.TotalReservedQuantity != decimal.Truncate(report.Totals.TotalReservedQuantity) ||
+        report.Totals.TotalIncomingQuantity != decimal.Truncate(report.Totals.TotalIncomingQuantity) ||
+        report.Totals.TotalAvailableQuantity != decimal.Truncate(report.Totals.TotalAvailableQuantity);
 }

@@ -73,7 +73,7 @@ function localDate(value?: string | null): string {
                 <option value="FixedPrice">Prezzo fisso netto EUR</option><option value="PercentageDiscount">Sconto %</option></select></label>
               <label>Valore
                 <input type="number" min="0" step="0.00000001" formControlName="value" class="border p-2 w-full"></label>
-              <label>Quantità minima<input type="number" min="0.00000001" step="0.00000001" formControlName="minimumQuantity" class="border p-2 w-full"></label>
+              <label>Quantità minima<input type="number" min="1" step="1" formControlName="minimumQuantity" class="border p-2 w-full"></label>
               <label>Priorità<input type="number" step="1" formControlName="priority" class="border p-2 w-full"></label>
               <label class="md:col-span-3">Causale sconto (mostrata in cassa e sui documenti)
                 <input formControlName="description" maxlength="200" class="border p-2 w-full"
@@ -82,7 +82,7 @@ function localDate(value?: string | null): string {
               <label>Al (incluso, ora locale)<input type="datetime-local" step="0.001" formControlName="validTo" class="border p-2 w-full"></label>
             </div>
             <p *ngIf="rule.invalid && rule.touched" class="text-red-600 text-sm" role="alert">
-              Verificare bersaglio GUID, valore non negativo (sconto ≤100), massimo 8 decimali, quantità positiva, priorità intera e intervallo date coerente.
+              Verificare bersaglio GUID, valore non negativo (sconto ≤100), massimo 8 decimali sul prezzo, quantità minima intera positiva, priorità intera e intervallo date coerente.
             </p>
             <button type="button" (click)="rules.removeAt(i)" class="text-red-600 mt-3">Rimuovi regola</button>
           </fieldset>
@@ -148,7 +148,7 @@ export class ListiniComponent implements OnInit {
       targetId: rule?.variantId ?? rule?.productId ?? rule?.categoryId ?? '',
       calculationType: this.fb.nonNullable.control<PriceCalculationType>(rule?.calculationType ?? 'FixedPrice'),
       value: [rule?.value ?? 0, [Validators.required, Validators.min(0), decimal8]],
-      minimumQuantity: [rule?.minimumQuantity ?? 1, [Validators.required, Validators.min(0.00000001), decimal8]],
+      minimumQuantity: [rule?.minimumQuantity ?? 1, [Validators.required, Validators.min(1), Validators.pattern(/^\d+$/)]],
       priority: [rule?.priority ?? 0, [Validators.required, Validators.min(-2147483648), Validators.max(2147483647), Validators.pattern(/^-?\d+$/)]],
       description: [rule?.description ?? '', [Validators.maxLength(200)]],
       validFrom: localDate(rule?.validFrom), validTo: localDate(rule?.validTo)

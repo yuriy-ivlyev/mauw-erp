@@ -10,5 +10,8 @@ public sealed record InvoicePdfLineModel(
     decimal? DiscountPercent,
     decimal  VatRate,
     decimal  LineTotal,
-    string?  NatureCode = null
+    string?  NatureCode = null,
+    string?  ModelCode = null,
+    string?  Color = null,
+    string?  Size = null
 );

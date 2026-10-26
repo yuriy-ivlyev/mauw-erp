@@ -28,7 +28,7 @@
       <p class="text-sm text-gray-500">Pezzi fisici</p>
       <p class="mt-1 text-xl font-semibold">
         @if (hasLoadedSummary()) {
-          {{ totals().totalPhysicalQuantity | number:'1.0-3' }}
+          {{ totals().totalPhysicalQuantity | number:'1.0-0' }}
         } @else {
           <span class="inline-block h-6 w-16 animate-pulse rounded bg-gray-200" aria-hidden="true"></span>
         }
@@ -38,7 +38,7 @@
       <p class="text-sm text-gray-500">Impegnati</p>
       <p class="mt-1 text-xl font-semibold text-orange-700">
         @if (hasLoadedSummary()) {
-          {{ totals().totalReservedQuantity | number:'1.0-3' }}
+          {{ totals().totalReservedQuantity | number:'1.0-0' }}
         } @else {
           <span class="inline-block h-6 w-16 animate-pulse rounded bg-gray-200" aria-hidden="true"></span>
         }
@@ -48,7 +48,7 @@
       <p class="text-sm text-gray-500">In arrivo</p>
       <p class="mt-1 text-xl font-semibold text-blue-700">
         @if (hasLoadedSummary()) {
-          {{ totals().totalIncomingQuantity | number:'1.0-3' }}
+          {{ totals().totalIncomingQuantity | number:'1.0-0' }}
         } @else {
           <span class="inline-block h-6 w-16 animate-pulse rounded bg-gray-200" aria-hidden="true"></span>
         }
@@ -58,7 +58,7 @@
       <p class="text-sm text-gray-500">Disponibile netto</p>
       <p class="mt-1 text-xl font-semibold">
         @if (hasLoadedSummary()) {
-          {{ totals().totalAvailableQuantity | number:'1.0-3' }}
+          {{ totals().totalAvailableQuantity | number:'1.0-0' }}
         } @else {
           <span class="inline-block h-6 w-16 animate-pulse rounded bg-gray-200" aria-hidden="true"></span>
         }
@@ -202,12 +202,12 @@
                 <span class="rounded bg-indigo-50 px-2 py-0.5 font-mono text-xs text-indigo-700">{{ stock.warehouseCode }}</span>
                 <div class="text-xs text-gray-500">{{ stock.warehouseName }}</div>
               </td>
-              <td class="px-4 py-3 text-right">{{ stock.quantityOnHand | number:'1.0-3' }} {{ stock.unitOfMeasure }}</td>
-              <td class="px-4 py-3 text-right text-orange-700">{{ stock.quantityReserved | number:'1.0-3' }}</td>
-              <td class="px-4 py-3 text-right text-blue-700">{{ stock.quantityIncoming | number:'1.0-3' }}</td>
+              <td class="px-4 py-3 text-right">{{ stock.quantityOnHand | number:'1.0-0' }} {{ stock.unitOfMeasure }}</td>
+              <td class="px-4 py-3 text-right text-orange-700">{{ stock.quantityReserved | number:'1.0-0' }}</td>
+              <td class="px-4 py-3 text-right text-blue-700">{{ stock.quantityIncoming | number:'1.0-0' }}</td>
               <td class="px-4 py-3 text-right">
                 <span class="rounded px-2 py-1 font-semibold" [ngClass]="stockClass(stock.quantityAvailable)">
-                  {{ stock.quantityAvailable | number:'1.0-3' }}
+                  {{ stock.quantityAvailable | number:'1.0-0' }}
                 </span>
               </td>
               @if (canSeeCosts) {
@@ -232,10 +232,10 @@
           @if (stockItems().length > 0 && hasLoadedSummary()) {
             <tr class="border-t-2 bg-gray-50 font-semibold">
               <td colspan="4" class="px-4 py-3 text-right text-gray-700">Totali per i filtri selezionati:</td>
-              <td class="px-4 py-3 text-right">{{ totals().totalPhysicalQuantity | number:'1.0-3' }}</td>
-              <td class="px-4 py-3 text-right text-orange-700">{{ totals().totalReservedQuantity | number:'1.0-3' }}</td>
-              <td class="px-4 py-3 text-right text-blue-700">{{ totals().totalIncomingQuantity | number:'1.0-3' }}</td>
-              <td class="px-4 py-3 text-right">{{ totals().totalAvailableQuantity | number:'1.0-3' }}</td>
+              <td class="px-4 py-3 text-right">{{ totals().totalPhysicalQuantity | number:'1.0-0' }}</td>
+              <td class="px-4 py-3 text-right text-orange-700">{{ totals().totalReservedQuantity | number:'1.0-0' }}</td>
+              <td class="px-4 py-3 text-right text-blue-700">{{ totals().totalIncomingQuantity | number:'1.0-0' }}</td>
+              <td class="px-4 py-3 text-right">{{ totals().totalAvailableQuantity | number:'1.0-0' }}</td>
               @if (canSeeCosts) {
                 <td></td>
                 <td class="px-4 py-3 text-right text-indigo-700">
@@ -301,7 +301,7 @@
                     {{ movementLabel(movement) }}
                   </td>
                   <td class="whitespace-nowrap p-3 text-right">
-                    {{ movement.runningBalance != null ? (movement.runningBalance | number:'1.0-3') : 'Non disponibile' }}
+                    {{ movement.runningBalance != null ? (movement.runningBalance | number:'1.0-0') : 'Non disponibile' }}
                   </td>
                   @if (canSeeCosts) {
                     <td class="whitespace-nowrap p-3 text-right">

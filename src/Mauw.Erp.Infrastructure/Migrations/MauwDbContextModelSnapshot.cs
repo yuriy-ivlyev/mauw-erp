@@ -17,7 +17,7 @@ namespace Mauw.Erp.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.4")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
@@ -1874,7 +1874,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
                     b.HasIndex("PriceListId", "VariantId");
 
-                    b.ToTable("price_list_rules", (string)null);
+                    b.ToTable("price_list_rules", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_price_list_rules_whole_minimum_quantity", "minimum_quantity = trunc(minimum_quantity)");
+                        });
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Product", b =>
@@ -2216,7 +2219,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasIndex("WarehouseId", "ProductVariantId")
                         .IsUnique();
 
-                    b.ToTable("stock_items", (string)null);
+                    b.ToTable("stock_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_stock_items_whole_quantities", "quantity_on_hand = trunc(quantity_on_hand) AND quantity_reserved = trunc(quantity_reserved)");
+                        });
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.StockMovement", b =>
@@ -2328,7 +2334,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
                     NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("WarehouseId", "VariantId", "MovementDateUtc", "Id"), new[] { "QuantityDelta", "Quantity", "Type", "UnitCost" });
 
-                    b.ToTable("stock_movements");
+                    b.ToTable("stock_movements", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_stock_movements_whole_quantity_delta", "quantity_delta IS NULL OR quantity_delta = trunc(quantity_delta)");
+                        });
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierArticleMapping", b =>

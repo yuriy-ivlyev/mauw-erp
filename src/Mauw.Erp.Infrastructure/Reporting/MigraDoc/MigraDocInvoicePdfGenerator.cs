@@ -17,6 +17,10 @@ public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos
 {
     // ─── Palette ─────────────────────────────────────────────────────────────
     private static readonly CultureInfo ItalianCulture = CultureInfo.GetCultureInfo("it-IT");
+    private const string CourtesyCopyNotice =
+        "Copia di cortesia priva di valenza fiscale ai sensi dell'art. 21 D.P.R. 633/72. " +
+        "L'originale della fattura elettronica è trasmesso tramite SDI ed è disponibile " +
+        "nell'area riservata dell'Agenzia delle Entrate.";
     private static readonly Color ClrDark = new(0xFF1F2937);
     private static readonly Color ClrBorder = new(0xFFCBD5E1);
     private static readonly Color ClrBorderMid = new(0xFF888888);
@@ -99,7 +103,7 @@ public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos
         ps.PageFormat = PageFormat.A4;
         ps.Orientation = Orientation.Portrait;
         ps.TopMargin = Unit.FromCentimeter(1.8);
-        ps.BottomMargin = Unit.FromCentimeter(1.5);
+        ps.BottomMargin = Unit.FromCentimeter(2.3);
         ps.LeftMargin = Unit.FromCentimeter(1.5);
         ps.RightMargin = Unit.FromCentimeter(1.5);
         ps.HeaderDistance = Unit.FromCentimeter(0.6);
@@ -124,18 +128,20 @@ public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos
             ($"Num. {GetDocumentTitle(model)} / Anno", model.DocumentNumber),
             ("Data Emissione", model.IssueDate.ToString("dd/MM/yyyy", ItalianCulture)),
             ("Divisa / Valuta", model.Currency),
-            ($"Pagamento ({model.Payment.PaymentMethod})", model.Payment.PaymentTerms)
+            ("Modalità pagamento", model.Payment.PaymentMethod)
         };
         if (model.Payment.DueDate is { } dueDate)
             details.Add(("Scadenza", dueDate.ToString("dd/MM/yyyy", ItalianCulture)));
+        if (model.Payment.Amount is { } amount)
+            details.Add(("Importo da pagare", Money(amount, model.Currency)));
 
         var table = section.AddTable();
         table.Borders.Visible = false;
         table.AddColumn(Unit.FromCentimeter(1.3));
         table.AddColumn(Unit.FromCentimeter(0.2));
-        table.AddColumn(Unit.FromCentimeter(9.0));
+        table.AddColumn(Unit.FromCentimeter(8.1));
         table.AddColumn(Unit.FromCentimeter(0.3));
-        table.AddColumn(Unit.FromCentimeter(7.2));
+        table.AddColumn(Unit.FromCentimeter(8.1));
         table.LeftPadding = Unit.FromPoint(0);
         table.RightPadding = Unit.FromPoint(0);
 
@@ -156,16 +162,26 @@ public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos
             $"{model.Seller.Address}, {model.Seller.PostalCode} {model.Seller.City} ({model.Seller.Province}) - Italia"
         ).Format.Font.Size = Unit.FromPoint(8.5);
 
-        var vatLine = $"C.F. / P.IVA: {model.Seller.VatNumber}";
-        if (!string.IsNullOrWhiteSpace(model.Seller.Rea)) vatLine += $" | REA: {model.Seller.Rea}";
-        if (!string.IsNullOrWhiteSpace(model.Seller.ShareCapital))
-            vatLine += $" | Cap. Soc. {model.Seller.ShareCapital}" +
-                (model.Seller.IsShareCapitalFullyPaid ? " I.V." : string.Empty);
-        sc.AddParagraph(vatLine).Format.Font.Size = Unit.FromPoint(8.5);
+        sc.AddParagraph($"C.F. / P.IVA: {model.Seller.VatNumber}").Format.Font.Size = Unit.FromPoint(8.5);
+
+        var registryLine = BuildRegistryLine(model.Seller);
+        if (registryLine is not null)
+            sc.AddParagraph(registryLine).Format.Font.Size = Unit.FromPoint(6.5);
+
+        var capitalLine = BuildShareCapitalLine(model.Seller);
+        if (capitalLine is not null)
+        {
+            var capitalParagraph = sc.AddParagraph(capitalLine);
+            capitalParagraph.Format.Font.Size = Unit.FromPoint(6.5);
+        }
 
         var regimeLine = $"Regime Fiscale: {model.Seller.TaxRegime}";
         if (!string.IsNullOrWhiteSpace(model.Seller.Pec)) regimeLine += $" | PEC: {model.Seller.Pec}";
-        sc.AddParagraph(regimeLine).Format.Font.Size = Unit.FromPoint(8.5);
+        sc.AddParagraph(regimeLine).Format.Font.Size = Unit.FromPoint(6.5);
+
+        var legalStatusLine = BuildLegalStatusLine(model.Seller);
+        if (legalStatusLine is not null)
+            sc.AddParagraph(legalStatusLine).Format.Font.Size = Unit.FromPoint(6.5);
 
         var dc = row.Cells[4];
         var title = IsInvoice(model)
@@ -174,8 +190,8 @@ public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos
         AddDocInfoTitle(dc, title);
         // Independent cells let either side grow without overflowing a vertically merged range.
         var detailsTable = new Table();
-        detailsTable.AddColumn(Unit.FromCentimeter(3.4));
-        detailsTable.AddColumn(Unit.FromCentimeter(3.8));
+        detailsTable.AddColumn(Unit.FromCentimeter(4.0));
+        detailsTable.AddColumn(Unit.FromCentimeter(4.1));
         detailsTable.LeftPadding = Unit.FromPoint(0);
         detailsTable.RightPadding = Unit.FromPoint(0);
         dc.Elements.Add(detailsTable);
@@ -333,15 +349,28 @@ public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos
     private static void BuildFooter(HeaderFooter footer, InvoicePdfModel model)
     {
         var table = footer.AddTable();
-        table.AddColumn(Unit.FromCentimeter(14));
-        table.AddColumn(Unit.FromCentimeter(4));
+        table.AddColumn(Unit.FromCentimeter(15));
+        table.AddColumn(Unit.FromCentimeter(3));
         table.Borders.Top.Width = Unit.FromPoint(0.5);
         table.Borders.Top.Color = ClrBorder;
-        table.Format.Font.Size = Unit.FromPoint(7);
+        table.Format.Font.Size = Unit.FromPoint(6);
         var row = table.AddRow();
-        row.TopPadding = Unit.FromPoint(4);
-        row.Cells[0].AddParagraph(
-            $"{model.Seller.BusinessName} | {GetDocumentTitle(model)} N. {model.DocumentNumber} del {model.IssueDate:dd/MM/yyyy}");
+        row.TopPadding = Unit.FromPoint(2);
+        var companyCell = row.Cells[0];
+        var footerDetails = new[]
+        {
+            model.Seller.BusinessName,
+            BuildFooterLegalStatus(model.Seller),
+            BuildShareCapitalLine(model.Seller),
+            BuildFooterRegistryLine(model.Seller)
+        }.Where(value => !string.IsNullOrWhiteSpace(value));
+        companyCell.AddParagraph(string.Join(" | ", footerDetails));
+        if (IsFiscalDocument(model))
+        {
+            var notice = companyCell.AddParagraph(CourtesyCopyNotice);
+            notice.Format.Font.Size = Unit.FromPoint(6);
+        }
+
         var p = row.Cells[1].AddParagraph("Pagina ");
         p.Format.Alignment = ParagraphAlignment.Right;
         p.AddPageField();
@@ -368,8 +397,14 @@ public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos
 
         AddLinesHeaderRow(table);
 
-        for (var i = 0; i < model.Lines.Count; i++)
-            AddLineDataRow(table, model.Lines[i], i);
+        var orderedLines = model.Lines
+            .OrderBy(line => line.ModelCode ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(line => line.Color ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(line => GetSizeSortOrder(line.Size))
+            .ThenBy(line => line.Size ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        for (var i = 0; i < orderedLines.Count; i++)
+            AddLineDataRow(table, orderedLines[i], i);
     }
 
     private static void AddLinesHeaderRow(Table table)
@@ -397,7 +432,7 @@ public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos
             ParagraphAlignment.Center,
             ParagraphAlignment.Left,
             ParagraphAlignment.Left,
-            ParagraphAlignment.Center,
+            ParagraphAlignment.Right,
             ParagraphAlignment.Right,
             ParagraphAlignment.Center,
             ParagraphAlignment.Center,
@@ -431,8 +466,10 @@ public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos
         SetLineCell(row, 0, (index + 1).ToString("D2"), ParagraphAlignment.Center);
         SetLineCell(row, 1, line.Sku, ParagraphAlignment.Left);
         SetLineCell(row, 2, line.Description, ParagraphAlignment.Left);
-        SetLineCell(row, 3, line.Pieces.ToString(), ParagraphAlignment.Center);
-        SetLineCell(row, 4, Math.Round(line.UnitPrice, 2, MidpointRounding.AwayFromZero).ToString("N2", ItalianCulture), ParagraphAlignment.Right);
+        SetLineCell(row, 3, line.Pieces.ToString("N0", ItalianCulture), ParagraphAlignment.Right);
+        SetLineCell(row, 4,
+            Math.Round(line.UnitPrice, 2, MidpointRounding.AwayFromZero).ToString("N2", ItalianCulture),
+            ParagraphAlignment.Right);
         SetLineCell(row, 5, discText, ParagraphAlignment.Center);
         SetLineCell(row, 6, line.NatureCode is null
             ? $"{line.VatRate.ToString("0.##", ItalianCulture)}%"
@@ -457,10 +494,10 @@ public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos
 
         var outer = section.AddTable();
         outer.Borders.Visible = false;
-        outer.AddColumn(Unit.FromCentimeter(10.5));
+        outer.AddColumn(Unit.FromCentimeter(9.7));
         outer.AddColumn(Unit.FromCentimeter(0.3));
-        outer.AddColumn(Unit.FromCentimeter(1.9));
-        outer.AddColumn(Unit.FromCentimeter(1.9));
+        outer.AddColumn(Unit.FromCentimeter(2.3));
+        outer.AddColumn(Unit.FromCentimeter(2.3));
         outer.AddColumn(Unit.FromCentimeter(1.6));
         outer.AddColumn(Unit.FromCentimeter(1.8));
         outer.LeftPadding = Unit.FromPoint(0);
@@ -509,6 +546,8 @@ public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos
             p.AddFormattedText("BIC / SWIFT: ");
             p.AddFormattedText(model.Payment.Swift!).Bold = true;
         }
+
+        BuildPaymentSummary(cell, model);
 
         if (model.Agent is not null)
         {
@@ -683,4 +722,117 @@ public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos
 
     private static string Money(decimal amount, string currency) =>
         $"{(currency == "EUR" ? "€" : currency)} {amount.ToString("N2", ItalianCulture)}";
+
+    private static string? BuildRegistryLine(InvoicePdfSellerDetails seller)
+    {
+        if (string.IsNullOrWhiteSpace(seller.Rea) && string.IsNullOrWhiteSpace(seller.ReaOffice))
+            return null;
+
+        var office = string.IsNullOrWhiteSpace(seller.ReaOffice) ? null : $" di {seller.ReaOffice}";
+        var rea = string.IsNullOrWhiteSpace(seller.Rea) ? null : $"  -  REA {seller.Rea}";
+        return $"Iscritta al Reg. Imprese{office}{rea}";
+    }
+
+    private static string? BuildShareCapitalLine(InvoicePdfSellerDetails seller)
+    {
+        if (string.IsNullOrWhiteSpace(seller.ShareCapital))
+            return null;
+
+        var paymentStatus = seller.IsShareCapitalFullyPaid ? " i.v." : " deliberato, non interamente versato";
+        return $"Capitale sociale € {seller.ShareCapital}{paymentStatus}";
+    }
+
+    private static string? BuildLegalStatusLine(InvoicePdfSellerDetails seller)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(seller.LegalForm))
+            parts.Add(seller.LegalForm);
+        if (seller.IsSoleShareholder == true)
+            parts.Add("Soci: socio unico");
+        else if (seller.IsSoleShareholder == false)
+            parts.Add("Soci: pluralità di soci");
+        if (seller.IsInLiquidation is { } isInLiquidation)
+            parts.Add(isInLiquidation ? "in liquidazione" : "non in liquidazione");
+        return parts.Count == 0 ? null : string.Join(", ", parts);
+    }
+
+    private static string? BuildFooterLegalStatus(InvoicePdfSellerDetails seller)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(seller.LegalForm))
+            parts.Add("S.r.l.");
+        if (seller.IsSoleShareholder.HasValue)
+            parts.Add(seller.IsSoleShareholder.Value ? "socio unico" : "soci plurimi");
+        if (seller.IsInLiquidation is { } isInLiquidation)
+            parts.Add(isInLiquidation ? "in liquidazione" : "non in liquidazione");
+        return parts.Count == 0 ? null : string.Join(", ", parts);
+    }
+
+    private static string? BuildFooterRegistryLine(InvoicePdfSellerDetails seller)
+    {
+        if (string.IsNullOrWhiteSpace(seller.Rea) && string.IsNullOrWhiteSpace(seller.ReaOffice))
+            return null;
+
+        var registryOffice = string.IsNullOrWhiteSpace(seller.ReaOffice)
+            ? null
+            : $"Reg. Imprese {seller.ReaOffice}";
+        var rea = string.IsNullOrWhiteSpace(seller.Rea) ? null : $"REA {seller.Rea}";
+        return string.Join(", ", new[] { registryOffice, rea }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static int GetSizeSortOrder(string? size) =>
+        size?.Trim().ToUpperInvariant() switch
+        {
+            "XXXS" => 0,
+            "XXS" => 1,
+            "XS" => 2,
+            "S" => 3,
+            "M" => 4,
+            "L" => 5,
+            "XL" => 6,
+            "XXL" or "2XL" => 7,
+            "XXXL" or "3XL" => 8,
+            "XXXXL" or "4XL" => 9,
+            _ => 10
+        };
+
+    private static void BuildPaymentSummary(Cell cell, InvoicePdfModel model)
+    {
+        if (model.Payment.DueDate is null && model.Payment.Amount is null &&
+            string.IsNullOrWhiteSpace(model.Payment.PaymentTerms))
+            return;
+
+        var table = new Table();
+        table.AddColumn(Unit.FromCentimeter(5.4));
+        table.AddColumn(Unit.FromCentimeter(3.6));
+        table.Borders.Width = Unit.FromPoint(0.35);
+        table.Borders.Color = ClrBorder;
+        table.Format.Font.Size = Unit.FromPoint(7);
+        table.TopPadding = Unit.FromPoint(2);
+        table.BottomPadding = Unit.FromPoint(2);
+
+        AddPaymentSummaryRow(table, "Modalità di pagamento",
+            $"{model.Payment.PaymentMethod}  -  {model.Payment.PaymentTerms}");
+        if (model.Payment.DueDate is { } dueDate)
+            AddPaymentSummaryRow(table, "Data scadenza rata / quietanza",
+                dueDate.ToString("dd/MM/yyyy", ItalianCulture));
+        if (model.Payment.Amount is { } amount)
+            AddPaymentSummaryRow(table, "Importo da pagare", Money(amount, model.Currency), rightAlign: true);
+
+        cell.Elements.Add(table);
+    }
+
+    private static void AddPaymentSummaryRow(Table table, string label, string value, bool rightAlign = false)
+    {
+        var row = table.AddRow();
+        row.Cells[0].Shading.Color = ClrBandBg;
+        row.Cells[0].Format.Font.Bold = true;
+        row.Cells[0].AddParagraph(label);
+        row.Cells[1].Format.Alignment = rightAlign ? ParagraphAlignment.Right : ParagraphAlignment.Left;
+        row.Cells[1].AddParagraph(value);
+    }
+
+    private static bool IsFiscalDocument(InvoicePdfModel model) =>
+        IsInvoice(model) || model.DocumentType.Equals("NOTA CREDITO", StringComparison.OrdinalIgnoreCase);
 }

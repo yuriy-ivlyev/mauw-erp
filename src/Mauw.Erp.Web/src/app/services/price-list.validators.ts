@@ -17,6 +17,7 @@ export const priceRuleValidator: ValidatorFn = (control: AbstractControl): Valid
   const targetId = control.get('targetId')?.value as string;
   const type = control.get('calculationType')?.value as string;
   const value = Number(control.get('value')?.value);
+  const minimumQuantity = Number(control.get('minimumQuantity')?.value);
   const from = control.get('validFrom')?.value as string;
   const to = control.get('validTo')?.value as string;
   const errors: ValidationErrors = {};
@@ -25,6 +26,7 @@ export const priceRuleValidator: ValidatorFn = (control: AbstractControl): Valid
     (target === 'global' && !!targetId)) errors['target'] = true;
   if (!['FixedPrice', 'PercentageDiscount'].includes(type) ||
     (type === 'PercentageDiscount' && value > 100)) errors['calculationType'] = true;
+  if (!Number.isInteger(minimumQuantity) || minimumQuantity < 1) errors['minimumQuantity'] = true;
   if ((from && !Number.isFinite(Date.parse(from))) || (to && !Number.isFinite(Date.parse(to))) ||
     (from && to && Date.parse(from) > Date.parse(to))) errors['dateWindow'] = true;
   return Object.keys(errors).length ? errors : null;

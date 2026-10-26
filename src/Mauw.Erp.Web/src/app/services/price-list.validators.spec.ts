@@ -6,6 +6,7 @@ describe('Price list rule validation', () => {
     return new FormGroup({
       target: new FormControl('global'), targetId: new FormControl(''),
       calculationType: new FormControl('FixedPrice'), value: new FormControl(0),
+      minimumQuantity: new FormControl(1),
       validFrom: new FormControl(''), validTo: new FormControl('')
     }, { validators: priceRuleValidator });
   }
@@ -39,6 +40,15 @@ describe('Price list rule validation', () => {
     expect(form.valid).toBeTrue();
     form.patchValue({ calculationType: 'Unknown' as never });
     expect(form.hasError('calculationType')).toBeTrue();
+  });
+  it('requires a whole, positive minimum quantity', () => {
+    const form = rule();
+    form.patchValue({ minimumQuantity: 1.5 });
+    expect(form.hasError('minimumQuantity')).toBeTrue();
+    form.patchValue({ minimumQuantity: 0 });
+    expect(form.hasError('minimumQuantity')).toBeTrue();
+    form.patchValue({ minimumQuantity: 2 });
+    expect(form.valid).toBeTrue();
   });
   it('validates inclusive windows and rejects invalid or reversed dates', () => {
     const form = rule();

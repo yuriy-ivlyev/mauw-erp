@@ -217,8 +217,11 @@ public class DdtService(
         var agent = await DocumentPdfMapper.GetAgentAsync(unitOfWork, ddt.ContactId);
         if (!agent.Success)
             return OperationResult<byte[]>.Fail(agent.Error!);
-        var companyResult = await companySettingsService.GetCompanyAsync();
-        var company = companyResult.Success ? companyResult.Data : null;
+        var companyResult = DocumentPdfMapper.RequireCompanyForPdf(
+            await companySettingsService.GetCompanyAsync());
+        if (!companyResult.Success)
+            return OperationResult<byte[]>.Fail(companyResult.Error!);
+        var company = companyResult.Data!;
         var sellerAddress = company?.LegalHeadquarters
             ?? company?.OperationalSites.FirstOrDefault(s => s.IsMainOperationalSite)
             ?? company?.OperationalSites.FirstOrDefault();
@@ -279,7 +282,11 @@ public class DdtService(
                 TaxRegime: company?.FiscalRegime ?? "RF01 - Ordinario",
                 SdiCode: company?.SdiCode,
                 Pec: company?.PecEmail,
-                IsShareCapitalFullyPaid: company?.IsShareCapitalFullyPaid ?? false),
+                IsShareCapitalFullyPaid: company?.IsShareCapitalFullyPaid ?? false,
+                ReaOffice: company?.ReaOffice,
+                LegalForm: "Società a responsabilità limitata",
+                IsSoleShareholder: company?.IsSoleShareholder,
+                IsInLiquidation: company?.IsInLiquidation ?? false),
             Customer: new InvoicePdfCustomerDetails(
                 BusinessName: ddt.Contact?.BusinessName ?? string.Empty,
                 VatNumber: ddt.Contact?.VatNumber,

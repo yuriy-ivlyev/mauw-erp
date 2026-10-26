@@ -9,5 +9,7 @@ public sealed record InvoicePdfPaymentInfo(
     DateOnly? DueDate,
     string?  Iban,
     string?  Swift,
-    string?  BankName
+    string?  BankName,
+    decimal? Amount = null,
+    string PaymentConditionCode = "TP02"
 );

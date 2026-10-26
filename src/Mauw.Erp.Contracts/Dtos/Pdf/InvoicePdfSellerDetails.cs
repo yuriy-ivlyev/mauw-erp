@@ -15,5 +15,9 @@ public sealed record InvoicePdfSellerDetails(
     string  TaxRegime,
     string? SdiCode,
     string? Pec,
-    bool IsShareCapitalFullyPaid = false
+    bool IsShareCapitalFullyPaid = false,
+    string? ReaOffice = null,
+    string? LegalForm = null,
+    bool? IsSoleShareholder = null,
+    bool? IsInLiquidation = null
 );

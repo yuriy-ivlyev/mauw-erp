@@ -36,7 +36,8 @@ public sealed class PriceList : Entity<Guid>
                 rule.Value < 0m || rule.Value > 99999999999999.99999999m ||
                 decimal.Round(rule.Value, 8, MidpointRounding.AwayFromZero) != rule.Value ||
                 rule.MinimumQuantity <= 0m || rule.MinimumQuantity > 99999999999999.99999999m ||
-                decimal.Round(rule.MinimumQuantity, 8, MidpointRounding.AwayFromZero) != rule.MinimumQuantity)
+                decimal.Round(rule.MinimumQuantity, 8, MidpointRounding.AwayFromZero) != rule.MinimumQuantity ||
+                rule.MinimumQuantity != decimal.Truncate(rule.MinimumQuantity))
                 return AccountingResult<PriceList>.Fail("Tipo, valore o quantita minima della regola non validi.");
             if (rule.CalculationType == PriceCalculationType.PercentageDiscount && rule.Value > 100m)
                 return AccountingResult<PriceList>.Fail("Lo sconto deve essere compreso tra 0 e 100.");

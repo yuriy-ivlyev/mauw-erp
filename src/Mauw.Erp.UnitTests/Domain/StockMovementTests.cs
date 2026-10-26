@@ -21,16 +21,11 @@ public sealed class StockMovementTests
         Assert.Equal(expected, movement.GetEffectiveQuantityDelta());
     }
 
-    public static IEnumerable<object[]> AdjustmentQuantities =>
-    [
-        [2.5m, 2.5m],
-        [-1.25m, -1.25m]
-    ];
-
     [Theory]
-    [MemberData(nameof(AdjustmentQuantities))]
-    public void GetEffectiveQuantityDelta_NewAdjustment_PreservesSignedDecimal(
-        decimal quantity,
+    [InlineData(2, 2)]
+    [InlineData(-1, -1)]
+    public void GetEffectiveQuantityDelta_NewAdjustmentPreservesWholeSignedQuantity(
+        int quantity,
         decimal expected)
     {
         var movement = new StockMovement(
@@ -40,6 +35,24 @@ public sealed class StockMovementTests
             quantity);
 
         Assert.Equal(expected, movement.GetEffectiveQuantityDelta());
+    }
+
+    public static TheoryData<decimal> FractionalQuantities => new()
+    {
+        2.5m,
+        -1.25m
+    };
+
+    [Theory]
+    [MemberData(nameof(FractionalQuantities))]
+    public void NewAdjustmentRejectsFractionalQuantity(decimal quantity)
+    {
+        Assert.Throws<Mauw.Erp.Domain.Exceptions.DomainException>(() =>
+            new StockMovement(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                StockMovementReason.InventoryAdjustment,
+                quantity));
     }
 
 }

@@ -26,6 +26,8 @@ public sealed class PriceListService(IPriceListRepository repository, PriceListR
             return OperationResult<PriceListResponse>.Fail("Listino non trovato.");
         if (request.Rules is null || request.Rules.Any(rule => rule is null))
             return OperationResult<PriceListResponse>.Fail("Le regole non possono essere null.");
+        if (request.Rules.Any(rule => rule.MinimumQuantity != decimal.Truncate(rule.MinimumQuantity)))
+            return OperationResult<PriceListResponse>.Fail("La quantita minima della regola deve essere un numero intero.");
         if (request.Rules.Any(rule => rule.Id.HasValue && (list is null || list.Rules.All(old => old.Id != rule.Id))))
             return OperationResult<PriceListResponse>.Fail("Identificativo regola estraneo al listino.");
         var rules = request.Rules.Select(rule => new PriceRuleDefinition(
@@ -80,7 +82,8 @@ public sealed class PriceListService(IPriceListRepository repository, PriceListR
     public async Task<OperationResult<ResolvedPricesResponse>> ResolveAsync(ResolvePricesRequest request, CancellationToken ct)
     {
         if (request.Lines is null || request.Lines.Count < 1 ||
-            request.Lines.Any(line => line is null || line.VariantId == Guid.Empty || line.Quantity <= 0m) ||
+            request.Lines.Any(line => line is null || line.VariantId == Guid.Empty ||
+                line.Quantity <= 0m || line.Quantity != decimal.Truncate(line.Quantity)) ||
             request.At == default)
             return OperationResult<ResolvedPricesResponse>.Fail("Specificare data e almeno una riga con quantita positiva.");
         var priceListId = request.PriceListId;

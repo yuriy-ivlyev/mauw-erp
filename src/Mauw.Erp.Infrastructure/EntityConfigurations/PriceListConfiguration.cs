@@ -22,7 +22,9 @@ public sealed class PriceListRuleConfiguration : IEntityTypeConfiguration<PriceL
 {
     public void Configure(EntityTypeBuilder<PriceListRule> builder)
     {
-        builder.ToTable("price_list_rules");
+        builder.ToTable("price_list_rules", table => table.HasCheckConstraint(
+            "ck_price_list_rules_whole_minimum_quantity",
+            "minimum_quantity = trunc(minimum_quantity)"));
         builder.HasKey(rule => rule.Id);
         builder.Property(rule => rule.Id).ValueGeneratedNever();
         builder.Property(rule => rule.CalculationType).HasConversion<string>().HasMaxLength(30);

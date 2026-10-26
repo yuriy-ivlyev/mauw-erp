@@ -1,5 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Observable, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, finalize, takeUntil } from 'rxjs/operators';
@@ -150,10 +151,26 @@ export class OrdiniElencoComponent implements OnInit, OnDestroy {
         link.click();
         URL.revokeObjectURL(url);
       },
-      error: () => {
-        this.pdfErrorMessage = 'Impossibile scaricare il PDF. Riprova tra poco.';
-      }
+      error: error => this.setPdfError(error)
     });
+  }
+
+  private setPdfError(error: unknown): void {
+    const fallback = 'Impossibile scaricare il PDF. Riprova tra poco.';
+    if (error instanceof HttpErrorResponse) {
+      if (typeof error.error === 'string') {
+        this.pdfErrorMessage = error.error.trim() || fallback;
+        return;
+      }
+      if (error.error instanceof Blob) {
+        void error.error.text().then(
+          body => { this.pdfErrorMessage = body.trim() || fallback; },
+          () => { this.pdfErrorMessage = fallback; }
+        );
+        return;
+      }
+    }
+    this.pdfErrorMessage = fallback;
   }
 
   statusLabel(status: string): string {

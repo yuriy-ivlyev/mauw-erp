@@ -146,8 +146,12 @@ public sealed class MigraDocInventoryStockPdfGenerator : IInventoryStockPdfGener
         return output.ToArray();
     }
 
-    private static string FormatQuantity(decimal quantity) =>
-        quantity.ToString("0.###", ItalianCulture);
+    private static string FormatQuantity(decimal quantity)
+    {
+        if (quantity != decimal.Truncate(quantity))
+            throw new InvalidOperationException("La giacenza contiene quantita frazionarie: correggere i dati prima dell'esportazione.");
+        return quantity.ToString("N0", ItalianCulture);
+    }
 
     private static string FormatMoney(decimal? amount) =>
         amount.HasValue ? amount.Value.ToString("N2", ItalianCulture) + " €" : "—";

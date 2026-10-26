@@ -71,4 +71,17 @@ describe('ImpostazioniAziendaComponent invoice settings', () => {
     expect(fixture.componentInstance.successMessage).toBe('');
     expect(fixture.componentInstance.saving).toBeFalse();
   });
+
+  it('rejects an IBAN with an invalid checksum before sending the save request', () => {
+    const fixture = TestBed.createComponent(ImpostazioniAziendaComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.form.patchValue({ iban: 'IT60X0542811101000000123457' });
+
+    component.save();
+
+    expect(component.form.get('iban')?.hasError('ibanInvalid')).toBeTrue();
+    expect(component.form.get('iban')?.touched).toBeTrue();
+    expect(service.upsertCompany).not.toHaveBeenCalled();
+  });
 });

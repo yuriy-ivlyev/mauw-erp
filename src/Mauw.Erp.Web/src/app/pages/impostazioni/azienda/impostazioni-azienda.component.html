@@ -132,6 +132,8 @@
           IBAN
           <input formControlName="iban" type="text" maxlength="42"
             class="w-full px-4 py-2 border rounded-lg uppercase" />
+          <span *ngIf="form.get('iban')?.hasError('ibanInvalid') && form.get('iban')?.touched"
+            class="text-sm text-red-600">IBAN non valido: verificare formato e codice di controllo.</span>
         </label>
         <label class="block text-sm font-medium text-gray-700">
           BIC / SWIFT

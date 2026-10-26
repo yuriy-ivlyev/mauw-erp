@@ -4,6 +4,7 @@ using Mauw.Erp.Application.Validation;
 using Mauw.Erp.Contracts.Interfaces;
 using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Domain.Enums;
 using Mauw.Erp.Domain.Repositories;
 using Mauw.Erp.Domain.Services;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -236,6 +237,138 @@ public class DocumentAccountingServiceTests
         Assert.False(result.Success);
         Assert.False(string.IsNullOrWhiteSpace(result.Error));
         _fixture.UnitOfWork.Verify(work => work.SaveChangesAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task CassaSessionCreationPersistsPreparedFiscalTotals()
+    {
+        Order? created = null;
+        _fixture.UnitOfWork.Setup(work => work.Orders.AddAsync(It.IsAny<Order>()))
+            .Callback<Order>(order => created = order)
+            .Returns(Task.CompletedTask);
+        _fixture.UnitOfWork.Setup(work => work.Orders.GetCassaSessionWithItemsAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(() => created);
+
+        var result = await _fixture.OrderService.CreateCassaSessionAsync(new(
+            _fixture.Contact.Id, "Rif-1", "terminale-1",
+            [new(_fixture.Variant.Id, 2, 10m, 22m, 10)]));
+
+        Assert.True(result.Success, result.Error);
+        Assert.Equal("Cliente", result.Data!.ContactName);
+        Assert.Equal("Rif-1", result.Data.DocumentReference);
+        Assert.Single(result.Data.Items);
+        Assert.Equal(OrderStatus.Suspended, created!.Status);
+        Assert.Equal("terminale-1", created.TerminalId);
+        Assert.Equal(20m, created.TaxableTotal);
+        Assert.Equal(4.40m, created.VatTotal);
+        Assert.Equal(24.40m, created.GrossTotal);
+        _fixture.UnitOfWork.Verify(work => work.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task CassaSessionCreationRejectsUnknownCustomer()
+    {
+        var result = await _fixture.OrderService.CreateCassaSessionAsync(new(
+            Guid.NewGuid(), null, null, []));
+
+        Assert.False(result.Success);
+        Assert.Equal("Cliente non trovato", result.Error);
+        _fixture.UnitOfWork.Verify(work => work.Orders.AddAsync(It.IsAny<Order>()), Times.Never);
+        _fixture.UnitOfWork.Verify(work => work.SaveChangesAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task CassaSessionUpdateReplacesItemsAndPersistsTotals()
+    {
+        var order = new Order(_fixture.Contact.Id, "ORD-TEST");
+        _fixture.UnitOfWork.Setup(work => work.Orders.GetCassaSessionWithItemsAsync(order.Id))
+            .ReturnsAsync(order);
+        _fixture.UnitOfWork.Setup(work => work.Orders.UpdateAsync(order)).Returns(Task.CompletedTask);
+
+        var result = await _fixture.OrderService.UpdateCassaSessionAsync(order.Id, new(
+            _fixture.Contact.Id, "Rif-2", "terminale-2",
+            [new(_fixture.Variant.Id, 2, 10m, 22m, 10)]));
+
+        Assert.True(result.Success, result.Error);
+        Assert.Equal("Rif-2", order.DocumentReference);
+        Assert.Equal(OrderStatus.Suspended, order.Status);
+        Assert.Equal("terminale-2", order.TerminalId);
+        Assert.Equal(20m, order.TaxableTotal);
+        Assert.Equal(24.40m, order.GrossTotal);
+        Assert.Single(order.Items);
+        _fixture.UnitOfWork.Verify(work => work.Orders.UpdateAsync(order), Times.Once);
+        _fixture.UnitOfWork.Verify(work => work.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task CassaSessionUpdateRejectsMissingOrClosedSessions()
+    {
+        var orderId = Guid.NewGuid();
+        _fixture.UnitOfWork.Setup(work => work.Orders.GetCassaSessionWithItemsAsync(orderId))
+            .ReturnsAsync((Order?)null);
+        var missing = await _fixture.OrderService.UpdateCassaSessionAsync(orderId,
+            new(_fixture.Contact.Id, null, null, []));
+        Assert.Equal("Sessione non trovata", missing.Error);
+
+        var order = new Order(_fixture.Contact.Id, "ORD-CLOSED") { Status = OrderStatus.Confirmed };
+        _fixture.UnitOfWork.Setup(work => work.Orders.GetCassaSessionWithItemsAsync(order.Id))
+            .ReturnsAsync(order);
+        var closed = await _fixture.OrderService.UpdateCassaSessionAsync(order.Id,
+            new(_fixture.Contact.Id, null, null, []));
+        Assert.Equal("Non e possibile modificare una sessione confermata o terminata.", closed.Error);
+    }
+
+    [Fact]
+    public async Task CassaSessionCanResumeTerminateAndBeRead()
+    {
+        var order = new Order(_fixture.Contact.Id, "ORD-SESSION")
+        {
+            Status = OrderStatus.Suspended,
+            Contact = _fixture.Contact
+        };
+        _fixture.UnitOfWork.Setup(work => work.Orders.GetCassaSessionWithItemsAsync(order.Id))
+            .ReturnsAsync(order);
+        _fixture.UnitOfWork.Setup(work => work.Orders.GetByIdAsync(order.Id)).ReturnsAsync(order);
+        _fixture.UnitOfWork.Setup(work => work.Orders.UpdateAsync(order)).Returns(Task.CompletedTask);
+
+        var resumed = await _fixture.OrderService.ResumeCassaSessionAsync(order.Id, "terminal-3");
+        Assert.True(resumed.Success, resumed.Error);
+        Assert.Equal(OrderStatus.Draft, order.Status);
+        Assert.Equal("terminal-3", order.TerminalId);
+        var details = await _fixture.OrderService.GetCassaSessionAsync(order.Id);
+        var terminated = await _fixture.OrderService.TerminateCassaSessionAsync(order.Id);
+
+        Assert.Equal("Cliente", details.Data!.ContactName);
+        Assert.True(terminated.Success, terminated.Error);
+        Assert.Equal(OrderStatus.Terminated, order.Status);
+        _fixture.UnitOfWork.Verify(work => work.SaveChangesAsync(), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task CassaSessionReadersHandleMissingOrdersAndListSuspendedSessions()
+    {
+        var id = Guid.NewGuid();
+        _fixture.UnitOfWork.Setup(work => work.Orders.GetCassaSessionWithItemsAsync(id))
+            .ReturnsAsync((Order?)null);
+        _fixture.UnitOfWork.Setup(work => work.Orders.GetByIdAsync(id)).ReturnsAsync((Order?)null);
+        Assert.Equal("Sessione non trovata",
+            (await _fixture.OrderService.GetCassaSessionAsync(id)).Error);
+        Assert.Equal("Sessione non trovata",
+            (await _fixture.OrderService.ResumeCassaSessionAsync(id, null)).Error);
+        Assert.Equal("Sessione non trovata",
+            (await _fixture.OrderService.TerminateCassaSessionAsync(id)).Error);
+
+        var suspended = new Order(_fixture.Contact.Id, "ORD-SUSPENDED") { Contact = _fixture.Contact };
+        suspended.Items.Add(new OrderItem(suspended.Id, _fixture.Variant.Id, 1, 10m, 22m));
+        _fixture.UnitOfWork.Setup(work => work.Orders.GetSuspendedCassaSessionsAsync())
+            .ReturnsAsync([suspended]);
+
+        var result = await _fixture.OrderService.GetSuspendedSessionsAsync();
+
+        var summary = Assert.Single(result.Data!);
+        Assert.Equal("ORD-SUSPENDED", summary.SessionCode);
+        Assert.Equal("Cliente", summary.ContactName);
+        Assert.Equal(1, summary.CartItemCount);
     }
 
     private sealed class Fixture

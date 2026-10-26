@@ -1,4 +1,5 @@
 import '../../../locale';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, Subject } from 'rxjs';
 import { Order } from '../../../models/order.model';
@@ -84,5 +85,21 @@ describe('OrdiniElencoComponent', () => {
     fixture.destroy();
     expect(pdf.observed).toBeFalse();
     expect(component.downloadingPdf).toBeNull();
+  });
+
+  it('displays the API reason when the PDF request fails with a server validation error', async () => {
+    fixture.detectChanges();
+    fixture.componentInstance.downloadPdf('order', 'order-0', 'ordine.pdf');
+    const body = new Blob(['Configurare il capitale sociale in Impostazioni > Azienda.']);
+    pdf.error(new HttpErrorResponse({
+      status: 400,
+      error: body
+    }));
+
+    await body.text();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[role="alert"]').textContent)
+      .toContain('Configurare il capitale sociale in Impostazioni > Azienda');
   });
 });

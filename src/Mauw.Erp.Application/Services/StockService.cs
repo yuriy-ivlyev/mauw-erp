@@ -17,8 +17,10 @@ public class StockService(
         if (!Enum.IsDefined(typeof(StockMovementReason), command.Reason))
             return OperationResult<StockItemDto>.Fail("Invalid stock movement reason");
 
-        if (command.Quantity == 0)
+        if (command.Quantity == 0m)
             return OperationResult<StockItemDto>.Fail("Quantity must be different from zero");
+        if (command.Quantity != decimal.Truncate(command.Quantity))
+            return OperationResult<StockItemDto>.Fail("La quantita di merce deve essere un numero intero.");
 
         var warehouse = await unitOfWork.Warehouses.GetByIdAsync(command.WarehouseId);
         if (warehouse is null)
@@ -85,8 +87,10 @@ public class StockService(
         if (command.SourceWarehouseId == command.TargetWarehouseId)
             return OperationResult<bool>.Fail("Source and target warehouses must be different");
 
-        if (command.Quantity <= 0)
+        if (command.Quantity <= 0m)
             return OperationResult<bool>.Fail("Quantity must be greater than zero");
+        if (command.Quantity != decimal.Truncate(command.Quantity))
+            return OperationResult<bool>.Fail("La quantita di trasferimento deve essere un numero intero.");
 
         var sourceWarehouse = await unitOfWork.Warehouses.GetByIdAsync(command.SourceWarehouseId);
         if (sourceWarehouse is null)

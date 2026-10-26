@@ -70,7 +70,7 @@ public class PriceListServiceTests(PostgreSqlContainerFixture postgres)
         var calculator = new ItalianAccountingCalculator();
         var repository = new Mock<IPriceListRepository>();
         var list = PriceList.Create("Test", "EUR", true,
-            [new(null, PriceCalculationType.PercentageDiscount, 10m, MinimumQuantity: 0.25m)]).Data!;
+            [new(null, PriceCalculationType.PercentageDiscount, 10m, MinimumQuantity: 1m)]).Data!;
         var product = new Product(Guid.NewGuid(), "S", "P", "Product", 22m, 10m);
         var variant = new ProductVariant(product.Id, "SKU", 10m, product.SupplierId)
         {
@@ -86,7 +86,7 @@ public class PriceListServiceTests(PostgreSqlContainerFixture postgres)
         var result = await service.ResolveAsync(new()
         {
             PriceListId = list.Id,
-            Lines = Enumerable.Range(0, 1000).Select(_ => new ResolvePriceLineRequest(variant.Id, 0.5m)).ToList()
+            Lines = Enumerable.Range(0, 1000).Select(_ => new ResolvePriceLineRequest(variant.Id, 1m)).ToList()
         }, default);
         Assert.True(result.Success, result.Error);
         Assert.Equal(1000, result.Data!.Lines.Count);

@@ -35,6 +35,7 @@ public class StockMovement : Entity<Guid>
         string? referenceDoc = null
     ) : base()
     {
+        EnsureWholeQuantity(quantity);
         VariantId = variantId;
         Type = type;
         Quantity = quantity;
@@ -54,8 +55,9 @@ public class StockMovement : Entity<Guid>
         string? createdByUserId = null,
         string? documentReference = null) : base()
     {
-        VariantId = variantId;
-        WarehouseId = warehouseId;
+            EnsureWholeQuantity(quantity);
+            VariantId = variantId;
+            WarehouseId = warehouseId;
         Reason = reason;
         Type = StockMovementType.InventoryAdjustment;
         Quantity = (int)Math.Round(Math.Abs(quantity));
@@ -186,4 +188,10 @@ public class StockMovement : Entity<Guid>
         StockMovementType.InventoryAdjustment => null,
         _ => null
     };
+
+    private static void EnsureWholeQuantity(decimal quantity)
+    {
+        if (quantity != decimal.Truncate(quantity))
+            throw new Mauw.Erp.Domain.Exceptions.DomainException("La quantita di merce deve essere un numero intero.");
+    }
 }

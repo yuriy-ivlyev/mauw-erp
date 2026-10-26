@@ -76,7 +76,7 @@ public class PostgreSqlPriceListTests(PostgreSqlContainerFixture postgres)
             Rules = [new()
             {
                 CalculationType = PriceCalculationType.FixedPrice, Value = 18.83606557m,
-                VariantId = variant.Id, MinimumQuantity = 0.25m,
+                VariantId = variant.Id, MinimumQuantity = 1m,
                 ValidFrom = DateTimeOffset.UtcNow.AddDays(-1)
             }]
         }, default);

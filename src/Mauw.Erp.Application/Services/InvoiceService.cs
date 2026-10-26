@@ -202,21 +202,24 @@ public class InvoiceService(
         var agent = await DocumentPdfMapper.GetAgentAsync(unitOfWork, invoice.ContactId);
         if (!agent.Success)
             return OperationResult<InvoicePdfModel>.Fail(agent.Error!);
-        var companyResult = await companySettingsService.GetCompanyAsync();
-        var company = companyResult.Success ? companyResult.Data : null;
+        var companyResult = DocumentPdfMapper.RequireCompanyForPdf(
+            await companySettingsService.GetCompanyAsync());
+        if (!companyResult.Success)
+            return OperationResult<InvoicePdfModel>.Fail(companyResult.Error!);
+        var company = companyResult.Data!;
         var sellerAddress = company?.LegalHeadquarters
             ?? company?.OperationalSites.FirstOrDefault(s => s.IsMainOperationalSite)
             ?? company?.OperationalSites.FirstOrDefault();
         var customerAddress = invoice.Contact?.LegalHeadquarters ?? invoice.Contact?.Addresses.FirstOrDefault();
 
         var lines = invoice.Items.Select(item => new InvoicePdfLineModel(
-            Sku: item.Variant?.Barcode ?? string.Empty,
+            Sku: item.Variant?.Product?.SupplierCode ?? item.Variant?.Barcode ?? string.Empty,
             Description: string.Join(" ",
                     new[]
                     {
                         item.Variant?.Product?.Name,
-                        item.Variant?.Size?.Name,
-                        item.Variant?.Color?.Name
+                        item.Variant?.Color?.Name,
+                        item.Variant?.Size?.Name
                     }.Where(part => !string.IsNullOrWhiteSpace(part)))
                 .Trim(),
             SeasonCollection: null,
@@ -225,7 +228,10 @@ public class InvoiceService(
             DiscountPercent: item.DiscountPercent,
             VatRate: item.VatRate,
             LineTotal: item.LineNetTotal,
-            NatureCode: item.NatureCode
+            NatureCode: item.NatureCode,
+            ModelCode: item.Variant?.Product?.SupplierCode,
+            Color: item.Variant?.Color?.Name,
+            Size: item.Variant?.Size?.Name
         )).ToList();
 
         var accounting = accountingCalculator.Calculate(invoice.Items.Select(item => new DocumentLineInput(
@@ -253,7 +259,14 @@ public class InvoiceService(
             Currency: "EUR",
             Seller: BuildSeller(company, sellerAddress),
             Customer: BuildCustomer(invoice.Contact, customerAddress),
-            Payment: new InvoicePdfPaymentInfo("A vista", "MP01", null, company?.Iban, company?.BicSwift, company?.BankName),
+            Payment: new InvoicePdfPaymentInfo(
+                "A vista",
+                "MP01",
+                DateOnly.FromDateTime(invoice.InvoiceDate),
+                company?.Iban,
+                company?.BicSwift,
+                company?.BankName,
+                calculated.TotalGross),
             Lines: lines,
             VatSummary: vatSummary,
             Totals: new InvoicePdfTotals(
@@ -272,8 +285,11 @@ public class InvoiceService(
         var agent = await DocumentPdfMapper.GetAgentAsync(unitOfWork, relatedInvoice.ContactId);
         if (!agent.Success)
             return OperationResult<InvoicePdfModel>.Fail(agent.Error!);
-        var companyResult = await companySettingsService.GetCompanyAsync();
-        var company = companyResult.Success ? companyResult.Data : null;
+        var companyResult = DocumentPdfMapper.RequireCompanyForPdf(
+            await companySettingsService.GetCompanyAsync());
+        if (!companyResult.Success)
+            return OperationResult<InvoicePdfModel>.Fail(companyResult.Error!);
+        var company = companyResult.Data!;
         var sellerAddress = company?.LegalHeadquarters
             ?? company?.OperationalSites.FirstOrDefault(s => s.IsMainOperationalSite)
             ?? company?.OperationalSites.FirstOrDefault();
@@ -347,7 +363,11 @@ public class InvoiceService(
             TaxRegime: company?.FiscalRegime ?? "RF01 - Ordinario",
             SdiCode: company?.SdiCode,
             Pec: company?.PecEmail,
-            IsShareCapitalFullyPaid: company?.IsShareCapitalFullyPaid ?? false
+            IsShareCapitalFullyPaid: company?.IsShareCapitalFullyPaid ?? false,
+            ReaOffice: company?.ReaOffice,
+            LegalForm: "Società a responsabilità limitata",
+            IsSoleShareholder: company?.IsSoleShareholder,
+            IsInLiquidation: company?.IsInLiquidation ?? false
         );
 
     private static InvoicePdfCustomerDetails BuildCustomer(Contact? contact, ContactAddress? customerAddress) =>

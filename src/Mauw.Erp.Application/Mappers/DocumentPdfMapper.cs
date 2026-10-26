@@ -1,4 +1,5 @@
 using Mauw.Erp.Application.Services;
+using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Dtos.Pdf;
 using Mauw.Erp.Domain.Repositories;
 
@@ -6,6 +7,19 @@ namespace Mauw.Erp.Application.Mappers;
 
 internal static class DocumentPdfMapper
 {
+    public static OperationResult<CompanySettingsDto> RequireCompanyForPdf(
+        OperationResult<CompanySettingsDto> companyResult)
+    {
+        if (!companyResult.Success || companyResult.Data is null)
+            return OperationResult<CompanySettingsDto>.Fail(
+                companyResult.Error ?? "Anagrafica aziendale non disponibile.");
+        if (companyResult.Data.ShareCapital is not > 0m)
+            return OperationResult<CompanySettingsDto>.Fail(
+                "Configurare il capitale sociale in Impostazioni > Azienda prima di generare il PDF; " +
+                "indicare il versamento integrale solo se applicabile.");
+        return companyResult;
+    }
+
     public static async Task<OperationResult<InvoicePdfAgentInfo?>> GetAgentAsync(
         IUnitOfWork unitOfWork, Guid customerId)
     {

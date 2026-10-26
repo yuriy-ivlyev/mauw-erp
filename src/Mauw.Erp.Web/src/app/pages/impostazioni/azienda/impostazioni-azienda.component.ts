@@ -1,6 +1,15 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  ReactiveFormsModule,
+  FormsModule,
+  FormBuilder,
+  FormGroup,
+  ValidationErrors,
+  ValidatorFn,
+  Validators
+} from '@angular/forms';
 import { CompanySettingsService } from '../../../services/company-settings.service';
 import { CompanySettings, CompanyAddressSite, CompanyAddressSiteRequest } from '../../../models/company-settings.model';
 import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
@@ -9,6 +18,21 @@ import { PaginationComponent } from '../../../shared/pagination/pagination.compo
 import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
 import { SortChange } from '../../../models/pagination.model';
 import { sortRows } from '../../../shared/sort-rows';
+
+const ibanChecksumValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
+  const iban = String(control.value ?? '').replace(/\s/g, '').toUpperCase();
+  if (!iban) return null;
+  if (iban.length < 15 || iban.length > 34 || !/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(iban)) {
+    return { ibanInvalid: true };
+  }
+
+  let remainder = 0;
+  for (const character of iban.slice(4) + iban.slice(0, 4)) {
+    const digits = character >= 'A' ? String(character.charCodeAt(0) - 55) : character;
+    for (const digit of digits) remainder = (remainder * 10 + Number(digit)) % 97;
+  }
+  return remainder === 1 ? null : { ibanInvalid: true };
+};
 
 @Component({
   selector: 'app-impostazioni-azienda',
@@ -109,7 +133,7 @@ export class ImpostazioniAziendaComponent implements OnInit {
       shareCapital:      [null],
       isShareCapitalFullyPaid: [false],
       bankName:          ['', Validators.maxLength(250)],
-      iban:              ['', Validators.maxLength(42)],
+      iban:              ['', [Validators.maxLength(42), ibanChecksumValidator]],
       bicSwift:          ['', Validators.maxLength(11)],
       invoiceNotes:      ['', Validators.maxLength(4000)],
       isSoleShareholder: [null],

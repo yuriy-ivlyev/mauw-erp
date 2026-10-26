@@ -30,7 +30,8 @@ public class CompanyInvoiceSettingsTests(PostgreSqlContainerFixture postgres)
 
     private static UpdateCompanySettingsRequest Request() => new()
     {
-        BusinessName = "Mauw", ShareCapital = 10000.00m, IsShareCapitalFullyPaid = true,
+        BusinessName = "Mauw", ReaNumber = "591450", ReaOffice = "BO",
+        ShareCapital = 10000.00m, IsShareCapitalFullyPaid = true, IsSoleShareholder = true,
         BankName = " Banca Prova ", Iban = "it60 x054 2811 1010 0000 0123 456",
         BicSwift = "bpititmm", InvoiceNotes = $" {Notes} ",
         LegalHeadquarters = new() { Street = "Via Roma 1", ZipCode = "00100", City = "Roma" }
@@ -201,14 +202,50 @@ public class CompanyInvoiceSettingsTests(PostgreSqlContainerFixture postgres)
         var leftColumnText = string.Join(" ", document.GetPages().SelectMany(page => page.GetWords())
             .Where(word => word.BoundingBox.Left < 12.0 / 2.54 * 72.0).Select(word => word.Text));
         Assert.Contains("10.000,00", text);
-        Assert.Equal(fullyPaid, text.Contains("I.V."));
+        Assert.Contains("Capitale sociale", text);
+        Assert.Equal(fullyPaid, text.Contains("i.v."));
+        Assert.Contains("BO-591450", text);
+        Assert.Contains("Soci: socio unico", text);
         Assert.Equal(hasAgent, text.Contains("Rossi Rappresentanze"));
-        Assert.Equal(hasAgent, leftColumnText.Contains("Provvigione a ns. carico, nessun addebito al committente"));
+        Assert.Equal(hasAgent, leftColumnText.Contains("Provvigione") && leftColumnText.Contains("committente"));
         Assert.Equal(hasInvoiceDetails, text.Contains("IT60X0542811101000000123456"));
         Assert.Equal(hasInvoiceDetails, text.Contains("BPITITMM"));
         Assert.Equal(hasInvoiceDetails, text.Contains("Banca Prova"));
         Assert.Equal(hasInvoiceDetails, text.Contains("Trascorsi 8 giorni"));
-        Assert.DoesNotContain("trasmesso tramite", text);
+        var isFiscalDocument = type is "TD01" or "NOTA CREDITO";
+        Assert.Equal(isFiscalDocument, text.Contains("trasmesso tramite"));
+    }
+
+    [Fact]
+    public async Task InvoicePdfFailsWhenCompanyCapitalIsMissing()
+    {
+        await using var db = CreateDb();
+        var company = new Contact("Mauw") { IsInternalCompany = true };
+        company.SetLegalHeadquarters("Via Roma 1", "00100", "Roma");
+        var customer = new Contact("Cliente");
+        customer.EnableAsCustomer();
+        db.AddRange(company, customer);
+        await db.SaveChangesAsync();
+        db.Add(new Invoice(customer.Id, "F-1"));
+        await db.SaveChangesAsync();
+
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var work = new UnitOfWork(db, cache);
+        var settings = new CompanySettingsService(work, cache, NullLogger<CompanySettingsService>.Instance);
+        var calculator = new ItalianAccountingCalculator();
+        var service = new InvoiceService(
+            work,
+            Mock.Of<Mauw.Erp.Application.Validation.IValidator<CreateInvoiceRequest>>(),
+            calculator,
+            settings,
+            Mock.Of<IInvoicePdfGenerator>(),
+            Mock.Of<IDocumentPricingService>());
+
+        var result = await service.GetInvoicePdfAsync(
+            (await db.Invoices.SingleAsync()).Id);
+
+        Assert.False(result.Success);
+        Assert.Contains("capitale sociale", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -11,6 +11,9 @@ public class StockMovementConfiguration : IEntityTypeConfiguration<StockMovement
 {
     public void Configure(EntityTypeBuilder<StockMovement> builder)
     {
+        builder.ToTable("stock_movements", table => table.HasCheckConstraint(
+            "ck_stock_movements_whole_quantity_delta",
+            "quantity_delta IS NULL OR quantity_delta = trunc(quantity_delta)"));
         builder.HasKey(sm => sm.Id);
 
         builder.Property(sm => sm.Type)
