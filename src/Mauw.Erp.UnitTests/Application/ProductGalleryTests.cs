@@ -26,7 +26,8 @@ public class ProductGalleryTests : IDisposable
         _db = postgres.CreateDbContext();
         var repository = new ProductVariantImageRepository(_db);
         _images = new ImageApplicationService(repository, _storage.Object, NullLogger<ImageApplicationService>.Instance);
-        _products = new ProductService(new UnitOfWork(_db, _cache), new CreateProductRequestValidator(), new(), _images);
+        _products = new ProductService(
+            new UnitOfWork(_db, _cache), new CreateProductRequestValidator(new()), new(), _images);
     }
 
     public void Dispose() { _db.Dispose(); _cache.Dispose(); }

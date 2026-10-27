@@ -1,11 +1,12 @@
 using Mauw.Erp.Contracts.Requests;
+using Mauw.Erp.Domain.Services;
 
 namespace Mauw.Erp.Application.Validation;
 
 /// <summary>
 /// Validator for CreateProductRequest without reflection.
 /// </summary>
-public class CreateProductRequestValidator : IValidator<CreateProductRequest>
+public class CreateProductRequestValidator(CatalogPriceCalculator catalogPrices) : IValidator<CreateProductRequest>
 {
     public ValidationResult Validate(CreateProductRequest request)
     {
@@ -37,7 +38,7 @@ public class CreateProductRequestValidator : IValidator<CreateProductRequest>
             errors.Add(new(nameof(request.VatRate), "VAT rate must be between 0 and 100"));
         if (!request.HasVariants)
         {
-            var pricing = new Mauw.Erp.Domain.Services.CatalogPriceCalculator().Validate(request.SellingPrice);
+            var pricing = catalogPrices.Validate(request.SellingPrice);
             if (!pricing.Success)
                 errors.Add(new(nameof(request.SellingPrice), pricing.Error));
         }

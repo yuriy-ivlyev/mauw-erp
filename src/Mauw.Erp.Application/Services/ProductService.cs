@@ -24,13 +24,6 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             var errors = string.Join("; ", validationResult.Errors.Select(e => $"{e.PropertyName}: {e.Message}"));
             return OperationResult<ProductDto>.Fail(errors);
         }
-        if (!request.HasVariants)
-        {
-            var pricing = catalogPrices.Validate(request.SellingPrice);
-            if (!pricing.Success)
-                return OperationResult<ProductDto>.Fail(pricing.Error);
-        }
-
         var product = new Product(
             supplierId: request.SupplierId,
             supplierCode: request.SupplierCode,
@@ -62,7 +55,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         }
         await unitOfWork.SaveChangesAsync();
 
-        return ProductMapper.MapToDto(product);
+        return ProductMapper.MapToDto(product, catalogPrices);
     }
 
     public async Task<OperationResult<ProductDto>> GetProductAsync(Guid id)
@@ -71,7 +64,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         if (product == null)
             return OperationResult<ProductDto>.Fail("Product not found");
 
-        var dto = ProductMapper.MapToDto(product);
+        var dto = ProductMapper.MapToDto(product, catalogPrices);
         if (!dto.Success)
             return dto;
 
@@ -87,7 +80,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         var products = (await unitOfWork.Products.GetPaginatedAsync(page, pageSize, search, sortBy, sortDescending)).ToList();
         var total = await unitOfWork.Products.GetTotalCountAsync(search);
 
-        var dtos = ProductMapper.MapToListDto(products);
+        var dtos = ProductMapper.MapToListDto(products, catalogPrices);
         if (!dtos.Success)
             return OperationResult<PagedResult<ProductDto>>.Fail(dtos.Error!);
         var result = new PagedResult<ProductDto>(await WithThumbnailsAsync(products, dtos.Data!), page, pageSize, total);
@@ -110,12 +103,6 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
 
         if (product.HasVariants != request.HasVariants && product.Variants.Count > 0)
             return OperationResult<ProductDto>.Fail("Non e possibile cambiare tipologia a un prodotto con SKU gia presenti.");
-        if (!request.HasVariants)
-        {
-            var pricing = catalogPrices.Validate(request.SellingPrice);
-            if (!pricing.Success)
-                return OperationResult<ProductDto>.Fail(pricing.Error);
-        }
         var previousSupplierCode = product.SupplierCode;
         product.Update(
             supplierId: request.SupplierId,
@@ -160,7 +147,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         }
 
         var updated = await unitOfWork.Products.GetByIdAsync(id);
-        return ProductMapper.MapToDto(updated!);
+        return ProductMapper.MapToDto(updated!, catalogPrices);
     }
 
     public async Task<OperationResult<bool>> DeleteProductAsync(Guid id)
@@ -190,7 +177,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         if (variant?.Product == null)
             return OperationResult<BarcodeVariantDto>.Fail("Variant not found");
 
-        return ProductMapper.MapBarcodeVariantToDto(variant, variant.Product);
+        return ProductMapper.MapBarcodeVariantToDto(variant, variant.Product, catalogPrices);
     }
 
     public async Task<OperationResult<bool>> SetVarianteVetrinaAsync(Guid productId, Guid variantId, bool value)
@@ -283,7 +270,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
             return OperationResult<ProductVariantDto>.Fail($"Failed to create variant: {ex.Message}");
         }
 
-        return ProductMapper.MapVariantToDto(variant, product);
+        return ProductMapper.MapVariantToDto(variant, product, catalogPrices);
     }
 
     public async Task<OperationResult<List<ProductVariantDto>>> GetProductVariantsAsync(Guid productId)
@@ -295,7 +282,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         var variants = new List<ProductVariantDto>();
         foreach (var variant in product.Variants)
         {
-            var result = ProductMapper.MapVariantToDto(variant, product);
+            var result = ProductMapper.MapVariantToDto(variant, product, catalogPrices);
             if (!result.Success)
                 return OperationResult<List<ProductVariantDto>>.Fail(result.Error!);
             variants.Add(result.Data!);
@@ -368,7 +355,7 @@ public class ProductService(IUnitOfWork unitOfWork, IValidator<CreateProductRequ
         }
 
         var updated = await unitOfWork.ProductVariants.GetByIdAsync(variantId);
-        return ProductMapper.MapVariantToDto(updated!, product);
+        return ProductMapper.MapVariantToDto(updated!, product, catalogPrices);
     }
 
     private static string? NormalizeSupplierCode(string? supplierCode) =>

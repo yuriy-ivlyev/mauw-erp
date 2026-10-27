@@ -1,5 +1,6 @@
 using Mauw.Erp.Application.Mappers;
 using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Domain.Services;
 using Mauw.Erp.Infrastructure.DbContext;
 using Mauw.Erp.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -81,7 +82,10 @@ public class ProductBarcodeLookupTests(PostgreSqlContainerFixture postgres)
         Assert.Equal(variant.Id, byVariantBarcode?.Id);
         Assert.Contains(simpleSearch, result => result.Id == simpleVariant.Id);
         Assert.Null(parentBarcodeLookup);
-        Assert.Equal(barcode, ProductMapper.MapVariantToDto(simpleVariant, simpleProduct).Data!.Barcode);
-        Assert.Equal(barcode, ProductMapper.MapBarcodeVariantToDto(simpleVariant, simpleProduct).Data!.Barcode);
+        var catalogPrices = new CatalogPriceCalculator();
+        Assert.Equal(barcode,
+            ProductMapper.MapVariantToDto(simpleVariant, simpleProduct, catalogPrices).Data!.Barcode);
+        Assert.Equal(barcode,
+            ProductMapper.MapBarcodeVariantToDto(simpleVariant, simpleProduct, catalogPrices).Data!.Barcode);
     }
 }

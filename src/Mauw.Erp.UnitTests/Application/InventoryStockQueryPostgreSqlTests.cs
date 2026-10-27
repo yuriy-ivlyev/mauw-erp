@@ -508,4 +508,97 @@ public sealed class InventoryStockQueryPostgreSqlTests(PostgreSqlContainerFixtur
             .ToListAsync();
         Assert.All(unchangedMovements, movement => Assert.Null(movement.QuantityDelta));
     }
+
+    [Fact]
+    public async Task GetAmbiguousMovementsAsync_UsesOnlySparseWarehouseVariantPairs()
+    {
+        var database = postgres.CreateDatabase();
+        Guid firstWarehouseId;
+        Guid secondWarehouseId;
+        Guid firstVariantId;
+        Guid secondVariantId;
+        Guid firstMovementId;
+        Guid secondMovementId;
+
+        await using (var seed = database.CreateDbContext())
+        {
+            var supplier = new Contact("Fornitore coppie sparse");
+            supplier.EnableAsSupplier();
+            seed.Add(supplier);
+            await seed.SaveChangesAsync();
+
+            var firstAddress = new ContactAddress(supplier.Id, AddressPurpose.LegalHeadquarters,
+                "Via Test 1", "20100", "Milano");
+            var secondAddress = new ContactAddress(supplier.Id, AddressPurpose.OperationalSite,
+                "Via Test 2", "20100", "Milano");
+            seed.AddRange(firstAddress, secondAddress);
+            await seed.SaveChangesAsync();
+
+            var code = Guid.NewGuid().ToString("N");
+            var firstWarehouse = new Warehouse($"SP-A-{code}"[..12], "Deposito A",
+                WarehouseType.Standard, firstAddress.Id, isSellable: true);
+            var secondWarehouse = new Warehouse($"SP-B-{code}"[..12], "Deposito B",
+                WarehouseType.Standard, secondAddress.Id, isSellable: true);
+            var product = new Product(supplier.Id, code, code, "Articolo coppie sparse", 22m, 9m);
+            seed.AddRange(firstWarehouse, secondWarehouse, product);
+            await seed.SaveChangesAsync();
+
+            var firstVariant = new ProductVariant(product.Id, $"SP-A-{code}", 9m, supplier.Id);
+            var secondVariant = new ProductVariant(product.Id, $"SP-B-{code}", 9m, supplier.Id);
+            seed.AddRange(firstVariant, secondVariant);
+            await seed.SaveChangesAsync();
+
+            var firstAmbiguous = new StockMovement(firstVariant.Id, firstWarehouse.Id,
+                StockMovementReason.InventoryAdjustment, 3m);
+            var secondAmbiguous = new StockMovement(secondVariant.Id, secondWarehouse.Id,
+                StockMovementReason.InventoryAdjustment, 4m);
+            var crossedKnownMovement = new StockMovement(secondVariant.Id, firstWarehouse.Id,
+                StockMovementReason.SupplierReceipt, 50m);
+            seed.AddRange(
+                firstAmbiguous,
+                secondAmbiguous,
+                crossedKnownMovement,
+                new StockItem(firstWarehouse.Id, firstVariant.Id, 3m),
+                new StockItem(firstWarehouse.Id, secondVariant.Id, 100m),
+                new StockItem(secondWarehouse.Id, firstVariant.Id, 200m),
+                new StockItem(secondWarehouse.Id, secondVariant.Id, 4m));
+            await seed.SaveChangesAsync();
+            await seed.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE stock_movements SET quantity_delta = NULL WHERE id = {firstAmbiguous.Id}");
+            await seed.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE stock_movements SET quantity_delta = NULL WHERE id = {secondAmbiguous.Id}");
+
+            firstWarehouseId = firstWarehouse.Id;
+            secondWarehouseId = secondWarehouse.Id;
+            firstVariantId = firstVariant.Id;
+            secondVariantId = secondVariant.Id;
+            firstMovementId = firstAmbiguous.Id;
+            secondMovementId = secondAmbiguous.Id;
+        }
+
+        await using var db = database.CreateDbContext();
+        var result = await new InventoryStockQueryService(db).GetAmbiguousMovementsAsync();
+
+        Assert.True(result.Success, result.Error);
+        Assert.Equal(2, result.Data!.TotalCount);
+        Assert.Equal(
+            new[] { (firstWarehouseId, firstMovementId), (secondWarehouseId, secondMovementId) }
+                .OrderBy(item => item.Item1)
+                .Select(item => item.Item2),
+            result.Data.Items.Select(item => item.MovementId));
+
+        var first = Assert.Single(result.Data.Items, item => item.MovementId == firstMovementId);
+        Assert.Equal(firstVariantId, first.ProductVariantId);
+        Assert.Equal(3m, first.StockQuantityOnHand);
+        Assert.Equal(0m, first.KnownMovementsQuantity);
+        Assert.Equal(3m, first.UnexplainedQuantity);
+        Assert.Equal(3m, first.ProposedQuantityDelta);
+
+        var second = Assert.Single(result.Data.Items, item => item.MovementId == secondMovementId);
+        Assert.Equal(secondVariantId, second.ProductVariantId);
+        Assert.Equal(4m, second.StockQuantityOnHand);
+        Assert.Equal(0m, second.KnownMovementsQuantity);
+        Assert.Equal(4m, second.UnexplainedQuantity);
+        Assert.Equal(4m, second.ProposedQuantityDelta);
+    }
 }

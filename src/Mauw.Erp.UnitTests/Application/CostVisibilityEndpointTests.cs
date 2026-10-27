@@ -64,7 +64,6 @@ public sealed class CostVisibilityHost : IAsyncLifetime
         var services = builder.Services;
         services.AddDbContext<MauwDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IValidator<CreateProductRequest>, CreateProductRequestValidator>();
-        services.AddScoped<IValidator<CreateProductVariantRequest>, CreateProductVariantRequestValidator>();
         services.AddScoped<IValidator<CreateContactRequest>, CreateContactRequestValidator>();
         services.AddScoped<IValidator<UpdateContactRequest>, UpdateContactRequestValidator>();
         services.AddScoped<IValidator<CreateOrderRequest>, CreateOrderRequestValidator>();

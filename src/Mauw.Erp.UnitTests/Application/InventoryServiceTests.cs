@@ -200,7 +200,8 @@ public class InventoryServiceTests
         unitOfWork.SetupGet(work => work.Stock).Returns(stock.Object);
         var service = new InventoryService(
             unitOfWork.Object,
-            new BarcodeScanRequestValidator());
+            new BarcodeScanRequestValidator(),
+            new CatalogPriceCalculator());
         return (service, unitOfWork, variants, movements, stock);
     }
 

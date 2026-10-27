@@ -268,6 +268,19 @@ public class AddressAndVatProviderTests
     }
 
     [Fact]
+    public async Task PhotonPropagatesUnexpectedProviderErrors()
+    {
+        var service = CreatePhotonService(_ => Task.FromResult(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{invalid json", Encoding.UTF8, "application/json")
+            })).Service;
+
+        await Assert.ThrowsAsync<System.Text.Json.JsonException>(() =>
+            service.AutocompleteAsync("Via Roma", "session"));
+    }
+
+    [Fact]
     public async Task GeocodingFallbackUsesPhotonWithoutKeyAndAfterGoogleFailures()
     {
         var photon = CreatePhotonService(_ => Task.FromResult(JsonResponse("""
@@ -287,6 +300,52 @@ public class AddressAndVatProviderTests
         var afterGoogleFailure = await configured.AutocompleteAsync("Roma", "session");
         Assert.Equal("osm:55", Assert.Single(afterGoogleFailure).PlaceId);
         Assert.NotNull(await configured.GetPlaceDetailsAsync("osm:55", "session"));
+    }
+
+    [Fact]
+    public async Task GeocodingCallerCancellationDoesNotFallBackToPhoton()
+    {
+        var photonCalled = false;
+        var photon = CreatePhotonService(_ =>
+        {
+            photonCalled = true;
+            return Task.FromResult(JsonResponse("""{"features":[]}"""));
+        }).Service;
+        var google = CreateGoogleService(_ =>
+            Task.FromException<HttpResponseMessage>(new HttpRequestException("offline")));
+        var fallback = new FallbackGeocodingService(google, photon,
+            Options.Create(new GooglePlacesSettings { ApiKey = "configured" }),
+            NullLogger<FallbackGeocodingService>.Instance);
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            fallback.AutocompleteAsync("Roma", "session", ct: cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            fallback.GetPlaceDetailsAsync("place-1", "session", cancellation.Token));
+
+        Assert.False(photonCalled);
+    }
+
+    [Fact]
+    public async Task GeocodingFallbackDoesNotHideUnexpectedGoogleErrors()
+    {
+        var photonCalled = false;
+        var photon = CreatePhotonService(_ =>
+        {
+            photonCalled = true;
+            return Task.FromResult(JsonResponse("""{"features":[]}"""));
+        }).Service;
+        var google = CreateGoogleService(_ =>
+            Task.FromException<HttpResponseMessage>(new InvalidOperationException("unexpected")));
+        var fallback = new FallbackGeocodingService(google, photon,
+            Options.Create(new GooglePlacesSettings { ApiKey = "configured" }),
+            NullLogger<FallbackGeocodingService>.Instance);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            fallback.AutocompleteAsync("Roma", "session"));
+
+        Assert.False(photonCalled);
     }
 
     [Fact]

@@ -67,6 +67,19 @@ public class OrderRepository(MauwDbContext dbContext) : Repository<Order, Guid>(
             .Include(o => o.Items).ThenInclude(i => i.Variant).ThenInclude(v => v.Size)
             .FirstOrDefaultAsync(o => o.Id == id);
 
+    public async Task AddWithNextNumberAsync(Order order, string prefix)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync();
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({prefix}, 0))");
+
+        var count = await _dbSet.CountAsync(o => o.OrderNumber.StartsWith(prefix));
+        order.OrderNumber = $"{prefix}{count + 1:D3}";
+        await _dbSet.AddAsync(order);
+        await _dbContext.SaveChangesAsync();
+        await transaction.CommitAsync();
+    }
+
     public async Task<(IEnumerable<Order> Items, int Total)> GetAllPagedAsync(
         string? search, string? status, string? orderType, int page, int pageSize, string? sortBy = null, bool sortDescending = false)
     {

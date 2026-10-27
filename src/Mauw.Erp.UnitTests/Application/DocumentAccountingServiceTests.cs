@@ -87,7 +87,8 @@ public class DocumentAccountingServiceTests
             [new(_fixture.Variant.Id, 1, 10m, 22m, 10), new(_fixture.Variant.Id, 1, 10m, 0m, 10)]));
 
         Assert.False(result.Success);
-        _fixture.UnitOfWork.Verify(work => work.Orders.AddAsync(It.IsAny<Order>()), Times.Never);
+        _fixture.UnitOfWork.Verify(work => work.Orders.AddWithNextNumberAsync(
+            It.IsAny<Order>(), It.IsAny<string>()), Times.Never);
         _fixture.UnitOfWork.Verify(work => work.SaveChangesAsync(), Times.Never);
     }
 
@@ -243,8 +244,13 @@ public class DocumentAccountingServiceTests
     public async Task CassaSessionCreationPersistsPreparedFiscalTotals()
     {
         Order? created = null;
-        _fixture.UnitOfWork.Setup(work => work.Orders.AddAsync(It.IsAny<Order>()))
-            .Callback<Order>(order => created = order)
+        _fixture.UnitOfWork.Setup(work => work.Orders.AddWithNextNumberAsync(
+                It.IsAny<Order>(), It.IsAny<string>()))
+            .Callback<Order, string>((order, prefix) =>
+            {
+                order.OrderNumber = $"{prefix}001";
+                created = order;
+            })
             .Returns(Task.CompletedTask);
         _fixture.UnitOfWork.Setup(work => work.Orders.GetCassaSessionWithItemsAsync(It.IsAny<Guid>()))
             .ReturnsAsync(() => created);
@@ -262,7 +268,8 @@ public class DocumentAccountingServiceTests
         Assert.Equal(20m, created.TaxableTotal);
         Assert.Equal(4.40m, created.VatTotal);
         Assert.Equal(24.40m, created.GrossTotal);
-        _fixture.UnitOfWork.Verify(work => work.SaveChangesAsync(), Times.Once);
+        _fixture.UnitOfWork.Verify(work => work.Orders.AddWithNextNumberAsync(
+            It.IsAny<Order>(), It.IsAny<string>()), Times.Once);
     }
 
     [Fact]
@@ -273,7 +280,8 @@ public class DocumentAccountingServiceTests
 
         Assert.False(result.Success);
         Assert.Equal("Cliente non trovato", result.Error);
-        _fixture.UnitOfWork.Verify(work => work.Orders.AddAsync(It.IsAny<Order>()), Times.Never);
+        _fixture.UnitOfWork.Verify(work => work.Orders.AddWithNextNumberAsync(
+            It.IsAny<Order>(), It.IsAny<string>()), Times.Never);
         _fixture.UnitOfWork.Verify(work => work.SaveChangesAsync(), Times.Never);
     }
 

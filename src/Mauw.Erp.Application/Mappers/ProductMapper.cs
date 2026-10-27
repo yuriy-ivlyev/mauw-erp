@@ -10,14 +10,12 @@ namespace Mauw.Erp.Application.Mappers;
 /// </summary>
 public static class ProductMapper
 {
-    private static readonly CatalogPriceCalculator CatalogPrices = new();
-
-    public static OperationResult<ProductDto> MapToDto(Product product)
+    public static OperationResult<ProductDto> MapToDto(Product product, CatalogPriceCalculator catalogPrices)
     {
         var variants = new List<ProductVariantDto>();
         foreach (var variant in product.Variants)
         {
-            var result = MapVariantToDto(variant, product);
+            var result = MapVariantToDto(variant, product, catalogPrices);
             if (!result.Success)
                 return OperationResult<ProductDto>.Fail(result.Error!);
             variants.Add(result.Data!);
@@ -42,11 +40,14 @@ public static class ProductMapper
         ));
     }
 
-    public static OperationResult<ProductVariantDto> MapVariantToDto(ProductVariant variant, Product product)
+    public static OperationResult<ProductVariantDto> MapVariantToDto(
+        ProductVariant variant,
+        Product product,
+        CatalogPriceCalculator catalogPrices)
     {
         if (variant.SellingPrice.HasValue)
         {
-            var validation = CatalogPrices.Validate(variant.SellingPrice);
+            var validation = catalogPrices.Validate(variant.SellingPrice);
             if (!validation.Success)
                 return OperationResult<ProductVariantDto>.Fail(validation.Error);
         }
@@ -73,9 +74,12 @@ public static class ProductMapper
         ));
     }
 
-    public static OperationResult<BarcodeVariantDto> MapBarcodeVariantToDto(ProductVariant variant, Product product)
+    public static OperationResult<BarcodeVariantDto> MapBarcodeVariantToDto(
+        ProductVariant variant,
+        Product product,
+        CatalogPriceCalculator catalogPrices)
     {
-        var pricing = CatalogPrices.GetStoredPrice(variant);
+        var pricing = catalogPrices.GetStoredPrice(variant);
         if (!pricing.Success)
             return OperationResult<BarcodeVariantDto>.Fail(pricing.Error);
         var price = pricing.Data!.Value;
@@ -93,12 +97,14 @@ public static class ProductMapper
         ));
     }
 
-    public static OperationResult<List<ProductDto>> MapToListDto(IEnumerable<Product> products)
+    public static OperationResult<List<ProductDto>> MapToListDto(
+        IEnumerable<Product> products,
+        CatalogPriceCalculator catalogPrices)
     {
         var dtos = new List<ProductDto>();
         foreach (var product in products)
         {
-            var result = MapToDto(product);
+            var result = MapToDto(product, catalogPrices);
             if (!result.Success)
                 return OperationResult<List<ProductDto>>.Fail(result.Error!);
             dtos.Add(result.Data!);
