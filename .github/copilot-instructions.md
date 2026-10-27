@@ -4,6 +4,30 @@ Rispondere brevemente; fornire dettagli estesi solo se richiesti.
 Preferire dependency injection, configurazioni DI in metodi di estensione e
 `Program.cs` minimale. Per errori di validazione usare il Result pattern.
 
+## Invarianti per refactoring e validazione
+
+- Per gli ordini fornitore mantenere il formato `OF-{yyyyMMdd}-{sequenza:D6}`
+  e la progressione concorrente basata su `supplier_purchase_order_number_seq`;
+  non sostituirla con un conteggio delle righe. Estendere
+  `SupplierPurchaseOrderPostgreSqlTests` per verificare formato, prefisso,
+  progressione e unicita sotto concorrenza.
+- Le query di riconciliazione devono restringere i dati alle coppie effettive
+  `(WarehouseId, VariantId)`. Ogni ottimizzazione deve conservare risultati,
+  ordinamento e stati; estendere
+  `InventoryStockQueryPostgreSqlTests.GetAmbiguousMovementsAsync_ProposesOnlySingleExactDeltaAndDoesNotModifyHistory`
+  per coprire coppie di magazzino-variante incrociate.
+- Propagare la cancellazione richiesta dal chiamante. Il fallback geocoding e
+  ammesso solo per guasti attesi del provider, non per cancellazione o errori
+  estranei. Estendere `AddressAndVatProviderTests` con casi di cancellazione e
+  di errore non recuperabile, oltre ai casi di fallback esistenti.
+- Ogni request deve avere un solo percorso canonico di validazione: coprire con
+  test le regole effettivamente applicate a runtime e non duplicarle tra
+  endpoint, validator e servizio. Aggiornare i test del validator/servizio
+  interessato.
+- Ottimizzazioni e refactoring devono preservare output, ordinamento e
+  comportamento business. Aggiungere test di regressione nel test pertinente
+  prima di cambiare il percorso di calcolo o di query.
+
 ## Contabilita italiana: invarianti obbligatori
 
 Queste regole si applicano a fatture, preventivi, ordini, DDT e relativi
