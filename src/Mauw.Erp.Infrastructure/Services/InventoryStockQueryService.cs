@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Enums;
@@ -282,17 +283,13 @@ public sealed class InventoryStockQueryService(MauwDbContext db) : IInventorySto
         var stockQuantities = new Dictionary<(Guid WarehouseId, Guid VariantId), decimal>();
         if (pairKeys.Count > 0)
         {
-            var warehouseIds = pairKeys.Select(key => key.WarehouseId).Distinct().ToArray();
-            var variantIds = pairKeys.Select(key => key.VariantId).Distinct().ToArray();
-
             var unresolvedMovements = await db.StockMovements
                 .IgnoreQueryFilters()
                 .AsNoTracking()
                 .Where(movement =>
                     !movement.QuantityDelta.HasValue &&
-                    movement.WarehouseId.HasValue &&
-                    warehouseIds.Contains(movement.WarehouseId.Value) &&
-                    variantIds.Contains(movement.VariantId))
+                    movement.WarehouseId.HasValue)
+                .Where(BuildWarehouseVariantPairFilter<StockMovement>(pairKeys))
                 .ToListAsync(cancellationToken);
             ambiguousCounts = unresolvedMovements
                 .Where(movement => !movement.GetEffectiveQuantityDelta().HasValue)
@@ -302,10 +299,7 @@ public sealed class InventoryStockQueryService(MauwDbContext db) : IInventorySto
             var candidateMovements = await db.StockMovements
                 .IgnoreQueryFilters()
                 .AsNoTracking()
-                .Where(movement =>
-                    movement.WarehouseId.HasValue &&
-                    warehouseIds.Contains(movement.WarehouseId.Value) &&
-                    variantIds.Contains(movement.VariantId))
+                .Where(BuildWarehouseVariantPairFilter<StockMovement>(pairKeys))
                 .ToListAsync(cancellationToken);
             knownMovements = candidateMovements
                 .Where(movement =>
@@ -317,9 +311,7 @@ public sealed class InventoryStockQueryService(MauwDbContext db) : IInventorySto
             var stockItems = await db.StockItems
                 .IgnoreQueryFilters()
                 .AsNoTracking()
-                .Where(stock =>
-                    warehouseIds.Contains(stock.WarehouseId) &&
-                    variantIds.Contains(stock.ProductVariantId))
+                .Where(BuildWarehouseVariantPairFilter<StockItem>(pairKeys))
                 .Select(stock => new
                 {
                     stock.WarehouseId,
@@ -393,6 +385,39 @@ public sealed class InventoryStockQueryService(MauwDbContext db) : IInventorySto
             totalCount,
             totalPages,
             DateTime.UtcNow));
+    }
+
+    private static Expression<Func<T, bool>> BuildWarehouseVariantPairFilter<T>(
+        IReadOnlyCollection<(Guid WarehouseId, Guid VariantId)> pairKeys)
+    {
+        var row = Expression.Parameter(typeof(T), "row");
+        Expression warehouseId = Expression.Property(row,
+            typeof(T) == typeof(StockMovement)
+                ? nameof(StockMovement.WarehouseId)
+                : nameof(StockItem.WarehouseId));
+        if (warehouseId.Type == typeof(Guid))
+            warehouseId = Expression.Convert(warehouseId, typeof(Guid?));
+        var variantId = Expression.Property(row,
+            typeof(T) == typeof(StockMovement)
+                ? nameof(StockMovement.VariantId)
+                : nameof(StockItem.ProductVariantId));
+
+        Expression? predicate = null;
+        foreach (var pair in pairKeys)
+        {
+            var matchesPair = Expression.AndAlso(
+                Expression.Equal(warehouseId,
+                    Expression.Constant((Guid?)pair.WarehouseId, typeof(Guid?))),
+                Expression.Equal(variantId,
+                    Expression.Constant(pair.VariantId)));
+            predicate = predicate is null
+                ? matchesPair
+                : Expression.OrElse(predicate, matchesPair);
+        }
+
+        return Expression.Lambda<Func<T, bool>>(
+            predicate ?? Expression.Constant(false),
+            row);
     }
 
     private static string GetReconciliationStatus(

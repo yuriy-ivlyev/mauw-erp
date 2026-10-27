@@ -4,10 +4,6 @@
     <ProjectReference Include="..\Mauw.Erp.Domain\Mauw.Erp.Domain.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="FluentValidation" />
-  </ItemGroup>
-
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

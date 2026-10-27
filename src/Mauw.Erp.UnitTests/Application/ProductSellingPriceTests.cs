@@ -118,6 +118,21 @@ public class ProductSellingPriceTests(PostgreSqlContainerFixture postgres)
     }
 
     [Fact]
+    public async Task VariantCreationRejectsInvalidPriceBeforePersisting()
+    {
+        using var fixture = new Fixture(postgres);
+        var product = await fixture.Service.CreateProductAsync(Request(null));
+        Assert.True(product.Success, product.Error);
+
+        var result = await fixture.Service.CreateProductVariantAsync(product.Data!.Id,
+            new(product.Data.Id, null, null, "INVALID-PRICE", 10m, SellingPrice: 1.123456789m));
+
+        Assert.False(result.Success);
+        Assert.Contains("massimo 8 decimali", result.Error);
+        Assert.Empty(await fixture.Db.ProductVariants.ToListAsync());
+    }
+
+    [Fact]
     public async Task SimpleProductKeepsOneSkuAndSynchronizesExplicitPriceEdits()
     {
         using var fixture = new Fixture(postgres);
@@ -135,11 +150,11 @@ public class ProductSellingPriceTests(PostgreSqlContainerFixture postgres)
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void BothValidationImplementationsRequireParentPriceOnlyForSimpleProducts(bool hasVariants)
+    public void RuntimeValidationRequiresParentPriceOnlyForSimpleProducts(bool hasVariants)
     {
         var request = Request(null) with { HasVariants = hasVariants };
-        Assert.Equal(hasVariants, new CreateProductRequestValidator().Validate(request).IsValid);
-        Assert.Equal(hasVariants, new Mauw.Erp.Application.Validators.CreateProductRequestValidator().Validate(request).IsValid);
+        Assert.Equal(hasVariants,
+            new CreateProductRequestValidator(new CatalogPriceCalculator()).Validate(request).IsValid);
     }
 
     [Fact]
@@ -170,7 +185,7 @@ public class ProductSellingPriceTests(PostgreSqlContainerFixture postgres)
         Assert.False(barcode.Success);
         Assert.Contains("mancante", barcode.Error);
         variant.SellingPrice = -1m;
-        Assert.False(ProductMapper.MapToDto(product).Success);
+        Assert.False(ProductMapper.MapToDto(product, new CatalogPriceCalculator()).Success);
     }
 
     private static CreateProductRequest Request(decimal? price) =>
@@ -184,7 +199,7 @@ public class ProductSellingPriceTests(PostgreSqlContainerFixture postgres)
         public Fixture(PostgreSqlContainerFixture postgres)
         {
             Db = postgres.CreateDbContext();
-            Service = new(new UnitOfWork(Db, _cache), new CreateProductRequestValidator(), new(),
+            Service = new(new UnitOfWork(Db, _cache), new CreateProductRequestValidator(new()), new(),
                 new ImageApplicationService(new ProductVariantImageRepository(Db),
                 new Moq.Mock<IImageStorageService>().Object,
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<ImageApplicationService>.Instance));

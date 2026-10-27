@@ -58,17 +58,14 @@ public partial class OrderService(
             OrderType.WebOrder   => $"WEB-{now:MMyyyy}-",
             _                    => $"ORD-{now:MMyyyy}-",
         };
-        var count = await unitOfWork.Orders.CountOrdersByPrefixAsync(prefix);
-        var orderNumber = $"{prefix}{(count + 1):D3}";
 
         var order = new Order(
             contactId: request.ContactId,
-            orderNumber: orderNumber,
+            orderNumber: prefix,
             customerDiscountRate: request.DiscountRate ?? 0
         ) { OrderType = orderType };
 
-        await unitOfWork.Orders.AddAsync(order);
-        await unitOfWork.SaveChangesAsync();
+        await unitOfWork.Orders.AddWithNextNumberAsync(order, prefix);
 
         sw.Stop();
         TelemetryDiagnostics.OrdersCreated.Add(1);
@@ -109,17 +106,33 @@ public partial class OrderService(
         var creditNotes = invoiceIds.Count > 0
             ? (await unitOfWork.CreditNotes.GetByInvoiceIdsAsync(invoiceIds)).ToList()
             : [];
+        var invoicesByOrderId = invoices
+            .Where(invoice => invoice.OrderId.HasValue)
+            .GroupBy(invoice => invoice.OrderId!.Value)
+            .ToDictionary(group => group.Key, group => group.First());
+        var ddtsByOrderId = ddts
+            .Where(ddt => ddt.OrderId.HasValue)
+            .GroupBy(ddt => ddt.OrderId!.Value)
+            .ToDictionary(group => group.Key, group => group.First());
+        var creditNotesByInvoiceId = creditNotes
+            .GroupBy(creditNote => creditNote.InvoiceId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(creditNote => new CreditNoteRefDto(
+                    creditNote.Id,
+                    creditNote.CreditNoteNumber,
+                    creditNote.CreditNoteDate,
+                    creditNote.GrossTotal,
+                    creditNote.Reason)).ToList());
 
         var dtos = orderList.Select(o =>
         {
-            var invoice = invoices.FirstOrDefault(i => i.OrderId == o.Id);
-            var ddt = ddts.FirstOrDefault(d => d.OrderId == o.Id);
-            var creditNoteRefs = invoice != null
-                ? creditNotes
-                    .Where(cn => cn.InvoiceId == invoice.Id)
-                    .Select(cn => new CreditNoteRefDto(cn.Id, cn.CreditNoteNumber, cn.CreditNoteDate, cn.GrossTotal, cn.Reason))
-                    .ToList()
-                : [];
+            invoicesByOrderId.TryGetValue(o.Id, out var invoice);
+            ddtsByOrderId.TryGetValue(o.Id, out var ddt);
+            List<CreditNoteRefDto> creditNoteRefs = [];
+            if (invoice is not null &&
+                creditNotesByInvoiceId.TryGetValue(invoice.Id, out var invoiceCreditNotes))
+                creditNoteRefs = invoiceCreditNotes;
 
             OrderLinkedDocumentsDto? linked = invoice != null || ddt != null
                 ? new OrderLinkedDocumentsDto(invoice?.Id, invoice?.InvoiceNumber, ddt?.Id, ddt?.DdtNumber, creditNoteRefs)
@@ -429,10 +442,8 @@ public partial class OrderService(
 
         var now = DateTime.UtcNow;
         var prefix = $"ORD-{now:MMyyyy}-";
-        var count = await unitOfWork.Orders.CountOrdersByPrefixAsync(prefix);
-        var sessionCode = $"{prefix}{(count + 1):D3}";
 
-        var order = new Order(request.ContactId, sessionCode) { OrderType = OrderType.CassaSession };
+        var order = new Order(request.ContactId, prefix) { OrderType = OrderType.CassaSession };
         order.SetDocumentReference(request.DocumentReference);
         order.Suspend(request.TerminalId);
 
@@ -447,10 +458,9 @@ public partial class OrderService(
         order.TaxableTotal = accounting.TotalTaxable;
         order.VatTotal = accounting.TotalVat;
         order.GrossTotal = accounting.TotalGross;
-        await unitOfWork.Orders.AddAsync(order);
-        await unitOfWork.SaveChangesAsync();
+        await unitOfWork.Orders.AddWithNextNumberAsync(order, prefix);
 
-        logger.LogInformation("Cassa session {Code} created", sessionCode);
+        logger.LogInformation("Cassa session {Code} created", order.OrderNumber);
 
         var loaded = await unitOfWork.Orders.GetCassaSessionWithItemsAsync(order.Id);
         return OperationResult<CassaSessionDetailDto>.Ok(MapCassaDetail(loaded!, contact.BusinessName));

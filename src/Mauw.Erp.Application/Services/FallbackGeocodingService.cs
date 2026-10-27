@@ -26,7 +26,13 @@ public class FallbackGeocodingService(
         {
             return await googlePlaces.AutocompleteAsync(input, sessionToken, countryCode, ct);
         }
-        catch (Exception ex)
+        catch (HttpRequestException ex)
+        {
+            logger.LogWarning(ex,
+                "Google Places Autocomplete fallito – uso Photon come fallback. Input: {Input}", input);
+            return await photon.AutocompleteAsync(input, sessionToken, countryCode, ct);
+        }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
         {
             logger.LogWarning(ex,
                 "Google Places Autocomplete fallito – uso Photon come fallback. Input: {Input}", input);
@@ -48,7 +54,13 @@ public class FallbackGeocodingService(
         {
             return await googlePlaces.GetPlaceDetailsAsync(placeId, sessionToken, ct);
         }
-        catch (Exception ex)
+        catch (HttpRequestException ex)
+        {
+            logger.LogWarning(ex,
+                "Google Places Details fallito – fallback Photon. PlaceId: {PlaceId}", placeId);
+            return await photon.GetPlaceDetailsAsync(placeId, sessionToken, ct);
+        }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
         {
             logger.LogWarning(ex,
                 "Google Places Details fallito – fallback Photon. PlaceId: {PlaceId}", placeId);

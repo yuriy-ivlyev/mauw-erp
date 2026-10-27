@@ -27,7 +27,12 @@ public class PhotonGeocodingService(
         {
             result = await client.GetFromJsonAsync<PhotonResponse>(url, ct);
         }
-        catch (Exception ex)
+        catch (HttpRequestException ex)
+        {
+            logger.LogWarning(ex, "Photon API error");
+            return [];
+        }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Photon API error");
             return [];
@@ -62,6 +67,7 @@ public class PhotonGeocodingService(
     public Task<GeocodedAddressDto?> GetPlaceDetailsAsync(
         string placeId, string sessionToken, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         // I dati sono già in PrePopulatedAddress; ma se qualcuno chiede esplicitamente,
         // restituiamo dalla cache.
         cache.TryGetValue(placeId, out GeocodedAddressDto? dto);

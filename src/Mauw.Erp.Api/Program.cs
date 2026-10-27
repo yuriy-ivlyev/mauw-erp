@@ -33,7 +33,6 @@ builder.Services.AddDbContext<MauwDbContext>(options =>
 
 // Register custom validators (no reflection)
 builder.Services.AddScoped<IValidator<CreateProductRequest>, CreateProductRequestValidator>();
-builder.Services.AddScoped<IValidator<CreateProductVariantRequest>, CreateProductVariantRequestValidator>();
 builder.Services.AddScoped<IValidator<CreateContactRequest>, CreateContactRequestValidator>();
 builder.Services.AddScoped<IValidator<UpdateContactRequest>, UpdateContactRequestValidator>();
 builder.Services.AddScoped<IValidator<CreateOrderRequest>, CreateOrderRequestValidator>();

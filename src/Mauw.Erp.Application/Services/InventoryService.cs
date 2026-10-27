@@ -5,6 +5,7 @@ using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Domain.Entities;
 using Mauw.Erp.Domain.Enums;
 using Mauw.Erp.Domain.Repositories;
+using Mauw.Erp.Domain.Services;
 
 namespace Mauw.Erp.Application.Services;
 
@@ -13,7 +14,8 @@ namespace Mauw.Erp.Application.Services;
 /// </summary>
 public class InventoryService(
     IUnitOfWork unitOfWork,
-    IValidator<BarcodeScanRequest> barcodeValidator)
+    IValidator<BarcodeScanRequest> barcodeValidator,
+    CatalogPriceCalculator catalogPrices)
     : IInventoryService
 {
     public async Task<OperationResult<StockMovementDto>> ScanBarcodeAsync(BarcodeScanRequest request)
@@ -81,7 +83,7 @@ public class InventoryService(
         if (variant?.Product == null)
             return OperationResult<BarcodeVariantDto>.Fail("Variant not found");
 
-        return ProductMapper.MapBarcodeVariantToDto(variant, variant.Product);
+        return ProductMapper.MapBarcodeVariantToDto(variant, variant.Product, catalogPrices);
     }
 
     public async Task<OperationResult<BarcodeVariantDto>> GetVariantByBarcodeWithStockAsync(string barcode, Guid warehouseId)
@@ -91,7 +93,7 @@ public class InventoryService(
             return OperationResult<BarcodeVariantDto>.Fail("Variant not found");
 
         var quantityAvailable = await unitOfWork.Stock.GetAvailableQtyAsync(warehouseId, variant.Id);
-        var pricing = ProductMapper.MapBarcodeVariantToDto(variant, variant.Product);
+        var pricing = ProductMapper.MapBarcodeVariantToDto(variant, variant.Product, catalogPrices);
         if (!pricing.Success)
             return pricing;
         var dto = pricing.Data! with
