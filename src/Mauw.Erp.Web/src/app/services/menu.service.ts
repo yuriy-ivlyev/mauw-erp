@@ -41,7 +41,6 @@ export class MenuService {
       children: [
         { label: 'Cassa',      route: '/vendite/cassa',          icon: ICONS.cash,     roles: ['Admin', 'Sales'] },
         { label: 'Ordini',     route: '/ordini/elenco',          icon: ICONS.orders,   roles: ['Admin', 'Sales'] },
-        { label: 'Preventivi', route: '/fatturazione/preventivi', icon: ICONS.quote,   roles: ['Admin', 'Sales', 'Accounting'] },
         { label: 'Contatti',   route: '/anagrafiche/elenco',     icon: ICONS.contacts, roles: ['Admin', 'Sales', 'Accounting'] }
       ]
     },
@@ -77,6 +76,7 @@ export class MenuService {
       isCollapsed: true,
       roles: ['Admin', 'Sales', 'Warehouse'],
       children: [
+        { label: 'Ordini da Spedire', route: '/magazzino/spedizioni', icon: ICONS.ddt, roles: ['Admin', 'Warehouse'] },
         { label: 'Magazzini', route: '/magazzino/magazzini',  icon: ICONS.warehouse, roles: ['Admin', 'Warehouse'] },
         { label: 'Giacenze',  route: '/magazzino/inventario', icon: ICONS.inventory, roles: ['Admin', 'Sales', 'Warehouse'] },
         { label: 'Movimenti', route: '/magazzino/movimenti',  icon: ICONS.movements, roles: ['Admin', 'Warehouse'] },

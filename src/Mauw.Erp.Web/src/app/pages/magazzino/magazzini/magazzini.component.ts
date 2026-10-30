@@ -16,11 +16,16 @@ import { CompanyAddressSite } from '../../../models/company-settings.model';
 import { PaginationComponent } from '../../../shared/pagination/pagination.component';
 import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
 import { SortChange } from '../../../models/pagination.model';
+import { TableActionButtonComponent } from '../../../shared/table-action-button/table-action-button.component';
+import { AddActionButtonComponent } from '../../../shared/add-action-button/add-action-button.component';
 
 @Component({
   selector: 'app-magazzini',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, ConfirmDeleteModalComponent, PaginationComponent, SortHeaderDirective],
+  imports: [
+    CommonModule, FormsModule, ReactiveFormsModule, ConfirmDeleteModalComponent, PaginationComponent,
+    SortHeaderDirective, TableActionButtonComponent, AddActionButtonComponent
+  ],
   templateUrl: './magazzini.component.html',
   styleUrl: './magazzini.component.scss'
 })

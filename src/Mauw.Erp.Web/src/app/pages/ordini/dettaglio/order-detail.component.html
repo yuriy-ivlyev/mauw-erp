@@ -1,0 +1,403 @@
+<div class="-mt-4 max-w-screen-2xl mx-auto p-6 text-slate-800">
+  <app-back-button (activated)="goBack()"></app-back-button>
+
+  <div *ngIf="errorMessage" role="alert" class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-red-700">{{ errorMessage }}</div>
+  <div *ngIf="successMessage" role="status" aria-live="polite"
+    class="fixed bottom-4 right-4 z-[1100] max-w-md rounded-lg border border-green-300 bg-green-50 p-4 text-green-800 shadow-lg">
+    {{ successMessage }}
+  </div>
+
+  <div *ngIf="loading && !order" class="p-8 text-center text-slate-500">Caricamento ordine…</div>
+  <ng-container *ngIf="order as currentOrder">
+    <header class="mb-5 flex items-end justify-between gap-4 max-[700px]:items-start max-[700px]:flex-col">
+      <div>
+        <p class="mb-1 text-xs font-bold uppercase tracking-wider text-slate-500">Ordine vendita</p>
+        <h1 class="m-0 text-3xl font-bold">{{ currentOrder.orderNumber }}</h1>
+        <div class="mt-3 flex flex-wrap items-center gap-4 text-sm text-slate-500">
+          <span [class]="currentOrder.fulfillmentType === 'CashDesk' ? 'type-badge type-cash' : 'type-badge type-shipping'">
+            {{ currentOrder.fulfillmentType === 'CashDesk' ? 'Cassa' : 'Spedizione' }}
+          </span>
+          <span [class]="'status-badge ' + statusClass(currentOrder.status)">
+            {{ currentOrder.statusDescription }}
+          </span>
+          <span>Data: {{ currentOrder.orderDate | date:'dd/MM/yyyy' }}</span>
+          <span>Cliente: {{ currentOrder.contactName }}</span>
+        </div>
+      </div>
+      <div class="grid text-right text-sm text-slate-500 max-[700px]:text-left">
+        <span>Totale ordine</span>
+        <strong class="text-2xl text-slate-900">{{ currentOrder.grossTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</strong>
+      </div>
+    </header>
+
+    <section *ngIf="currentOrder.internalNotes" class="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4" aria-label="Note interne">
+      <h2 class="m-0 text-sm font-bold text-amber-900">Note interne</h2>
+      <p class="mb-0 mt-1 whitespace-pre-wrap text-sm text-amber-900">{{ currentOrder.internalNotes }}</p>
+    </section>
+
+    <section *ngIf="currentOrder.permittedActions.length || (canManageBilling && currentOrder.status === 'Completed' && !currentOrder.linkedDocuments?.invoiceId)"
+      class="mb-5 flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-white p-4" aria-label="Azioni consentite">
+      <button
+        *ngFor="let action of currentOrder.permittedActions"
+        type="button"
+        [class]="'rounded-lg px-4 py-2 font-bold ' + actionClass(action.style)"
+        [disabled]="submitting"
+        (click)="openAction(action)">
+        {{ action.label }}
+      </button>
+      <button *ngIf="canManageBilling && currentOrder.status === 'Completed' && !currentOrder.linkedDocuments?.invoiceId"
+        type="button" [disabled]="generatingInvoice"
+        class="rounded-lg bg-blue-700 px-4 py-2 font-bold text-white hover:bg-blue-800 disabled:opacity-50"
+        (click)="generateInvoice()">
+        {{ generatingInvoice ? 'Generazione…' : 'Genera fattura' }}
+      </button>
+    </section>
+
+    <section class="mb-5 rounded-xl border border-slate-200 bg-white p-5">
+      <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 class="m-0 text-lg font-bold">Costo di spedizione</h2>
+          <p class="mt-1 text-xs text-slate-500">L’importo netto e la classificazione IVA partecipano ai totali e al PDF ordine.</p>
+        </div>
+        <ng-container *ngIf="currentOrder.isReadOnly && !canEditCompletedInvoice(currentOrder); else editableShipping">
+          <div class="text-right">
+            <p class="font-semibold">{{ (currentOrder.shippingCost ?? 0) | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</p>
+            <p *ngIf="currentOrder.shippingCost" class="text-xs text-slate-500">
+              IVA {{ currentOrder.shippingVatRate }}%<span *ngIf="currentOrder.shippingNatureCode"> · {{ currentOrder.shippingNatureCode }}</span>
+            </p>
+          </div>
+        </ng-container>
+        <ng-template #editableShipping>
+          <div class="flex flex-wrap items-end gap-3">
+            <label class="grid gap-1 text-sm font-semibold text-slate-700">
+              Netto
+              <input aria-label="Costo spedizione netto" name="shippingCostEdit" type="number" min="0" step="0.01" required
+                [(ngModel)]="shippingCostEdit" class="w-28 rounded border border-slate-300 p-2 text-right" />
+            </label>
+            <label class="grid gap-1 text-sm font-semibold text-slate-700">
+              Aliquota IVA
+              <select aria-label="Aliquota IVA spedizione" name="shippingVatRateEdit" [(ngModel)]="shippingVatRateEdit"
+                [required]="shippingCostEdit > 0" [disabled]="shippingCostEdit <= 0"
+                class="w-36 rounded border border-slate-300 p-2 disabled:bg-slate-100">
+                <option [ngValue]="null">Seleziona</option>
+                <option [ngValue]="22">22%</option>
+                <option [ngValue]="10">10%</option>
+                <option [ngValue]="5">5%</option>
+                <option [ngValue]="4">4%</option>
+                <option [ngValue]="0">0% (Natura)</option>
+              </select>
+            </label>
+            <label *ngIf="shippingCostEdit > 0 && shippingVatRateEdit === 0" class="grid gap-1 text-sm font-semibold text-slate-700">
+              Natura
+              <select aria-label="Natura IVA spedizione" name="shippingNatureCodeEdit" [(ngModel)]="shippingNatureCodeEdit"
+                required class="w-36 rounded border border-slate-300 p-2">
+                <option [ngValue]="null">Seleziona</option>
+                <option *ngFor="let code of natureCodes" [value]="code">{{ code }}</option>
+              </select>
+            </label>
+            <button type="button" aria-label="Salva costo di spedizione" title="Salva costo di spedizione"
+              [disabled]="savingShippingCharge"
+              class="rounded-lg bg-blue-700 p-2 text-white hover:bg-blue-800 disabled:opacity-50"
+              (click)="saveShippingCharge()">
+              <svg aria-hidden="true" focusable="false" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+                <path d="M17 21v-8H7v8M7 3v5h8" />
+              </svg>
+            </button>
+          </div>
+        </ng-template>
+      </div>
+    </section>
+
+    <section class="mb-5 rounded-xl border border-slate-200 bg-white p-5">
+      <div class="flex items-center justify-between gap-4">
+        <div>
+          <h2 class="m-0 text-lg font-bold">Articoli</h2>
+          <p class="mt-1 text-sm text-slate-500">{{ currentOrder.items.length }} righe</p>
+        </div>
+        <span *ngIf="currentOrder.isReadOnly && !canEditCompletedInvoice(currentOrder)"
+          class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">Sola lettura</span>
+        <span *ngIf="canEditCompletedInvoice(currentOrder)"
+          class="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">Modifica fattura abilitata · invio SDI non effettuato</span>
+      </div>
+
+      <div class="mt-4 overflow-x-auto">
+        <table class="w-full min-w-[760px] table-fixed border-collapse text-left">
+          <thead>
+            <tr>
+              <th class="w-[32%]">Articolo</th>
+              <th *ngIf="!currentOrder.isReadOnly" class="w-[9%]">Quantità</th>
+              <th *ngIf="currentOrder.isReadOnly" class="w-[8%] text-right">Q.tà ordinata</th>
+              <th *ngIf="currentOrder.isReadOnly" class="w-[8%] text-right">Q.tà spedita</th>
+              <th *ngIf="currentOrder.isReadOnly" class="w-[8%] text-right">Q.tà residua</th>
+              <th class="w-[17%]" [class.text-right]="currentOrder.isReadOnly">Prezzo unitario netto</th>
+              <th class="w-[9%] text-right">Sconto</th>
+              <th class="w-[13%] text-right">Totale riga</th>
+              <th *ngIf="!currentOrder.isReadOnly || canEditCompletedInvoice(currentOrder)" class="w-[12%]"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of currentOrder.items | pageSlice:itemsPage:itemsPageSize">
+              <td class="overflow-hidden p-2">
+                <span class="block truncate font-mono text-sm font-semibold" [class.line-through]="item.isExcludedFromInvoice" [title]="item.sku || ''">{{ item.sku || 'SKU non disponibile' }}</span>
+                <span class="block truncate text-xs text-slate-500" [class.line-through]="item.isExcludedFromInvoice">
+                  {{ item.productName || 'Articolo' }} · {{ item.sizeName || '—' }} · {{ item.colorName || '—' }}
+                </span>
+                <span *ngIf="item.isBillingOnly" class="mt-1 inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+                  Riga contabile, non movimenta il magazzino
+                </span>
+                <span *ngIf="item.isExcludedFromInvoice" class="mt-1 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+                  Esclusa dalla fattura
+                </span>
+              </td>
+              <ng-container *ngIf="currentOrder.isReadOnly; else editableLine">
+                <td class="text-right">{{ item.quantity }}</td>
+                <td class="text-right">{{ item.shippedQuantity }}</td>
+                <td class="text-right">{{ item.remainingQuantity }}</td>
+                <td class="text-right">{{ item.unitNetPrice | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+                <td class="text-right">{{ item.discountPercent }}%</td>
+                <td class="text-right">{{ item.lineNetTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+              </ng-container>
+              <td *ngIf="currentOrder.isReadOnly && canEditCompletedInvoice(currentOrder)" class="text-center">
+                <app-table-action-button *ngIf="!item.isExcludedFromInvoice" action="delete"
+                  [label]="'Rimuovi ' + (item.productName || 'articolo') + ' dalla fattura'"
+                  [disabled]="removingBillingItem" (activated)="askRemoveBillingItem(item)">
+                </app-table-action-button>
+              </td>
+              <ng-template #editableLine>
+                <td>
+                  <input aria-label="Quantità riga" class="w-16 rounded border border-slate-300 p-1.5 text-right" type="number" min="1" step="1"
+                    [(ngModel)]="draftEdits[item.id].quantity" />
+                </td>
+                <td>
+                  <input aria-label="Prezzo unitario netto" class="w-28 max-w-full rounded border border-slate-300 p-1.5 text-right" type="number" min="0" step="0.00000001"
+                    [(ngModel)]="draftEdits[item.id].unitNetPrice" />
+                </td>
+                <td class="text-right">{{ item.discountPercent }}%</td>
+                <td class="text-right">{{ item.lineNetTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+                <td class="text-center">
+                  <div class="flex justify-center gap-2">
+                    <app-table-action-button action="edit" label="Salva modifiche riga"
+                      [disabled]="savingItemId !== null || removingDraftItem" (activated)="saveItem(item)">
+                    </app-table-action-button>
+                    <app-table-action-button *ngIf="canAddDraftOrderItem(currentOrder)" action="delete"
+                      [label]="'Elimina ' + (item.productName || 'articolo') + ' dall’ordine'"
+                      [disabled]="removingDraftItem || savingItemId !== null" (activated)="askRemoveDraftItem(item)">
+                    </app-table-action-button>
+                  </div>
+                </td>
+              </ng-template>
+            </tr>
+            <tr *ngIf="currentOrder.items.length === 0">
+              <td [attr.colspan]="currentOrder.isReadOnly ? (canEditCompletedInvoice(currentOrder) ? 8 : 7) : 6"
+                class="p-8 text-center text-slate-500">Nessun articolo presente.</td>
+            </tr>
+          </tbody>
+        </table>
+        <app-pagination *ngIf="currentOrder.items.length > 0" [page]="itemsPage" [pageSize]="itemsPageSize"
+          [totalCount]="currentOrder.items.length" (pageChange)="itemsPage = $event"
+          (pageSizeChange)="itemsPageSize = $event; itemsPage = 1">
+        </app-pagination>
+      </div>
+      <section *ngIf="canAddDraftOrderItem(currentOrder) || canEditCompletedInvoice(currentOrder)"
+        class="mt-5 rounded-lg border border-blue-100 bg-blue-50 p-4">
+        <h3 class="m-0 text-base font-bold">
+          {{ currentOrder.status === 'Draft' ? 'Aggiungi articolo all’ordine' : 'Aggiungi riga all’ordine e alla fattura' }}
+        </h3>
+        <p *ngIf="currentOrder.status === 'Draft'" class="mt-1 text-xs text-slate-600">
+          L’articolo verrà aggiunto all’ordine in bozza e seguirà il normale flusso di evasione.
+        </p>
+        <p *ngIf="currentOrder.status !== 'Draft'" class="mt-1 text-xs text-slate-600">
+          La riga aggiunta è contabile e non genera movimenti di magazzino o DDT.
+        </p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <input name="billingProductSearch" [(ngModel)]="billingProductSearch" type="search" autocomplete="off"
+            (keyup.enter)="searchBillingProducts()" placeholder="Cerca SKU, barcode o descrizione..."
+            class="min-w-[220px] flex-1 rounded-lg border border-slate-300 bg-white p-2" />
+          <button type="button" (click)="searchBillingProducts()"
+            [disabled]="searchingBillingProducts || billingProductSearch.trim().length < 2"
+            class="rounded-lg bg-slate-700 px-4 py-2 font-semibold text-white disabled:opacity-50">
+            {{ searchingBillingProducts ? 'Ricerca…' : 'Cerca articolo' }}
+          </button>
+        </div>
+        <div *ngIf="billingProductResults.length" class="mt-2 max-h-48 overflow-y-auto rounded border bg-white">
+          <button *ngFor="let variant of billingProductResults" type="button"
+            class="block w-full border-b p-2 text-left last:border-0 hover:bg-blue-50"
+            (click)="selectBillingVariant(variant)">
+            <span class="block font-semibold">{{ variant.productName }}</span>
+            <span class="text-xs text-slate-500">{{ variant.sku || variant.barcode }} · {{ variant.sizeName || '—' }} · {{ variant.colorName || '—' }}</span>
+            <span *ngIf="currentOrder.status === 'Draft'" class="block text-xs font-medium text-green-700">
+              Disponibili: {{ variant.currentStock }}
+            </span>
+          </button>
+        </div>
+        <div *ngIf="selectedBillingVariant && selectedBillingProduct as product" class="mt-3 grid items-end gap-3 sm:grid-cols-3">
+          <p class="mb-2 font-semibold">{{ product.name }} · {{ selectedBillingVariant.sku || selectedBillingVariant.barcode }}</p>
+          <label class="text-sm font-semibold">Quantità
+            <input name="billingQuantity" type="number" min="1" step="1" [(ngModel)]="billingQuantity"
+              class="mt-1 w-full rounded border border-slate-300 p-2" />
+          </label>
+          <label *ngIf="currentOrder.status === 'Draft'" class="text-sm font-semibold">Prezzo unitario netto
+            <input name="newItemUnitNetPrice" type="number" min="0" step="0.00000001"
+              [(ngModel)]="newItemUnitNetPrice" class="mt-1 w-full rounded border border-slate-300 p-2" />
+          </label>
+          <label *ngIf="product.vatRate === 0" class="text-sm font-semibold">Natura IVA
+            <select name="billingNature" [(ngModel)]="billingNatureCode" required class="mt-1 w-full rounded border border-slate-300 p-2">
+              <option [ngValue]="null">Seleziona</option>
+              <option *ngFor="let code of natureCodes" [value]="code">{{ code }}</option>
+            </select>
+          </label>
+          <app-add-action-button class="sm:col-span-3"
+            [label]="currentOrder.status === 'Draft' ? 'Aggiungi articolo all’ordine' : 'Aggiungi riga all’ordine e alla fattura'"
+            [disabled]="addingBillingItem"
+            (activated)="currentOrder.status === 'Draft' ? addDraftItem() : addBillingItem()">
+          </app-add-action-button>
+        </div>
+      </section>
+      <div class="mt-4 flex flex-wrap justify-end gap-4 text-slate-500">
+        <span>Imponibile <strong>{{ currentOrder.taxableTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</strong></span>
+        <span>IVA <strong>{{ currentOrder.vatTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</strong></span>
+        <span>Totale <strong>{{ currentOrder.grossTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</strong></span>
+      </div>
+    </section>
+
+    <section class="mb-5 rounded-xl border border-slate-200 bg-white p-5">
+      <div class="flex items-center justify-between gap-4">
+        <div>
+          <h2 class="m-0 text-lg font-bold">Documenti</h2>
+          <p class="mt-1 text-sm text-slate-500">Apri o scarica i documenti generati per questo ordine.</p>
+        </div>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-3">
+        <a *ngIf="currentOrder.linkedDocuments?.invoiceId"
+          [routerLink]="['/fatturazione/fatture', currentOrder.linkedDocuments!.invoiceId]"
+          [queryParams]="{ returnTo: returnToUrl }"
+          class="rounded-lg bg-blue-700 px-3 py-2 font-bold text-white hover:bg-blue-800">
+          Dettaglio fattura {{ currentOrder.linkedDocuments!.invoiceNumber }}
+        </a>
+        <button type="button" class="rounded-lg bg-slate-600 px-3 py-2 font-bold text-white" (click)="downloadPdf('order', currentOrder.id, 'ordine-' + currentOrder.orderNumber + '.pdf')"
+          [disabled]="downloadingPdf !== null">PDF Ordine</button>
+        <button *ngIf="currentOrder.linkedDocuments?.invoiceId" type="button" class="rounded-lg bg-slate-600 px-3 py-2 font-bold text-white"
+          (click)="downloadPdf('invoice', currentOrder.linkedDocuments!.invoiceId!, 'fattura-' + currentOrder.linkedDocuments!.invoiceNumber + '.pdf')"
+          [disabled]="downloadingPdf !== null">
+          PDF Fattura {{ currentOrder.linkedDocuments!.invoiceNumber }}
+        </button>
+        <ng-container *ngIf="currentOrder.linkedDocuments?.ddts?.length; else legacyDdt">
+          <button *ngFor="let ddt of currentOrder.linkedDocuments!.ddts" type="button" class="rounded-lg bg-slate-600 px-3 py-2 font-bold text-white"
+            (click)="downloadPdf('ddt', ddt.id, 'ddt-' + ddt.ddtNumber + '.pdf')"
+            [disabled]="downloadingPdf !== null">
+            PDF DDT {{ ddt.ddtNumber }}
+          </button>
+        </ng-container>
+        <ng-template #legacyDdt>
+          <button *ngIf="currentOrder.linkedDocuments?.ddtId" type="button" class="rounded-lg bg-slate-600 px-3 py-2 font-bold text-white"
+            (click)="downloadPdf('ddt', currentOrder.linkedDocuments!.ddtId!, 'ddt-' + currentOrder.linkedDocuments!.ddtNumber + '.pdf')"
+            [disabled]="downloadingPdf !== null">
+            PDF DDT {{ currentOrder.linkedDocuments!.ddtNumber }}
+          </button>
+        </ng-template>
+      </div>
+    </section>
+  </ng-container>
+
+  <div *ngIf="dialogAction as action" class="fixed inset-0 z-[1000] grid place-items-center overflow-y-auto bg-slate-900/60 p-4" role="presentation">
+    <section class="max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-5 shadow-2xl" role="dialog" aria-modal="true" [attr.aria-label]="getDialogTitle(action)">
+      <form (ngSubmit)="submitDialog()">
+        <header class="mb-4 flex items-center justify-between gap-3">
+          <h2 class="m-0 text-lg font-bold">{{ getDialogTitle(action) }}</h2>
+          <button type="button" aria-label="Chiudi" class="text-2xl text-slate-500" (click)="closeDialog()">×</button>
+        </header>
+
+        <label *ngIf="action.dialogType === 'CancelReason'" class="mb-3 grid gap-2 text-sm font-semibold text-slate-700">
+          Motivo
+          <textarea class="w-full rounded border border-slate-300 p-2" name="reason" [(ngModel)]="reason" required maxlength="500" rows="3"></textarea>
+        </label>
+
+        <ng-container *ngIf="action.dialogType === 'ShipmentDetails'">
+          <label class="mb-3 grid gap-2 text-sm font-semibold text-slate-700">Vettore
+            <select class="w-full rounded border border-slate-300 p-2" name="carrier" [(ngModel)]="carrierName" required>
+              <option *ngFor="let carrier of carriers" [value]="carrier">{{ carrier }}</option>
+            </select>
+          </label>
+          <label class="mb-3 grid gap-2 text-sm font-semibold text-slate-700">Tracking / note trasporto (facoltativo)
+            <input class="w-full rounded border border-slate-300 p-2" name="tracking" [(ngModel)]="trackingCode" maxlength="200" />
+          </label>
+          <label class="mb-3 grid gap-2 text-sm font-semibold text-slate-700">Numero colli
+            <input class="w-full rounded border border-slate-300 p-2" name="boxCount" type="number" min="1" step="1" [(ngModel)]="boxCount" required />
+          </label>
+          <label class="mb-3 grid gap-2 text-sm font-semibold text-slate-700">Peso (kg)
+            <input class="w-full rounded border border-slate-300 p-2" name="weightKg" type="number" min="0" step="0.001" [(ngModel)]="weightKg" />
+          </label>
+          <div class="my-4 border-t border-slate-200 pt-3">
+            <p class="text-sm text-slate-600">Quantità da spedire (modificabili per effettuare una spedizione parziale)</p>
+            <label *ngFor="let item of order?.items" class="grid grid-cols-[minmax(0,1fr)_7rem] items-center gap-3 py-1 text-sm">
+              <span>{{ item.variantId }} <small>(residuo {{ item.remainingQuantity }})</small></span>
+              <input class="w-full rounded border border-slate-300 p-2" type="number" min="0" [max]="item.remainingQuantity" step="1"
+                [name]="'shipment-' + item.id" [(ngModel)]="shipmentQuantities[item.id]" />
+            </label>
+          </div>
+        </ng-container>
+
+        <ng-container *ngIf="action.dialogType === 'PaymentDetails'">
+          <label class="mb-3 grid gap-2 text-sm font-semibold text-slate-700">Metodo di pagamento
+            <select class="w-full rounded border border-slate-300 p-2" name="paymentMethod" [(ngModel)]="paymentMethod" required>
+              <option value="Contanti">Contanti</option>
+              <option value="Carta">Carta</option>
+            </select>
+          </label>
+          <label class="mb-3 grid gap-2 text-sm font-semibold text-slate-700">Riferimento transazione (facoltativo)
+            <input class="w-full rounded border border-slate-300 p-2" name="transactionDetails" [(ngModel)]="transactionDetails" maxlength="500" />
+          </label>
+        </ng-container>
+
+        <footer class="mt-4 flex justify-end gap-3">
+          <app-back-button label="Indietro" [disabled]="submitting" (activated)="closeDialog()"></app-back-button>
+          <button type="submit" class="rounded-lg bg-blue-700 px-4 py-2 font-bold text-white" [disabled]="submitting">
+            {{ submitting ? 'Attendere…' : action.label }}
+          </button>
+        </footer>
+      </form>
+    </section>
+  </div>
+
+  <div *ngIf="pendingDraftRemoval as item"
+    class="fixed inset-0 z-[1050] grid place-items-center bg-slate-900/60 p-4"
+    role="presentation">
+    <section class="w-full max-w-lg rounded-xl bg-white p-5 shadow-2xl"
+      role="alertdialog" aria-modal="true" aria-labelledby="remove-draft-item-title">
+      <h2 id="remove-draft-item-title" class="m-0 text-lg font-bold">Eliminare l’articolo dall’ordine?</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        {{ item.productName || item.sku || 'Articolo' }} verrà rimosso dalla bozza e i totali dell’ordine saranno ricalcolati.
+      </p>
+      <div class="mt-5 flex justify-end gap-3">
+        <button type="button" class="rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+          [disabled]="removingDraftItem" (click)="cancelRemoveDraftItem()">Annulla</button>
+        <button type="button" class="rounded-lg bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700 disabled:opacity-50"
+          [disabled]="removingDraftItem" (click)="confirmRemoveDraftItem()">
+          {{ removingDraftItem ? 'Eliminazione…' : 'Conferma eliminazione' }}
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <div *ngIf="pendingBillingRemoval as item"
+    class="fixed inset-0 z-[1050] grid place-items-center bg-slate-900/60 p-4"
+    role="presentation">
+    <section class="w-full max-w-lg rounded-xl bg-white p-5 shadow-2xl"
+      role="alertdialog" aria-modal="true" aria-labelledby="remove-billing-item-title">
+      <h2 id="remove-billing-item-title" class="m-0 text-lg font-bold">Rimuovere l’articolo dalla fattura?</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        {{ item.productName || item.sku || 'Articolo' }} sarà escluso dall’ordine contabile e dalla fattura.
+        I movimenti di magazzino e i DDT storici non verranno modificati.
+      </p>
+      <div class="mt-5 flex justify-end gap-3">
+        <button type="button" class="rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+          [disabled]="removingBillingItem" (click)="cancelRemoveBillingItem()">Annulla</button>
+        <button type="button" class="rounded-lg bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700 disabled:opacity-50"
+          [disabled]="removingBillingItem" (click)="confirmRemoveBillingItem()">
+          {{ removingBillingItem ? 'Rimozione…' : 'Conferma rimozione' }}
+        </button>
+      </div>
+    </section>
+  </div>
+</div>

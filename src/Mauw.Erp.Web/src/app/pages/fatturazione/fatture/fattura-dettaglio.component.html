@@ -1,0 +1,187 @@
+<main class="-mt-4 mx-auto max-w-screen-2xl space-y-3 px-3 pb-3 pt-0 text-slate-800 sm:px-4">
+  <app-back-button (activated)="goBack()"></app-back-button>
+
+  <div *ngIf="errorMessage" role="alert" class="rounded-lg border border-red-300 bg-red-50 p-3 text-red-700">
+    {{ errorMessage }}
+  </div>
+  <div *ngIf="successMessage" role="status" class="rounded-lg border border-green-300 bg-green-50 p-3 text-green-800">
+    {{ successMessage }}
+  </div>
+  <div *ngIf="loading && !invoice" role="status" class="p-8 text-center text-slate-500">
+    Caricamento fattura…
+  </div>
+
+  <ng-container *ngIf="invoice as currentInvoice">
+    <header class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
+      <div>
+        <p class="mb-1 text-xs font-bold uppercase tracking-wider text-slate-500">
+          Dettaglio fattura ·
+          <span [class]="'rounded-full px-2 py-0.5 ' + statusClass(currentInvoice.status)">
+            {{ statusLabel(currentInvoice.status) }}
+          </span>
+        </p>
+        <h1 class="m-0 text-2xl font-bold">{{ currentInvoice.invoiceNumber }}</h1>
+        <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+          <span>{{ currentInvoice.contactName }}</span>
+          <span>Data: {{ currentInvoice.invoiceDate | date:'dd/MM/yyyy' }}</span>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center justify-end gap-2">
+        <div class="grid text-right text-sm text-slate-500">
+          <span>Totale fattura</span>
+          <strong class="text-xl text-slate-900">{{ currentInvoice.grossTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</strong>
+        </div>
+        <a *ngIf="currentInvoice.orderId" [routerLink]="['/ordini', currentInvoice.orderId]"
+          [queryParams]="{ returnTo: currentUrl }" [attr.aria-label]="'Apri ordine ' + (relatedOrder?.orderNumber || currentInvoice.orderId)"
+          [title]="'Apri ordine ' + (relatedOrder?.orderNumber || currentInvoice.orderId)"
+          class="inline-flex h-10 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 text-sm font-semibold text-blue-800 hover:bg-blue-100">
+          ORD
+          <svg aria-hidden="true" focusable="false" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 17 17 7M8 7h9v9" />
+          </svg>
+        </a>
+        <a *ngFor="let ddt of relatedDdts" [routerLink]="['/ddt', ddt.id]"
+          [queryParams]="{ returnTo: currentUrl }" [attr.aria-label]="'Apri DDT ' + ddt.ddtNumber"
+          [title]="'Apri DDT ' + ddt.ddtNumber"
+          class="inline-flex h-10 items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 text-sm font-semibold text-green-800 hover:bg-green-100">
+          DDT
+          <svg aria-hidden="true" focusable="false" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 17 17 7M8 7h9v9" />
+          </svg>
+        </a>
+        <button type="button" (click)="downloadPdf()" [disabled]="downloadingPdf"
+          class="inline-flex h-10 items-center gap-2 rounded-lg bg-slate-700 px-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
+          {{ downloadingPdf ? '…' : 'PDF' }}
+          <svg aria-hidden="true" focusable="false" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" />
+          </svg>
+        </button>
+      </div>
+      <p *ngIf="loadingRelatedDocuments" role="status" class="w-full text-right text-xs text-slate-500">
+        Caricamento documenti collegati…
+      </p>
+      <p *ngIf="relatedDocumentsError" role="alert" class="w-full text-right text-xs text-red-700">
+        {{ relatedDocumentsError }}
+      </p>
+    </header>
+
+    <section class="rounded-xl border border-slate-200 bg-white p-4">
+      <div class="mb-3 flex items-center justify-between gap-4">
+        <div>
+          <h2 class="m-0 text-lg font-bold">Righe fattura</h2>
+          <p class="mt-1 text-sm text-slate-500">{{ currentInvoice.items.length }} righe</p>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[760px] text-sm">
+          <thead class="border-b bg-slate-50">
+            <tr class="text-left text-slate-600">
+              <th class="px-3 py-2">Articolo</th>
+              <th class="px-3 py-2">SKU</th>
+              <th class="px-3 py-2 text-right">Quantità</th>
+              <th class="px-3 py-2 text-right">Prezzo unitario</th>
+              <th class="px-3 py-2 text-right">Sconto</th>
+              <th class="px-3 py-2">IVA / Natura</th>
+              <th class="px-3 py-2 text-right">Imponibile</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of currentInvoice.items | pageSlice:itemsPage:itemsPageSize" class="border-b">
+              <td class="px-3 py-2">
+                {{ item.productName || item.variantId }}
+                <span *ngIf="item.sizeName || item.colorName" class="block text-xs text-slate-500">{{ item.sizeName }} {{ item.colorName }}</span>
+              </td>
+              <td class="px-3 py-2 font-mono">{{ item.sku || '—' }}</td>
+              <td class="px-3 py-2 text-right">{{ item.quantity }}</td>
+              <td class="px-3 py-2 text-right">{{ item.unitNetPrice | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+              <td class="px-3 py-2 text-right">{{ item.discountPercent }}%</td>
+              <td class="px-3 py-2">{{ item.vatRate }}%<span *ngIf="item.natureCode"> · {{ item.natureCode }}</span></td>
+              <td class="px-3 py-2 text-right font-semibold">{{ item.lineNetTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+            </tr>
+            <tr *ngIf="currentInvoice.shippingCost > 0
+              && currentInvoice.items.length >= (itemsPage - 1) * itemsPageSize
+              && currentInvoice.items.length < itemsPage * itemsPageSize" class="border-b bg-slate-50">
+              <td class="px-3 py-2">Spese di spedizione</td>
+              <td class="px-3 py-2">—</td>
+              <td class="px-3 py-2 text-right">1</td>
+              <td class="px-3 py-2 text-right">{{ currentInvoice.shippingCost | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+              <td class="px-3 py-2 text-right">0%</td>
+              <td class="px-3 py-2">
+                {{ currentInvoice.shippingVatRate }}%<span *ngIf="currentInvoice.shippingNatureCode"> · {{ currentInvoice.shippingNatureCode }}</span>
+              </td>
+              <td class="px-3 py-2 text-right font-semibold">{{ currentInvoice.shippingCost | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+            </tr>
+            <tr *ngIf="currentInvoice.items.length === 0 && currentInvoice.shippingCost <= 0">
+              <td colspan="7" class="p-6 text-center text-slate-500">Nessuna riga inserita.</td>
+            </tr>
+          </tbody>
+        </table>
+        <app-pagination *ngIf="currentInvoice.items.length + (currentInvoice.shippingCost > 0 ? 1 : 0) > 0"
+          [page]="itemsPage" [pageSize]="itemsPageSize"
+          [totalCount]="currentInvoice.items.length + (currentInvoice.shippingCost > 0 ? 1 : 0)"
+          (pageChange)="itemsPage = $event" (pageSizeChange)="onItemsPageSizeChange($event)">
+        </app-pagination>
+      </div>
+    </section>
+
+    <div class="grid gap-5 lg:grid-cols-2">
+      <section class="rounded-xl border border-slate-200 bg-white p-4">
+        <h2 class="mb-2 text-lg font-bold">Riepilogo fiscale</h2>
+        <dl class="space-y-2 text-sm">
+          <div class="flex justify-between"><dt>Imponibile</dt><dd>{{ currentInvoice.taxableTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</dd></div>
+          <div class="flex justify-between"><dt>IVA</dt><dd>{{ currentInvoice.vatTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</dd></div>
+          <div class="flex justify-between border-t pt-2 text-base font-bold"><dt>Totale documento</dt><dd>{{ currentInvoice.grossTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</dd></div>
+          <div class="flex justify-between"><dt>Pagato</dt><dd>{{ currentInvoice.paidAmount | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</dd></div>
+          <div class="flex justify-between font-semibold"><dt>Residuo</dt><dd>{{ currentInvoice.balanceDue | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</dd></div>
+        </dl>
+      </section>
+
+      <section class="rounded-xl border border-slate-200 bg-white p-4">
+        <h2 class="mb-2 text-lg font-bold">Pagamenti registrati</h2>
+        <ul *ngIf="currentInvoice.payments.length; else noPayments" class="divide-y">
+          <li *ngFor="let payment of currentInvoice.payments" class="py-3 text-sm">
+            <div class="flex justify-between gap-3">
+              <span>{{ payment.paymentDate | date:'dd/MM/yyyy' }} · {{ payment.paymentMethod || 'Metodo storico non specificato' }}</span>
+              <strong>{{ payment.amount | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</strong>
+            </div>
+            <p *ngIf="payment.transactionDetails" class="mt-1 text-xs text-slate-500">
+              Riferimento: {{ payment.transactionDetails }}
+            </p>
+          </li>
+        </ul>
+        <ng-template #noPayments><p class="text-sm text-slate-500">Nessun pagamento registrato.</p></ng-template>
+        <form *ngIf="currentInvoice.balanceDue > 0 && (currentInvoice.items.length > 0 || currentInvoice.shippingCost > 0)"
+          (ngSubmit)="recordPayment()" class="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2">
+          <label class="text-sm font-semibold">
+            Importo
+            <input name="paymentAmount" type="number" min="0.01" step="0.01" [max]="currentInvoice.balanceDue"
+              [(ngModel)]="paymentAmount" required class="mt-1 w-full rounded border border-slate-300 p-2" />
+          </label>
+          <label class="text-sm font-semibold">
+            Data
+            <input name="paymentDate" type="date" [(ngModel)]="paymentDate" required
+              class="mt-1 w-full rounded border border-slate-300 p-2" />
+          </label>
+          <label class="text-sm font-semibold">
+            Metodo di pagamento
+            <select name="paymentMethod" [(ngModel)]="paymentMethod" required
+              class="mt-1 w-full rounded border border-slate-300 p-2">
+              <option *ngFor="let method of paymentMethods" [value]="method">{{ method }}</option>
+            </select>
+          </label>
+          <label class="text-sm font-semibold">
+            {{ paymentMethod === 'Bonifico bancario' ? 'Riferimento bonifico (CRO/TRN)' : 'Dettagli operazione (facoltativi)' }}
+            <input name="transactionDetails" [(ngModel)]="transactionDetails" maxlength="500"
+              [required]="paymentMethod === 'Bonifico bancario'"
+              class="mt-1 w-full rounded border border-slate-300 p-2" />
+          </label>
+          <button type="submit" [disabled]="recordingPayment || !paymentAmount"
+            class="rounded bg-green-700 px-3 py-2 font-semibold text-white hover:bg-green-800 disabled:opacity-50 sm:col-span-2">
+            {{ recordingPayment ? 'Registrazione…' : 'Registra pagamento' }}
+          </button>
+        </form>
+      </section>
+    </div>
+
+  </ng-container>
+</main>

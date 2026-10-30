@@ -10,6 +10,7 @@ import { PaginationComponent } from '../../../shared/pagination/pagination.compo
 import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
 import { SortChange } from '../../../models/pagination.model';
 import { sortRows } from '../../../shared/sort-rows';
+import { AddActionButtonComponent } from '../../../shared/add-action-button/add-action-button.component';
 
 function localDate(value?: string | null): string {
   if (!value) return '';
@@ -20,11 +21,14 @@ function localDate(value?: string | null): string {
 @Component({
   selector: 'app-listini',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, PriceRuleTargetComponent, PaginationComponent, SortHeaderDirective],
+  imports: [
+    CommonModule, ReactiveFormsModule, PriceRuleTargetComponent, PaginationComponent,
+    SortHeaderDirective, AddActionButtonComponent
+  ],
   template: `
     <div class="p-6 space-y-4">
       <div class="flex justify-between"><h1 class="text-3xl font-bold">Listini prezzi</h1>
-        <button class="bg-blue-600 text-white rounded px-4 py-2" [disabled]="busy" (click)="edit()">Nuovo listino</button></div>
+        <app-add-action-button label="Nuovo listino" [disabled]="busy" (activated)="edit()"></app-add-action-button></div>
       <p class="text-sm text-gray-600">Valuta EUR. Specificità: SKU → prodotto → categoria → globale; poi priorità maggiore.
         Parità fra regole applicabili: errore, verificato dal server. I prezzi risolti non sono totali fiscali.</p>
       <p *ngIf="error" role="alert" class="bg-red-50 text-red-700 p-3">{{ error }}</p>
@@ -87,7 +91,7 @@ function localDate(value?: string | null): string {
             <button type="button" (click)="rules.removeAt(i)" class="text-red-600 mt-3">Rimuovi regola</button>
           </fieldset>
         </div>
-        <button type="button" (click)="addRule()" class="text-blue-600">+ Aggiungi regola</button>
+        <app-add-action-button label="Aggiungi regola al listino" (activated)="addRule()"></app-add-action-button>
         <p *ngIf="form.controls.name.invalid && form.controls.name.touched" class="text-red-600">Nome obbligatorio (max 255 caratteri).</p>
         <div class="flex gap-3"><button type="submit" [disabled]="busy" class="bg-blue-600 text-white rounded px-4 py-2">Salva</button>
           <button type="button" [disabled]="busy" (click)="editing = false">Annulla</button></div>

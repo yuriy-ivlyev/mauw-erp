@@ -69,7 +69,6 @@ public sealed class CostVisibilityHost : IAsyncLifetime
         services.AddScoped<IValidator<CreateOrderRequest>, CreateOrderRequestValidator>();
         services.AddScoped<IValidator<CreateOrderItemRequest>, CreateOrderItemRequestValidator>();
         services.AddScoped<IValidator<BarcodeScanRequest>, BarcodeScanRequestValidator>();
-        services.AddScoped<IValidator<CreateInvoiceRequest>, CreateInvoiceRequestValidator>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddPricingApi();
         services.AddInvoicePdfReporting();
@@ -263,6 +262,24 @@ public sealed class CostVisibilityEndpointTests(CostVisibilityHost host) : IClas
         var (withStock, withStockBody) = await GetAsync(role, $"/api/v1/inventory/barcode/BAR-A1?warehouseId={host.WarehouseId}");
         Assert.Equal(30.5m, Num(withStock, "unitNetPrice"));
         Assert.False(HasCostValue(withStockBody));
+    }
+
+    [Fact]
+    public async Task AvailableOnlyVariantSearchUsesDefaultSellableWarehouseAndExcludesOutOfStock()
+    {
+        using var client = host.CreateClient("Sales");
+
+        var response = await client.GetAsync("/api/v1/products/variants/search?q=BAR&availableOnly=true");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var variants = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var ids = variants.EnumerateArray()
+            .Select(variant => variant.GetProperty("variantId").GetGuid())
+            .Order()
+            .ToArray();
+        Assert.Equal(new[] { host.AlfaVariantId, host.BetaVariantId }.Order().ToArray(), ids);
+        Assert.All(variants.EnumerateArray(), variant =>
+            Assert.True(variant.GetProperty("currentStock").GetDecimal() > 0m));
     }
 
     [Theory]

@@ -466,7 +466,7 @@ public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos
         SetLineCell(row, 0, (index + 1).ToString("D2"), ParagraphAlignment.Center);
         SetLineCell(row, 1, line.Sku, ParagraphAlignment.Left);
         SetLineCell(row, 2, line.Description, ParagraphAlignment.Left);
-        SetLineCell(row, 3, line.Pieces.ToString("N0", ItalianCulture), ParagraphAlignment.Right);
+        SetLineCell(row, 3, line.Pieces.ToString("0.########", ItalianCulture), ParagraphAlignment.Right);
         SetLineCell(row, 4,
             Math.Round(line.UnitPrice, 2, MidpointRounding.AwayFromZero).ToString("N2", ItalianCulture),
             ParagraphAlignment.Right);
@@ -573,7 +573,7 @@ public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos
 
     private static void BuildTotalsRows(Table table, InvoicePdfModel model)
     {
-        AddTotalRow(table, "Totale Capi / Pezzi:", $"{model.Totals.TotalPieces} Pz");
+        AddTotalRow(table, "Totale Capi / Pezzi:", $"{model.Totals.TotalPieces.ToString("0.########", ItalianCulture)} Pz");
         AddTotalRow(table, "Totale Merci Netto:", Money(model.Totals.TotalNet, model.Currency));
         AddTotalRow(table, "Spese Spedizione / Assic.:", Money(model.Totals.ShippingCost, model.Currency));
         AddTotalRow(table, "Totale Imponibile:",
@@ -593,7 +593,8 @@ public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos
         model.DocumentType.ToUpperInvariant() switch
         {
             "ORDINE" => "Ordine",
-            "DDT" => "DDT",
+            "RICEVUTA CASSA" => "Ricevuta cassa",
+            "DDT" => "Documento di Trasporto (DDT)",
             "NOTA CREDITO" or "TD04" => "Nota credito",
             _ => "Fattura"
         };
@@ -602,7 +603,8 @@ public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos
         model.DocumentType.ToUpperInvariant() switch
         {
             "ORDINE" => "ORDINE",
-            "DDT" => "DDT",
+            "RICEVUTA CASSA" => "RICEVUTA CASSA",
+            "DDT" => "DOCUMENTO DI TRASPORTO (DDT)",
             "NOTA CREDITO" or "TD04" => "NOTA CREDITO",
             _ => "FATTURA IMMEDIATA"
         };
@@ -611,6 +613,7 @@ public sealed class MigraDocInvoicePdfGenerator(ICompanyLogoService companyLogos
         model.DocumentType.ToUpperInvariant() switch
         {
             "ORDINE" => "TOTALE ORDINE:",
+            "RICEVUTA CASSA" => "TOTALE VENDITA:",
             "DDT" => "TOTALE DDT:",
             "NOTA CREDITO" or "TD04" => "TOTALE NOTA CREDITO:",
             _ => "TOTALE FATTURA:"

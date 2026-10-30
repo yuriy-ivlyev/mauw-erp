@@ -11,5 +11,7 @@ public interface IDdtDocumentRepository : IRepository<DdtDocument, Guid>
     Task<(IEnumerable<DdtDocument> Items, int Total)> GetByContactIdPagedAsync(Guid contactId, int page, int pageSize);
     Task<DdtDocument?> GetByNumberAsync(string ddtNumber);
     Task<IEnumerable<DdtDocument>> GetByOrderIdsAsync(IEnumerable<Guid> orderIds);
+    Task<IEnumerable<DdtDocument>> GetByOrderIdWithItemsAsync(Guid orderId);
     Task<int> CountDdtsByPrefixAsync(string prefix);
+    Task<long> GetNextShipmentSequenceAsync();
 }

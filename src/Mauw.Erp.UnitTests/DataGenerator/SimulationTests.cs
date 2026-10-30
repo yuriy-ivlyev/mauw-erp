@@ -113,20 +113,48 @@ public class SimulationTests(PostgreSqlContainerFixture postgres)
 
         var orders = await db.Orders.AsNoTracking().Include(item => item.Items).ToDictionaryAsync(item => item.Id);
         var ddts = await db.DdtDocuments.AsNoTracking().Include(item => item.Items).ToDictionaryAsync(item => item.OrderId!.Value);
-        var invoices = await db.Invoices.AsNoTracking().Include(item => item.Items).ToListAsync();
+        var shipments = await db.Shipments.AsNoTracking().Include(item => item.Lines)
+            .ToDictionaryAsync(item => item.OrderId);
+        var invoices = await db.Invoices.AsNoTracking()
+            .Include(item => item.Items)
+            .Include(item => item.Payments)
+            .ToListAsync();
         var customerContactIds = customers.Select(item => item.ContactId).ToHashSet();
         Assert.NotEmpty(orders);
+        Assert.All(orders.Values, order => Assert.Equal(OrderStatus.Completed, order.Status));
         Assert.All(orders.Values, order => Assert.Contains(order.ContactId, customerContactIds));
+        Assert.All(orders.Values, order => Assert.Equal(0.00m, order.ShippingCost));
+        Assert.All(orders.Values, order => Assert.Equal(order.Items.Sum(item => item.Quantity), order.Items.Sum(item => item.QuantityShipped)));
+        Assert.Contains(orders.Values, order => !string.IsNullOrWhiteSpace(order.InternalNotes));
+        Assert.All(orders.Values, order => Assert.True(order.InternalNotes is null || order.InternalNotes.Length <= 2000));
         Assert.All(ddts.Values, ddt => Assert.Contains(ddt.ContactId, customerContactIds));
+        Assert.Equal(orders.Count, shipments.Count);
         Assert.All(invoices, invoice => Assert.Contains(invoice.ContactId, customerContactIds));
+        Assert.All(invoices, invoice => Assert.Equal(InvoiceStatuses.Confirmed, invoice.Status));
+        Assert.All(invoices, invoice => Assert.Matches(
+            "^FAT-[0-9]{6}-[0-9]{5}$", invoice.InvoiceNumber));
+        foreach (var period in invoices.GroupBy(invoice => invoice.InvoiceNumber[4..10]))
+        {
+            var sequences = period.Select(invoice => int.Parse(invoice.InvoiceNumber[11..]))
+                .Order()
+                .ToArray();
+            Assert.Equal(Enumerable.Range(1, sequences.Length), sequences);
+        }
         var calculator = new ItalianAccountingCalculator();
         foreach (var invoice in invoices)
         {
+            Assert.Empty(invoice.Payments);
             var order = orders[invoice.OrderId!.Value];
             var ddt = ddts[order.Id];
+            var shipment = shipments[order.Id];
             Assert.True(order.OrderDate <= ddt.DdtDate && ddt.DdtDate <= invoice.InvoiceDate);
             Assert.Equal(order.ContactId, invoice.ContactId);
             Assert.Equal(order.ContactId, ddt.ContactId);
+            Assert.Equal(shipment.DdtNumber, ddt.DdtNumber);
+            Assert.StartsWith("SIM-SPED-", shipment.ShipmentNumber);
+            Assert.Equal(order.Id, shipment.OrderId);
+            Assert.Equal(order.Items.Sum(item => item.Quantity),
+                shipment.Lines.Sum(item => item.QuantityShipped));
             var calculated = calculator.CalculateAndApply(invoice.Items);
             Assert.True(calculated.Success, calculated.Error);
             Assert.Equal(calculated.Data!.TotalGross, invoice.GrossTotal);
@@ -135,11 +163,12 @@ public class SimulationTests(PostgreSqlContainerFixture postgres)
             var expected = invoice.Items.OrderBy(item => item.VariantId)
                 .Select(item => (item.VariantId, item.Quantity, item.UnitNetPrice, item.DiscountPercent, item.VatRate, item.NatureCode, item.LineNetTotal));
             Assert.Equal(expected, order.Items.OrderBy(item => item.VariantId)
-                .Select(item => (item.VariantId, item.Quantity, item.UnitNetPrice, item.DiscountPercent, item.VatRate, item.NatureCode, item.LineNetTotal)));
+                .Select(item => (item.VariantId, Quantity: (decimal)item.Quantity, item.UnitNetPrice, item.DiscountPercent, item.VatRate, item.NatureCode, item.LineNetTotal)));
             Assert.Equal(expected, ddt.Items.OrderBy(item => item.VariantId)
-                .Select(item => (item.VariantId, item.Quantity, item.UnitNetPrice, item.DiscountPercent, item.VatRate, item.NatureCode, item.LineNetTotal)));
+                .Select(item => (item.VariantId, Quantity: (decimal)item.Quantity, item.UnitNetPrice, item.DiscountPercent, item.VatRate, item.NatureCode, item.LineNetTotal)));
             Assert.All(invoice.Items, item =>
             {
+                Assert.Equal(decimal.Truncate(item.Quantity), item.Quantity);
                 Assert.Null(item.LineVatTotal);
                 Assert.Null(item.LineGrossTotal);
             });

@@ -12,6 +12,7 @@ public class DdtDocument : Entity<Guid>
     public Guid ContactId { get; set; }
     public Guid? WarehouseId { get; set; }
     public Guid? OrderId { get; set; }
+    public Guid? ShipmentId { get; set; }
     public string DdtNumber { get; set; }
     public DateTime DdtDate { get; set; }
     public decimal TaxableTotal { get; set; }
@@ -21,6 +22,7 @@ public class DdtDocument : Entity<Guid>
     // Navigation
     public Contact Contact { get; set; } = null!;
     public Warehouse? Warehouse { get; set; }
+    public Shipment? Shipment { get; set; }
     public ICollection<DdtItem> Items { get; set; } = [];
 
     public DdtDocument(

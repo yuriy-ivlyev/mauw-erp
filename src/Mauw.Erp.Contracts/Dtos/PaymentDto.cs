@@ -7,5 +7,6 @@ public record PaymentDto(
     Guid Id,
     decimal Amount,
     DateTime PaymentDate,
-    string PaymentMethod
+    string? PaymentMethod,
+    string? TransactionDetails
 );

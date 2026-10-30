@@ -66,7 +66,8 @@ public sealed class GeneratorRunner(ILogger<GeneratorRunner> logger)
                 await db.StockMovements.AnyAsync(token) ||
                 await db.Orders.AnyAsync(token) ||
                 await db.Invoices.AnyAsync(token) ||
-                await db.DdtDocuments.AnyAsync(token))
+                await db.DdtDocuments.AnyAsync(token) ||
+                await db.Shipments.AnyAsync(token))
             {
                 logger.LogError("Database gia popolato: seed richiede dati operativi vuoti. Nessun dato modificato; usare reset per ripartire.");
                 return 2;

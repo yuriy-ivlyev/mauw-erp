@@ -145,6 +145,7 @@ public class CompanyInvoiceSettingsTests(PostgreSqlContainerFixture postgres)
         string type, bool hasInvoiceDetails, bool hasAgent, bool fullyPaid)
     {
         await using var db = CreateDb();
+        var calculator = new ItalianAccountingCalculator();
         var agent = new Contact("Rossi Rappresentanze");
         agent.EnableAsAgent();
         var customer = new Contact("Cliente");
@@ -158,7 +159,22 @@ public class CompanyInvoiceSettingsTests(PostgreSqlContainerFixture postgres)
         db.Add(variant);
         var invoice = new Invoice(customer.Id, "F-1");
         invoice.Items.Add(new(invoice.Id, variant.Id, 1, 10.00m, 22m));
-        var order = new Order(customer.Id, "O-1");
+        var order = new Order(
+            customer.Id,
+            "O-1",
+            fulfillmentType: type == "ORDINE"
+                ? OrderFulfillmentType.CashDesk
+                : OrderFulfillmentType.StandardShipping);
+        if (type == "ORDINE")
+        {
+            order.Items.Add(new OrderItem(order.Id, variant.Id, 1, 10.00m, 22m)
+            {
+                LineNetTotal = 10.00m
+            });
+            var shipping = order.SetShippingCharge(5.00m, 10m, null, calculator);
+            Assert.True(shipping.Success, shipping.Error);
+            order.FinalizeCashSale("Carta", "txn-123");
+        }
         var ddt = new DdtDocument(customer.Id, "D-1");
         db.AddRange(invoice, order, ddt);
         var credit = new CreditNote(invoice.Id, "N-1")
@@ -180,10 +196,8 @@ public class CompanyInvoiceSettingsTests(PostgreSqlContainerFixture postgres)
         services.AddInvoicePdfReporting();
         using var provider = services.BuildServiceProvider();
         var pdf = provider.GetRequiredService<IInvoicePdfGenerator>();
-        var calculator = new ItalianAccountingCalculator();
         var pricing = new DocumentPricingService(Mock.Of<Mauw.Erp.Domain.Repositories.IPriceListRepository>(), Mock.Of<IPriceListService>(), calculator);
-        var invoices = new InvoiceService(work, Mock.Of<IValidator<CreateInvoiceRequest>>(),
-            calculator, settings, pdf, pricing);
+        var invoices = new InvoiceService(work, calculator, settings, pdf);
         var orders = new OrderService(work, Mock.Of<IValidator<CreateOrderRequest>>(),
             new CreateOrderItemRequestValidator(), calculator, settings, pdf,
             NullLogger<OrderService>.Instance, pricing);
@@ -202,6 +216,12 @@ public class CompanyInvoiceSettingsTests(PostgreSqlContainerFixture postgres)
         var leftColumnText = string.Join(" ", document.GetPages().SelectMany(page => page.GetWords())
             .Where(word => word.BoundingBox.Left < 12.0 / 2.54 * 72.0).Select(word => word.Text));
         Assert.Contains("10.000,00", text);
+        if (type == "ORDINE")
+        {
+            Assert.Contains("SPEDIZIONE", text);
+            Assert.Contains("Spese di spedizione", text);
+            Assert.Contains("17,70", text);
+        }
         Assert.Contains("Capitale sociale", text);
         Assert.Equal(fullyPaid, text.Contains("i.v."));
         Assert.Contains("BO-591450", text);
@@ -212,6 +232,12 @@ public class CompanyInvoiceSettingsTests(PostgreSqlContainerFixture postgres)
         Assert.Equal(hasInvoiceDetails, text.Contains("BPITITMM"));
         Assert.Equal(hasInvoiceDetails, text.Contains("Banca Prova"));
         Assert.Equal(hasInvoiceDetails, text.Contains("Trascorsi 8 giorni"));
+        if (type == "ORDINE")
+        {
+            Assert.Contains("RICEVUTA CASSA", text);
+            Assert.Contains("TOTALE VENDITA", text);
+            Assert.Contains("Carta", text);
+        }
         var isFiscalDocument = type is "TD01" or "NOTA CREDITO";
         Assert.Equal(isFiscalDocument, text.Contains("trasmesso tramite"));
     }
@@ -235,11 +261,9 @@ public class CompanyInvoiceSettingsTests(PostgreSqlContainerFixture postgres)
         var calculator = new ItalianAccountingCalculator();
         var service = new InvoiceService(
             work,
-            Mock.Of<Mauw.Erp.Application.Validation.IValidator<CreateInvoiceRequest>>(),
             calculator,
             settings,
-            Mock.Of<IInvoicePdfGenerator>(),
-            Mock.Of<IDocumentPricingService>());
+            Mock.Of<IInvoicePdfGenerator>());
 
         var result = await service.GetInvoicePdfAsync(
             (await db.Invoices.SingleAsync()).Id);
@@ -262,9 +286,7 @@ public class CompanyInvoiceSettingsTests(PostgreSqlContainerFixture postgres)
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var pdf = new Mock<IInvoicePdfGenerator>(MockBehavior.Strict);
         var service = new InvoiceService(new UnitOfWork(db, cache),
-            Mock.Of<IValidator<CreateInvoiceRequest>>(), new ItalianAccountingCalculator(),
-            Mock.Of<ICompanySettingsService>(), pdf.Object,
-            new DocumentPricingService(Mock.Of<Mauw.Erp.Domain.Repositories.IPriceListRepository>(), Mock.Of<IPriceListService>(), new ItalianAccountingCalculator()));
+            new ItalianAccountingCalculator(), Mock.Of<ICompanySettingsService>(), pdf.Object);
 
         var result = await service.GetInvoicePdfAsync(invoice.Id);
 

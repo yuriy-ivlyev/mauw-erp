@@ -40,4 +40,3 @@ public abstract class Entity<TId> where TId : IEquatable<TId>
         return Id.GetHashCode();
     }
 }
-

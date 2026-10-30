@@ -1,9 +1,12 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 import { PriceFormulaService, priceFormulaErrorMessage } from '../../../services/price-formula.service';
+import { PaginationComponent } from '../../../shared/pagination/pagination.component';
+import { PageSlicePipe } from '../../../shared/pagination/page-slice.pipe';
+import { AddActionButtonComponent } from '../../../shared/add-action-button/add-action-button.component';
 import {
   PRICE_FORMULA_DEFAULT_ROUNDING_STEP,
   PRICE_FORMULA_MAX_STEPS,
@@ -23,6 +26,12 @@ interface StepErrors {
   percentage: string | null;
 }
 
+interface FormulaCalculationRow {
+  label: string;
+  percentage: number | null;
+  value: number;
+}
+
 const MAX_LABEL_LENGTH = 100;
 const MAX_PERCENTAGE = 9999;
 const MAX_ROUNDING_STEP = 100;
@@ -39,7 +48,7 @@ function hasMaxFourDecimals(value: number): boolean {
 @Component({
   selector: 'app-formula-prezzi',
   standalone: true,
-  imports: [FormsModule, DecimalPipe],
+  imports: [CommonModule, FormsModule, DecimalPipe, PaginationComponent, PageSlicePipe, AddActionButtonComponent],
   templateUrl: './formula-prezzi.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -68,6 +77,23 @@ export class FormulaPrezziComponent implements OnInit {
   readonly calculating = signal(false);
   readonly calculationError = signal('');
   readonly calculation = signal<PriceFormulaCalculation | null>(null);
+  calculationPage = 1;
+  calculationPageSize = 20;
+
+  get calculationRows(): FormulaCalculationRow[] {
+    const result = this.calculation();
+    if (!result) return [];
+
+    return [
+      { label: 'Costo di acquisto', percentage: null, value: result.purchaseCost },
+      ...result.steps.map(step => ({
+        label: step.label,
+        percentage: step.percentage,
+        value: step.runningValue
+      })),
+      { label: 'Prezzo non arrotondato', percentage: null, value: result.unroundedPrice }
+    ];
+  }
 
   readonly hasUnsavedChanges = computed(
     () => this.snapshotOf(this.steps(), this.roundingStep()) !== this.savedSnapshot()
@@ -194,6 +220,7 @@ export class FormulaPrezziComponent implements OnInit {
     this.calculating.set(true);
     this.calculationError.set('');
     this.calculation.set(null);
+    this.calculationPage = 1;
     this.service.calculate(cost)
       .pipe(finalize(() => this.calculating.set(false)), takeUntilDestroyed(this.destroyRef))
       .subscribe({
@@ -201,6 +228,11 @@ export class FormulaPrezziComponent implements OnInit {
         error: error => this.calculationError.set(
           priceFormulaErrorMessage(error, 'Impossibile calcolare il prezzo di vendita.'))
       });
+  }
+
+  onCalculationPageSizeChange(pageSize: number): void {
+    this.calculationPageSize = pageSize;
+    this.calculationPage = 1;
   }
 
   private patchStep(index: number, patch: Partial<EditableStep>): void {

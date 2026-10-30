@@ -7,7 +7,7 @@ public class InvoiceItem : Entity<Guid>, ICommercialDocumentLine
 {
     public Guid InvoiceId { get; set; }
     public Guid VariantId { get; set; }
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
     public decimal UnitNetPrice { get; set; }
     public decimal LineNetTotal { get; set; }
     public decimal VatRate { get; set; }
@@ -24,7 +24,7 @@ public class InvoiceItem : Entity<Guid>, ICommercialDocumentLine
     public InvoiceItem(
         Guid invoiceId,
         Guid variantId,
-        int quantity,
+        decimal quantity,
         decimal unitNetPrice,
         decimal vatRate,
         string? natureCode = null,

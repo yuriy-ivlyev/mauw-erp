@@ -1,9 +1,19 @@
 import { PaginationComponent } from './pagination.component';
+import { PageSlicePipe } from './page-slice.pipe';
 import { SortHeaderDirective } from '../sort-header/sort-header.directive';
 import { sortRows } from '../sort-rows';
 import { TestBed } from '@angular/core/testing';
 
 describe('shared list controls', () => {
+  it('slices client-side rows for the requested page without mutating the source', () => {
+    const rows = ['a', 'b', 'c', 'd'];
+    const pipe = new PageSlicePipe();
+
+    expect(pipe.transform(rows, 2, 2)).toEqual(['c', 'd']);
+    expect(pipe.transform(rows, 3, 2)).toEqual([]);
+    expect(rows).toEqual(['a', 'b', 'c', 'd']);
+  });
+
   it('calculates the result range and page count', () => {
     const component = new PaginationComponent();
     component.page = 2;

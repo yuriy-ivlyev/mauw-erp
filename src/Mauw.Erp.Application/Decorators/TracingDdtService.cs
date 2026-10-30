@@ -26,7 +26,7 @@ public sealed class TracingDdtService(IDdtService inner) : TracingDecoratorBase,
         TraceAsync("Ddt.Delete", () => inner.DeleteDdtAsync(id),
             a => a?.SetTag("ddt.id", id));
 
-    public Task<OperationResult<byte[]>> GetDdtPdfAsync(Guid id) =>
-        TraceAsync("Ddt.Pdf", () => inner.GetDdtPdfAsync(id),
+    public Task<OperationResult<byte[]>> GetDdtPdfAsync(Guid id, CancellationToken cancellationToken = default) =>
+        TraceAsync("Ddt.Pdf", () => inner.GetDdtPdfAsync(id, cancellationToken),
             a => a?.SetTag("ddt.id", id));
 }

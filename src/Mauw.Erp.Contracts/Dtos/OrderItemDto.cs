@@ -15,5 +15,13 @@ public record OrderItemDto(
     decimal? LineGrossTotal,
     string? NatureCode = null,
     decimal DiscountPercent = 0m,
-    Mauw.Erp.Contracts.Pricing.PricingSnapshotDto? PricingSnapshot = null
+    Mauw.Erp.Contracts.Pricing.PricingSnapshotDto? PricingSnapshot = null,
+    int ShippedQuantity = 0,
+    int RemainingQuantity = 0,
+    bool IsBillingOnly = false,
+    bool IsExcludedFromInvoice = false,
+    string? Sku = null,
+    string? ProductName = null,
+    string? SizeName = null,
+    string? ColorName = null
 );

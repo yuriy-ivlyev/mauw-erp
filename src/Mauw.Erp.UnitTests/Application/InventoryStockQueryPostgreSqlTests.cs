@@ -260,10 +260,11 @@ public sealed class InventoryStockQueryPostgreSqlTests(PostgreSqlContainerFixtur
                 $"UPDATE stock_movements SET unit_cost = {8.125m} WHERE id = {receipt.Id}");
             movementCutoff = receipt.MovementDateUtc.AddSeconds(-1);
 
-            var order = new Order(customer.Id, $"ORD-{code}") { Status = OrderStatus.Confirmed };
+            var order = new Order(customer.Id, $"ORD-{code}");
+            order.Items.Add(new OrderItem(order.Id, variant.Id, 3, 10m, 22m));
+            order.Confirm();
             seed.Add(order);
             await seed.SaveChangesAsync();
-            seed.Add(new OrderItem(order.Id, variant.Id, 3, 10m, 22m));
 
             var ddt = new DdtDocument(customer.Id, $"DDT-{code}") { OrderId = order.Id };
             seed.Add(ddt);

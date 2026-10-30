@@ -114,6 +114,100 @@ public class PriceListServiceTests(PostgreSqlContainerFixture postgres)
     }
 
     [Fact]
+    public async Task FractionalInvoiceQuantityIsPricedAndPersistedWithoutTruncation()
+    {
+        using var fixture = new Fixture(postgres);
+        await fixture.AssignListAsync(PriceCalculationType.FixedPrice, 10m);
+        var prepared = await fixture.Pricing.PrepareAsync(fixture.Customer.Id,
+            [new(fixture.Variant.Id, 0.125m, null, null, null, null, null)], DateTimeOffset.UtcNow);
+
+        Assert.True(prepared.Success, prepared.Error);
+        var fiscalLine = Assert.Single(prepared.Data!.Lines);
+        var invoice = new Invoice(fixture.Customer.Id, "INV-FRACTIONAL");
+        var item = new InvoiceItem(invoice.Id, fixture.Variant.Id, 0.125m, fiscalLine.FiscalLine.UnitNetPrice,
+            fiscalLine.FiscalLine.VatRate, fiscalLine.FiscalLine.NatureCode, fiscalLine.FiscalLine.DiscountPercent)
+        {
+            PricingSnapshot = fiscalLine.Snapshot
+        };
+        var calculated = invoice.AddItem(item, fixture.Calculator);
+        Assert.True(calculated.Success, calculated.Error);
+
+        fixture.Db.Add(invoice);
+        await fixture.Db.SaveChangesAsync();
+        fixture.Db.ChangeTracker.Clear();
+        var loaded = await fixture.Db.Invoices.Include(value => value.Items)
+            .SingleAsync(value => value.Id == invoice.Id);
+
+        Assert.Equal(0.125m, Assert.Single(loaded.Items).Quantity);
+        Assert.Equal(prepared.Data.FiscalDocument.TotalGross, loaded.GrossTotal);
+    }
+
+    [Fact]
+    public async Task InvoiceListCanSearchCustomerNameAndPageResults()
+    {
+        using var fixture = new Fixture(postgres);
+        var other = new Contact("Altro Cliente");
+        var first = new Invoice(fixture.Customer.Id, "INV-100") { Contact = fixture.Customer };
+        var second = new Invoice(other.Id, "INV-101") { Contact = other };
+        fixture.Db.AddRange(other, first, second);
+        await fixture.Db.SaveChangesAsync();
+
+        var (items, total) = await new InvoiceRepository(fixture.Db)
+            .GetPagedAsync(null, "Altro", 1, 10);
+
+        Assert.Equal(1, total);
+        Assert.Equal("INV-101", Assert.Single(items).InvoiceNumber);
+    }
+
+    [Fact]
+    public async Task InvoiceListDefaultsToNewestDateThenDescendingNumberAndFiltersUnpaidDateRange()
+    {
+        using var fixture = new Fixture(postgres);
+        var prefix = $"INV-{Guid.NewGuid():N}";
+        var date = new DateTime(2026, 10, 29, 12, 0, 0, DateTimeKind.Utc);
+        var fullyPaid = new Invoice(fixture.Customer.Id, $"{prefix}-100")
+        {
+            Contact = fixture.Customer,
+            InvoiceDate = date,
+            GrossTotal = 100m,
+            PaidAmount = 100m
+        };
+        var unpaidNewestNumber = new Invoice(fixture.Customer.Id, $"{prefix}-200")
+        {
+            Contact = fixture.Customer,
+            InvoiceDate = date
+        };
+        Assert.True(unpaidNewestNumber.AddItem(
+            new(unpaidNewestNumber.Id, fixture.Variant.Id, 1, 120m, 0m, "N3.2"), fixture.Calculator).Success);
+        Assert.True(unpaidNewestNumber.Confirm(fixture.Calculator, date).Success);
+        var unpaidOlder = new Invoice(fixture.Customer.Id, $"{prefix}-900")
+        {
+            Contact = fixture.Customer,
+            InvoiceDate = date.AddDays(-1),
+            GrossTotal = 80m
+        };
+        fixture.Db.AddRange(fullyPaid, unpaidNewestNumber, unpaidOlder);
+        await fixture.Db.SaveChangesAsync();
+
+        var repository = new InvoiceRepository(fixture.Db);
+        var (allInvoices, allCount) = await repository.GetPagedAsync(null, prefix, 1, 10);
+        var (unpaidInvoices, unpaidCount) = await repository.GetPagedAsync(
+            null, prefix, 1, 10, dateFrom: DateOnly.FromDateTime(date),
+            dateTo: DateOnly.FromDateTime(date), unpaidOnly: true);
+        var (confirmedInvoices, confirmedCount) = await repository.GetPagedAsync(
+            null, prefix, 1, 10, status: "Confirmed");
+
+        Assert.Equal(3, allCount);
+        Assert.Equal(
+            [$"{prefix}-200", $"{prefix}-100", $"{prefix}-900"],
+            allInvoices.Select(invoice => invoice.InvoiceNumber));
+        Assert.Equal(1, unpaidCount);
+        Assert.Equal($"{prefix}-200", Assert.Single(unpaidInvoices).InvoiceNumber);
+        Assert.Equal(1, confirmedCount);
+        Assert.Equal($"{prefix}-200", Assert.Single(confirmedInvoices).InvoiceNumber);
+    }
+
+    [Fact]
     public async Task SnapshotsSurviveRuleChangesDeletionAndReload()
     {
         using var fixture = new Fixture(postgres);

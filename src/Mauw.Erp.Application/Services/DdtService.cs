@@ -82,6 +82,8 @@ public class DdtService(
         var ddt = await unitOfWork.DdtDocuments.GetByIdAsync(ddtId);
         if (ddt == null)
             return OperationResult<DdtDto>.Fail("DDT not found");
+        if (ddt.ShipmentId.HasValue)
+            return OperationResult<DdtDto>.Fail("Un DDT emesso con una spedizione non può essere modificato.");
         if (!ddt.WarehouseId.HasValue)
             return OperationResult<DdtDto>.Fail("Il DDT storico non ha un magazzino assegnato.");
         if (request.Quantity == int.MinValue)
@@ -161,6 +163,8 @@ public class DdtService(
         var ddt = await unitOfWork.DdtDocuments.GetByIdAsync(id);
         if (ddt == null)
             return OperationResult<bool>.Fail("DDT not found");
+        if (ddt.ShipmentId.HasValue)
+            return OperationResult<bool>.Fail("Un DDT emesso con una spedizione non può essere eliminato.");
 
         var movements = (await unitOfWork.StockMovements.GetByReferenceIdAsync(ddt.Id)).ToList();
         var reversals = new List<StockMovement>(movements.Count);
@@ -208,8 +212,11 @@ public class DdtService(
         return OperationResult<bool>.Ok(true);
     }
 
-    public async Task<OperationResult<byte[]>> GetDdtPdfAsync(Guid id)
+    public async Task<OperationResult<byte[]>> GetDdtPdfAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var ddt = await unitOfWork.DdtDocuments.GetByIdAsync(id);
         if (ddt == null)
             return OperationResult<byte[]>.Fail("DDT not found");
@@ -306,10 +313,11 @@ public class DdtService(
                 TotalVat: calculated.TotalVat,
                 TotalGross: calculated.TotalGross,
                 ShippingCost: 0m),
-            Agent: agent.Data
+            Agent: agent.Data,
+            FiscalNotes: BuildShipmentNotes(ddt.Shipment)
         );
 
-        return OperationResult<byte[]>.Ok(await pdfGenerator.GenerateInvoicePdfAsync(model));
+        return OperationResult<byte[]>.Ok(await pdfGenerator.GenerateInvoicePdfAsync(model, cancellationToken));
     }
 
     private static string? BuildRea(CompanySettingsDto? company)
@@ -324,5 +332,22 @@ public class DdtService(
             return company.ReaOffice;
 
         return $"{company.ReaOffice}-{company.ReaNumber}";
+    }
+
+    private static string? BuildShipmentNotes(Shipment? shipment)
+    {
+        if (shipment is null)
+            return null;
+
+        var details = new List<string>();
+        if (!string.IsNullOrWhiteSpace(shipment.CarrierName))
+            details.Add($"Vettore: {shipment.CarrierName}");
+        if (!string.IsNullOrWhiteSpace(shipment.TrackingCode))
+            details.Add($"Tracking: {shipment.TrackingCode}");
+        details.Add($"Colli: {shipment.BoxCount}");
+        if (shipment.TotalWeightKg.HasValue)
+            details.Add($"Peso: {shipment.TotalWeightKg.Value.ToString("N3", ItalianCulture)} kg");
+
+        return string.Join(" | ", details);
     }
 }

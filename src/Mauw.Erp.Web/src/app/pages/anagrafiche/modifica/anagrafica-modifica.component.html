@@ -143,10 +143,7 @@
     <div *ngIf="activeTab === 'addresses'">
       <div class="flex justify-between mb-4">
         <h2 class="text-lg font-semibold">Indirizzi</h2>
-        <button type="button" (click)="addAddress()"
-          class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
-          + Aggiungi Indirizzo
-        </button>
+        <app-add-action-button label="Aggiungi indirizzo" (activated)="addAddress()"></app-add-action-button>
       </div>
 
       <div formArrayName="addresses" class="space-y-4">
@@ -238,10 +235,7 @@
     <div *ngIf="activeTab === 'persons'">
       <div class="flex justify-between mb-4">
         <h2 class="text-lg font-semibold">Referenti Aziendali</h2>
-        <button type="button" (click)="addPerson()"
-          class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
-          + Aggiungi Referente
-        </button>
+        <app-add-action-button label="Aggiungi referente" (activated)="addPerson()"></app-add-action-button>
       </div>
 
       <div formArrayName="persons" class="space-y-4">
@@ -448,12 +442,11 @@
                   <td class="px-3 py-2">{{ customer.tradeName || '—' }}</td>
                   <td class="px-3 py-2">{{ customer.city || '—' }}</td>
                   <td class="px-3 py-2">
-                    <button type="button" (click)="removeCustomerFromAgent(customer.id)"
+                    <app-table-action-button action="delete"
+                      [label]="'Rimuovi ' + customer.businessName + ' da questo agente'"
                       [disabled]="customerAssociationBusy"
-                      [attr.aria-label]="'Rimuovi ' + customer.businessName + ' da questo agente'"
-                      title="Rimuovi cliente" class="rounded px-2 py-1 text-red-700 hover:bg-red-50 disabled:opacity-50">
-                      Rimuovi
-                    </button>
+                      (activated)="askRemoveCustomerFromAgent(customer.id)">
+                    </app-table-action-button>
                   </td>
                 </tr>
                 <tr *ngIf="assignedCustomers.length === 0">
@@ -495,12 +488,10 @@
                   <td class="px-3 py-2">{{ customer.tradeName || '—' }}</td>
                   <td class="px-3 py-2">{{ customer.city || '—' }}</td>
                   <td class="px-3 py-2">
-                    <button type="button" (click)="assignCustomerToAgent(customer.id)"
+                    <app-add-action-button [label]="'Associa ' + customer.businessName + ' a questo agente'"
                       [disabled]="customerAssociationBusy"
-                      [attr.aria-label]="'Associa ' + customer.businessName + ' a questo agente'"
-                      class="rounded px-2 py-1 text-blue-700 hover:bg-blue-50 disabled:opacity-50">
-                      Aggiungi
-                    </button>
+                      (activated)="assignCustomerToAgent(customer.id)">
+                    </app-add-action-button>
                   </td>
                 </tr>
                 <tr *ngIf="availableCustomers.length === 0">
@@ -537,6 +528,13 @@
       : 'Sei sicuro di voler eliminare questo referente? Se già salvato verrà rimosso immediatamente dal database.'"
     (confirmed)="onDeleteConfirmed()"
     (cancelled)="onDeleteCancelled()">
+  </app-confirm-delete-modal>
+  <app-confirm-delete-modal
+    [isOpen]="!!pendingAgentCustomerRemoval"
+    title="Rimuovere il cliente dall’agente?"
+    message="Il cliente verrà scollegato dall’agente, ma la sua anagrafica resterà invariata."
+    (confirmed)="confirmRemoveCustomerFromAgent()"
+    (cancelled)="cancelRemoveCustomerFromAgent()">
   </app-confirm-delete-modal>
 
 </div>

@@ -1,5 +1,6 @@
 ﻿using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
+using Mauw.Erp.Domain.Entities;
 
 namespace Mauw.Erp.Application.Services;
 
@@ -8,11 +9,20 @@ namespace Mauw.Erp.Application.Services;
 /// </summary>
 public interface IInvoiceService
 {
-    Task<OperationResult<InvoiceDto>> CreateInvoiceAsync(CreateInvoiceRequest request);
     Task<OperationResult<InvoiceDto>> GetInvoiceAsync(Guid id);
+    Task<OperationResult<InvoiceDto>> GenerateFromOrderAsync(Guid orderId);
+    Task<OperationResult<PagedResult<InvoiceDto>>> GetInvoicesAsync(
+        Guid? contactId,
+        string? search,
+        int page,
+        int pageSize,
+        string? status = null,
+        DateOnly? dateFrom = null,
+        DateOnly? dateTo = null,
+        bool unpaidOnly = false,
+        string? sortBy = null,
+        bool sortDescending = true);
     Task<OperationResult<PagedResult<InvoiceDto>>> GetInvoicesByContactAsync(Guid contactId, int page, int pageSize);
-    Task<OperationResult<InvoiceDto>> AddItemAsync(Guid invoiceId, CreateInvoiceItemRequest request);
     Task<OperationResult<InvoiceDto>> RecordPaymentAsync(Guid invoiceId, RecordPaymentRequest request);
-    Task<OperationResult<bool>> DeleteInvoiceAsync(Guid id);
     Task<OperationResult<byte[]>> GetInvoicePdfAsync(Guid id);
 }

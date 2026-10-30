@@ -3,10 +3,7 @@
   <!-- Header -->
   <div class="mb-6 flex justify-between items-center">
     <h1 class="text-3xl font-bold">Gestione Magazzini</h1>
-    <button (click)="openNew()"
-      class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-      + Nuovo Magazzino
-    </button>
+    <app-add-action-button label="Nuovo magazzino" (activated)="openNew()"></app-add-action-button>
   </div>
 
   <!-- Toast messages -->
@@ -104,19 +101,19 @@
           </td>
 
           <!-- Azioni -->
-          <td class="px-4 py-3 text-sm space-x-1 whitespace-nowrap">
-            <button (click)="openEdit(w.id)"
-              class="bg-blue-500 hover:bg-blue-600 text-white py-1 px-3 rounded text-xs font-medium">
-              Modifica
-            </button>
+          <td class="px-4 py-3 text-sm">
+            <div class="flex items-center gap-2 whitespace-nowrap">
+            <app-table-action-button action="edit" [label]="'Modifica magazzino ' + w.name"
+              (activated)="openEdit(w.id)">
+            </app-table-action-button>
             <button *ngIf="!w.isDefault" (click)="askSetDefault(w.id)"
               class="bg-indigo-500 hover:bg-indigo-600 text-white py-1 px-3 rounded text-xs font-medium">
               Predefinito
             </button>
-            <button *ngIf="!w.isDefault" (click)="askDelete(w.id)"
-              class="bg-red-600 hover:bg-red-700 text-white py-1 px-3 rounded text-xs font-medium">
-              Elimina
-            </button>
+            <app-table-action-button *ngIf="!w.isDefault" action="delete"
+              [label]="'Elimina magazzino ' + w.name" (activated)="askDelete(w.id)">
+            </app-table-action-button>
+            </div>
           </td>
         </tr>
 

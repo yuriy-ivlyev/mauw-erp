@@ -74,6 +74,21 @@ La migrazione `AddCompanyInvoiceDetails` e solo additiva: nuovi campi facoltativ
 e flag inizialmente disattivato, senza riscrivere documenti o inventare dati bancari.
 Le modifiche si vedono nei PDF rigenerati; quelli gia scaricati restano invariati.
 
+## Fatturazione da ordine
+
+Non si creano fatture indipendenti o in bozza: da un ordine `Completed` un utente
+con permessi di fatturazione usa **Genera fattura**. Il numero assegnato segue
+`FAT-AAAAmm-NNNNN`; il progressivo mensile è serializzato in transazione e non
+viene consumato se la generazione fallisce. Le fatture definitive non si
+eliminano e i numeri storici non vengono rinumerati.
+
+La generazione copia le righe e l'eventuale spesa di spedizione classificata
+dall'ordine, usando il calcolatore fiscale condiviso. Prima dell'invio a SdI,
+aggiunte/rimozioni contabili e variazioni della spedizione sull'ordine
+completato aggiornano la fattura nello stesso salvataggio; le righe rimosse
+restano nello storico fisico e nei DDT. Dopo l'invio, il timestamp SdI blocca
+le modifiche. Invio XML e trasmissione a SdI non sono ancora implementati.
+
 ## Acquisti / Carico Merce (DDT fornitore)
 
 La voce **Acquisti > Carico Merce**, subito sotto Vendite, e disponibile ai ruoli

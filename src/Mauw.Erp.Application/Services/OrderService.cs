@@ -10,6 +10,7 @@ using Mauw.Erp.Contracts.Requests;
 using Mauw.Erp.Domain.Entities;
 using Mauw.Erp.Domain.Accounting;
 using Mauw.Erp.Domain.Enums;
+using Mauw.Erp.Domain.Exceptions;
 using Mauw.Erp.Domain.Repositories;
 using Mauw.Erp.Domain.Services;
 using Microsoft.Extensions.Logging;
@@ -50,6 +51,12 @@ public partial class OrderService(
 
         var orderType = Enum.TryParse<OrderType>(request.OrderType, out var parsedType)
             ? parsedType : OrderType.Standard;
+        var fulfillmentType = Enum.TryParse<OrderFulfillmentType>(
+            request.FulfillmentType ?? nameof(OrderFulfillmentType.StandardShipping),
+            ignoreCase: true,
+            out var parsedFulfillmentType)
+            ? parsedFulfillmentType
+            : OrderFulfillmentType.StandardShipping;
 
         var now = DateTime.UtcNow;
         var prefix = orderType switch
@@ -62,8 +69,17 @@ public partial class OrderService(
         var order = new Order(
             contactId: request.ContactId,
             orderNumber: prefix,
-            customerDiscountRate: request.DiscountRate ?? 0
+            customerDiscountRate: request.DiscountRate ?? 0,
+            fulfillmentType: fulfillmentType
         ) { OrderType = orderType };
+        order.SetInternalNotes(request.InternalNotes);
+        var shippingCharge = order.SetShippingCharge(
+            request.ShippingCost ?? 0.00m,
+            request.ShippingVatRate,
+            request.ShippingNatureCode,
+            accountingCalculator);
+        if (!shippingCharge.Success)
+            return OperationResult<OrderDto>.Fail(shippingCharge.Error);
 
         await unitOfWork.Orders.AddWithNextNumberAsync(order, prefix);
 
@@ -82,7 +98,33 @@ public partial class OrderService(
         if (order == null)
             return OperationResult<OrderDto>.Fail("Order not found");
 
-        return OperationResult<OrderDto>.Ok(OrderMapper.MapToDto(order));
+        var invoices = (await unitOfWork.Invoices.GetByOrderIdsAsync([id])).ToList();
+        var ddts = (await unitOfWork.DdtDocuments.GetByOrderIdWithItemsAsync(id)).ToList();
+        var invoice = invoices.FirstOrDefault();
+        var creditNotes = invoice is null
+            ? []
+            : (await unitOfWork.CreditNotes.GetByInvoiceIdsAsync([invoice.Id]))
+                .Select(creditNote => new CreditNoteRefDto(
+                    creditNote.Id,
+                    creditNote.CreditNoteNumber,
+                    creditNote.CreditNoteDate,
+                    creditNote.GrossTotal,
+                    creditNote.Reason))
+                .ToList();
+
+        OrderLinkedDocumentsDto? linked = invoice is not null || ddts.Count > 0
+            ? new OrderLinkedDocumentsDto(
+                invoice?.Id,
+                invoice?.InvoiceNumber,
+                ddts.FirstOrDefault()?.Id,
+                ddts.FirstOrDefault()?.DdtNumber,
+                creditNotes,
+                ddts.Select(ddt => new DdtDocumentRefDto(ddt.Id, ddt.DdtNumber, ddt.DdtDate)).ToList())
+            : null;
+        var shippedQuantities = OrderInventoryOperations.GetShippedQuantitiesByItem(order, ddts);
+        var canEditInvoice = order.Status == OrderStatus.Completed && invoice?.SdiSubmittedAt is null;
+        return OperationResult<OrderDto>.Ok(
+            OrderMapper.MapToDto(order, linked, shippedQuantities, canEditInvoice));
     }
 
     public async Task<OperationResult<PagedResult<OrderDto>>> GetAllOrdersAsync(
@@ -113,7 +155,7 @@ public partial class OrderService(
         var ddtsByOrderId = ddts
             .Where(ddt => ddt.OrderId.HasValue)
             .GroupBy(ddt => ddt.OrderId!.Value)
-            .ToDictionary(group => group.Key, group => group.First());
+            .ToDictionary(group => group.Key, group => group.ToList());
         var creditNotesByInvoiceId = creditNotes
             .GroupBy(creditNote => creditNote.InvoiceId)
             .ToDictionary(
@@ -128,20 +170,54 @@ public partial class OrderService(
         var dtos = orderList.Select(o =>
         {
             invoicesByOrderId.TryGetValue(o.Id, out var invoice);
-            ddtsByOrderId.TryGetValue(o.Id, out var ddt);
+            ddtsByOrderId.TryGetValue(o.Id, out var orderDdts);
             List<CreditNoteRefDto> creditNoteRefs = [];
             if (invoice is not null &&
                 creditNotesByInvoiceId.TryGetValue(invoice.Id, out var invoiceCreditNotes))
                 creditNoteRefs = invoiceCreditNotes;
 
-            OrderLinkedDocumentsDto? linked = invoice != null || ddt != null
-                ? new OrderLinkedDocumentsDto(invoice?.Id, invoice?.InvoiceNumber, ddt?.Id, ddt?.DdtNumber, creditNoteRefs)
+            var firstDdt = orderDdts?.FirstOrDefault();
+            OrderLinkedDocumentsDto? linked = invoice != null || firstDdt != null
+                ? new OrderLinkedDocumentsDto(
+                    invoice?.Id,
+                    invoice?.InvoiceNumber,
+                    firstDdt?.Id,
+                    firstDdt?.DdtNumber,
+                    creditNoteRefs,
+                    orderDdts?.Select(ddt => new DdtDocumentRefDto(ddt.Id, ddt.DdtNumber, ddt.DdtDate)).ToList())
                 : null;
 
             return OrderMapper.MapToDto(o, linked);
         }).ToList();
 
         return OperationResult<PagedResult<OrderDto>>.Ok(new PagedResult<OrderDto>(dtos, page, pageSize, total));
+    }
+
+    public async Task<OperationResult<PagedResult<OrderDto>>> GetFulfillmentQueueAsync(int page, int pageSize)
+    {
+        page = page <= 0 ? 1 : page;
+        pageSize = pageSize <= 0 ? 20 : Math.Min(pageSize, 100);
+        var (orders, total) = await unitOfWork.Orders.GetFulfillmentQueueAsync(page, pageSize);
+        var orderList = orders.ToList();
+        var orderIds = orderList.Select(order => order.Id).ToList();
+        var ddts = orderIds.Count > 0
+            ? (await unitOfWork.DdtDocuments.GetByOrderIdsAsync(orderIds)).ToList()
+            : [];
+        var ddtsByOrderId = ddts
+            .Where(ddt => ddt.OrderId.HasValue)
+            .GroupBy(ddt => ddt.OrderId!.Value)
+            .ToDictionary(group => group.Key, group => group.ToList());
+
+        var dtos = orderList.Select(order =>
+        {
+            ddtsByOrderId.TryGetValue(order.Id, out var orderDdts);
+            var shippedQuantities = OrderInventoryOperations.GetShippedQuantitiesByItem(
+                order, orderDdts ?? []);
+            return OrderMapper.MapToDto(order, shippedQuantities: shippedQuantities);
+        }).ToList();
+
+        return OperationResult<PagedResult<OrderDto>>.Ok(
+            new PagedResult<OrderDto>(dtos, page, pageSize, total));
     }
 
     public async Task<OperationResult<PagedResult<OrderDto>>> GetOrdersByContactAsync(Guid contactId, int page, int pageSize)
@@ -153,7 +229,27 @@ public partial class OrderService(
         return OperationResult<PagedResult<OrderDto>>.Ok(result);
     }
 
-    public async Task<OperationResult<OrderDto>> AddItemAsync(Guid orderId, CreateOrderItemRequest request)
+    private async Task<OperationResult<bool>> SyncLinkedInvoiceAsync(Order order)
+    {
+        var invoice = await unitOfWork.Invoices.GetByOrderIdAsync(order.Id);
+        if (invoice is null)
+            return OperationResult<bool>.Ok(false);
+        if (invoice.SdiSubmittedAt.HasValue)
+            return OperationResult<bool>.Fail("La fattura è già stata inviata allo SDI e l'ordine non può essere modificato.");
+
+        var synchronized = invoice.SyncFromOrder(order, accountingCalculator);
+        if (!synchronized.Success)
+            return OperationResult<bool>.Fail(synchronized.Error);
+
+        await unitOfWork.Invoices.UpdateAsync(invoice);
+        return OperationResult<bool>.Ok(true);
+    }
+
+    public Task<OperationResult<OrderDto>> AddItemAsync(Guid orderId, CreateOrderItemRequest request) =>
+        AddItemCoreAsync(orderId, request);
+
+    private async Task<OperationResult<OrderDto>> AddItemCoreAsync(
+        Guid orderId, CreateOrderItemRequest request)
     {
         var itemValidationResult = itemValidator.Validate(request);
         if (!itemValidationResult.IsValid)
@@ -162,137 +258,519 @@ public partial class OrderService(
             return OperationResult<OrderDto>.Fail(errors);
         }
 
-        var order = await unitOfWork.Orders.GetByIdAsync(orderId);
-        if (order == null)
-            return OperationResult<OrderDto>.Fail("Order not found");
-        if (order.Status is OrderStatus.Confirmed or OrderStatus.Terminated)
-            return OperationResult<OrderDto>.Fail("Non e possibile modificare le righe di un ordine confermato o terminato.");
-
-        var variant = await unitOfWork.ProductVariants.GetByIdAsync(request.VariantId);
-        if (variant == null)
-            return OperationResult<OrderDto>.Fail("Variant not found");
-
-        var product = await unitOfWork.Products.GetByIdAsync(variant.ProductId);
-        if (product == null)
-            return OperationResult<OrderDto>.Fail("Product not found");
-
-        var pricing = await documentPricing.PrepareAsync(order.ContactId,
-            [new(request.VariantId, request.Quantity, request.UnitNetPrice, request.UnitGrossPrice,
-                request.SourceOrderItemId.HasValue || request.SourceLineId.HasValue ? request.VatRate : request.VatRate ?? product.VatRate,
-                request.NatureCode, request.DiscountPercent,
-                request.PriceListId, request.OverrideReason, request.IsCustomerReturn, request.SourceLineId,
-                DefaultDiscountPercent: order.CustomerDiscountRate, SourceOrderItemId: request.SourceOrderItemId)],
-            DateTimeOffset.UtcNow);
-        if (!pricing.Success)
-            return OperationResult<OrderDto>.Fail(pricing.Error);
-        var prepared = pricing.Data!.Lines[0];
-        var line = prepared.FiscalLine;
-
-        var item = new OrderItem(
-            orderId: orderId,
-            variantId: request.VariantId,
-            quantity: request.Quantity,
-            unitNetPrice: line.UnitNetPrice,
-            vatRate: line.VatRate,
-            natureCode: line.NatureCode,
-            discountPercent: line.DiscountPercent
-        ) { PricingSnapshot = prepared.Snapshot };
-
-        var accounting = order.AddItem(item, accountingCalculator);
-        if (!accounting.Success)
-            return OperationResult<OrderDto>.Fail(accounting.Error);
-        await unitOfWork.Orders.UpdateAsync(order);
-        await unitOfWork.SaveChangesAsync();
-
-        logger.LogInformation("Item {VariantId} (qty {Quantity}) added to order {OrderId}",
-            request.VariantId, request.Quantity, orderId);
-
-        var updated = await unitOfWork.Orders.GetByIdAsync(orderId);
-        return OperationResult<OrderDto>.Ok(OrderMapper.MapToDto(updated!));
-    }
-
-    public async Task<OperationResult<OrderDto>> ConfirmOrderAsync(Guid orderId)
-    {
-        var order = await unitOfWork.Orders.GetByIdAsync(orderId);
-        if (order == null)
-            return OperationResult<OrderDto>.Fail("Order not found");
-
-        var isCassaSale = order.OrderType == OrderType.CassaSession;
-        Warehouse? warehouse = null;
-        if (isCassaSale)
+        var transactionStarted = false;
+        async Task<OperationResult<OrderDto>> FailAsync(string error)
         {
-            if (order.Status is OrderStatus.Confirmed or OrderStatus.Terminated)
-                return OperationResult<OrderDto>.Fail("La sessione cassa è già chiusa.");
-            if (order.Items.Any(item => item.Quantity == int.MinValue || item.Quantity == 0))
-                return OperationResult<OrderDto>.Fail("Una riga della sessione cassa ha una quantità non valida.");
-
-            warehouse = await unitOfWork.Warehouses.GetDefaultWarehouseAsync();
-            if (warehouse is null || !warehouse.IsActive || !warehouse.IsSellable)
-                return OperationResult<OrderDto>.Fail(
-                    "Non è disponibile un magazzino predefinito attivo e abilitato alla vendita.");
+            if (transactionStarted)
+            {
+                await unitOfWork.RollbackAsync();
+                transactionStarted = false;
+            }
+            return OperationResult<OrderDto>.Fail(error);
         }
 
         try
         {
-            if (isCassaSale)
-                await unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
+            await unitOfWork.BeginTransactionAsync(IsolationLevel.ReadCommitted);
+            transactionStarted = true;
+            await unitOfWork.Invoices.AcquireOrderInvoiceLockAsync(orderId);
+            var order = await unitOfWork.Orders.GetByIdAsync(orderId);
+            if (order is null)
+                return await FailAsync("Order not found");
 
-            if (isCassaSale)
-            {
-                var stockDeltas = order.Items
-                    .GroupBy(item => item.VariantId)
-                    .Select(group => new
-                    {
-                        VariantId = group.Key,
-                        Delta = group.Sum(item =>
-                            item.PricingSnapshot?.IsCustomerReturn == true || item.Quantity < 0
-                                ? Math.Abs((decimal)item.Quantity)
-                                : -Math.Abs((decimal)item.Quantity))
-                    });
-                foreach (var stockDelta in stockDeltas.Where(item => item.Delta < 0))
-                {
-                    var available = await unitOfWork.Stock.GetAvailableQtyAsync(warehouse!.Id, stockDelta.VariantId);
-                    if (available < -stockDelta.Delta)
-                    {
-                        await unitOfWork.RollbackAsync();
-                        return OperationResult<OrderDto>.Fail(
-                            $"Giacenza insufficiente per la variante {stockDelta.VariantId}: disponibili {available}.");
-                    }
-                }
-            }
+            if (order.Status == OrderStatus.Completed)
+                return await FailAsync("Per aggiungere righe contabili a un ordine completato usare il flusso fattura.");
+            if (order.Status is not (OrderStatus.Draft or OrderStatus.Suspended))
+                return await FailAsync("Non è possibile modificare le righe di un ordine confermato o terminato.");
 
-            order.Confirm();
-            if (isCassaSale)
-            {
-                foreach (var item in order.Items)
-                {
-                    var movement = StockMovement.FromCassaItem(order, item, warehouse!.Id);
-                    await unitOfWork.Stock.RecordMovementAsync(movement, movement.QuantityDelta!.Value);
-                }
-            }
+            var variant = await unitOfWork.ProductVariants.GetByIdAsync(request.VariantId);
+            if (variant == null)
+                return await FailAsync("Variant not found");
+
+            var product = await unitOfWork.Products.GetByIdAsync(variant.ProductId);
+            if (product == null)
+                return await FailAsync("Product not found");
+
+            var pricing = await documentPricing.PrepareAsync(order.ContactId,
+                [new(request.VariantId, request.Quantity, request.UnitNetPrice, request.UnitGrossPrice,
+                    request.SourceOrderItemId.HasValue || request.SourceLineId.HasValue ? request.VatRate : request.VatRate ?? product.VatRate,
+                    request.NatureCode, request.DiscountPercent,
+                    request.PriceListId, request.OverrideReason, request.IsCustomerReturn, request.SourceLineId,
+                    DefaultDiscountPercent: order.CustomerDiscountRate, SourceOrderItemId: request.SourceOrderItemId)],
+                DateTimeOffset.UtcNow);
+            if (!pricing.Success)
+                return await FailAsync(pricing.Error ?? "Impossibile calcolare il prezzo della riga.");
+            var prepared = pricing.Data!.Lines[0];
+            var line = prepared.FiscalLine;
+
+            var item = new OrderItem(
+                orderId: orderId,
+                variantId: request.VariantId,
+                quantity: request.Quantity,
+                unitNetPrice: line.UnitNetPrice,
+                vatRate: line.VatRate,
+                natureCode: line.NatureCode,
+                discountPercent: line.DiscountPercent
+            ) { PricingSnapshot = prepared.Snapshot };
+
+            var accounting = order.AddItem(item, accountingCalculator);
+            if (!accounting.Success)
+                return await FailAsync(accounting.Error);
 
             await unitOfWork.Orders.UpdateAsync(order);
             await unitOfWork.SaveChangesAsync();
-            if (isCassaSale)
-                await unitOfWork.CommitAsync();
+            await unitOfWork.CommitAsync();
+            transactionStarted = false;
+
+            logger.LogInformation("Item {VariantId} (qty {Quantity}) added to order {OrderId}",
+                request.VariantId, request.Quantity, orderId);
+            var updated = await unitOfWork.Orders.GetByIdAsync(orderId);
+            return OperationResult<OrderDto>.Ok(OrderMapper.MapToDto(updated!));
         }
-        catch (InvalidOperationException ex)
+        catch (ConcurrencyException ex)
         {
-            if (isCassaSale)
+            if (transactionStarted)
                 await unitOfWork.RollbackAsync();
             return OperationResult<OrderDto>.Fail(ex.Message);
         }
         catch
         {
-            if (isCassaSale)
+            if (transactionStarted)
+                await unitOfWork.RollbackAsync();
+            throw;
+        }
+    }
+
+    public async Task<OperationResult<OrderDto>> AddCompletedBillingItemAsync(
+        Guid orderId, AddCompletedOrderItemRequest request)
+    {
+        if (request.VariantId == Guid.Empty || request.Quantity <= 0)
+            return OperationResult<OrderDto>.Fail("Selezionare una variante e una quantità positiva.");
+
+        var transactionStarted = false;
+        async Task<OperationResult<OrderDto>> FailAsync(string error)
+        {
+            if (transactionStarted)
+            {
+                await unitOfWork.RollbackAsync();
+                transactionStarted = false;
+            }
+            return OperationResult<OrderDto>.Fail(error);
+        }
+
+        try
+        {
+            await unitOfWork.BeginTransactionAsync(IsolationLevel.ReadCommitted);
+            transactionStarted = true;
+            await unitOfWork.Invoices.AcquireOrderInvoiceLockAsync(orderId);
+            var order = await unitOfWork.Orders.GetByIdAsync(orderId);
+            if (order is null)
+                return await FailAsync("Order not found");
+            if (order.Status != OrderStatus.Completed)
+                return await FailAsync("È possibile aggiungere righe contabili solo a un ordine completato.");
+
+            var invoice = await unitOfWork.Invoices.GetByOrderIdAsync(orderId);
+            if (invoice?.SdiSubmittedAt.HasValue == true)
+                return await FailAsync("La fattura è già stata inviata allo SDI e l'ordine non può essere modificato.");
+
+            var variant = await unitOfWork.ProductVariants.GetByIdAsync(request.VariantId);
+            if (variant is null)
+                return await FailAsync("Variante non trovata.");
+            var product = await unitOfWork.Products.GetByIdAsync(variant.ProductId);
+            if (product is null)
+                return await FailAsync("Prodotto non trovato.");
+
+            var pricing = await documentPricing.PrepareAsync(order.ContactId,
+                [new(request.VariantId, request.Quantity, null, null, null, request.NatureCode, null,
+                    DefaultDiscountPercent: order.CustomerDiscountRate)],
+                DateTimeOffset.UtcNow);
+            if (!pricing.Success)
+                return await FailAsync(pricing.Error ?? "Impossibile calcolare il prezzo della riga.");
+
+            var prepared = pricing.Data!.Lines[0];
+            var item = new OrderItem(
+                orderId, request.VariantId, request.Quantity,
+                prepared.FiscalLine.UnitNetPrice, prepared.FiscalLine.VatRate,
+                natureCode: prepared.FiscalLine.NatureCode,
+                discountPercent: prepared.FiscalLine.DiscountPercent)
+            {
+                PricingSnapshot = prepared.Snapshot
+            };
+            var accounting = order.AddCompletedBillingItem(item, accountingCalculator);
+            if (!accounting.Success)
+                return await FailAsync(accounting.Error);
+
+            if (invoice is not null)
+            {
+                var synced = invoice.SyncFromOrder(order, accountingCalculator);
+                if (!synced.Success)
+                    return await FailAsync(synced.Error);
+                await unitOfWork.Invoices.UpdateAsync(invoice);
+            }
+
+            await unitOfWork.Orders.UpdateAsync(order);
+            await unitOfWork.SaveChangesAsync();
+            await unitOfWork.CommitAsync();
+            transactionStarted = false;
+            return await GetOrderAsync(orderId);
+        }
+        catch (ConcurrencyException ex)
+        {
+            if (transactionStarted)
+                await unitOfWork.RollbackAsync();
+            return OperationResult<OrderDto>.Fail(ex.Message);
+        }
+        catch
+        {
+            if (transactionStarted)
+                await unitOfWork.RollbackAsync();
+            throw;
+        }
+    }
+
+    public async Task<OperationResult<OrderDto>> UpdateItemAsync(
+        Guid orderId,
+        Guid itemId,
+        CreateOrderItemRequest request)
+    {
+        var validation = itemValidator.Validate(request);
+        if (!validation.IsValid)
+            return OperationResult<OrderDto>.Fail(
+                string.Join("; ", validation.Errors.Select(error => $"{error.PropertyName}: {error.Message}")));
+
+        var order = await unitOfWork.Orders.GetByIdAsync(orderId);
+        if (order is null)
+            return OperationResult<OrderDto>.Fail("Order not found");
+        if (order.Status != OrderStatus.Draft)
+            return OperationResult<OrderDto>.Fail("Only draft order lines can be edited.");
+
+        var variant = await unitOfWork.ProductVariants.GetByIdAsync(request.VariantId);
+        if (variant is null)
+            return OperationResult<OrderDto>.Fail("Variant not found");
+        var product = await unitOfWork.Products.GetByIdAsync(variant.ProductId);
+        if (product is null)
+            return OperationResult<OrderDto>.Fail("Product not found");
+
+        var pricing = await documentPricing.PrepareAsync(order.ContactId,
+            [new(request.VariantId, request.Quantity, request.UnitNetPrice, request.UnitGrossPrice,
+                request.VatRate ?? product.VatRate, request.NatureCode, request.DiscountPercent,
+                request.PriceListId, request.OverrideReason, request.IsCustomerReturn, request.SourceLineId,
+                DefaultDiscountPercent: order.CustomerDiscountRate, SourceOrderItemId: request.SourceOrderItemId)],
+            DateTimeOffset.UtcNow);
+        if (!pricing.Success)
+            return OperationResult<OrderDto>.Fail(pricing.Error);
+
+        var prepared = pricing.Data!.Lines[0];
+        var line = prepared.FiscalLine;
+        var replacement = new OrderItem(
+            orderId,
+            request.VariantId,
+            request.Quantity,
+            line.UnitNetPrice,
+            line.VatRate,
+            natureCode: line.NatureCode,
+            discountPercent: line.DiscountPercent)
+        {
+            PricingSnapshot = prepared.Snapshot
+        };
+        var accounting = order.ReplaceItem(itemId, replacement, accountingCalculator);
+        if (!accounting.Success)
+            return OperationResult<OrderDto>.Fail(accounting.Error);
+
+        await unitOfWork.Orders.UpdateAsync(order);
+        await unitOfWork.SaveChangesAsync();
+        return OperationResult<OrderDto>.Ok(OrderMapper.MapToDto(order));
+    }
+
+    public async Task<OperationResult<OrderDto>> RemoveDraftItemAsync(Guid orderId, Guid itemId)
+    {
+        var transactionStarted = false;
+        async Task<OperationResult<OrderDto>> FailAsync(string error)
+        {
+            if (transactionStarted)
+            {
+                await unitOfWork.RollbackAsync();
+                transactionStarted = false;
+            }
+            return OperationResult<OrderDto>.Fail(error);
+        }
+
+        try
+        {
+            await unitOfWork.BeginTransactionAsync(IsolationLevel.ReadCommitted);
+            transactionStarted = true;
+            await unitOfWork.Invoices.AcquireOrderInvoiceLockAsync(orderId);
+            var order = await unitOfWork.Orders.GetByIdAsync(orderId);
+            if (order is null)
+                return await FailAsync("Order not found");
+            if (order.Status != OrderStatus.Draft)
+                return await FailAsync("È possibile eliminare righe solo da un ordine in bozza.");
+
+            var result = order.RemoveItem(itemId, accountingCalculator);
+            if (!result.Success)
+                return await FailAsync(result.Error);
+
+            await unitOfWork.Orders.UpdateAsync(order);
+            await unitOfWork.SaveChangesAsync();
+            await unitOfWork.CommitAsync();
+            transactionStarted = false;
+
+            logger.LogInformation("Item {ItemId} removed from draft order {OrderId}", itemId, orderId);
+            return await GetOrderAsync(orderId);
+        }
+        catch (ConcurrencyException ex)
+        {
+            if (transactionStarted)
+                await unitOfWork.RollbackAsync();
+            return OperationResult<OrderDto>.Fail(ex.Message);
+        }
+        catch
+        {
+            if (transactionStarted)
+                await unitOfWork.RollbackAsync();
+            throw;
+        }
+    }
+
+    public async Task<OperationResult<OrderDto>> RemoveCompletedBillingItemAsync(Guid orderId, Guid itemId)
+    {
+        var transactionStarted = false;
+        async Task<OperationResult<OrderDto>> FailAsync(string error)
+        {
+            if (transactionStarted)
+            {
+                await unitOfWork.RollbackAsync();
+                transactionStarted = false;
+            }
+            return OperationResult<OrderDto>.Fail(error);
+        }
+
+        try
+        {
+            await unitOfWork.BeginTransactionAsync(IsolationLevel.ReadCommitted);
+            transactionStarted = true;
+            await unitOfWork.Invoices.AcquireOrderInvoiceLockAsync(orderId);
+            var order = await unitOfWork.Orders.GetByIdAsync(orderId);
+            if (order is null)
+                return await FailAsync("Order not found");
+            if (order.Status != OrderStatus.Completed)
+                return await FailAsync("È possibile rimuovere righe contabili solo da un ordine completato.");
+
+            var result = order.ExcludeCompletedBillingItem(itemId, accountingCalculator);
+            if (!result.Success)
+                return await FailAsync(result.Error);
+
+            var synced = await SyncLinkedInvoiceAsync(order);
+            if (!synced.Success)
+                return await FailAsync(synced.Error!);
+
+            await unitOfWork.Orders.UpdateAsync(order);
+            await unitOfWork.SaveChangesAsync();
+            await unitOfWork.CommitAsync();
+            transactionStarted = false;
+            var updated = await GetOrderAsync(orderId);
+            return updated;
+        }
+        catch (ConcurrencyException ex)
+        {
+            if (transactionStarted)
+                await unitOfWork.RollbackAsync();
+            return OperationResult<OrderDto>.Fail(ex.Message);
+        }
+        catch
+        {
+            if (transactionStarted)
+                await unitOfWork.RollbackAsync();
+            throw;
+        }
+    }
+
+    public Task<OperationResult<OrderDto>> UpdateShippingChargeAsync(
+        Guid orderId, UpdateOrderShippingChargeRequest request) =>
+        UpdateShippingChargeCoreAsync(orderId, request, allowCompletedEdit: false);
+
+    public Task<OperationResult<OrderDto>> UpdateCompletedInvoiceShippingChargeAsync(
+        Guid orderId, UpdateOrderShippingChargeRequest request) =>
+        UpdateShippingChargeCoreAsync(orderId, request, allowCompletedEdit: true);
+
+    private async Task<OperationResult<OrderDto>> UpdateShippingChargeCoreAsync(
+        Guid orderId,
+        UpdateOrderShippingChargeRequest request,
+        bool allowCompletedEdit)
+    {
+        var transactionStarted = false;
+        async Task<OperationResult<OrderDto>> FailAsync(string error)
+        {
+            if (transactionStarted)
+            {
+                await unitOfWork.RollbackAsync();
+                transactionStarted = false;
+            }
+            return OperationResult<OrderDto>.Fail(error);
+        }
+
+        try
+        {
+            await unitOfWork.BeginTransactionAsync(IsolationLevel.ReadCommitted);
+            transactionStarted = true;
+            await unitOfWork.Invoices.AcquireOrderInvoiceLockAsync(orderId);
+            var order = await unitOfWork.Orders.GetByIdAsync(orderId);
+            if (order is null)
+                return await FailAsync("Order not found");
+
+            var isCompleted = order.Status == OrderStatus.Completed;
+            if (allowCompletedEdit && !isCompleted)
+                return await FailAsync("La spesa fattura può essere modificata solo su un ordine completato.");
+            if (!allowCompletedEdit && order.Status != OrderStatus.Draft)
+                return await FailAsync("Il costo di spedizione può essere modificato solo su un ordine in bozza.");
+            var invoice = allowCompletedEdit
+                ? await unitOfWork.Invoices.GetByOrderIdAsync(orderId)
+                : null;
+            if (allowCompletedEdit && invoice?.SdiSubmittedAt.HasValue == true)
+                return await FailAsync("La fattura è già stata inviata allo SDI e l'ordine non può essere modificato.");
+
+            var result = order.SetShippingCharge(
+                request.ShippingCost,
+                request.VatRate,
+                request.NatureCode,
+                accountingCalculator);
+            if (!result.Success)
+                return await FailAsync(result.Error);
+
+            if (allowCompletedEdit && invoice is not null)
+            {
+                var synced = invoice.SyncFromOrder(order, accountingCalculator);
+                if (!synced.Success)
+                    return await FailAsync(synced.Error);
+                await unitOfWork.Invoices.UpdateAsync(invoice);
+            }
+
+            await unitOfWork.Orders.UpdateAsync(order);
+            await unitOfWork.SaveChangesAsync();
+            await unitOfWork.CommitAsync();
+            transactionStarted = false;
+            return await GetOrderAsync(orderId);
+        }
+        catch (ConcurrencyException ex)
+        {
+            if (transactionStarted)
+                await unitOfWork.RollbackAsync();
+            return OperationResult<OrderDto>.Fail(ex.Message);
+        }
+        catch
+        {
+            if (transactionStarted)
+                await unitOfWork.RollbackAsync();
+            throw;
+        }
+    }
+
+    public async Task<OperationResult<OrderDto>> ConfirmOrderAsync(Guid orderId)
+    {
+        Order order;
+        var isLegacyCassaSession = false;
+        var transactionStarted = false;
+        try
+        {
+            await unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable);
+            transactionStarted = true;
+            var loadedOrder = await unitOfWork.Orders.GetByIdAsync(orderId);
+            if (loadedOrder is null)
+            {
+                await unitOfWork.RollbackAsync();
+                return OperationResult<OrderDto>.Fail("Order not found");
+            }
+            order = loadedOrder;
+
+            isLegacyCassaSession = order.OrderType == OrderType.CassaSession;
+            if (order.Status is OrderStatus.Confirmed or OrderStatus.Completed or OrderStatus.Terminated)
+            {
+                await unitOfWork.RollbackAsync();
+                return OperationResult<OrderDto>.Fail(isLegacyCassaSession
+                    ? "La sessione cassa è già chiusa."
+                    : $"Un ordine in stato {order.Status} non può essere confermato.");
+            }
+            if (isLegacyCassaSession && order.Status is not (OrderStatus.Draft or OrderStatus.Suspended))
+            {
+                await unitOfWork.RollbackAsync();
+                return OperationResult<OrderDto>.Fail("La sessione cassa non è modificabile nello stato corrente.");
+            }
+            if (!isLegacyCassaSession && order.Status != OrderStatus.Draft)
+            {
+                await unitOfWork.RollbackAsync();
+                return OperationResult<OrderDto>.Fail(
+                    order.Status == OrderStatus.PendingApproval
+                        ? "L'ordine è in attesa di approvazione."
+                        : $"Un ordine in stato {order.Status} non può essere confermato.");
+            }
+            if (order.Items.Count == 0)
+            {
+                await unitOfWork.RollbackAsync();
+                return OperationResult<OrderDto>.Fail("Cannot confirm an order without items.");
+            }
+
+            var warehouse = await unitOfWork.Warehouses.GetDefaultWarehouseAsync();
+            if (warehouse is null || !warehouse.IsActive || !warehouse.IsSellable)
+            {
+                await unitOfWork.RollbackAsync();
+                return OperationResult<OrderDto>.Fail(
+                    "Non è disponibile un magazzino predefinito attivo e abilitato alla vendita.");
+            }
+
+            if (isLegacyCassaSession)
+            {
+                var stockError = await OrderInventoryOperations.RecordCashSaleAsync(unitOfWork, order, warehouse);
+                if (stockError is not null)
+                {
+                    await unitOfWork.RollbackAsync();
+                    return OperationResult<OrderDto>.Fail(stockError);
+                }
+
+                order.ConfirmCassaSession();
+            }
+            else
+            {
+                order.SetFulfillmentWarehouse(warehouse.Id);
+                var approvalReason = await CustomerCreditPolicy.GetApprovalReasonAsync(unitOfWork, order);
+                if (approvalReason is not null)
+                {
+                    order.RequireApproval(approvalReason);
+                    await unitOfWork.Orders.UpdateAsync(order);
+                    await unitOfWork.SaveChangesAsync();
+                    await unitOfWork.CommitAsync();
+                    return OperationResult<OrderDto>.Ok(OrderMapper.MapToDto(order));
+                }
+
+                var reservationError = await OrderInventoryOperations.ReserveOrderAsync(
+                    unitOfWork, order, warehouse.Id);
+                if (reservationError is not null)
+                {
+                    await unitOfWork.RollbackAsync();
+                    return OperationResult<OrderDto>.Fail(reservationError);
+                }
+
+                order.Confirm();
+            }
+
+            await unitOfWork.Orders.UpdateAsync(order);
+            await unitOfWork.SaveChangesAsync();
+            await unitOfWork.CommitAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            if (transactionStarted)
+                await unitOfWork.RollbackAsync();
+            return OperationResult<OrderDto>.Fail(ex.Message);
+        }
+        catch
+        {
+            if (transactionStarted)
                 await unitOfWork.RollbackAsync();
             throw;
         }
 
         logger.LogInformation("Order {OrderId} confirmed", orderId);
-
-        var updated = await unitOfWork.Orders.GetByIdAsync(orderId);
-        return OperationResult<OrderDto>.Ok(OrderMapper.MapToDto(updated!));
+        return OperationResult<OrderDto>.Ok(OrderMapper.MapToDto(order));
     }
 
     public async Task<OperationResult<bool>> DeleteOrderAsync(Guid id)
@@ -359,7 +837,8 @@ public partial class OrderService(
             Pec: order.Contact?.PecEmail
         );
 
-        var lines = order.Items.Select(item => new InvoicePdfLineModel(
+        var billableItems = order.Items.Where(item => !item.IsExcludedFromInvoice).ToList();
+        var lines = billableItems.Select(item => new InvoicePdfLineModel(
             Sku: item.Variant?.Barcode ?? string.Empty,
             Description: string.Join(" ",
                     new[]
@@ -378,8 +857,17 @@ public partial class OrderService(
             NatureCode: item.NatureCode
         )).ToList();
 
-        var accounting = accountingCalculator.Calculate(order.Items.Select(item => new DocumentLineInput(
-            item.Quantity, item.UnitNetPrice, item.VatRate, item.NatureCode, item.DiscountPercent)));
+        var accountingLines = billableItems.Select(item => new DocumentLineInput(
+            item.Quantity, item.UnitNetPrice, item.VatRate, item.NatureCode, item.DiscountPercent)).ToList();
+        if (order.ShippingCost > 0m)
+        {
+            if (!order.ShippingVatRate.HasValue)
+                return OperationResult<byte[]>.Fail("Shipping charge VAT classification is missing.");
+            accountingLines.Add(new DocumentLineInput(
+                1m, order.ShippingCost, order.ShippingVatRate.Value, order.ShippingNatureCode));
+        }
+
+        var accounting = accountingCalculator.Calculate(accountingLines);
         if (!accounting.Success)
             return OperationResult<byte[]>.Fail(accounting.Error);
         var calculated = accounting.Data!;
@@ -395,25 +883,44 @@ public partial class OrderService(
                 VatRate = line.VatRate, NatureCode = line.NatureCode, LineTotal = line.LineNetTotal
             };
         }
+        var shippingCost = 0m;
+        if (order.ShippingCost > 0m)
+        {
+            var shippingLine = calculated.Lines[billableItems.Count];
+            shippingCost = shippingLine.LineNetTotal;
+            lines.Add(new InvoicePdfLineModel(
+                Sku: "SPEDIZIONE",
+                Description: "Spese di spedizione",
+                SeasonCollection: null,
+                Pieces: 1,
+                UnitPrice: shippingLine.UnitNetPrice,
+                DiscountPercent: null,
+                VatRate: shippingLine.VatRate,
+                LineTotal: shippingLine.LineNetTotal,
+                NatureCode: shippingLine.NatureCode));
+        }
 
         var totals = new InvoicePdfTotals(
-            TotalPieces: order.Items.Sum(i => (int)i.Quantity),
-            TotalNet: calculated.TotalTaxable,
+            TotalPieces: billableItems.Sum(i => (int)i.Quantity),
+            TotalNet: calculated.Lines.Take(billableItems.Count).Sum(line => line.LineNetTotal),
             TotalVat: calculated.TotalVat,
             TotalGross: calculated.TotalGross,
-            ShippingCost: 0m
+            ShippingCost: shippingCost
         );
 
         var model = new InvoicePdfModel(
             DocumentNumber: order.OrderNumber,
-            DocumentType: "ORDINE",
+            DocumentType: order.FulfillmentType == OrderFulfillmentType.CashDesk &&
+                          order.Status == OrderStatus.Completed
+                ? "RICEVUTA CASSA"
+                : "ORDINE",
             IssueDate: DateOnly.FromDateTime(order.OrderDate),
             Currency: "EUR",
             Seller: seller,
             Customer: customer,
             Payment: new InvoicePdfPaymentInfo(
                 PaymentTerms: "A vista",
-                PaymentMethod: "MP01",
+                PaymentMethod: order.PaymentMethod ?? "MP01",
                 DueDate: null,
                 Iban: null,
                 Swift: null,
@@ -443,7 +950,13 @@ public partial class OrderService(
         var now = DateTime.UtcNow;
         var prefix = $"ORD-{now:MMyyyy}-";
 
-        var order = new Order(request.ContactId, prefix) { OrderType = OrderType.CassaSession };
+        var order = new Order(
+            request.ContactId,
+            prefix,
+            fulfillmentType: OrderFulfillmentType.CashDesk)
+        {
+            OrderType = OrderType.CassaSession
+        };
         order.SetDocumentReference(request.DocumentReference);
         order.Suspend(request.TerminalId);
 
@@ -471,7 +984,7 @@ public partial class OrderService(
         var order = await unitOfWork.Orders.GetCassaSessionWithItemsAsync(orderId);
         if (order is null)
             return OperationResult<CassaSessionDetailDto>.Fail("Sessione non trovata");
-        if (order.Status is OrderStatus.Confirmed or OrderStatus.Terminated)
+        if (order.Status is not (OrderStatus.Draft or OrderStatus.Suspended))
             return OperationResult<CassaSessionDetailDto>.Fail("Non e possibile modificare una sessione confermata o terminata.");
 
         var contact = await unitOfWork.Contacts.GetByIdAsync(request.ContactId);
@@ -623,6 +1136,20 @@ public partial class OrderService(
             }
             inputs.Add(new DocumentLineInput(item.Quantity, item.UnitNetPrice, item.VatRate, item.NatureCode, percent));
             breakdowns.Add(breakdown);
+        }
+
+        if (request.ShippingCost < 0m)
+            return OperationResult<CassaPreviewDto>.Fail("Shipping cost cannot be negative.");
+        if (request.ShippingCost > 0m)
+        {
+            if (!request.ShippingVatRate.HasValue)
+                return OperationResult<CassaPreviewDto>.Fail("VAT rate is required for a shipping charge.");
+            inputs.Add(new DocumentLineInput(
+                1m,
+                request.ShippingCost,
+                request.ShippingVatRate.Value,
+                request.ShippingNatureCode));
+            breakdowns.Add([]);
         }
 
         var accounting = accountingCalculator.Calculate(inputs);

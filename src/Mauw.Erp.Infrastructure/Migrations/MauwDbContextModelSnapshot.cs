@@ -23,6 +23,8 @@ namespace Mauw.Erp.Infrastructure.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.HasSequence("shipment_document_number_seq");
+
             modelBuilder.HasSequence("supplier_purchase_order_number_seq");
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.AgentCommission", b =>
@@ -1096,6 +1098,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("order_id");
 
+                    b.Property<Guid?>("ShipmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shipment_id");
+
                     b.Property<decimal>("TaxableTotal")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -1123,6 +1129,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .IsUnique();
 
                     b.HasIndex("OrderId");
+
+                    b.HasIndex("ShipmentId")
+                        .IsUnique()
+                        .HasDatabaseName("i_x_ddt_documents_shipment_id");
 
                     b.HasIndex("WarehouseId")
                         .HasDatabaseName("i_x_ddt_documents_warehouse_id");
@@ -1217,6 +1227,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at");
+
                     b.Property<Guid>("ContactId")
                         .HasColumnType("uuid")
                         .HasColumnName("contact_id");
@@ -1250,6 +1264,25 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("paid_amount");
+
+                    b.Property<DateTime?>("SdiSubmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sdi_submitted_at");
+
+                    b.Property<decimal>("ShippingCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("shipping_cost");
+
+                    b.Property<string>("ShippingNatureCode")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("shipping_nature_code");
+
+                    b.Property<decimal?>("ShippingVatRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("shipping_vat_rate");
 
                     b.Property<decimal>("TaxableTotal")
                         .HasPrecision(18, 2)
@@ -1322,8 +1355,9 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("character varying(4)")
                         .HasColumnName("nature_code");
 
-                    b.Property<int>("Quantity")
-                        .HasColumnType("integer")
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(22, 8)
+                        .HasColumnType("numeric(22,8)")
                         .HasColumnName("quantity");
 
                     b.Property<decimal>("UnitNetPrice")
@@ -1466,6 +1500,20 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("ApprovalReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("approval_reason");
+
+                    b.Property<int?>("BoxCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("box_count");
+
+                    b.Property<string>("CarrierName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("carrier_name");
+
                     b.Property<Guid>("ContactId")
                         .HasColumnType("uuid")
                         .HasColumnName("contact_id");
@@ -1481,15 +1529,40 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("numeric(5,2)")
                         .HasColumnName("customer_discount_rate");
 
+                    b.Property<string>("DdtNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("ddt_number");
+
                     b.Property<string>("DocumentReference")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("document_reference");
 
+                    b.Property<int>("FulfillmentType")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("fulfillment_type");
+
+                    b.Property<Guid?>("FulfillmentWarehouseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fulfillment_warehouse_id");
+
                     b.Property<decimal>("GrossTotal")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("gross_total");
+
+                    b.Property<string>("HoldReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("hold_reason");
+
+                    b.Property<string>("InternalNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("internal_notes");
 
                     b.Property<DateTime>("OrderDate")
                         .HasColumnType("timestamp with time zone")
@@ -1507,9 +1580,42 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasDefaultValue(0)
                         .HasColumnName("order_type");
 
+                    b.Property<string>("PaymentMethod")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("payment_method");
+
+                    b.Property<string>("PaymentTransactionDetails")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("payment_transaction_details");
+
+                    b.Property<decimal>("ShippingCost")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0.00m)
+                        .HasColumnName("shipping_cost");
+
+                    b.Property<string>("ShippingNatureCode")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("shipping_nature_code");
+
+                    b.Property<decimal?>("ShippingVatRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("shipping_vat_rate");
+
                     b.Property<int>("Status")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
+                        .HasDefaultValue(0)
                         .HasColumnName("status");
+
+                    b.Property<int?>("StatusBeforeHold")
+                        .HasColumnType("integer")
+                        .HasColumnName("status_before_hold");
 
                     b.Property<decimal>("TaxableTotal")
                         .HasPrecision(18, 2)
@@ -1520,6 +1626,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("terminal_id");
+
+                    b.Property<string>("TrackingCode")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("tracking_code");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -1532,8 +1643,20 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("vat_total");
 
+                    b.Property<Guid?>("WarehouseOperatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("warehouse_operator_id");
+
+                    b.Property<decimal?>("WeightKg")
+                        .HasPrecision(10, 3)
+                        .HasColumnType("numeric(10,3)")
+                        .HasColumnName("weight_kg");
+
                     b.HasKey("Id")
                         .HasName("p_k_orders");
+
+                    b.HasIndex("FulfillmentWarehouseId")
+                        .HasDatabaseName("i_x_orders_fulfillment_warehouse_id");
 
                     b.HasIndex("OrderNumber")
                         .IsUnique();
@@ -1560,6 +1683,18 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Property<decimal>("DiscountPercent")
                         .HasColumnType("numeric")
                         .HasColumnName("discount_percent");
+
+                    b.Property<bool>("IsBillingOnly")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_billing_only");
+
+                    b.Property<bool>("IsExcludedFromInvoice")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_excluded_from_invoice");
 
                     b.Property<decimal?>("LineGrossTotal")
                         .HasPrecision(18, 2)
@@ -1594,6 +1729,12 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer")
                         .HasColumnName("quantity");
+
+                    b.Property<int>("QuantityShipped")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("quantity_shipped");
 
                     b.Property<decimal>("UnitNetPrice")
                         .HasPrecision(22, 8)
@@ -1652,6 +1793,16 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Property<DateTime>("PaymentDate")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("payment_date");
+
+                    b.Property<string>("PaymentMethod")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("payment_method");
+
+                    b.Property<string>("TransactionDetails")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("transaction_details");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -2132,6 +2283,135 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasIndex("TargetId", "SortOrder");
 
                     b.ToTable("product_variant_images");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.Shipment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("BoxCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("box_count");
+
+                    b.Property<string>("CarrierName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("carrier_name");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("DdtNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("ddt_number");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("ShipmentNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("shipment_number");
+
+                    b.Property<DateTime>("ShippedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("shipped_at_utc");
+
+                    b.Property<decimal?>("TotalWeightKg")
+                        .HasPrecision(10, 3)
+                        .HasColumnType("numeric(10,3)")
+                        .HasColumnName("total_weight_kg");
+
+                    b.Property<string>("TrackingCode")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("tracking_code");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_shipments");
+
+                    b.HasIndex("DdtNumber")
+                        .IsUnique();
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("i_x_shipments_order_id");
+
+                    b.HasIndex("ShipmentNumber")
+                        .IsUnique();
+
+                    b.ToTable("shipments");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.ShipmentLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("OrderLineId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_line_id");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<int>("QuantityShipped")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity_shipped");
+
+                    b.Property<Guid>("ShipmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shipment_id");
+
+                    b.Property<string>("Sku")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("sku");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_shipment_lines");
+
+                    b.HasIndex("OrderLineId")
+                        .HasDatabaseName("i_x_shipment_lines_order_line_id");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("i_x_shipment_lines_product_id");
+
+                    b.HasIndex("ShipmentId", "OrderLineId")
+                        .IsUnique();
+
+                    b.ToTable("shipment_lines");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Size", b =>
@@ -2950,6 +3230,12 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("f_k_ddt_documents_contacts_contact_id");
 
+                    b.HasOne("Mauw.Erp.Domain.Entities.Shipment", "Shipment")
+                        .WithMany()
+                        .HasForeignKey("ShipmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("f_k_ddt_documents__shipments_shipment_id");
+
                     b.HasOne("Mauw.Erp.Domain.Entities.Warehouse", "Warehouse")
                         .WithMany()
                         .HasForeignKey("WarehouseId")
@@ -2957,6 +3243,8 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasConstraintName("f_k_ddt_documents__warehouses_warehouse_id");
 
                     b.Navigation("Contact");
+
+                    b.Navigation("Shipment");
 
                     b.Navigation("Warehouse");
                 });
@@ -3144,7 +3432,15 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("f_k_orders_contacts_contact_id");
 
+                    b.HasOne("Mauw.Erp.Domain.Entities.Warehouse", "FulfillmentWarehouse")
+                        .WithMany()
+                        .HasForeignKey("FulfillmentWarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("f_k_orders__warehouses_fulfillment_warehouse_id");
+
                     b.Navigation("Contact");
+
+                    b.Navigation("FulfillmentWarehouse");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.OrderItem", b =>
@@ -3322,6 +3618,48 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Navigation("Product");
 
                     b.Navigation("Size");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.Shipment", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.Order", "Order")
+                        .WithMany("Shipments")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_shipments_orders_order_id");
+
+                    b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.ShipmentLine", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.OrderItem", "OrderLine")
+                        .WithMany()
+                        .HasForeignKey("OrderLineId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_shipment_lines_order_items_order_line_id");
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_shipment_lines_products_product_id");
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.Shipment", "Shipment")
+                        .WithMany("Lines")
+                        .HasForeignKey("ShipmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_shipment_lines_shipments_shipment_id");
+
+                    b.Navigation("OrderLine");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("Shipment");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.StockItem", b =>
@@ -3600,6 +3938,8 @@ namespace Mauw.Erp.Infrastructure.Migrations
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Order", b =>
                 {
                     b.Navigation("Items");
+
+                    b.Navigation("Shipments");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.PriceFormula", b =>
@@ -3620,6 +3960,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.ProductVariant", b =>
                 {
                     b.Navigation("StockMovements");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.Shipment", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierDeliveryNote", b =>

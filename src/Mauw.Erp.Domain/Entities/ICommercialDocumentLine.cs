@@ -2,7 +2,7 @@ namespace Mauw.Erp.Domain.Entities;
 
 public interface ICommercialDocumentLine
 {
-    int Quantity { get; }
+    decimal Quantity { get; }
     decimal UnitNetPrice { get; set; }
     decimal DiscountPercent { get; set; }
     decimal VatRate { get; }

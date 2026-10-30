@@ -86,6 +86,21 @@ public class CommercialDocumentAccountingTests
     }
 
     [Fact]
+    public void InvoiceAccountingPreservesFractionalFiscalQuantity()
+    {
+        var calculator = new ItalianAccountingCalculator();
+        var invoice = new Invoice(Guid.NewGuid(), "INV-FRACTIONAL");
+
+        var result = invoice.AddItem(new(invoice.Id, Guid.NewGuid(), 0.125m, 10.12345678m, 22m), calculator);
+
+        Assert.True(result.Success, result.Error);
+        Assert.Equal(0.125m, Assert.Single(invoice.Items).Quantity);
+        Assert.Equal(1.27m, invoice.TaxableTotal);
+        Assert.Equal(0.28m, invoice.VatTotal);
+        Assert.Equal(1.55m, invoice.GrossTotal);
+    }
+
+    [Fact]
     public void PersistencePreservesUnitPriceDiscountAndNaturePrecision()
     {
         var options = new DbContextOptionsBuilder<MauwDbContext>()
@@ -100,6 +115,8 @@ public class CommercialDocumentAccountingTests
             Assert.Equal("numeric", entity.FindProperty("DiscountPercent")!.GetColumnType());
             Assert.Equal(4, entity.FindProperty("NatureCode")!.GetMaxLength());
             Assert.Equal(2, entity.FindProperty("LineNetTotal")!.GetScale());
+            if (type == typeof(InvoiceItem))
+                Assert.Equal(8, entity.FindProperty("Quantity")!.GetScale());
             Assert.True(entity.FindProperty("LineVatTotal")!.IsNullable);
             Assert.True(entity.FindProperty("LineGrossTotal")!.IsNullable);
         }

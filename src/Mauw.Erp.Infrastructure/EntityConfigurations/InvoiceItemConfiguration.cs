@@ -15,6 +15,7 @@ public class InvoiceItemConfiguration : IEntityTypeConfiguration<InvoiceItem>
         builder.OwnsOne(item => item.PricingSnapshot, snapshot => PricingSnapshotConfiguration.Configure(snapshot, "invoice_items"));
 
         builder.Property(ii => ii.Quantity)
+            .HasPrecision(22, 8)
             .IsRequired();
 
         builder.Property(ii => ii.UnitNetPrice)

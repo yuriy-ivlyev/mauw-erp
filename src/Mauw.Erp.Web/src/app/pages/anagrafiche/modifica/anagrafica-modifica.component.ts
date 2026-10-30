@@ -12,6 +12,8 @@ import { VatLookupComponent } from '../../../components/vat-lookup/vat-lookup.co
 import { AddressAutocompleteComponent, ParsedAddress } from '../../../components/address-autocomplete/address-autocomplete.component';
 import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
 import { PaginationComponent } from '../../../shared/pagination/pagination.component';
+import { TableActionButtonComponent } from '../../../shared/table-action-button/table-action-button.component';
+import { AddActionButtonComponent } from '../../../shared/add-action-button/add-action-button.component';
 
 type Tab = 'fiscal' | 'addresses' | 'persons' | 'customer' | 'supplier' | 'agent';
 
@@ -23,7 +25,10 @@ interface AgentOption {
 @Component({
   selector: 'app-anagrafica-modifica',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, VatLookupComponent, AddressAutocompleteComponent, ConfirmDeleteModalComponent, PaginationComponent],
+  imports: [
+    CommonModule, ReactiveFormsModule, FormsModule, VatLookupComponent, AddressAutocompleteComponent,
+    ConfirmDeleteModalComponent, PaginationComponent, TableActionButtonComponent, AddActionButtonComponent
+  ],
   templateUrl: './anagrafica-modifica.component.html'
 })
 export class AnagraficaModificaComponent implements OnInit {
@@ -64,6 +69,7 @@ export class AnagraficaModificaComponent implements OnInit {
   availableCustomersLoading = false;
   customerAssociationError = '';
   customerAssociationBusy = false;
+  pendingAgentCustomerRemoval: string | null = null;
   get selectedCountry(): string { return this.form?.get('countryCode')?.value ?? 'IT'; }
   get selectedVatNumber(): string { return this.form?.get('vatNumber')?.value ?? ''; }
   get isExtraEu(): boolean {
@@ -468,6 +474,24 @@ export class AnagraficaModificaComponent implements OnInit {
         this.customerAssociationBusy = false;
       }
     });
+  }
+
+  askRemoveCustomerFromAgent(customerId: string): void {
+    if (!this.customerAssociationBusy) {
+      this.pendingAgentCustomerRemoval = customerId;
+    }
+  }
+
+  confirmRemoveCustomerFromAgent(): void {
+    const customerId = this.pendingAgentCustomerRemoval;
+    this.pendingAgentCustomerRemoval = null;
+    if (customerId) {
+      this.removeCustomerFromAgent(customerId);
+    }
+  }
+
+  cancelRemoveCustomerFromAgent(): void {
+    this.pendingAgentCustomerRemoval = null;
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────

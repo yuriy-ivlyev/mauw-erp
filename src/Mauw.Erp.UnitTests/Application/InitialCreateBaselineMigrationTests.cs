@@ -15,12 +15,72 @@ public class InitialCreateBaselineMigrationTests(PostgreSqlContainerFixture post
         await using var db = await MigratedDbAsync();
 
         var migrations = db.Database.GetMigrations().ToList();
-        Assert.Equal(2, migrations.Count);
+        Assert.Equal(12, migrations.Count);
         Assert.EndsWith("_InitialCreate", migrations[0]);
         Assert.EndsWith("_AddVariantForeignKeys", migrations[1]);
+        Assert.EndsWith("_EnforceWholeMerchandiseQuantities", migrations[2]);
+        Assert.EndsWith("_AddOrderFulfillmentAndOutbox", migrations[3]);
+        Assert.EndsWith("_RemoveOrderOutboxAndAddPaymentInfo", migrations[4]);
+        Assert.EndsWith("_AddOrderInternalNotes", migrations[5]);
+        Assert.EndsWith("_AddOrderShippingCharge", migrations[6]);
+        Assert.EndsWith("_AddShipmentFulfillment", migrations[7]);
+        Assert.EndsWith("_AlterInvoiceItemQuantityToDecimal", migrations[8]);
+        Assert.EndsWith("_AddInvoicePaymentMetadata", migrations[9]);
+        Assert.EndsWith("_AddInvoiceConfirmationWorkflow", migrations[10]);
+        Assert.EndsWith("_AddInvoiceOrderSynchronization", migrations[11]);
         Assert.Equal(migrations, await db.Database.GetAppliedMigrationsAsync());
         Assert.Empty(await db.Database.GetPendingMigrationsAsync());
         Assert.False(db.Database.HasPendingModelChanges());
+    }
+
+    [Fact]
+    public async Task OrderOutboxIsDroppedAndCashPaymentFieldsAreAvailable()
+    {
+        await using var db = await MigratedDbAsync();
+
+        var outbox = await QueryAsync(db, """
+            SELECT table_name, table_name FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = 'outbox_messages'
+            """);
+        Assert.Empty(outbox);
+
+        var paymentColumns = await QueryAsync(db, """
+            SELECT column_name, data_type FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'orders'
+              AND column_name IN ('payment_method', 'payment_transaction_details')
+            """);
+        Assert.Equal("character varying", paymentColumns["payment_method"]);
+        Assert.Equal("character varying", paymentColumns["payment_transaction_details"]);
+
+        var invoicePaymentColumns = await QueryAsync(db, """
+            SELECT column_name, is_nullable FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'payments'
+              AND column_name IN ('payment_method', 'transaction_details')
+            """);
+        Assert.Equal("YES", invoicePaymentColumns["payment_method"]);
+        Assert.Equal("YES", invoicePaymentColumns["transaction_details"]);
+
+        var confirmationColumn = await QueryAsync(db, """
+            SELECT column_name, is_nullable FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'invoices'
+              AND column_name = 'confirmed_at'
+            """);
+        Assert.Equal("YES", confirmationColumn["confirmed_at"]);
+
+        var invoiceSyncColumns = await QueryAsync(db, """
+            SELECT table_name || '.' || column_name, is_nullable FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND ((table_name = 'invoices' AND column_name IN
+                    ('sdi_submitted_at', 'shipping_cost', 'shipping_vat_rate', 'shipping_nature_code'))
+                OR (table_name = 'order_items' AND column_name IN
+                    ('is_billing_only', 'is_excluded_from_invoice')))
+            """);
+        Assert.Equal("YES", invoiceSyncColumns["invoices.sdi_submitted_at"]);
+        Assert.Equal("NO", invoiceSyncColumns["invoices.shipping_cost"]);
+        Assert.Equal("YES", invoiceSyncColumns["invoices.shipping_vat_rate"]);
+        Assert.Equal("YES", invoiceSyncColumns["invoices.shipping_nature_code"]);
+        Assert.Equal("NO", invoiceSyncColumns["order_items.is_billing_only"]);
+        Assert.Equal("NO", invoiceSyncColumns["order_items.is_excluded_from_invoice"]);
     }
 
     [Fact]
@@ -45,7 +105,14 @@ public class InitialCreateBaselineMigrationTests(PostgreSqlContainerFixture post
         var checks = await QueryAsync(db,
             "SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint WHERE contype = 'c' AND connamespace = 'public'::regnamespace");
         Assert.Equal(
-            ["ck_price_formula_steps_percentage", "ck_price_formula_steps_position", "ck_price_formulas_is_singleton"],
+            [
+                "ck_price_formula_steps_percentage",
+                "ck_price_formula_steps_position",
+                "ck_price_formulas_is_singleton",
+                "ck_price_list_rules_whole_minimum_quantity",
+                "ck_stock_items_whole_quantities",
+                "ck_stock_movements_whole_quantity_delta"
+            ],
             checks.Keys.Order(StringComparer.Ordinal));
     }
 

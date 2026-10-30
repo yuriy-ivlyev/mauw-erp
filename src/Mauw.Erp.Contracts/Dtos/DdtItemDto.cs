@@ -15,5 +15,9 @@ public record DdtItemDto(
     decimal? LineGrossTotal,
     string? NatureCode = null,
     decimal DiscountPercent = 0m,
-    Mauw.Erp.Contracts.Pricing.PricingSnapshotDto? PricingSnapshot = null
+    Mauw.Erp.Contracts.Pricing.PricingSnapshotDto? PricingSnapshot = null,
+    string? Sku = null,
+    string? ProductName = null,
+    string? SizeName = null,
+    string? ColorName = null
 );

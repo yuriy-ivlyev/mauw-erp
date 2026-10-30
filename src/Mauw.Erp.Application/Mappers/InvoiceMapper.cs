@@ -1,5 +1,6 @@
 ﻿using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Domain.Enums;
 
 namespace Mauw.Erp.Application.Mappers;
 
@@ -14,11 +15,19 @@ public static class InvoiceMapper
             Id: invoice.Id,
             InvoiceNumber: invoice.InvoiceNumber,
             ContactId: invoice.ContactId,
+            OrderId: invoice.OrderId,
+            ContactName: invoice.Contact?.BusinessName ?? string.Empty,
             InvoiceDate: invoice.InvoiceDate,
             TaxableTotal: invoice.TaxableTotal,
             VatTotal: invoice.VatTotal,
             GrossTotal: invoice.GrossTotal,
-            Status: "Draft", // Default; can be enhanced with InvoiceStatus enum
+            ShippingCost: invoice.ShippingCost,
+            ShippingVatRate: invoice.ShippingVatRate,
+            ShippingNatureCode: invoice.ShippingNatureCode,
+            SdiSubmittedAt: invoice.SdiSubmittedAt,
+            PaidAmount: invoice.PaidAmount,
+            BalanceDue: invoice.GrossTotal - invoice.PaidAmount,
+            Status: invoice.Status,
             Items: invoice.Items.Select(MapItemToDto).ToList(),
             Payments: invoice.Payments.Select(MapPaymentToDto).ToList()
         );
@@ -38,7 +47,11 @@ public static class InvoiceMapper
             LineGrossTotal: null,
             NatureCode: item.NatureCode,
             DiscountPercent: item.DiscountPercent,
-            PricingSnapshot: PricingSnapshotMapper.Map(item.PricingSnapshot)
+            PricingSnapshot: PricingSnapshotMapper.Map(item.PricingSnapshot),
+            Sku: item.Variant?.Barcode,
+            ProductName: item.Variant?.Product?.Name,
+            SizeName: item.Variant?.Size?.Name,
+            ColorName: item.Variant?.Color?.Name
         );
     }
 
@@ -48,7 +61,8 @@ public static class InvoiceMapper
             Id: payment.Id,
             Amount: payment.Amount,
             PaymentDate: payment.PaymentDate,
-            PaymentMethod: "Transfer" // Default; can be enhanced with PaymentMethod enum
+            PaymentMethod: payment.PaymentMethod,
+            TransactionDetails: payment.TransactionDetails
         );
     }
 

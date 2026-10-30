@@ -11,7 +11,12 @@ import { SupplierPurchaseOrderService } from '../../services/supplier-purchase-o
 import { ContactService } from '../../services/contact.service';
 import { WarehouseService } from '../../services/warehouse.service';
 import { ProductService } from '../../services/product.service';
+import { BackButtonComponent } from '../../shared/back-button/back-button.component';
 import { ConfirmDeleteModalComponent } from '../../shared/confirm-delete-modal/confirm-delete-modal.component';
+import { PaginationComponent } from '../../shared/pagination/pagination.component';
+import { PageSlicePipe } from '../../shared/pagination/page-slice.pipe';
+import { TableActionButtonComponent } from '../../shared/table-action-button/table-action-button.component';
+import { AddActionButtonComponent } from '../../shared/add-action-button/add-action-button.component';
 import { ContactSummary } from '../../models/contact.model';
 import { WarehouseSummary } from '../../models/warehouse.model';
 import { VariantSearchDto } from '../../models/product.model';
@@ -21,7 +26,10 @@ import { SupplierPurchaseOrder } from '../../models/supplier-purchase-order.mode
 @Component({
   selector: 'app-carico-merce-wizard',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ConfirmDeleteModalComponent],
+  imports: [
+    CommonModule, FormsModule, RouterLink, BackButtonComponent, ConfirmDeleteModalComponent,
+    PaginationComponent, PageSlicePipe, TableActionButtonComponent, AddActionButtonComponent
+  ],
   templateUrl: './carico-merce-wizard.component.html',
   styles: [`
     :host { display: block; }
@@ -40,6 +48,10 @@ export class CaricoMerceWizardComponent implements OnInit, OnDestroy {
   warehouses: WarehouseSummary[] = [];
   selected: SupplierDeliveryNote | null = null;
   activeStep = 1;
+  linePage = 1;
+  linePageSize = 20;
+  summaryPage = 1;
+  summaryPageSize = 20;
   busy = false;
   dirty = false;
   error = '';
@@ -239,7 +251,20 @@ export class CaricoMerceWizardComponent implements OnInit, OnDestroy {
       supplierPurchaseOrderLineId: null, description: '', quantity: 1,
       unitPrice: '0.00', lineStatus: 'NewArticleNeeded', stockMovementId: null
     });
+    if (this.selected) {
+      this.linePage = Math.max(1, Math.ceil(this.selected.lines.length / this.linePageSize));
+    }
     this.dirty = true;
+  }
+
+  onLinePageSizeChange(pageSize: number): void {
+    this.linePageSize = pageSize;
+    this.linePage = 1;
+  }
+
+  onSummaryPageSizeChange(pageSize: number): void {
+    this.summaryPageSize = pageSize;
+    this.summaryPage = 1;
   }
 
   removeLine(index: number): void {
@@ -250,6 +275,9 @@ export class CaricoMerceWizardComponent implements OnInit, OnDestroy {
   confirmRemoveLine(): void {
     if (this.lineToRemove === null) return;
     this.selected?.lines.splice(this.lineToRemove, 1);
+    if (this.selected) {
+      this.linePage = Math.min(this.linePage, Math.max(1, Math.ceil(this.selected.lines.length / this.linePageSize)));
+    }
     this.matchingLine = null;
     this.dirty = true;
     this.cancelRemoveLine();
@@ -402,6 +430,8 @@ export class CaricoMerceWizardComponent implements OnInit, OnDestroy {
   private accept(note: SupplierDeliveryNote): void {
     this.selected = note; this.dirty = false; this.error = ''; this.success = '';
     this.matchingLine = null; this.variants = []; this.ocrJson = '';
+    this.linePage = 1;
+    this.summaryPage = 1;
   }
 
   private showError(error: unknown): void {

@@ -39,7 +39,7 @@ public static class ProductEndpoints
 
         group.MapGet("/variants/search", SearchVariants)
             .WithName("SearchVariants")
-            .WithSummary("Ricerca varianti per barcode (o barcode prodotto per articoli semplici), nome, colore o taglia");
+            .WithSummary("Ricerca varianti per barcode, nome, colore o taglia; disponibile anche il filtro sulle giacenze del magazzino predefinito vendibile");
 
         group.MapGet("/barcode/{barcode}", GetVariantByBarcode)
             .WithName("GetVariantByBarcode")
@@ -132,26 +132,39 @@ public static class ProductEndpoints
         return TypedResults.Ok(costs.Redact(result.Data!));
     }
 
-    private static async Task<Ok<List<VariantSearchDto>>> SearchVariants(
+    private static async Task<Results<Ok<List<VariantSearchDto>>, BadRequest<string>>> SearchVariants(
         string? q,
         IUnitOfWork unitOfWork,
         IStockService stockService,
         ICostVisibility costs,
         Guid? warehouseId = null,
         Guid? supplierId = null,
-        int limit = 10)
+        int limit = 10,
+        bool availableOnly = false)
     {
         if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 1)
             return TypedResults.Ok(new List<VariantSearchDto>());
+
+        var stockWarehouseId = warehouseId;
+        if (availableOnly && !stockWarehouseId.HasValue)
+        {
+            var defaultWarehouse = await unitOfWork.Warehouses.GetDefaultWarehouseAsync();
+            if (defaultWarehouse is null || !defaultWarehouse.IsActive || !defaultWarehouse.IsSellable)
+                return TypedResults.BadRequest("Configurare un magazzino predefinito attivo e vendibile per cercare articoli disponibili.");
+
+            stockWarehouseId = defaultWarehouse.Id;
+        }
 
         var variants = await unitOfWork.ProductVariants.SearchAsync(q.Trim(), Math.Min(limit, 30), supplierId);
 
         var results = new List<VariantSearchDto>();
         foreach (var v in variants)
         {
-            var stock = warehouseId.HasValue
-                ? (await stockService.GetAvailableQtyAsync(warehouseId.Value, v.Id)).Data
+            var stock = stockWarehouseId.HasValue
+                ? (await stockService.GetAvailableQtyAsync(stockWarehouseId.Value, v.Id)).Data
                 : 0m;
+            if (availableOnly && stock <= 0m)
+                continue;
 
             results.Add(new VariantSearchDto(
                 VariantId:    v.Id,

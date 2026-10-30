@@ -1,0 +1,241 @@
+<main class="mx-auto max-w-screen-2xl space-y-5 p-4 text-slate-800 sm:p-6">
+  <app-back-button label="Annulla e torna agli ordini" (activated)="returnToOrders()"></app-back-button>
+
+  <header>
+    <p class="mb-1 text-xs font-bold uppercase tracking-wider text-slate-500">Vendite B2B</p>
+    <h1 class="m-0 text-3xl font-bold">Nuovo Ordine</h1>
+    <p class="mt-2 text-sm text-slate-500">Crea una bozza e completa i dati prima di avviare il workflow.</p>
+  </header>
+
+  <div *ngIf="errorMessage" role="alert" class="rounded-lg border border-red-300 bg-red-50 p-3 text-red-700">{{ errorMessage }}</div>
+  <div *ngIf="createdOrderId" role="status" class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-800">
+    Bozza {{ createdOrderNumber }} creata, ma non tutte le righe sono state salvate.
+    <a [routerLink]="['/vendite/ordini', createdOrderId]" class="ml-1 font-bold underline">Apri la bozza</a>
+  </div>
+
+  <form (ngSubmit)="createDraft()" class="space-y-5">
+    <section class="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 md:grid-cols-2">
+      <div class="relative">
+        <label for="order-customer" class="mb-1 block text-sm font-semibold text-slate-700">Cliente</label>
+        <input id="order-customer" name="customerSearch" type="search" autocomplete="off"
+          [(ngModel)]="customerSearch" (ngModelChange)="onCustomerSearch($event)"
+          placeholder="Cerca per ragione sociale o partita IVA..."
+          class="w-full rounded-lg border border-slate-300 p-2.5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+        <div *ngIf="searchingCustomers" class="mt-1 text-xs text-slate-500">Ricerca clienti…</div>
+        <div *ngIf="customerResults.length" class="absolute z-30 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border bg-white shadow-lg">
+          <button *ngFor="let customer of customerResults" type="button"
+            class="block w-full border-b px-3 py-2 text-left last:border-0 hover:bg-blue-50"
+            (click)="selectCustomer(customer)">
+            <span class="block font-medium">{{ customer.businessName }}</span>
+            <span class="text-xs text-slate-500">
+              P.IVA: {{ customer.vatNumber || '—' }} · Codice fiscale: {{ customer.taxCode || '—' }}
+            </span>
+          </button>
+        </div>
+        <section *ngIf="selectedCustomer as customer" class="mt-3 rounded-lg border border-green-200 bg-green-50 p-3 text-sm">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="font-semibold text-green-900">{{ customer.businessName }}</p>
+              <p class="mt-1 text-green-800">P.IVA: {{ customer.vatNumber || '—' }}</p>
+              <p class="text-green-800">Codice cliente (ID): <span class="font-mono">{{ customer.id }}</span></p>
+            </div>
+            <button type="button" class="text-sm font-semibold text-slate-600 hover:text-red-700" (click)="clearCustomer()">Rimuovi</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="grid gap-4">
+        <label class="block text-sm font-semibold text-slate-700">
+          Tipo evasione
+          <select name="fulfillmentType" [(ngModel)]="fulfillmentType"
+            class="mt-1 w-full rounded-lg border border-slate-300 p-2.5 focus:border-blue-500 focus:outline-none">
+            <option value="StandardShipping">Logistica / Spedizione (StandardShipping)</option>
+            <option value="CashDesk">Banco Cassa (CashDesk)</option>
+          </select>
+        </label>
+        <label class="block text-sm font-semibold text-slate-700">
+          Note interne (facoltative)
+          <textarea name="internalNotes" [(ngModel)]="internalNotes" maxlength="2000" rows="3"
+            placeholder="Accordi o indicazioni per la gestione dell’ordine..."
+            class="mt-1 w-full resize-y rounded-lg border border-slate-300 p-2.5 focus:border-blue-500 focus:outline-none"></textarea>
+        </label>
+        <div class="grid gap-3 sm:grid-cols-3">
+          <label class="block text-sm font-semibold text-slate-700">
+            Costo spedizione netto
+            <input name="shippingCost" type="number" min="0" step="0.01" [(ngModel)]="shippingCost"
+              (ngModelChange)="requestPreview()"
+              class="mt-1 w-full rounded-lg border border-slate-300 p-2.5 focus:border-blue-500 focus:outline-none" />
+          </label>
+          <label class="block text-sm font-semibold text-slate-700">
+            IVA spedizione
+            <select name="shippingVatRate" [(ngModel)]="shippingVatRate" (ngModelChange)="requestPreview()"
+              [required]="shippingCost > 0" [disabled]="shippingCost <= 0"
+              class="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-100">
+              <option [ngValue]="null">Seleziona aliquota</option>
+              <option [ngValue]="22">22%</option>
+              <option [ngValue]="10">10%</option>
+              <option [ngValue]="5">5%</option>
+              <option [ngValue]="4">4%</option>
+              <option [ngValue]="0">0% (Natura)</option>
+            </select>
+          </label>
+          <label *ngIf="shippingCost > 0 && shippingVatRate === 0" class="block text-sm font-semibold text-slate-700">
+            Natura spedizione
+            <select name="shippingNatureCode" [(ngModel)]="shippingNatureCode" (ngModelChange)="requestPreview()"
+              required class="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
+              <option [ngValue]="null">Seleziona Natura</option>
+              <option *ngFor="let code of natureCodes" [value]="code">{{ code }}</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <section class="rounded-xl border border-slate-200 bg-white p-5">
+      <div class="mb-4">
+        <h2 class="m-0 text-lg font-bold">Aggiungi articolo</h2>
+        <p class="mt-1 text-sm text-slate-500">Cerca per SKU o descrizione, poi scegli la taglia e il colore della variante.</p>
+      </div>
+
+      <div class="mb-4 flex flex-wrap gap-2">
+        <input name="productSearch" [(ngModel)]="productSearch" type="search" autocomplete="off"
+          placeholder="SKU, codice a barre o descrizione..."
+          class="min-w-[220px] flex-1 rounded-lg border border-slate-300 p-2.5 focus:border-blue-500 focus:outline-none" />
+        <button type="button" class="rounded-lg bg-slate-700 px-4 py-2.5 font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+          [disabled]="searchingProducts || productSearch.trim().length < 2" (click)="searchProducts()">
+          {{ searchingProducts ? 'Ricerca…' : 'Cerca prodotto' }}
+        </button>
+      </div>
+
+      <div *ngIf="productResults.length" class="mb-4 max-h-64 overflow-y-auto rounded-lg border border-slate-200">
+        <button *ngFor="let variant of productResults" type="button"
+          class="flex w-full items-center justify-between gap-4 border-b border-slate-100 p-3 text-left last:border-0 hover:bg-blue-50 disabled:opacity-50"
+          [disabled]="loadingVariant" (click)="selectVariant(variant)">
+          <span>
+            <span class="block font-semibold">{{ variant.productName }}</span>
+            <span class="text-xs text-slate-500">SKU: {{ variant.sku || variant.barcode }} · Taglia: {{ variant.sizeName || '—' }} · Colore: {{ variant.colorName || '—' }}</span>
+          </span>
+          <span class="shrink-0 text-xs text-slate-500">Giacenza: {{ variant.currentStock }}</span>
+        </button>
+      </div>
+
+      <div *ngIf="selectedVariant && selectedProduct && selectedVariantDetails as details"
+        class="grid items-end gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 md:grid-cols-6">
+        <div class="md:col-span-2">
+          <p class="text-xs font-semibold uppercase text-blue-800">Variante selezionata</p>
+          <p class="mt-1 font-semibold">{{ selectedProduct.name }}</p>
+          <p class="text-sm text-slate-600">SKU {{ selectedVariant.sku || selectedVariant.barcode }} · {{ details.size }} / {{ details.color }}</p>
+        </div>
+        <label class="text-sm font-semibold text-slate-700">
+          Quantità
+          <input name="pendingQuantity" type="number" min="1" step="1" required [(ngModel)]="pendingQuantity"
+            class="mt-1 w-full rounded border border-slate-300 p-2" />
+        </label>
+        <label class="text-sm font-semibold text-slate-700">
+          Prezzo netto unitario
+          <input name="pendingUnitNetPrice" type="number" min="0" step="0.00000001" required [(ngModel)]="pendingUnitNetPrice"
+            class="mt-1 w-full rounded border border-slate-300 p-2" />
+        </label>
+        <label *ngIf="selectedProduct.vatRate === 0" class="text-sm font-semibold text-slate-700">
+          Natura IVA
+          <select name="pendingNatureCode" [(ngModel)]="pendingNatureCode" required class="mt-1 w-full rounded border border-slate-300 p-2">
+            <option [ngValue]="null">Seleziona</option>
+            <option *ngFor="let code of natureCodes" [value]="code">{{ code }}</option>
+          </select>
+        </label>
+        <div class="flex gap-2">
+          <app-add-action-button label="Aggiungi riga all’ordine"
+            [disabled]="loadingVariant" (activated)="addDraftLine()">
+          </app-add-action-button>
+          <button type="button" aria-label="Annulla selezione variante" title="Annulla selezione variante"
+            class="rounded-lg border border-slate-300 px-3 py-2 text-slate-600 hover:bg-white" (click)="clearVariant()">×</button>
+        </div>
+      </div>
+
+      <div class="mt-5 overflow-x-auto">
+        <table class="w-full min-w-[850px] border-collapse text-left text-sm">
+          <thead>
+            <tr class="border-b border-slate-200 text-slate-600">
+              <th class="p-3">Codice SKU</th>
+              <th class="p-3">Descrizione</th>
+              <th class="p-3">Taglia</th>
+              <th class="p-3">Colore</th>
+              <th class="p-3 text-right">Quantità</th>
+              <th class="p-3 text-right">Prezzo Unit.</th>
+              <th class="p-3 text-right">Subtotale Riga</th>
+              <th class="p-3"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let line of draftLines | pageSlice:draftLinesPage:draftLinesPageSize; let rowIndex = index"
+              class="border-b border-slate-100">
+              <td class="p-3 font-mono">{{ line.sku }}</td>
+              <td class="p-3">{{ line.description }}</td>
+              <td class="p-3">{{ line.size }}</td>
+              <td class="p-3">{{ line.color }}</td>
+              <td class="p-3 text-right">
+                <input [name]="'lineQuantity-' + ((draftLinesPage - 1) * draftLinesPageSize + rowIndex)" type="number" min="1" step="1" required
+                  [(ngModel)]="line.quantity" (ngModelChange)="requestPreview()"
+                  class="w-20 rounded border border-slate-300 p-1.5 text-right" />
+              </td>
+              <td class="p-3 text-right">
+                <input [name]="'linePrice-' + ((draftLinesPage - 1) * draftLinesPageSize + rowIndex)" type="number" min="0" step="0.00000001" required
+                  [(ngModel)]="line.unitNetPrice" (ngModelChange)="requestPreview()"
+                  class="w-32 rounded border border-slate-300 p-1.5 text-right" />
+              </td>
+              <td class="p-3 text-right font-semibold">
+                {{ preview ? (lineSubtotal((draftLinesPage - 1) * draftLinesPageSize + rowIndex) | currency:'EUR':'symbol':'1.2-2':'it-IT') : '—' }}
+              </td>
+              <td class="p-3 text-right">
+                <app-table-action-button action="delete" [label]="'Elimina riga ' + line.sku"
+                  (activated)="removeDraftLine((draftLinesPage - 1) * draftLinesPageSize + rowIndex)">
+                </app-table-action-button>
+              </td>
+            </tr>
+            <tr *ngIf="draftLines.length === 0">
+              <td colspan="8" class="p-8 text-center text-slate-500">Non ci sono righe. Cerca un prodotto e aggiungi una variante.</td>
+            </tr>
+          </tbody>
+        </table>
+        <app-pagination *ngIf="draftLines.length > 0" [page]="draftLinesPage" [pageSize]="draftLinesPageSize"
+          [totalCount]="draftLines.length" (pageChange)="draftLinesPage = $event"
+          (pageSizeChange)="onDraftLinesPageSizeChange($event)">
+        </app-pagination>
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 sm:flex-row sm:items-end sm:justify-between">
+      <div class="text-sm text-slate-600">
+        <p class="font-semibold">Riepilogo fiscale elaborato dal server</p>
+        <p class="text-xs text-slate-500">I valori sono una stima e vengono ricalcolati al salvataggio.</p>
+        <p *ngIf="previewPending" role="status" class="mt-2 text-blue-700">Calcolo totali in corso…</p>
+        <p *ngIf="previewError" role="alert" class="mt-2 text-red-700">{{ previewError }}</p>
+      </div>
+      <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:min-w-[380px]">
+        <span>Pezzi / capi</span><strong class="text-right">{{ totalPieces }}</strong>
+        <span>Totale imponibile</span>
+        <strong class="text-right">{{ preview ? (preview.totalTaxable | currency:'EUR':'symbol':'1.2-2':'it-IT') : '—' }}</strong>
+        <span>IVA</span>
+        <strong class="text-right">{{ preview ? (preview.totalVat | currency:'EUR':'symbol':'1.2-2':'it-IT') : '—' }}</strong>
+        <span class="border-t border-slate-200 pt-2 font-bold">Totale ordine</span>
+        <strong class="border-t border-slate-200 pt-2 text-right text-lg text-blue-800">
+          {{ preview ? (preview.totalGross | currency:'EUR':'symbol':'1.2-2':'it-IT') : '—' }}
+        </strong>
+      </div>
+    </section>
+
+    <footer class="flex flex-wrap justify-end gap-3">
+      <app-back-button label="Annulla" (activated)="returnToOrders()"></app-back-button>
+      <button type="submit" class="rounded-lg bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+        [disabled]="submitting || !!createdOrderId || !selectedCustomer || draftLines.length === 0">
+        {{ submitting ? 'Creazione bozza…' : 'Crea Bozza Ordine' }}
+      </button>
+    </footer>
+  </form>
+
+  <app-confirm-delete-modal [isOpen]="pendingDraftLineRemovalIndex !== null"
+    title="Eliminare la riga dall’ordine?"
+    message="La riga selezionata verrà rimossa dalla bozza e i totali saranno ricalcolati."
+    (confirmed)="confirmRemoveDraftLine()" (cancelled)="cancelRemoveDraftLine()">
+  </app-confirm-delete-modal>
+</main>

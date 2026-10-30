@@ -14,6 +14,8 @@ public static class DdtMapper
             Id: ddt.Id,
             DdtNumber: ddt.DdtNumber,
             ContactId: ddt.ContactId,
+            OrderId: ddt.OrderId,
+            ContactName: ddt.Contact?.BusinessName ?? string.Empty,
             WarehouseId: ddt.WarehouseId,
             DdtDate: ddt.DdtDate,
             TaxableTotal: ddt.TaxableTotal,
@@ -37,7 +39,11 @@ public static class DdtMapper
             LineGrossTotal: null,
             NatureCode: item.NatureCode,
             DiscountPercent: item.DiscountPercent,
-            PricingSnapshot: PricingSnapshotMapper.Map(item.PricingSnapshot)
+            PricingSnapshot: PricingSnapshotMapper.Map(item.PricingSnapshot),
+            Sku: item.Variant?.Barcode,
+            ProductName: item.Variant?.Product?.Name,
+            SizeName: item.Variant?.Size?.Name,
+            ColorName: item.Variant?.Color?.Name
         );
     }
 

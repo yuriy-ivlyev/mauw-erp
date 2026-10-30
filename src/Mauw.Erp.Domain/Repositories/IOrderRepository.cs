@@ -16,5 +16,6 @@ public interface IOrderRepository : IRepository<Order, Guid>
     Task AddWithNextNumberAsync(Order order, string prefix);
     Task<(IEnumerable<Order> Items, int Total)> GetAllPagedAsync(
         string? search, string? status, string? orderType, int page, int pageSize, string? sortBy = null, bool sortDescending = false);
+    Task<(IEnumerable<Order> Items, int Total)> GetFulfillmentQueueAsync(int page, int pageSize);
     Task<int> CountOrdersByPrefixAsync(string prefix);
 }

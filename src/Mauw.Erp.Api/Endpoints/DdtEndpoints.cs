@@ -23,7 +23,7 @@ public static class DdtEndpoints
             .WithSummary("Create a new transport document (DDT)");
 
         group.MapGet("/{id}", GetDdt)
-            .RequireAuthorization(AppPolicies.DdtDocuments)
+            .RequireAuthorization(AppPolicies.AnyRole)
             .WithName("GetDdt")
             .WithSummary("Get DDT details by ID");
 

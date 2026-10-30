@@ -9,12 +9,17 @@ import { ContactSummary, ContactFilterParams, PagedResult } from '../../../model
 import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
 import { PaginationComponent } from '../../../shared/pagination/pagination.component';
 import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
+import { TableActionButtonComponent } from '../../../shared/table-action-button/table-action-button.component';
+import { AddActionButtonComponent } from '../../../shared/add-action-button/add-action-button.component';
 import { SortChange } from '../../../models/pagination.model';
 
 @Component({
   selector: 'app-anagrafiche-elenco',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ConfirmDeleteModalComponent, PaginationComponent, SortHeaderDirective],
+  imports: [
+    CommonModule, FormsModule, RouterModule, ConfirmDeleteModalComponent, PaginationComponent,
+    SortHeaderDirective, TableActionButtonComponent, AddActionButtonComponent
+  ],
   templateUrl: './anagrafiche-elenco.component.html'
 })
 export class AnagraficheElencoComponent implements OnInit, OnDestroy {

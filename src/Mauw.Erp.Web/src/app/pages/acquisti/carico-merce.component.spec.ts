@@ -47,7 +47,7 @@ describe('CaricoMerceComponent', () => {
     expect(pageElement.textContent).toContain('DDT registrati');
     expect(pageElement.textContent).not.toContain('Documento originale');
     expect(pageElement.textContent).not.toContain('Riconciliazione');
-    expect(pageElement.querySelector('a[href="/acquisti/ddt-fornitore/nuovo"]')).toBeTruthy();
+    expect(pageElement.querySelector('button[aria-label="Nuovo carico"]')).toBeTruthy();
     expect(pageElement.textContent).toContain('4 / 27');
     expect(pageElement.textContent).toContain('Bozza');
   });
@@ -64,7 +64,7 @@ describe('CaricoMerceComponent', () => {
     expect(service.list).toHaveBeenCalledWith(1, {
       search: 'DDT-17', supplierId: 'supplier', status: 'Draft',
       dateFrom: '2026-10-01', dateTo: '2026-10-31'
-    });
+    }, 20);
     component.resetFilters();
     expect(component.page).toBe(1);
     expect(component.search).toBe('');

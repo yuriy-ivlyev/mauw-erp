@@ -33,4 +33,8 @@ public record UpdateCassaSessionRequest(
 
 public record ResumeCassaSessionRequest(string? TerminalId);
 
-public record CassaPreviewRequest(List<CassaCartItemRequest> Items);
+public record CassaPreviewRequest(
+    List<CassaCartItemRequest> Items,
+    decimal ShippingCost = 0.00m,
+    decimal? ShippingVatRate = null,
+    string? ShippingNatureCode = null);

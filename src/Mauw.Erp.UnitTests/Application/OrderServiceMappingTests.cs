@@ -13,6 +13,53 @@ namespace Mauw.Erp.UnitTests.Application;
 public sealed class OrderServiceMappingTests
 {
     [Fact]
+    public async Task GetOrderMapsQuantitiesShippedAcrossLinkedDdts()
+    {
+        var contact = new Contact("Cliente spedizioni");
+        SetId(contact);
+        var order = new Order(contact.Id, "ORD-SHIP") { Contact = contact };
+        SetId(order);
+        var variantId = Guid.NewGuid();
+        var orderItem = new OrderItem(order.Id, variantId, 5, 10m, 22m);
+        order.Items.Add(orderItem);
+        var ddt = new DdtDocument(contact.Id, "DDT-SHIP") { OrderId = order.Id };
+        SetId(ddt);
+        ddt.Items.Add(new DdtItem(ddt.Id, variantId, 2, 10m, 22m));
+
+        var unitOfWork = new Mock<IUnitOfWork>();
+        var orders = new Mock<IOrderRepository>();
+        var invoices = new Mock<IInvoiceRepository>();
+        var ddts = new Mock<IDdtDocumentRepository>();
+        unitOfWork.SetupGet(work => work.Orders).Returns(orders.Object);
+        unitOfWork.SetupGet(work => work.Invoices).Returns(invoices.Object);
+        unitOfWork.SetupGet(work => work.DdtDocuments).Returns(ddts.Object);
+        orders.Setup(repository => repository.GetByIdAsync(order.Id)).ReturnsAsync(order);
+        invoices.Setup(repository => repository.GetByOrderIdsAsync(It.IsAny<IEnumerable<Guid>>()))
+            .ReturnsAsync([]);
+        ddts.Setup(repository => repository.GetByOrderIdWithItemsAsync(order.Id))
+            .ReturnsAsync([ddt]);
+
+        var service = new OrderService(
+            unitOfWork.Object,
+            new CreateOrderRequestValidator(),
+            new CreateOrderItemRequestValidator(),
+            new ItalianAccountingCalculator(),
+            Mock.Of<ICompanySettingsService>(),
+            Mock.Of<IInvoicePdfGenerator>(),
+            NullLogger<OrderService>.Instance,
+            Mock.Of<IDocumentPricingService>());
+
+        var result = await service.GetOrderAsync(order.Id);
+
+        Assert.True(result.Success, result.Error);
+        var item = Assert.Single(result.Data!.Items);
+        Assert.Equal(2, item.ShippedQuantity);
+        Assert.Equal(3, item.RemainingQuantity);
+        Assert.Equal(ddt.Id, result.Data.LinkedDocuments!.DdtId);
+        Assert.Equal("DDT-SHIP", Assert.Single(result.Data.LinkedDocuments.Ddts!).DdtNumber);
+    }
+
+    [Fact]
     public async Task GetAllOrdersPreservesFirstLinkedDocumentsAndEveryMatchingCreditNote()
     {
         var contact = new Contact("Cliente mapping");

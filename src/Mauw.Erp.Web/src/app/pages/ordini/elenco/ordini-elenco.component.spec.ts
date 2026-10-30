@@ -1,6 +1,7 @@
 import '../../../locale';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Router, provideRouter } from '@angular/router';
 import { of, Subject } from 'rxjs';
 import { Order } from '../../../models/order.model';
 import { OrderService } from '../../../services/order.service';
@@ -28,8 +29,12 @@ describe('OrdiniElencoComponent', () => {
       vatTotal: 22,
       grossTotal: 122,
       orderType: 'Standard',
+      fulfillmentType: 'StandardShipping',
       items: [],
-      linkedDocuments: null
+      linkedDocuments: null,
+      statusDescription: 'Bozza',
+      isReadOnly: false,
+      permittedActions: []
     }));
     service.getList.and.returnValue(of({
       items: orders, pageNumber: 1, pageSize: 20, totalCount: 3, totalPages: 1
@@ -37,21 +42,37 @@ describe('OrdiniElencoComponent', () => {
     service.downloadOrderPdf.and.returnValue(pdf);
     await TestBed.configureTestingModule({
       imports: [OrdiniElencoComponent],
-      providers: [{ provide: OrderService, useValue: service }]
+      providers: [
+        provideRouter([]),
+        { provide: OrderService, useValue: service }
+      ]
     }).compileComponents();
     fixture = TestBed.createComponent(OrdiniElencoComponent);
   });
 
   it('renders every row, Italian amounts and PDF labels without partial rows', () => {
     expect(() => fixture.detectChanges()).not.toThrow();
+    const newOrderButton = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
+    expect(newOrderButton.getAttribute('aria-label')).toBe('Nuovo ordine');
+    expect(newOrderButton.className).toContain('bg-green-600');
     const rows = fixture.nativeElement.querySelectorAll('tbody tr') as NodeListOf<HTMLElement>;
     expect(rows.length).toBe(3);
     rows.forEach((row, index) => {
       expect(row.textContent).toContain(`ORD-${index}`);
+      expect(row.querySelector('td:first-child a')).toBeNull();
+      expect(row.querySelector('td:last-child app-table-action-button button')?.getAttribute('aria-label'))
+        .toBe(`Modifica ordine ORD-${index}`);
       expect(row.textContent).toContain('100,00');
       expect(row.textContent).toContain('122,00');
-      expect(row.querySelector('button')?.textContent).toContain('ORD PDF');
+      expect(Array.from(row.querySelectorAll('button')).some(button => button.textContent?.includes('ORD PDF'))).toBeTrue();
     });
+
+    const navigation = spyOn(TestBed.inject(Router), 'navigate').and.returnValue(Promise.resolve(true));
+    const editButton = fixture.nativeElement.querySelector(
+      'tbody app-table-action-button button'
+    ) as HTMLButtonElement;
+    editButton.click();
+    expect(navigation).toHaveBeenCalledWith(['/vendite/ordini', 'order-0']);
   });
 
   it('keeps the row count stable after repeated failed PDF downloads and displays the error', () => {
@@ -59,7 +80,8 @@ describe('OrdiniElencoComponent', () => {
     for (let attempt = 0; attempt < 3; attempt++) {
       pdf = new Subject<Blob>();
       service.downloadOrderPdf.and.returnValue(pdf);
-      const button = fixture.nativeElement.querySelector('tbody button') as HTMLButtonElement;
+      const buttons = fixture.nativeElement.querySelectorAll('tbody td:last-child button') as NodeListOf<HTMLButtonElement>;
+      const button = Array.from(buttons).find(candidate => candidate.textContent?.includes('ORD PDF'))!;
       button.click();
       fixture.detectChanges();
       expect(button.disabled).toBeTrue();

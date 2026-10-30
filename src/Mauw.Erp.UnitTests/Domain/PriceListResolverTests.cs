@@ -102,11 +102,11 @@ public class PriceListResolverTests
     }
 
     [Fact]
-    public void FractionalQuantitiesAreRejected()
+    public void FractionalQuantitiesResolveWhilePriceBreaksRemainWhole()
     {
         Assert.False(PriceList.Create("Test", "EUR", true,
             [new PriceRuleDefinition(null, PriceCalculationType.FixedPrice, 3.12345678m, MinimumQuantity: 0.25m)]).Success);
-        Assert.False(_resolver.Resolve(null, Input() with { Quantity = 0.25m }).Success);
+        Assert.True(_resolver.Resolve(null, Input() with { Quantity = 0.25m }).Success);
     }
 
     public static TheoryData<PriceRuleDefinition> InvalidRules => new()

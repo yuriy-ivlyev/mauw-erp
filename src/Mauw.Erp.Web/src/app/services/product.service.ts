@@ -89,10 +89,16 @@ export class ProductService {
     );
   }
 
-  searchVariants(q: string, limit = 30, supplierId?: string): Observable<VariantSearchDto[]> {
+  searchVariants(
+    q: string,
+    limit = 30,
+    supplierId?: string,
+    availableOnly = false
+  ): Observable<VariantSearchDto[]> {
     const supplierParam = supplierId ? `&supplierId=${encodeURIComponent(supplierId)}` : '';
+    const availableParam = availableOnly ? '&availableOnly=true' : '';
     return this.apiService.get<VariantSearchDto[]>(
-      `${this.endpoint}/variants/search?q=${encodeURIComponent(q)}&limit=${limit}${supplierParam}`
+      `${this.endpoint}/variants/search?q=${encodeURIComponent(q)}&limit=${limit}${supplierParam}${availableParam}`
     );
   }
 

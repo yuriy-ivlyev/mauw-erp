@@ -5,7 +5,7 @@ public sealed record InvoicePdfLineModel(
     string   Sku,
     string   Description,
     string?  SeasonCollection,
-    int      Pieces,
+    decimal  Pieces,
     decimal  UnitPrice,
     decimal? DiscountPercent,
     decimal  VatRate,

@@ -206,10 +206,7 @@
   <section *ngIf="!loading" class="mt-8 bg-white rounded-lg shadow p-6">
     <div class="flex justify-between items-center mb-4">
       <h2 class="text-xl font-semibold text-gray-800">🏭 Sedi Operative</h2>
-      <button (click)="openAddSite()"
-        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-medium">
-        + Aggiungi Sede
-      </button>
+      <app-add-action-button label="Aggiungi sede operativa" (activated)="openAddSite()"></app-add-action-button>
     </div>
 
     <div *ngIf="!company?.operationalSites?.length" class="text-gray-400 italic text-sm">
@@ -241,11 +238,15 @@
             <span *ngIf="site.province"> ({{ site.province }})</span>
           </td>
           <td class="px-4 py-3 text-gray-600">{{ site.phone || '—' }}</td>
-          <td class="px-4 py-3 space-x-2">
-            <button (click)="openEditSite(site)"
-              class="bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded text-xs">Modifica</button>
-            <button (click)="askDelete(site.id)"
-              class="bg-red-600 hover:bg-red-700 text-white py-1 px-2 rounded text-xs">Elimina</button>
+          <td class="px-4 py-3">
+            <div class="flex gap-2">
+              <app-table-action-button action="edit" [label]="'Modifica sede ' + site.siteName"
+                (activated)="openEditSite(site)">
+              </app-table-action-button>
+              <app-table-action-button action="delete" [label]="'Elimina sede ' + site.siteName"
+                (activated)="askDelete(site.id)">
+              </app-table-action-button>
+            </div>
           </td>
         </tr>
       </tbody>
@@ -319,9 +320,12 @@
       </form>
 
       <div class="flex gap-3 mt-5">
-        <button (click)="saveSite()" [disabled]="savingSite"
-          class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 rounded font-medium">
-          {{ savingSite ? 'Salvataggio…' : (editingSiteId ? 'Aggiorna' : 'Aggiungi') }}
+        <app-add-action-button *ngIf="!editingSiteId" label="Aggiungi sede"
+          [disabled]="savingSite" (activated)="saveSite()">
+        </app-add-action-button>
+        <button *ngIf="editingSiteId" type="button" (click)="saveSite()" [disabled]="savingSite"
+          class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 px-4 rounded font-medium">
+          {{ savingSite ? 'Salvataggio…' : 'Aggiorna' }}
         </button>
         <button (click)="closeSiteModal()"
           class="flex-1 bg-gray-400 hover:bg-gray-500 text-white py-2 rounded font-medium">

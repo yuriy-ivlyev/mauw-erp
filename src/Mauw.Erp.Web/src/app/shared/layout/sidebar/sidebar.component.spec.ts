@@ -63,9 +63,10 @@ describe('SidebarComponent', () => {
     const links = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('nav a'))
       .map(link => link.textContent?.trim());
 
-    for (const label of ['Cassa', 'Ordini', 'Preventivi', 'Contatti', 'Fatture', 'Note Credito', 'Giacenze']) {
+    for (const label of ['Cassa', 'Ordini', 'Contatti', 'Fatture', 'Note Credito', 'Giacenze']) {
       expect(links).toContain(label);
     }
+    expect(links).not.toContain('Preventivi');
     for (const label of ['Movimenti', 'DDT', 'Magazzini', 'Carico Merce']) {
       expect(links).not.toContain(label);
     }

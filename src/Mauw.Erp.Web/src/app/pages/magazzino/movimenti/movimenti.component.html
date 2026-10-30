@@ -1,10 +1,7 @@
 <div class="p-6">
   <div class="mb-6 flex justify-between items-center">
     <h1 class="text-3xl font-bold">Movimenti Magazzino</h1>
-    <button (click)="openForm()"
-      class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-      + Nuovo Movimento
-    </button>
+    <app-add-action-button label="Nuovo movimento di magazzino" (activated)="openForm()"></app-add-action-button>
   </div>
 
   <div *ngIf="successMessage" class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">{{ successMessage }}</div>

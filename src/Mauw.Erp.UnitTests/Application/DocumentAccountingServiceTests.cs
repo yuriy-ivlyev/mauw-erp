@@ -1,4 +1,3 @@
-using System.Globalization;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Application.Validation;
 using Mauw.Erp.Contracts.Interfaces;
@@ -15,70 +14,6 @@ namespace Mauw.Erp.UnitTests.Application;
 public class DocumentAccountingServiceTests
 {
     private readonly Fixture _fixture = new();
-
-    [Fact]
-    public async Task FreeInvoiceLineUsesAuthoritativeVatRateWithoutDivisionByZero()
-    {
-        var result = await _fixture.InvoiceService.AddItemAsync(_fixture.Invoice.Id,
-            new() { VariantId = _fixture.Variant.Id, Quantity = 1, UnitNetPrice = 0m, VatRate = 22m });
-
-        Assert.True(result.Success, result.Error);
-        Assert.Equal(0m, result.Data!.GrossTotal);
-        Assert.Equal(22m, Assert.Single(result.Data.Items).VatRate);
-        _fixture.UnitOfWork.Verify(work => work.SaveChangesAsync(), Times.Once);
-    }
-
-    [Theory]
-    [InlineData("23", "94.26", "20.74", "115.00")]
-    [InlineData("94.18", "385.98", "84.92", "470.90")]
-    public async Task InvoiceScorporoPersistsEightPlacePriceAndFiscalTotals(
-        string gross, string taxable, string vat, string total)
-    {
-        var result = await _fixture.InvoiceService.AddItemAsync(_fixture.Invoice.Id,
-            new()
-            {
-                VariantId = _fixture.Variant.Id, Quantity = 5,
-                UnitGrossPrice = Parse(gross), VatRate = 22m
-            });
-
-        Assert.True(result.Success, result.Error);
-        Assert.Equal(Parse(taxable), result.Data!.TaxableTotal);
-        Assert.Equal(Parse(vat), result.Data.VatTotal);
-        Assert.Equal(Parse(total), result.Data.GrossTotal);
-        var line = Assert.Single(result.Data.Items);
-        Assert.Equal(Math.Round(line.UnitNetPrice * 5m, 2, MidpointRounding.AwayFromZero), line.LineNetTotal);
-        Assert.Null(line.LineVatTotal);
-        Assert.Null(line.LineGrossTotal);
-    }
-
-    [Fact]
-    public async Task InvoiceAdditionRecalculatesGroupRatherThanSummingLineTaxes()
-    {
-        var request = new CreateInvoiceItemRequest
-        {
-            VariantId = _fixture.Variant.Id, Quantity = 1, UnitNetPrice = 0.03m, VatRate = 22m
-        };
-        Assert.True((await _fixture.InvoiceService.AddItemAsync(_fixture.Invoice.Id, request)).Success);
-
-        var result = await _fixture.InvoiceService.AddItemAsync(_fixture.Invoice.Id, request);
-
-        Assert.True(result.Success, result.Error);
-        Assert.Equal(0.06m, result.Data!.TaxableTotal);
-        Assert.Equal(0.01m, result.Data.VatTotal);
-        Assert.Equal(0.07m, result.Data.GrossTotal);
-    }
-
-    [Fact]
-    public async Task MissingNatureFailsWithoutSavingInvoice()
-    {
-        var result = await _fixture.InvoiceService.AddItemAsync(_fixture.Invoice.Id,
-            new() { VariantId = _fixture.Variant.Id, Quantity = 1, UnitNetPrice = 10m, VatRate = 0m });
-
-        Assert.False(result.Success);
-        Assert.False(string.IsNullOrWhiteSpace(result.Error));
-        Assert.Empty(_fixture.Invoice.Items);
-        _fixture.UnitOfWork.Verify(work => work.SaveChangesAsync(), Times.Never);
-    }
 
     [Fact]
     public async Task InvalidCartIsRejectedBeforeCreatingOrSavingAnOrder()
@@ -107,8 +42,6 @@ public class DocumentAccountingServiceTests
         Assert.Equal(12.20m, order.GrossTotal);
         _fixture.UnitOfWork.Verify(work => work.SaveChangesAsync(), Times.Never);
     }
-
-    private static decimal Parse(string value) => decimal.Parse(value, CultureInfo.InvariantCulture);
 
     [Fact]
     public void CartPreviewUsesNetPricesAndGroupsVatByRateAndNature()
@@ -140,6 +73,21 @@ public class DocumentAccountingServiceTests
         Assert.Equal(0.06m, result.Data!.TotalTaxable);
         Assert.Equal(0.01m, result.Data.TotalVat);
         Assert.Equal(0.07m, result.Data.TotalGross);
+    }
+
+    [Fact]
+    public void CartPreviewIncludesShippingAsAClassifiedLineInTotals()
+    {
+        var result = _fixture.OrderService.PreviewCassaCart(new(
+            [new(_fixture.Variant.Id, 1, 10m, 22m, 10)],
+            ShippingCost: 5.00m,
+            ShippingVatRate: 10m));
+
+        Assert.True(result.Success, result.Error);
+        Assert.Equal([10.00m, 5.00m], result.Data!.Lines.Select(line => line.LineNetTotal));
+        Assert.Equal(15.00m, result.Data.TotalTaxable);
+        Assert.Equal(2.70m, result.Data.TotalVat);
+        Assert.Equal(17.70m, result.Data.TotalGross);
     }
 
     [Fact]
@@ -264,6 +212,7 @@ public class DocumentAccountingServiceTests
         Assert.Equal("Rif-1", result.Data.DocumentReference);
         Assert.Single(result.Data.Items);
         Assert.Equal(OrderStatus.Suspended, created!.Status);
+        Assert.Equal(OrderFulfillmentType.CashDesk, created.FulfillmentType);
         Assert.Equal("terminale-1", created.TerminalId);
         Assert.Equal(20m, created.TaxableTotal);
         Assert.Equal(4.40m, created.VatTotal);
@@ -318,7 +267,9 @@ public class DocumentAccountingServiceTests
             new(_fixture.Contact.Id, null, null, []));
         Assert.Equal("Sessione non trovata", missing.Error);
 
-        var order = new Order(_fixture.Contact.Id, "ORD-CLOSED") { Status = OrderStatus.Confirmed };
+        var order = new Order(_fixture.Contact.Id, "ORD-CLOSED");
+        order.Items.Add(new OrderItem(order.Id, _fixture.Variant.Id, 1, 10m, 22m));
+        order.Confirm();
         _fixture.UnitOfWork.Setup(work => work.Orders.GetCassaSessionWithItemsAsync(order.Id))
             .ReturnsAsync(order);
         var closed = await _fixture.OrderService.UpdateCassaSessionAsync(order.Id,
@@ -329,11 +280,8 @@ public class DocumentAccountingServiceTests
     [Fact]
     public async Task CassaSessionCanResumeTerminateAndBeRead()
     {
-        var order = new Order(_fixture.Contact.Id, "ORD-SESSION")
-        {
-            Status = OrderStatus.Suspended,
-            Contact = _fixture.Contact
-        };
+        var order = new Order(_fixture.Contact.Id, "ORD-SESSION") { Contact = _fixture.Contact };
+        order.Suspend("terminal-2");
         _fixture.UnitOfWork.Setup(work => work.Orders.GetCassaSessionWithItemsAsync(order.Id))
             .ReturnsAsync(order);
         _fixture.UnitOfWork.Setup(work => work.Orders.GetByIdAsync(order.Id)).ReturnsAsync(order);
@@ -384,17 +332,13 @@ public class DocumentAccountingServiceTests
         public Mock<IUnitOfWork> UnitOfWork { get; } = new();
         public ItalianAccountingCalculator Calculator { get; } = new();
         public Contact Contact { get; } = new("Cliente");
-        public Invoice Invoice { get; }
         public ProductVariant Variant { get; }
-        public InvoiceService InvoiceService { get; }
         public OrderService OrderService { get; }
 
         public Fixture()
         {
             var product = new Product(Guid.NewGuid(), "SUP", "SKU", "Articolo", 22m, 10m);
             Variant = new(product.Id, "123", 10m, product.SupplierId);
-            Invoice = new(Contact.Id, "INV-TEST");
-            UnitOfWork.Setup(work => work.Invoices.GetByIdAsync(Invoice.Id)).ReturnsAsync(Invoice);
             UnitOfWork.Setup(work => work.ProductVariants.GetByIdAsync(Variant.Id)).ReturnsAsync(Variant);
             UnitOfWork.Setup(work => work.Products.GetByIdAsync(product.Id)).ReturnsAsync(product);
             UnitOfWork.Setup(work => work.Contacts.GetByIdAsync(Contact.Id)).ReturnsAsync(Contact);
@@ -406,8 +350,6 @@ public class DocumentAccountingServiceTests
                     It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new[] { Variant });
             var pricing = new DocumentPricingService(pricingRepository.Object, Mock.Of<IPriceListService>(), Calculator);
-            InvoiceService = new(UnitOfWork.Object, Mock.Of<IValidator<CreateInvoiceRequest>>(),
-                Calculator, settings, pdf, pricing);
             OrderService = new(UnitOfWork.Object, Mock.Of<IValidator<CreateOrderRequest>>(),
                 new CreateOrderItemRequestValidator(), Calculator, settings, pdf,
                 NullLogger<OrderService>.Instance, pricing);

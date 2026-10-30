@@ -15,6 +15,7 @@ public class DdtItem : Entity<Guid>, ICommercialDocumentLine
     public decimal? LineGrossTotal { get; set; }
     public string? NatureCode { get; set; }
     public decimal DiscountPercent { get; set; }
+    decimal ICommercialDocumentLine.Quantity => Quantity;
     public Mauw.Erp.Domain.Pricing.PricingSnapshot? PricingSnapshot { get; init; }
 
     // Navigation

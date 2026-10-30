@@ -52,12 +52,19 @@ public class DdtDocumentConfiguration : IEntityTypeConfiguration<DdtDocument>
             .HasForeignKey(d => d.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(d => d.Shipment)
+            .WithMany()
+            .HasForeignKey(d => d.ShipmentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasMany(d => d.Items)
             .WithOne(di => di.DdtDocument)
             .HasForeignKey(di => di.DdtDocumentId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(d => d.OrderId);
+        builder.HasIndex(d => d.ShipmentId)
+            .IsUnique();
         builder.HasIndex(d => d.WarehouseId)
             .HasDatabaseName("i_x_ddt_documents_warehouse_id");
         builder.HasIndex(d => new { d.ContactId, d.DdtDate })

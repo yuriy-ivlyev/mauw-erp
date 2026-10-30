@@ -22,6 +22,18 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(i => i.InvoiceDate)
             .IsRequired();
 
+        builder.Property(i => i.ConfirmedAt);
+        builder.Property(i => i.SdiSubmittedAt);
+
+        builder.Property(i => i.ShippingCost)
+            .HasPrecision(18, 2);
+
+        builder.Property(i => i.ShippingVatRate)
+            .HasPrecision(5, 2);
+
+        builder.Property(i => i.ShippingNatureCode)
+            .HasMaxLength(4);
+
         builder.Property(i => i.TaxableTotal)
             .HasPrecision(18, 2);
 

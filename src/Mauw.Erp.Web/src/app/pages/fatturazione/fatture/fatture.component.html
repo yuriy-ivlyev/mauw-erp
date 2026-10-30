@@ -1,0 +1,121 @@
+<main class="mx-auto max-w-screen-2xl space-y-5 p-4 text-slate-800 sm:p-6">
+  <header>
+    <div>
+      <p class="mb-1 text-xs font-bold uppercase tracking-wider text-slate-500">Amministrazione</p>
+      <h1 class="m-0 text-3xl font-bold">Fatture</h1>
+    </div>
+  </header>
+
+  <div *ngIf="errorMessage" role="alert" class="rounded-lg border border-red-300 bg-red-50 p-3 text-red-700">
+    {{ errorMessage }}
+  </div>
+  <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <h2 class="m-0 text-lg font-bold">Elenco fatture</h2>
+    </div>
+
+    <div class="mb-4 grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-6">
+      <label class="text-sm font-semibold text-slate-700 lg:col-span-2">
+        Cerca fattura o cliente
+        <input name="invoiceSearch" [(ngModel)]="searchTerm" (ngModelChange)="onSearchChange()"
+          type="search" placeholder="Numero o cliente..."
+          class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal focus:border-blue-500 focus:outline-none" />
+      </label>
+      <label class="text-sm font-semibold text-slate-700">
+        Stato
+        <select name="invoiceStatus" [(ngModel)]="statusFilter" (ngModelChange)="onFilterChange()"
+          class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal">
+          <option value="">Tutti gli stati</option>
+          <option value="Confirmed">Confermata</option>
+          <option value="PartiallyPaid">Parzialmente pagata</option>
+          <option value="Paid">Pagata</option>
+        </select>
+      </label>
+      <label class="text-sm font-semibold text-slate-700">
+        Data da
+        <input name="dateFrom" type="date" [(ngModel)]="dateFrom" (ngModelChange)="onFilterChange()"
+          class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal" />
+      </label>
+      <label class="text-sm font-semibold text-slate-700">
+        Data a
+        <input name="dateTo" type="date" [(ngModel)]="dateTo" (ngModelChange)="onFilterChange()"
+          class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal" />
+      </label>
+      <div class="flex items-end justify-between gap-3 lg:col-span-6">
+        <label class="inline-flex items-center gap-2 pb-2 text-sm font-medium text-slate-700">
+          <input name="unpaidOnly" type="checkbox" [(ngModel)]="unpaidOnly" (ngModelChange)="onFilterChange()"
+            class="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600" />
+          Solo da pagare
+        </label>
+        <button type="button" (click)="clearFilters()"
+          class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+          Azzera filtri
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="loading && invoices.length === 0" role="status" class="p-8 text-center text-slate-500">
+      Caricamento fatture…
+    </div>
+    <div class="overflow-x-auto">
+      <table *ngIf="!loading || invoices.length > 0" class="w-full min-w-[850px] text-sm">
+        <thead class="border-b bg-slate-50">
+          <tr class="text-left text-slate-600">
+            <th appSortHeader="invoiceNumber" [activeSortBy]="sortBy" [sortDescending]="sortDescending"
+              (sortChange)="onSortChange($event)" class="px-3 py-3">Numero</th>
+            <th appSortHeader="contactName" [activeSortBy]="sortBy" [sortDescending]="sortDescending"
+              (sortChange)="onSortChange($event)" class="px-3 py-3">Cliente</th>
+            <th appSortHeader="invoiceDate" [activeSortBy]="sortBy" [sortDescending]="sortDescending"
+              (sortChange)="onSortChange($event)" class="px-3 py-3">Data</th>
+            <th appSortHeader="status" [activeSortBy]="sortBy" [sortDescending]="sortDescending"
+              (sortChange)="onSortChange($event)" class="px-3 py-3">Stato</th>
+            <th appSortHeader="taxableTotal" [activeSortBy]="sortBy" [sortDescending]="sortDescending"
+              (sortChange)="onSortChange($event)" class="px-3 py-3 text-right">Imponibile</th>
+            <th appSortHeader="vatTotal" [activeSortBy]="sortBy" [sortDescending]="sortDescending"
+              (sortChange)="onSortChange($event)" class="px-3 py-3 text-right">IVA</th>
+            <th appSortHeader="grossTotal" [activeSortBy]="sortBy" [sortDescending]="sortDescending"
+              (sortChange)="onSortChange($event)" class="px-3 py-3 text-right">Totale</th>
+            <th appSortHeader="balanceDue" [activeSortBy]="sortBy" [sortDescending]="sortDescending"
+              (sortChange)="onSortChange($event)" class="px-3 py-3 text-right">Residuo</th>
+            <th class="px-3 py-3">Azioni</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let invoice of invoices" class="border-b hover:bg-blue-50">
+            <td class="px-3 py-3 font-mono font-semibold text-slate-900">
+              {{ invoice.invoiceNumber }}
+            </td>
+            <td class="px-3 py-3">{{ invoice.contactName }}</td>
+            <td class="px-3 py-3">{{ invoice.invoiceDate | date:'dd/MM/yyyy' }}</td>
+            <td class="px-3 py-3">
+              <span [class]="'rounded-full px-2 py-1 text-xs font-medium ' + statusClass(invoice.status)">
+                {{ statusLabel(invoice.status) }}
+              </span>
+            </td>
+            <td class="px-3 py-3 text-right">{{ invoice.taxableTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+            <td class="px-3 py-3 text-right">{{ invoice.vatTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+            <td class="px-3 py-3 text-right font-semibold">{{ invoice.grossTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+            <td class="px-3 py-3 text-right">{{ invoice.balanceDue | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+            <td class="px-3 py-3">
+              <div class="flex gap-2">
+                <button type="button" (click)="openInvoice(invoice.id)"
+                  class="inline-flex h-7 items-center rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-800 transition hover:bg-blue-100">
+                  Dettaglio
+                </button>
+                <button type="button" (click)="downloadPdf(invoice)" [disabled]="downloadingPdf !== null"
+                  class="inline-flex h-7 items-center rounded-lg bg-slate-700 px-3 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50">
+                  {{ downloadingPdf === invoice.id ? '…' : 'PDF' }}
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="!loading && invoices.length === 0">
+            <td colspan="9" class="p-8 text-center text-slate-500">Nessuna fattura trovata.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <app-pagination *ngIf="totalCount > 0" [page]="currentPage" [pageSize]="pageSize"
+      [totalCount]="totalCount" (pageChange)="goToPage($event)" (pageSizeChange)="onPageSizeChange($event)" />
+  </section>
+</main>

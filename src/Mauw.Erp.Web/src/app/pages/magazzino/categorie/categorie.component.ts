@@ -7,11 +7,16 @@ import { PaginationComponent } from '../../../shared/pagination/pagination.compo
 import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
 import { SortChange } from '../../../models/pagination.model';
 import { sortRows } from '../../../shared/sort-rows';
+import { TableActionButtonComponent } from '../../../shared/table-action-button/table-action-button.component';
+import { AddActionButtonComponent } from '../../../shared/add-action-button/add-action-button.component';
 
 @Component({
   selector: 'app-categorie',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, ConfirmDeleteModalComponent, PaginationComponent, SortHeaderDirective],
+  imports: [
+    CommonModule, FormsModule, ReactiveFormsModule, ConfirmDeleteModalComponent, PaginationComponent,
+    SortHeaderDirective, TableActionButtonComponent, AddActionButtonComponent
+  ],
   templateUrl: './categorie.component.html',
   styleUrl: './categorie.component.scss'
 })

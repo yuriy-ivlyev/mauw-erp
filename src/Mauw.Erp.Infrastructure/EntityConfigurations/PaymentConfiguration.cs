@@ -19,6 +19,12 @@ public class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.Property(p => p.PaymentDate)
             .IsRequired();
 
+        builder.Property(p => p.PaymentMethod)
+            .HasMaxLength(50);
+
+        builder.Property(p => p.TransactionDetails)
+            .HasMaxLength(500);
+
         builder.Property(p => p.CreatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 

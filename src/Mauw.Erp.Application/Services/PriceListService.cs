@@ -83,7 +83,7 @@ public sealed class PriceListService(IPriceListRepository repository, PriceListR
     {
         if (request.Lines is null || request.Lines.Count < 1 ||
             request.Lines.Any(line => line is null || line.VariantId == Guid.Empty ||
-                line.Quantity <= 0m || line.Quantity != decimal.Truncate(line.Quantity)) ||
+                line.Quantity <= 0m) ||
             request.At == default)
             return OperationResult<ResolvedPricesResponse>.Fail("Specificare data e almeno una riga con quantita positiva.");
         var priceListId = request.PriceListId;

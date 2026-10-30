@@ -51,6 +51,15 @@ async function setup(cart: CartItem[], data: CassaPreview | null = null) {
 }
 
 describe('BancoCassaComponent fiscal footer', () => {
+  it('offers synchronous cash finalization and payment method selection', async () => {
+    const { element } = await setup([cartItem()]);
+
+    expect(element.textContent).toContain('Vendita + ricevuta');
+    expect(element.querySelector('[aria-label="Metodo di pagamento"]')).not.toBeNull();
+    expect(element.textContent).toContain('Contanti');
+    expect(element.textContent).toContain('Carta');
+  });
+
   it('renders backend line, taxable, VAT and document totals', async () => {
     const { element } = await setup([cartItem({ unitNetPrice: 18.84 })],
       preview([previewLine({ unitNetPrice: 18.84, discountPercent: 10, lineNetTotal: 84.78 })]));

@@ -52,11 +52,26 @@ public class DdtDocumentRepository(MauwDbContext dbContext) : Repository<DdtDocu
     public async Task<IEnumerable<DdtDocument>> GetByOrderIdsAsync(IEnumerable<Guid> orderIds)
         => await _dbSet
             .AsNoTracking()
+            .Include(d => d.Items)
             .Where(d => d.OrderId.HasValue && orderIds.Contains(d.OrderId.Value))
+            .ToListAsync();
+
+    public async Task<IEnumerable<DdtDocument>> GetByOrderIdWithItemsAsync(Guid orderId)
+        => await _dbSet
+            .AsNoTracking()
+            .Include(d => d.Items)
+            .Where(d => d.OrderId == orderId)
+            .OrderBy(d => d.DdtDate)
+            .ThenBy(d => d.Id)
             .ToListAsync();
 
     public async Task<int> CountDdtsByPrefixAsync(string prefix)
         => await _dbSet.CountAsync(d => d.DdtNumber.StartsWith(prefix));
+
+    public async Task<long> GetNextShipmentSequenceAsync() =>
+        await _dbContext.Database
+            .SqlQueryRaw<long>("SELECT nextval('shipment_document_number_seq') AS \"Value\"")
+            .SingleAsync();
 
     public override async Task<DdtDocument?> GetByIdAsync(Guid id)
     {
@@ -66,6 +81,7 @@ public class DdtDocumentRepository(MauwDbContext dbContext) : Repository<DdtDocu
             .Include(d => d.Items).ThenInclude(i => i.Variant).ThenInclude(v => v.Product)
             .Include(d => d.Items).ThenInclude(i => i.Variant).ThenInclude(v => v.Color)
             .Include(d => d.Items).ThenInclude(i => i.Variant).ThenInclude(v => v.Size)
-            .FirstOrDefaultAsync(d => d.Id == id);
+                .Include(d => d.Shipment)
+                .FirstOrDefaultAsync(d => d.Id == id);
     }
 }

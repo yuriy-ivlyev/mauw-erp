@@ -17,8 +17,8 @@ export class SupplierDeliveryNoteService {
   private readonly base = `${environment.apiUrl}/supplier-delivery-notes`;
   constructor(private readonly http: HttpClient) {}
 
-  list(page: number, filters: SupplierDeliveryNoteFilters = {}) {
-    let params = new HttpParams().set('page', page).set('pageSize', 20);
+  list(page: number, filters: SupplierDeliveryNoteFilters = {}, pageSize = 20) {
+    let params = new HttpParams().set('page', page).set('pageSize', pageSize);
     for (const [key, value] of Object.entries(filters)) {
       if (value) params = params.set(key, value);
     }

@@ -2,6 +2,7 @@ using Mauw.Erp.Application.Costs;
 using Mauw.Erp.Application.Decorators;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Domain.Services;
+using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Mauw.Erp.Application.Extensions;
@@ -10,6 +11,8 @@ public static class ApplicationServicesExtensions
 {
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
+        services.AddMediatR(configuration =>
+            configuration.RegisterServicesFromAssembly(typeof(ApplicationServicesExtensions).Assembly));
         services.AddCostVisibility();
         services.AddSingleton<ItalianAccountingCalculator>();
         services.AddSingleton<PriceListResolver>();

@@ -15,6 +15,16 @@ public class OrderRepository(MauwDbContext dbContext) : Repository<Order, Guid>(
         await _dbSet
             .Include(o => o.Contact)
             .Include(o => o.Items)
+                .ThenInclude(item => item.Variant)
+                    .ThenInclude(variant => variant.Product)
+            .Include(o => o.Items)
+                .ThenInclude(item => item.Variant)
+                    .ThenInclude(variant => variant.Size)
+            .Include(o => o.Items)
+                .ThenInclude(item => item.Variant)
+                    .ThenInclude(variant => variant.Color)
+            .Include(o => o.Shipments)
+                .ThenInclude(shipment => shipment.Lines)
             .FirstOrDefaultAsync(o => o.Id == id);
 
     public async Task<IEnumerable<Order>> GetByContactIdAsync(Guid contactId)
@@ -117,6 +127,36 @@ public class OrderRepository(MauwDbContext dbContext) : Repository<Order, Guid>(
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .AsNoTracking()
+            .ToListAsync();
+
+        return (items, total);
+    }
+
+    public async Task<(IEnumerable<Order> Items, int Total)> GetFulfillmentQueueAsync(int page, int pageSize)
+    {
+        var query = _dbSet.Where(order =>
+            order.FulfillmentType == OrderFulfillmentType.StandardShipping &&
+            (order.Status == OrderStatus.Confirmed ||
+             order.Status == OrderStatus.Picking ||
+             order.Status == OrderStatus.Packing ||
+             order.Status == OrderStatus.PartiallyShipped));
+        var total = await query.CountAsync();
+        var items = await query
+            .Include(order => order.Contact)
+            .Include(order => order.Items)
+                .ThenInclude(item => item.Variant)
+                    .ThenInclude(variant => variant.Product)
+            .Include(order => order.Items)
+                .ThenInclude(item => item.Variant)
+                    .ThenInclude(variant => variant.Size)
+            .Include(order => order.Items)
+                .ThenInclude(item => item.Variant)
+                    .ThenInclude(variant => variant.Color)
+            .AsNoTracking()
+            .OrderBy(order => order.OrderDate)
+            .ThenBy(order => order.OrderNumber)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
 
         return (items, total);

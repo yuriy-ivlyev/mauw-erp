@@ -18,6 +18,8 @@ import { PaginationComponent } from '../../../shared/pagination/pagination.compo
 import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
 import { SortChange } from '../../../models/pagination.model';
 import { sortRows } from '../../../shared/sort-rows';
+import { TableActionButtonComponent } from '../../../shared/table-action-button/table-action-button.component';
+import { AddActionButtonComponent } from '../../../shared/add-action-button/add-action-button.component';
 
 const ibanChecksumValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
   const iban = String(control.value ?? '').replace(/\s/g, '').toUpperCase();
@@ -37,7 +39,10 @@ const ibanChecksumValidator: ValidatorFn = (control: AbstractControl): Validatio
 @Component({
   selector: 'app-impostazioni-azienda',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, ConfirmDeleteModalComponent, PaginationComponent, SortHeaderDirective],
+  imports: [
+    CommonModule, ReactiveFormsModule, FormsModule, ConfirmDeleteModalComponent, PaginationComponent,
+    SortHeaderDirective, TableActionButtonComponent, AddActionButtonComponent
+  ],
   templateUrl: './impostazioni-azienda.component.html'
 })
 export class ImpostazioniAziendaComponent implements OnInit {

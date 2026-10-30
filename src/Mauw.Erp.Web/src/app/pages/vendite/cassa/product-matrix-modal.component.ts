@@ -1,6 +1,7 @@
 import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatrixCellDto, MatrixColorDto, MatrixSizeDto, ProductMatrixDto } from '../../../models/product.model';
+import { AddActionButtonComponent } from '../../../shared/add-action-button/add-action-button.component';
 
 export interface MatrixSelection {
   variantId: string;
@@ -18,7 +19,7 @@ export interface MatrixSelection {
 @Component({
   selector: 'app-product-matrix-modal',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, AddActionButtonComponent],
   template: `
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" (click)="onBackdropClick($event)">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
@@ -123,14 +124,9 @@ export interface MatrixSelection {
           class="px-4 py-2 border border-gray-300 hover:bg-gray-100 text-gray-700 font-medium rounded-lg text-sm transition">
           Annulla
         </button>
-        <button (click)="addToCart()"
-          [disabled]="totalSelected === 0"
-          class="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-bold rounded-lg text-sm transition flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-1.5 6H19"/>
-          </svg>
-          Aggiungi al Carrello ({{ totalSelected }} pz)
-        </button>
+        <app-add-action-button [label]="'Aggiungi al carrello (' + totalSelected + ' pz)'"
+          [disabled]="totalSelected === 0" (activated)="addToCart()">
+        </app-add-action-button>
       </div>
     </div>
   </div>

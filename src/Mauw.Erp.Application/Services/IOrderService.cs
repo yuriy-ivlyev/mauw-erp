@@ -12,8 +12,17 @@ public interface IOrderService
     Task<OperationResult<OrderDto>> GetOrderAsync(Guid id);
     Task<OperationResult<PagedResult<OrderDto>>> GetAllOrdersAsync(
         string? search, string? status, string? orderType, int page, int pageSize, string? sortBy = null, bool sortDescending = false);
+    Task<OperationResult<PagedResult<OrderDto>>> GetFulfillmentQueueAsync(int page, int pageSize);
     Task<OperationResult<PagedResult<OrderDto>>> GetOrdersByContactAsync(Guid contactId, int page, int pageSize);
     Task<OperationResult<OrderDto>> AddItemAsync(Guid orderId, CreateOrderItemRequest request);
+    Task<OperationResult<OrderDto>> AddCompletedBillingItemAsync(
+        Guid orderId, AddCompletedOrderItemRequest request);
+    Task<OperationResult<OrderDto>> UpdateItemAsync(Guid orderId, Guid itemId, CreateOrderItemRequest request);
+    Task<OperationResult<OrderDto>> RemoveDraftItemAsync(Guid orderId, Guid itemId);
+    Task<OperationResult<OrderDto>> RemoveCompletedBillingItemAsync(Guid orderId, Guid itemId);
+    Task<OperationResult<OrderDto>> UpdateShippingChargeAsync(Guid orderId, UpdateOrderShippingChargeRequest request);
+    Task<OperationResult<OrderDto>> UpdateCompletedInvoiceShippingChargeAsync(
+        Guid orderId, UpdateOrderShippingChargeRequest request);
     Task<OperationResult<OrderDto>> ConfirmOrderAsync(Guid orderId);
     Task<OperationResult<bool>> DeleteOrderAsync(Guid id);
     Task<OperationResult<byte[]>> GetOrderPdfAsync(Guid orderId);

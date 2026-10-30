@@ -9,6 +9,7 @@ import { WarehouseSummary } from '../../../models/warehouse.model';
 import { PagedResult, SortChange } from '../../../models/pagination.model';
 import { PaginationComponent } from '../../../shared/pagination/pagination.component';
 import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
+import { AddActionButtonComponent } from '../../../shared/add-action-button/add-action-button.component';
 
 interface StockMovementDetailDto {
   id: string;
@@ -43,7 +44,10 @@ const REASON_LABELS: Record<number, string> = {
 @Component({
   selector: 'app-movimenti',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, PaginationComponent, SortHeaderDirective],
+  imports: [
+    CommonModule, FormsModule, ReactiveFormsModule, PaginationComponent, SortHeaderDirective,
+    AddActionButtonComponent
+  ],
   templateUrl: './movimenti.component.html'
 })
 export class MovimentiComponent implements OnInit, OnDestroy {

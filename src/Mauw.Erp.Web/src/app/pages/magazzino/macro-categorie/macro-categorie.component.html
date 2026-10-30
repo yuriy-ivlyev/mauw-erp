@@ -1,11 +1,7 @@
 ﻿<div class="p-6">
   <div class="mb-6 flex justify-between items-center">
     <h1 class="text-3xl font-bold">Gestione Macro Categorie</h1>
-    <button 
-      (click)="openForm()"
-      class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
-      + Nuova Macro Categoria
-    </button>
+    <app-add-action-button label="Nuova macro categoria" (activated)="openForm()"></app-add-action-button>
   </div>
 
   <!-- Messages -->
@@ -80,17 +76,15 @@
               {{ macroCategory.isVisible ? 'Visibile' : 'Nascosta' }}
             </button>
           </td>
-          <td class="px-6 py-4 text-sm space-x-2">
-            <button 
-              (click)="openForm(macroCategory)"
-              class="bg-blue-500 hover:bg-blue-600 text-white py-1 px-3 rounded text-xs font-medium">
-              Modifica
-            </button>
-            <button 
-              (click)="askDelete(macroCategory.id)"
-              class="bg-red-600 hover:bg-red-700 text-white py-1 px-3 rounded text-xs font-medium">
-              Elimina
-            </button>
+          <td class="px-6 py-4 text-sm">
+            <div class="flex gap-2">
+              <app-table-action-button action="edit" [label]="'Modifica macro categoria ' + macroCategory.name"
+                (activated)="openForm(macroCategory)">
+              </app-table-action-button>
+              <app-table-action-button action="delete" [label]="'Elimina macro categoria ' + macroCategory.name"
+                (activated)="askDelete(macroCategory.id)">
+              </app-table-action-button>
+            </div>
           </td>
         </tr>
         <tr *ngIf="macroCategories.length === 0 && !loading" class="border-b">
@@ -116,5 +110,3 @@
     (cancelled)="onDeleteCancelled()">
   </app-confirm-delete-modal>
 </div>
-
-

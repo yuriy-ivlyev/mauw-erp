@@ -14,6 +14,7 @@ import { hasDecimal8Precision } from '../../../services/price-list.validators';
 import { PaginationComponent } from '../../../shared/pagination/pagination.component';
 import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
 import { SortChange } from '../../../models/pagination.model';
+import { AddActionButtonComponent } from '../../../shared/add-action-button/add-action-button.component';
 import {
   ProductDto, PageResponse, ColorDto, SizeDto, CategoryDto, CollectionDto, MaterialDto,
   CreateProductRequest, CreateProductVariantRequest, ProductVariantDto
@@ -31,15 +32,15 @@ interface PriceFeedback {
 @Component({
   selector: 'app-prodotti',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ConfirmDeleteModalComponent, ProductImageGalleryComponent, PaginationComponent, SortHeaderDirective],
+  imports: [
+    CommonModule, FormsModule, RouterLink, ConfirmDeleteModalComponent, ProductImageGalleryComponent,
+    PaginationComponent, SortHeaderDirective, AddActionButtonComponent
+  ],
   template: `
     <div class="p-6">
       <div class="flex justify-between items-center mb-6">
         <h1 class="text-3xl font-bold">Prodotti</h1>
-        <button (click)="openNewProductModal()"
-          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
-          + Nuovo Prodotto
-        </button>
+        <app-add-action-button label="Nuovo prodotto" (activated)="openNewProductModal()"></app-add-action-button>
       </div>
 
       <div class="mb-6">
@@ -424,12 +425,9 @@ interface PriceFeedback {
                     </div>
                   </div>
                   <div *ngIf="variantError" class="bg-red-100 text-red-800 p-3 rounded text-sm">{{ variantError }}</div>
-                  <button
-                    (click)="addVariant()"
-                    [disabled]="savingVariant || calculatingPrice"
-                    class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded disabled:opacity-50">
-                    {{ savingVariant ? 'Aggiunta...' : '+ Aggiungi Variante' }}
-                  </button>
+                  <app-add-action-button [label]="savingVariant ? 'Aggiunta variante in corso' : 'Aggiungi variante'"
+                    [disabled]="savingVariant || calculatingPrice" (activated)="addVariant()">
+                  </app-add-action-button>
                 </div>
               </div>
             </div>

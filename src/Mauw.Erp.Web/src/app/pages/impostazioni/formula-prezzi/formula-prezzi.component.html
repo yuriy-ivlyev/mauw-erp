@@ -94,8 +94,9 @@
           }
         </ol>
 
-        <button type="button" (click)="addStep()" [disabled]="steps().length >= maxSteps" data-testid="add-step"
-          class="mt-4 text-blue-600 hover:text-blue-800 disabled:opacity-40">+ Aggiungi passaggio</button>
+        <app-add-action-button label="Aggiungi passaggio alla formula" (activated)="addStep()"
+          [disabled]="steps().length >= maxSteps" data-testid="add-step">
+        </app-add-action-button>
         <span class="ml-2 text-xs text-gray-500">({{ steps().length }}/{{ maxSteps }})</span>
 
         <div class="mt-6 max-w-xs">
@@ -157,24 +158,24 @@
               </tr>
             </thead>
             <tbody>
-              <tr class="border-b">
-                <td class="py-2">Costo di acquisto</td>
-                <td class="py-2 text-right"></td>
-                <td class="py-2 text-right">{{ result.purchaseCost | number:'1.2-4' }}</td>
-              </tr>
-              @for (row of result.steps; track $index) {
-                <tr class="border-b" data-testid="calculation-row">
+              @for (row of calculationRows | pageSlice:calculationPage:calculationPageSize; track $index) {
+                <tr class="border-b" [attr.data-testid]="row.percentage !== null ? 'calculation-row' : null">
                   <td class="py-2">{{ row.label }}</td>
-                  <td class="py-2 text-right">{{ row.percentage | number:'1.0-2' }}%</td>
-                  <td class="py-2 text-right">{{ row.runningValue | number:'1.2-4' }}</td>
+                  <td class="py-2 text-right">
+                    <ng-container *ngIf="row.percentage !== null">{{ row.percentage | number:'1.0-2' }}%</ng-container>
+                  </td>
+                  <td class="py-2 text-right"
+                    [attr.data-testid]="row.label === 'Prezzo non arrotondato' ? 'unrounded-price' : null">
+                    {{ row.value | number:'1.2-4' }}
+                  </td>
                 </tr>
               }
-              <tr class="border-b">
-                <td class="py-2" colspan="2">Prezzo non arrotondato</td>
-                <td class="py-2 text-right" data-testid="unrounded-price">{{ result.unroundedPrice | number:'1.2-4' }}</td>
-              </tr>
             </tbody>
           </table>
+          <app-pagination [page]="calculationPage" [pageSize]="calculationPageSize"
+            [totalCount]="calculationRows.length" (pageChange)="calculationPage = $event"
+            (pageSizeChange)="onCalculationPageSizeChange($event)">
+          </app-pagination>
           <div class="mt-4 p-4 bg-blue-50 border border-blue-300 rounded flex justify-between items-center">
             <span class="text-sm text-gray-700">
               Prezzo finale (arrotondato per eccesso a {{ result.roundingStep | number:'1.2-2' }})

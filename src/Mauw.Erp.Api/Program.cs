@@ -38,7 +38,6 @@ builder.Services.AddScoped<IValidator<UpdateContactRequest>, UpdateContactReques
 builder.Services.AddScoped<IValidator<CreateOrderRequest>, CreateOrderRequestValidator>();
 builder.Services.AddScoped<IValidator<CreateOrderItemRequest>, CreateOrderItemRequestValidator>();
 builder.Services.AddScoped<IValidator<BarcodeScanRequest>, BarcodeScanRequestValidator>();
-builder.Services.AddScoped<IValidator<CreateInvoiceRequest>, CreateInvoiceRequestValidator>();
 
 // Register repositories
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();

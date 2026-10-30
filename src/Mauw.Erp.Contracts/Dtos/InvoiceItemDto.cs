@@ -7,7 +7,7 @@ public record InvoiceItemDto(
     Guid Id,
     Guid InvoiceId,
     Guid VariantId,
-    int Quantity,
+    decimal Quantity,
     decimal UnitNetPrice,
     decimal VatRate,
     decimal LineNetTotal,
@@ -15,5 +15,9 @@ public record InvoiceItemDto(
     decimal? LineGrossTotal,
     string? NatureCode = null,
     decimal DiscountPercent = 0m,
-    Mauw.Erp.Contracts.Pricing.PricingSnapshotDto? PricingSnapshot = null
+    Mauw.Erp.Contracts.Pricing.PricingSnapshotDto? PricingSnapshot = null,
+    string? Sku = null,
+    string? ProductName = null,
+    string? SizeName = null,
+    string? ColorName = null
 );

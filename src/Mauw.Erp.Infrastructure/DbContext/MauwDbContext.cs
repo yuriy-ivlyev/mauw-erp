@@ -36,6 +36,8 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
     public DbSet<OrderItem> OrderItems { get; set; }
     public DbSet<DdtDocument> DdtDocuments { get; set; }
     public DbSet<DdtItem> DdtItems { get; set; }
+    public DbSet<Shipment> Shipments { get; set; }
+    public DbSet<ShipmentLine> ShipmentLines { get; set; }
     public DbSet<Invoice> Invoices { get; set; }
     public DbSet<InvoiceItem> InvoiceItems { get; set; }
     public DbSet<CreditNote> CreditNotes { get; set; }
@@ -54,6 +56,7 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.HasSequence<long>("supplier_purchase_order_number_seq");
+        modelBuilder.HasSequence<long>("shipment_document_number_seq");
         modelBuilder.HasPostgresExtension("pg_trgm");
 
         var converter = new SnakeCaseNameConverter();
@@ -107,6 +110,8 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
         modelBuilder.ApplyConfiguration(new StockMovementConfiguration());
         modelBuilder.ApplyConfiguration(new OrderConfiguration());
         modelBuilder.ApplyConfiguration(new OrderItemConfiguration());
+        modelBuilder.ApplyConfiguration(new ShipmentConfiguration());
+        modelBuilder.ApplyConfiguration(new ShipmentLineConfiguration());
         modelBuilder.ApplyConfiguration(new DdtDocumentConfiguration());
         modelBuilder.ApplyConfiguration(new DdtItemConfiguration());
         modelBuilder.ApplyConfiguration(new InvoiceConfiguration());

@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { Observable, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, finalize, takeUntil } from 'rxjs/operators';
 import { Order, OrderFilterParams, PagedResult } from '../../../models/order.model';
@@ -9,11 +10,16 @@ import { OrderService } from '../../../services/order.service';
 import { PaginationComponent } from '../../../shared/pagination/pagination.component';
 import { SortHeaderDirective } from '../../../shared/sort-header/sort-header.directive';
 import { SortChange } from '../../../models/pagination.model';
+import { AddActionButtonComponent } from '../../../shared/add-action-button/add-action-button.component';
+import { TableActionButtonComponent } from '../../../shared/table-action-button/table-action-button.component';
 
 @Component({
   selector: 'app-ordini-elenco',
   standalone: true,
-  imports: [CommonModule, FormsModule, PaginationComponent, SortHeaderDirective],
+  imports: [
+    CommonModule, FormsModule, PaginationComponent, SortHeaderDirective,
+    AddActionButtonComponent, TableActionButtonComponent
+  ],
   templateUrl: './ordini-elenco.component.html'
 })
 export class OrdiniElencoComponent implements OnInit, OnDestroy {
@@ -37,7 +43,10 @@ export class OrdiniElencoComponent implements OnInit, OnDestroy {
   private readonly searchSubject = new Subject<string>();
   private readonly destroy$ = new Subject<void>();
 
-  constructor(private readonly orderService: OrderService) {}
+  constructor(
+    private readonly orderService: OrderService,
+    private readonly router: Router
+  ) {}
 
   ngOnInit(): void {
     this.searchSubject.pipe(
@@ -114,6 +123,14 @@ export class OrdiniElencoComponent implements OnInit, OnDestroy {
     this.loadOrders();
   }
 
+  openNewOrder(): void {
+    void this.router.navigate(['/vendite/ordini/nuovo']);
+  }
+
+  openOrder(orderId: string): void {
+    void this.router.navigate(['/vendite/ordini', orderId]);
+  }
+
   onSortChange(sort: SortChange): void {
     this.sortBy = sort.sortBy;
     this.sortDescending = sort.sortDescending;
@@ -176,7 +193,16 @@ export class OrdiniElencoComponent implements OnInit, OnDestroy {
   statusLabel(status: string): string {
     const map: Record<string, string> = {
       Draft: 'Bozza',
+      PendingApproval: 'In attesa di approvazione',
       Confirmed: 'Confermato',
+      Picking: 'In prelievo',
+      Packing: 'In imballaggio',
+      PartiallyShipped: 'Parzialmente spedito',
+      Shipped: 'Spedito',
+      Delivered: 'Consegnato',
+      Completed: 'Completato',
+      Cancelled: 'Annullato',
+      OnHold: 'In sospeso',
       Suspended: 'Sospeso',
       Terminated: 'Terminato'
     };
@@ -187,7 +213,16 @@ export class OrdiniElencoComponent implements OnInit, OnDestroy {
   statusClass(status: string): string {
     const map: Record<string, string> = {
       Draft: 'bg-gray-100 text-gray-600',
+      PendingApproval: 'bg-orange-100 text-orange-700',
       Confirmed: 'bg-green-100 text-green-700',
+      Picking: 'bg-blue-100 text-blue-700',
+      Packing: 'bg-indigo-100 text-indigo-700',
+      PartiallyShipped: 'bg-amber-100 text-amber-700',
+      Shipped: 'bg-cyan-100 text-cyan-700',
+      Delivered: 'bg-teal-100 text-teal-700',
+      Completed: 'bg-green-100 text-green-700',
+      Cancelled: 'bg-red-100 text-red-700',
+      OnHold: 'bg-yellow-100 text-yellow-700',
       Suspended: 'bg-yellow-100 text-yellow-700',
       Terminated: 'bg-blue-100 text-blue-700'
     };

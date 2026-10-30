@@ -13,6 +13,30 @@ export interface OrderItem {
   lineGrossTotal: number | null;
   natureCode: string | null;
   discountPercent: number;
+  shippedQuantity: number;
+  remainingQuantity: number;
+  isBillingOnly?: boolean;
+  isExcludedFromInvoice?: boolean;
+  sku?: string | null;
+  productName?: string | null;
+  sizeName?: string | null;
+  colorName?: string | null;
+}
+
+export interface OrderPermittedAction {
+  action: string;
+  label: string;
+  endpoint: string;
+  method: 'POST';
+  style: 'primary' | 'secondary' | 'danger' | 'warning' | string;
+  requiresDialog: boolean;
+  dialogType: string | null;
+}
+
+export interface DdtDocumentRef {
+  id: string;
+  ddtNumber: string;
+  ddtDate: string;
 }
 
 export interface CreditNoteRef {
@@ -29,6 +53,7 @@ export interface OrderLinkedDocuments {
   ddtId: string | null;
   ddtNumber: string | null;
   creditNotes: CreditNoteRef[];
+  ddts?: DdtDocumentRef[] | null;
 }
 
 export interface Order {
@@ -43,12 +68,96 @@ export interface Order {
   vatTotal: number;
   grossTotal: number;
   orderType: 'Standard' | 'CassaSession' | 'Preventivo' | 'WebOrder' | string;
+  fulfillmentType: 'CashDesk' | 'StandardShipping' | string;
   items: OrderItem[];
   linkedDocuments: OrderLinkedDocuments | null;
+  statusDescription: string;
+  isReadOnly: boolean;
+  canEditInvoice?: boolean;
+  permittedActions: OrderPermittedAction[];
+  internalNotes?: string | null;
+  shippingCost?: number;
+  shippingVatRate?: number | null;
+  shippingNatureCode?: string | null;
 }
+
+export interface OrderFulfillmentResult {
+  order: Order;
+  documentFileName: string;
+  contentType: string;
+  documentBytes: string;
+  shipment?: Shipment;
+}
+
+export interface Shipment {
+  id: string;
+  shipmentNumber: string;
+  ddtNumber: string;
+  carrierName: string | null;
+  trackingCode: string | null;
+  boxCount: number;
+  totalWeightKg: number | null;
+  shippedAtUtc: string;
+  lines: ShipmentLine[];
+}
+
+export interface ShipmentLine {
+  orderLineId: string;
+  productId: string;
+  sku: string;
+  quantityShipped: number;
+}
+
+export interface CreateShipmentRequest {
+  carrierName: string;
+  trackingCode: string | null;
+  boxCount: number;
+  weightKg: number | null;
+  items: Array<{ orderItemId: string; quantity: number }>;
+}
+
+export type OrderActionResponse = Order | OrderFulfillmentResult;
 
 export interface OrderFilterParams extends PageSortParams {
   search?: string;
   status?: string;
   orderType?: string;
+}
+
+export interface CreateOrderRequest {
+  contactId: string;
+  orderType: 'Standard' | 'CassaSession';
+  fulfillmentType: 'StandardShipping' | 'CashDesk';
+  internalNotes?: string | null;
+  shippingCost?: number;
+  shippingVatRate?: number | null;
+  shippingNatureCode?: string | null;
+}
+
+export interface UpdateOrderShippingChargeRequest {
+  shippingCost: number;
+  vatRate: number | null;
+  natureCode: string | null;
+}
+
+export interface CreateOrderItemRequest {
+  variantId: string;
+  quantity: number;
+  unitNetPrice: number;
+  vatRate: number;
+  natureCode: string | null;
+  discountPercent: number;
+}
+
+export interface AddCompletedOrderItemRequest {
+  variantId: string;
+  quantity: number;
+  natureCode: string | null;
+}
+
+export interface DraftOrderPreview {
+  lines: Array<{ lineNetTotal: number }>;
+  totalTaxable: number;
+  totalVat: number;
+  totalGross: number;
 }

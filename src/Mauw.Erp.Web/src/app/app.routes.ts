@@ -8,15 +8,17 @@ import { roleGuard } from './guards/role.guard';
 // Ordini
 import { OrdiniElencoComponent } from './pages/ordini/elenco/ordini-elenco.component';
 import { OrdiniNuovoComponent } from './pages/ordini/nuovo/ordini-nuovo.component';
+import { OrderDetailComponent } from './pages/ordini/dettaglio/order-detail.component';
 
 // Fatturazione
 import { FattureComponent } from './pages/fatturazione/fatture/fatture.component';
-import { PreventiviComponent } from './pages/fatturazione/preventivi/preventivi.component';
+import { FatturaDettaglioComponent } from './pages/fatturazione/fatture/fattura-dettaglio.component';
 import { NotaCreditoComponent } from './pages/fatturazione/nota-credito/nota-credito.component';
 
 // DDT
 import { DdtElencoComponent } from './pages/ddt/elenco/ddt-elenco.component';
 import { DdtNuovoComponent } from './pages/ddt/nuovo/ddt-nuovo.component';
+import { DdtDettaglioComponent } from './pages/ddt/dettaglio/ddt-dettaglio.component';
 
 // Magazzino
 import { MagazziniComponent } from './pages/magazzino/magazzini/magazzini.component';
@@ -27,6 +29,7 @@ import { ColoriComponent } from './pages/magazzino/colori/colori.component';
 import { TaglieComponent } from './pages/magazzino/taglie/taglie.component';
 import { MmaterialiComponent } from './pages/magazzino/materiali/materiali.component';
 import { MacroCategorieComponent } from './pages/magazzino/macro-categorie/macro-categorie.component';
+import { ShipmentQueueComponent } from './pages/magazzino/spedizioni/shipment-queue.component';
 
 // Anagrafiche
 import { AnagraficheElencoComponent } from './pages/anagrafiche/elenco/anagrafiche-elenco.component';
@@ -62,18 +65,23 @@ export const routes: Routes = [
 
       // Ordini
       { path: 'ordini/elenco', component: OrdiniElencoComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales'] }, title: 'Elenco Ordini | Mauw ERP' },
-      { path: 'ordini/nuovo',  component: OrdiniNuovoComponent,  canActivate: [roleGuard], data: { roles: ['Admin', 'Sales'] }, title: 'Nuovo Ordine | Mauw ERP' },
+      { path: 'vendite/ordini/nuovo', component: OrdiniNuovoComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales'] }, title: 'Nuovo Ordine | Mauw ERP' },
+      { path: 'vendite/ordini/:id', component: OrderDetailComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Warehouse', 'Accounting'] }, title: 'Dettaglio Ordine | Mauw ERP' },
+      { path: 'ordini/nuovo', component: OrdiniNuovoComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales'] }, title: 'Nuovo Ordine | Mauw ERP' },
+      { path: 'ordini/:id', component: OrderDetailComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Warehouse', 'Accounting'] }, title: 'Dettaglio Ordine | Mauw ERP' },
 
       // Fatturazione
       { path: 'fatturazione/fatture',      component: FattureComponent,     canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Accounting'] }, title: 'Fatture | Mauw ERP' },
-      { path: 'fatturazione/preventivi',   component: PreventiviComponent,  canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Accounting'] }, title: 'Preventivi | Mauw ERP' },
+      { path: 'fatturazione/fatture/:id', component: FatturaDettaglioComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Accounting'] }, title: 'Dettaglio Fattura | Mauw ERP' },
       { path: 'fatturazione/nota-credito', component: NotaCreditoComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Accounting'] }, title: 'Nota Credito | Mauw ERP' },
 
       // DDT
       { path: 'ddt/elenco', component: DdtElencoComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Elenco DDT | Mauw ERP' },
       { path: 'ddt/nuovo',  component: DdtNuovoComponent,  canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Nuovo DDT | Mauw ERP' },
+      { path: 'ddt/:id', component: DdtDettaglioComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse', 'Sales', 'Accounting'] }, title: 'Dettaglio DDT | Mauw ERP' },
 
       // Magazzino
+      { path: 'magazzino/spedizioni', component: ShipmentQueueComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Ordini da Spedire | Mauw ERP' },
       { path: 'magazzino/magazzini',       component: MagazziniComponent,      canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Magazzini | Mauw ERP' },
       { path: 'magazzino/prodotti',        component: ProdottiComponent,       canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Prodotti | Mauw ERP' },
       { path: 'magazzino/movimenti',       component: MovimentiComponent,      canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Movimenti | Mauw ERP' },

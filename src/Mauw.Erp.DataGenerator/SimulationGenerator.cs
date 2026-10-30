@@ -1,4 +1,5 @@
 using Bogus;
+using System.Globalization;
 using Mauw.Erp.Domain.Accounting;
 using Mauw.Erp.Domain.Entities;
 using Mauw.Erp.Domain.Enums;
@@ -56,7 +57,8 @@ public sealed class SimulationGenerator(
         if (await db.Contacts.IgnoreQueryFilters().AnyAsync(token) || await db.Products.AnyAsync(token) ||
             await db.Warehouses.IgnoreQueryFilters().AnyAsync(token) || await db.StockMovements.AnyAsync(token) ||
             await db.Orders.AnyAsync(token) || await db.Invoices.AnyAsync(token) ||
-            await db.DdtDocuments.AnyAsync(token) || await db.StockItems.AnyAsync(token))
+            await db.DdtDocuments.AnyAsync(token) || await db.Shipments.AnyAsync(token) ||
+            await db.StockItems.AnyAsync(token))
             return Fail("The generator requires an empty business database; lookup data may already exist.");
 
         var start = options.EndDate.AddYears(-options.Years);
@@ -291,6 +293,7 @@ public sealed class SimulationGenerator(
                     };
                     Track(variant, date);
                     variantIds.Add(variant.Id);
+                    state.VariantDetails.Add(variant.Id, new VariantDetails(product.Id, variant.Barcode));
                     state.Variants++;
                     await FlushIfNeededAsync(state.Options.BatchSize, token);
                 }
@@ -400,10 +403,30 @@ public sealed class SimulationGenerator(
         var number = ++state.Documents;
         var documentDate = Utc(date).AddTicks(++state.EventSequence * 10);
         var order = new Order(customer, $"SIM-ORD-{number:D8}") { OrderDate = documentDate };
+        if (liquidation)
+            order.SetInternalNotes("Ordine sintetico di liquidazione stagionale.");
         Track(order, date);
-        var ddt = new DdtDocument(customer, $"SIM-DDT-{number:D8}") { DdtDate = documentDate, OrderId = order.Id };
-        var invoice = new Invoice(customer, $"SIM-INV-{number:D8}") { InvoiceDate = documentDate, OrderId = order.Id };
+        var ddt = new DdtDocument(customer, $"SIM-DDT-{number:D8}")
+        {
+            DdtDate = documentDate,
+            OrderId = order.Id
+        };
+        var shipment = new Shipment(
+            order.Id,
+            $"SIM-SPED-{number:D8}",
+            ddt.DdtNumber,
+            "Corriere simulato",
+            $"SIM-TRACK-{number:D8}",
+            1,
+            0m,
+            documentDate);
+        ddt.ShipmentId = shipment.Id;
+        ddt.Shipment = shipment;
+        order.AddShipment(shipment);
+        var invoice = new Invoice(customer, NextInvoiceNumber(state, documentDate))
+            { InvoiceDate = documentDate, OrderId = order.Id };
         Track(ddt, date);
+        Track(shipment, date);
         Track(invoice, date);
         for (var i = 0; i < lines.Count; i++)
         {
@@ -413,11 +436,18 @@ public sealed class SimulationGenerator(
                 discountPercent: fiscal.DiscountPercent) { LineNetTotal = fiscal.LineNetTotal };
             var ddtItem = new DdtItem(ddt.Id, stock.VariantId, units, fiscal.UnitNetPrice, fiscal.VatRate,
                 discountPercent: fiscal.DiscountPercent) { LineNetTotal = fiscal.LineNetTotal };
-            var invoiceItem = new InvoiceItem(invoice.Id, stock.VariantId, units, fiscal.UnitNetPrice, fiscal.VatRate,
+            var invoiceItem = new InvoiceItem(invoice.Id, stock.VariantId, (decimal)units, fiscal.UnitNetPrice, fiscal.VatRate,
                 discountPercent: fiscal.DiscountPercent) { LineNetTotal = fiscal.LineNetTotal };
             Track(orderItem, date);
             Track(ddtItem, date);
             Track(invoiceItem, date);
+            order.Items.Add(orderItem);
+            orderItem.RecordShipment(units);
+            var variantDetails = state.VariantDetails[stock.VariantId];
+            var shipmentLine = new ShipmentLine(
+                shipment.Id, orderItem.Id, variantDetails.ProductId, variantDetails.Sku, units);
+            shipment.AddLine(shipmentLine);
+            Track(shipmentLine, date);
             stock.Quantity -= units;
             if (liquidation) state.Liquidated += units;
             else state.RegularSold += units;
@@ -428,7 +458,17 @@ public sealed class SimulationGenerator(
         order.TaxableTotal = ddt.TaxableTotal = invoice.TaxableTotal = totals.TotalTaxable;
         order.VatTotal = ddt.VatTotal = invoice.VatTotal = totals.TotalVat;
         order.GrossTotal = ddt.GrossTotal = invoice.GrossTotal = totals.TotalGross;
-        order.Terminate();
+        var invoiceConfirmation = invoice.Confirm(accounting, documentDate);
+        if (!invoiceConfirmation.Success)
+            return AccountingResult<SimulationOptions>.Fail(invoiceConfirmation.Error);
+        Stamp(invoice, date);
+        order.SetFulfillmentWarehouse(state.CommercialWarehouse);
+        order.Confirm();
+        order.StartPicking(Guid.NewGuid());
+        order.CompletePacking(1, 0m);
+        order.Ship("Corriere simulato", $"SIM-TRACK-{number:D8}", ddt.DdtNumber);
+        ddt.ShipmentId = shipment.Id;
+        order.Complete();
         Stamp(order, date);
         state.CustomersWithMovements.Add(customerIndex);
         await FlushIfNeededAsync(state.Options.BatchSize, token);
@@ -456,6 +496,14 @@ public sealed class SimulationGenerator(
         if (!stocks.TryGetValue(variant, out var stock))
             stocks.Add(variant, stock = new Stock(variant, warehouse, model.Cost, model.Price));
         stock.Quantity += units;
+    }
+
+    private static string NextInvoiceNumber(RunState state, DateTime invoiceDate)
+    {
+        var period = invoiceDate.ToString("yyyyMM", CultureInfo.InvariantCulture);
+        var sequence = state.InvoiceSequences.GetValueOrDefault(period) + 1;
+        state.InvoiceSequences[period] = sequence;
+        return $"FAT-{period}-{sequence:D5}";
     }
 
     private void Track<T>(T entity, DateOnly date) where T : Entity<Guid>
@@ -507,6 +555,7 @@ public sealed class SimulationGenerator(
 
     private sealed record Receipt(DateOnly Date, int Quantity);
     private sealed record Model(Guid[] Variants, decimal Cost, decimal Price);
+    private sealed record VariantDetails(Guid ProductId, string Sku);
     private sealed class Stock(Guid variantId, Guid warehouseId, decimal cost, decimal price)
     {
         public Guid VariantId { get; } = variantId;
@@ -528,8 +577,10 @@ public sealed class SimulationGenerator(
         public List<Guid> Suppliers { get; } = [];
         public List<Guid> Customers { get; } = [];
         public List<Model> Models { get; } = [];
+        public Dictionary<Guid, VariantDetails> VariantDetails { get; } = [];
         public Dictionary<Guid, Stock> Commercial { get; } = [];
         public Dictionary<Guid, Stock> Defective { get; } = [];
+        public Dictionary<string, int> InvoiceSequences { get; } = new(StringComparer.Ordinal);
         public HashSet<int> CustomersWithMovements { get; } = [];
         public Guid CommercialWarehouse { get; set; }
         public Guid DefectiveWarehouse { get; set; }

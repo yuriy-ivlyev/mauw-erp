@@ -112,7 +112,7 @@ describe('FormulaPrezziComponent', () => {
 
   it('adds a step from the DOM and edits it through the inputs', async () => {
     await create(notConfigured);
-    (q('add-step') as HTMLButtonElement).click();
+    (q('add-step')?.querySelector('button') as HTMLButtonElement).click();
     fixture.detectChanges();
     await fixture.whenStable();
     const label = html().querySelector('[aria-label="Nome passaggio 1"]') as HTMLInputElement;

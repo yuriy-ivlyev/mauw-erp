@@ -13,5 +13,5 @@ public interface IDdtService
     Task<OperationResult<PagedResult<DdtDto>>> GetDdtsByContactAsync(Guid contactId, int page, int pageSize);
     Task<OperationResult<DdtDto>> AddItemAsync(Guid ddtId, CreateOrderItemRequest request);
     Task<OperationResult<bool>> DeleteDdtAsync(Guid id);
-    Task<OperationResult<byte[]>> GetDdtPdfAsync(Guid id);
+    Task<OperationResult<byte[]>> GetDdtPdfAsync(Guid id, CancellationToken cancellationToken = default);
 }

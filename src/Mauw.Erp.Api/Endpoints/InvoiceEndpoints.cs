@@ -17,10 +17,10 @@ public static class InvoiceEndpoints
         var group = app.MapGroup("/api/v1/invoices")
             .WithName("Invoices");
 
-        group.MapPost("/", CreateInvoice)
+        group.MapPost("/from-order/{orderId:guid}", GenerateFromOrder)
             .RequireAuthorization(AppPolicies.Billing)
-            .WithName("CreateInvoice")
-            .WithSummary("Create a new invoice");
+            .WithName("GenerateInvoiceFromOrder")
+            .WithSummary("Generate a final invoice from a completed order");
 
         // Read-only linked document: also needed by Warehouse for shipments.
         group.MapGet("/{id}", GetInvoice)
@@ -44,12 +44,18 @@ public static class InvoiceEndpoints
             .WithSummary("Generate and download invoice PDF");
     }
 
-    private static async Task<Results<Created<InvoiceDto>, BadRequest<string>>> CreateInvoice(
-        CreateInvoiceRequest request,
+    private static async Task<Results<Created<InvoiceDto>, BadRequest<string>, NotFound, Conflict<string>>> GenerateFromOrder(
+        Guid orderId,
         IInvoiceService invoiceService)
     {
-        var result = await invoiceService.CreateInvoiceAsync(request);
+        var result = await invoiceService.GenerateFromOrderAsync(orderId);
 
+        if (!result.Success &&
+            (result.Error?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true ||
+             result.Error?.Contains("non trovato", StringComparison.OrdinalIgnoreCase) == true))
+            return TypedResults.NotFound();
+        if (!result.Success && result.Error?.Contains("già", StringComparison.OrdinalIgnoreCase) == true)
+            return TypedResults.Conflict(result.Error);
         if (!result.Success)
             return TypedResults.BadRequest(result.Error);
 
@@ -68,25 +74,39 @@ public static class InvoiceEndpoints
         return TypedResults.Ok(result.Data!);
     }
 
-    private static async Task<Ok<List<InvoiceDto>>> ListInvoices(
+    private static async Task<Results<Ok<PagedResult<InvoiceDto>>, BadRequest<string>>> ListInvoices(
         IInvoiceService invoiceService,
+        Guid? contactId = null,
+        string? search = null,
         int page = 1,
-        int pageSize = 20)
+        int pageSize = 20,
+        string? status = null,
+        DateOnly? dateFrom = null,
+        DateOnly? dateTo = null,
+        bool unpaidOnly = false,
+        string? sortBy = null,
+        bool sortDescending = true)
     {
-        return TypedResults.Ok(new List<InvoiceDto>());
+        var result = await invoiceService.GetInvoicesAsync(
+            contactId, search, page, pageSize, status, dateFrom, dateTo, unpaidOnly, sortBy, sortDescending);
+        if (!result.Success)
+            return TypedResults.BadRequest(result.Error);
+
+        return TypedResults.Ok(result.Data!);
     }
 
-    private static async Task<Results<Ok<object>, BadRequest<string>, NotFound>> RecordPayment(
+    private static async Task<Results<Ok<InvoiceDto>, BadRequest<string>, NotFound>> RecordPayment(
         Guid id,
         RecordPaymentRequest request,
         IInvoiceService invoiceService)
     {
         var result = await invoiceService.RecordPaymentAsync(id, request);
 
-        if (result.Success) return TypedResults.Ok((object)new { PaymentRecorded = true });
-        if (result.Error != null && result.Error.Contains("not found"))
+        if (!result.Success && result.Error?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true)
             return TypedResults.NotFound();
-        return TypedResults.BadRequest(result.Error);
+        if (!result.Success)
+            return TypedResults.BadRequest(result.Error);
+        return TypedResults.Ok(result.Data!);
     }
 
     private static async Task<Results<FileContentHttpResult, NotFound, BadRequest<string>>> GetInvoicePdf(

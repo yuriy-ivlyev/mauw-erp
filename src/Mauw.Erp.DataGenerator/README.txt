@@ -37,11 +37,23 @@ Fermare API e altri generatori prima del reset.
 Preparazione (Bash; dalla radice del repository)
 ----------------------------------------------
 Richiesti SDK .NET 10, PostgreSQL e strumento dotnet-ef compatibile con la
-versione EF di Directory.Packages.props. Non sono richieste nuove migrazioni.
+versione EF di Directory.Packages.props. Sono richieste le migrazioni tracciate.
 Le migrazioni storiche sono riunite in una baseline (InitialCreate), che
 crea da zero l'intero schema, seguita da AddVariantForeignKeys (aggiunge le FK
 su variant_id di ddt_items, invoice_items, order_items e stock_movements, che
-la baseline non creava): il ciclo reset -> database update -> seed e
+la baseline non creava), EnforceWholeMerchandiseQuantities, le migrazioni
+AddOrderFulfillmentAndOutbox e RemoveOrderOutboxAndAddPaymentInfo, poi
+AddOrderInternalNotes (aggiunge le note interne facoltative agli ordini),
+AddOrderShippingCharge (aggiunge il costo netto e la classificazione IVA
+esplicita della spedizione), AddShipmentFulfillment (aggiunge spedizioni,
+righe di evasione, quantità spedite e progressivo DDT) e
+AlterInvoiceItemQuantityToDecimal (abilita quantità fiscali frazionarie sulle
+righe fattura senza modificare i valori storici), AddInvoicePaymentMetadata
+(aggiunge metodo di pagamento e riferimento transazione nullable, preservando
+i pagamenti storici non classificati), AddInvoiceConfirmationWorkflow e
+AddInvoiceOrderSynchronization (aggiunge spesa di spedizione, lock SDI e
+righe contabili aggiunte/escluse senza alterare lo storico di magazzino):
+il ciclo reset -> database update -> seed e
 percorribile su un database vuoto. Un database creato con le vecchie migrazioni
 va ricreato oppure la sua tabella __EFMigrationsHistory va allineata (riga con
 l'id di InitialCreate), poi database update applica AddVariantForeignKeys. Il generatore non usa EnsureCreated e non
@@ -176,7 +188,23 @@ Le quote sono applicate a pezzi interi; arrotondamenti e ultimo centinaio
 incompleto possono produrre piccoli scostamenti, riportati nel riepilogo.
 Il fallato non viene rivenduto come merce commerciale e resta separato.
 I movimenti distinguono carichi, vendite, resi al fornitore e fallati.
-Ogni vendita genera ordine, DDT e fattura con le stesse righe e totali.
+Ogni vendita genera ordine, spedizione, DDT e fattura con le stesse righe e totali.
+I numeri fattura simulati seguono FAT-AAAAmm-NNNNN con progressivo mensile
+contiguo; la generazione reale usa un lock transazionale per evitare collisioni
+e buchi.
+Il generatore usa quantita intere per le vendite simulate, mentre le righe
+fattura supportano quantita fiscali decimali fino a otto cifre. Non inventa
+pagamenti o riferimenti di transazione: le fatture simulate restano senza
+pagamenti registrati; le fatture emesse nello scenario vengono confermate
+internamente dopo il calcolo fiscale.
+Gli ordini generati percorrono il ciclo Confermato -> Prelievo -> Imballaggio
+-> Spedito -> Completato; le righe della spedizione collegano le quantita evase
+alle righe d'ordine e il DDT rappresenta la spedizione integrale. I dati
+di vettore e tracking sono sintetici e servono soltanto a esercitare il ciclo.
+Gli ordini sintetici di liquidazione stagionale includono una nota interna
+fittizia; gli altri ordini lasciano il campo facoltativo vuoto. Il costo
+spedizione sintetico resta a zero: il generatore non inventa un importo o
+una classificazione fiscale per questa spesa.
 Le vendite sono intestate solo ad anagrafiche con profilo cliente: agenti e
 fornitori non ricevono mai ordini, DDT o fatture di vendita.
 L'IVA ordinaria dello scenario e il 22%; non simula tutti i regimi fiscali,

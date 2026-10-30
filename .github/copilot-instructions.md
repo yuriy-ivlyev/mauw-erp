@@ -4,6 +4,23 @@ Rispondere brevemente; fornire dettagli estesi solo se richiesti.
 Preferire dependency injection, configurazioni DI in metodi di estensione e
 `Program.cs` minimale. Per errori di validazione usare il Result pattern.
 
+## Standard UI globali
+
+- Ogni tabella deve essere paginata e usare il componente condiviso
+  `PaginationComponent` (`<app-pagination>`); per elenchi client-side usare
+  `PageSlicePipe` per mostrare solo le righe della pagina corrente.
+- Le azioni Modifica/Elimina nelle tabelle devono usare il componente condiviso
+  `TableActionButtonComponent`: solo glifi SVG con etichetta accessibile,
+  Modifica verde ed Elimina rosso. Non sostituire i glifi con testo visibile o
+  stili locali diversi.
+- I pulsanti Nuovo/Aggiungi devono usare il componente condiviso
+  `AddActionButtonComponent`, verde e con glifo SVG `+`; descrivere l'azione
+  nell'etichetta accessibile e nel tooltip.
+- Ogni eliminazione richiede conferma esplicita tramite il componente condiviso
+  di conferma; non eliminare mai direttamente.
+- I controlli per tornare indietro/agli elenchi devono essere elementi `<button>`,
+  mai link, e usare `BackButtonComponent` con lo stile blu chiaro condiviso.
+
 ## Invarianti per refactoring e validazione
 
 - Per gli ordini fornitore mantenere il formato `OF-{yyyyMMdd}-{sequenza:D6}`

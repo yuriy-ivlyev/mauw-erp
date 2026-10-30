@@ -64,6 +64,15 @@ Le finestre temporali sono inclusive e memorizzate in UTC.
   emissione documento e movimentazione magazzino resta multi-richiesta, non una
   nuova transazione distribuita. Le schermate autonome ordine/preventivo restano
   i segnaposto preesistenti: la compilazione operativa e nella cassa.
+- Il ciclo ordini introduce `CashDesk` e `StandardShipping` senza rinumerare gli
+  stati storici della sessione POS. Finalizzazione cash e spedizione aggiornano
+  ordine, stock/movimenti, DDT e PDF in modo sincrono nella stessa transazione;
+  la risposta HTTP contiene il documento pronto per la stampa. Non ci sono
+  worker o tabelle outbox. Un profilo cliente bloccato o un'esposizione superiore
+  al fido configurato porta l'ordine in `PendingApproval` senza riserva; il
+  fido pari a zero e considerato non configurato, coerentemente con i profili
+  esistenti. La migrazione riconosce le vecchie `CassaSession` come `CashDesk`
+  e rimuove la tabella outbox introdotta dalla migrazione precedente.
 
 ### Sconti di riga con causale
 

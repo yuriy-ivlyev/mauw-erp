@@ -9,10 +9,12 @@ import { AuthService } from '../../../services/auth.service';
 import { ProductService } from '../../../services/product.service';
 import { ProductMatrixModalComponent, MatrixSelection } from './product-matrix-modal.component';
 import { ProductParentDto, ProductMatrixDto } from '../../../models/product.model';
+import { OrderFulfillmentResult } from '../../../models/order.model';
 import { CassaSessionService, CartItem, CashDiscount, CassaContact, CassaPreviewLine, CassaPreviewState, PausedSessionSummary, CassaEmissionItem } from '../../../services/cassa-session.service';
 import { DiscountDialogComponent } from './discount-dialog.component';
 import { PriceList } from '../../../models/price-list.model';
 import { PriceListService, priceError } from '../../../services/price-list.service';
+import { AddActionButtonComponent } from '../../../shared/add-action-button/add-action-button.component';
 
 interface BarcodeVariant {
   barcode: string;
@@ -35,7 +37,7 @@ interface PageResponse<T> {
 @Component({
   selector: 'app-banco-cassa',
   standalone: true,
-  imports: [CommonModule, FormsModule, ProductMatrixModalComponent, DiscountDialogComponent],
+  imports: [CommonModule, FormsModule, ProductMatrixModalComponent, DiscountDialogComponent, AddActionButtonComponent],
   template: `
 <!-- ===== MODALI ===== -->
 
@@ -231,10 +233,9 @@ interface PageResponse<T> {
           </svg>
         </div>
         <p *ngIf="barcodeError" class="text-red-500 text-xs mt-1">{{ barcodeError }}</p>
-        <button (click)="lookupBarcode()" [disabled]="!barcodeInput_value || lookingUp"
-          class="mt-2 w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-sm font-semibold py-2 rounded-lg transition">
-          {{ lookingUp ? '...' : '+ Aggiungi da Barcode' }}
-        </button>
+        <app-add-action-button class="mt-2" [label]="lookingUp ? 'Ricerca barcode in corso' : 'Aggiungi da barcode'"
+          [disabled]="!barcodeInput_value || lookingUp" (activated)="lookupBarcode()">
+        </app-add-action-button>
       </div>
 
       <div class="relative flex items-center mb-4">
@@ -413,6 +414,19 @@ interface PageResponse<T> {
 
         <!-- Action buttons: aligned right -->
         <div class="flex gap-2 flex-shrink-0 ml-auto">
+          <select [(ngModel)]="paymentMethod" [disabled]="!!generating"
+            aria-label="Metodo di pagamento"
+            class="px-2 py-2 border border-gray-300 rounded-lg bg-white text-sm">
+            <option value="Contanti">Contanti</option>
+            <option value="Carta">Carta</option>
+            <option value="Bonifico">Bonifico</option>
+          </select>
+          <button (click)="finalizeCashSale()"
+            [disabled]="!selectedContact || generating || !sessionService.canSubmit"
+            class="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 text-white text-sm font-semibold rounded-lg shadow transition flex items-center gap-1.5">
+            <span>💶</span>
+            <span>{{ generating === 'cash-sale' ? '...' : 'Vendita + ricevuta' }}</span>
+          </button>
           <button (click)="generateDocument('ddt')"
             [disabled]="!selectedContact || generating || !sessionService.canSubmit"
             class="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white text-sm font-semibold rounded-lg shadow transition flex items-center gap-1.5">
@@ -462,6 +476,7 @@ export class BancoCassaComponent implements OnInit, OnDestroy {
 
   // Document
   documentNumber = '';
+  paymentMethod = 'Contanti';
 
   // Cart
   cart: CartItem[] = [];
@@ -470,7 +485,7 @@ export class BancoCassaComponent implements OnInit, OnDestroy {
   private defaultWarehouseId: string | null = null;
 
   // Generation
-  generating: 'ddt' | 'invoice' | null = null;
+  generating: 'cash-sale' | 'ddt' | 'invoice' | null = null;
   generateError: string | null = null;
 
   // Session management
@@ -792,6 +807,72 @@ export class BancoCassaComponent implements OnInit, OnDestroy {
     this.cart = [];
     this.showClearCartConfirm = false;
     this.syncToService();
+  }
+
+  finalizeCashSale(): void {
+    if (this.generating || !this.selectedContact || this.cart.length === 0) return;
+    if (!this.sessionService.canSubmit) {
+      this.generateError = this.pricingError ?? 'Attendere prezzi e anteprima fiscale validi.';
+      return;
+    }
+
+    this.generating = 'cash-sale';
+    this.generateError = null;
+    this.sessionService.prepareEmission().subscribe({
+      next: () => {
+        const orderId = this.sessionService.snapshot.sessionId;
+        if (!orderId) {
+          this.generateError = 'La sessione cassa non è stata salvata correttamente.';
+          this.generating = null;
+          return;
+        }
+
+        this.api.post<OrderFulfillmentResult>(
+          `v1/orders/${orderId}/finalize-cash-sale`,
+          { paymentMethod: this.paymentMethod, transactionDetails: null }
+        ).subscribe({
+          next: result => {
+            this.clearCashSaleSession();
+            this.downloadCashReceipt(result);
+          },
+          error: error => {
+            this.generateError = priceError(error);
+            this.generating = null;
+          }
+        });
+      },
+      error: error => {
+        this.generateError = error instanceof Error && !(error instanceof HttpErrorResponse)
+          ? error.message
+          : priceError(error);
+        this.generating = null;
+      }
+    });
+  }
+
+  private clearCashSaleSession(): void {
+    this.generating = null;
+    this.sessionService.clearSession();
+    this.cart = [];
+    this.selectedContact = null;
+    this.documentNumber = '';
+    this.currentSessionCode = null;
+  }
+
+  private downloadCashReceipt(result: OrderFulfillmentResult): void {
+    try {
+      const binary = atob(result.documentBytes);
+      const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+      const blob = new Blob([bytes], { type: result.contentType });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = result.documentFileName;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      this.generateError = 'Vendita completata, ma non è stato possibile scaricare la ricevuta.';
+    }
   }
 
   // ── Document generation ───────────────────────────────────

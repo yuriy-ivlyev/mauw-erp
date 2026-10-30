@@ -1,69 +1,275 @@
 using Mauw.Erp.Domain.Accounting;
+using Mauw.Erp.Domain.Enums;
 using Mauw.Erp.Domain.Services;
 
 namespace Mauw.Erp.Domain.Entities;
 
-using Enums;
-
 /// <summary>
-/// Order entity representing a sales order.
+/// Sales order aggregate root, including the cash-desk and shipping lifecycles.
 /// </summary>
 public class Order : Entity<Guid>
 {
+    private readonly List<Shipment> _shipments = [];
+
+    private static readonly IReadOnlyDictionary<OrderStatus, HashSet<OrderStatus>> ValidTransitions =
+        new Dictionary<OrderStatus, HashSet<OrderStatus>>
+        {
+            [OrderStatus.Draft] =
+            [
+                OrderStatus.PendingApproval, OrderStatus.Confirmed, OrderStatus.Completed,
+                OrderStatus.Cancelled, OrderStatus.OnHold, OrderStatus.Suspended, OrderStatus.Terminated
+            ],
+            [OrderStatus.PendingApproval] =
+            [
+                OrderStatus.Draft, OrderStatus.Confirmed, OrderStatus.Cancelled, OrderStatus.OnHold
+            ],
+            [OrderStatus.Confirmed] =
+            [
+                OrderStatus.Picking, OrderStatus.Cancelled, OrderStatus.OnHold
+            ],
+            [OrderStatus.Picking] =
+            [
+                OrderStatus.Packing, OrderStatus.Cancelled, OrderStatus.OnHold
+            ],
+            [OrderStatus.Packing] =
+            [
+                OrderStatus.Shipped, OrderStatus.PartiallyShipped, OrderStatus.Cancelled, OrderStatus.OnHold
+            ],
+            [OrderStatus.PartiallyShipped] =
+            [
+                OrderStatus.PartiallyShipped, OrderStatus.Shipped, OrderStatus.Completed, OrderStatus.OnHold
+            ],
+            [OrderStatus.Shipped] = [OrderStatus.Delivered, OrderStatus.Completed, OrderStatus.OnHold],
+            [OrderStatus.Delivered] = [OrderStatus.Completed, OrderStatus.OnHold],
+            [OrderStatus.OnHold] =
+            [
+                OrderStatus.Draft, OrderStatus.PendingApproval, OrderStatus.Confirmed,
+                OrderStatus.Picking, OrderStatus.Packing, OrderStatus.Shipped, OrderStatus.PartiallyShipped,
+                OrderStatus.Delivered, OrderStatus.Suspended, OrderStatus.Cancelled
+            ],
+            [OrderStatus.Suspended] =
+            [
+                OrderStatus.Suspended, OrderStatus.Draft, OrderStatus.Confirmed,
+                OrderStatus.Terminated, OrderStatus.OnHold
+            ],
+            [OrderStatus.Terminated] = [],
+            [OrderStatus.Completed] = [],
+            [OrderStatus.Cancelled] = []
+        };
+
     public Guid ContactId { get; set; }
-    public string OrderNumber { get; set; }
-    public OrderStatus Status { get; set; }
+    public string OrderNumber { get; set; } = string.Empty;
+    public OrderStatus Status { get; private set; }
     public DateTime OrderDate { get; set; }
     public decimal CustomerDiscountRate { get; set; }
     public decimal TaxableTotal { get; set; }
     public decimal VatTotal { get; set; }
     public decimal GrossTotal { get; set; }
-    public string? TerminalId { get; set; }
-    public string? DocumentReference { get; set; }
+    public decimal ShippingCost { get; private set; } = 0.00m;
+    public decimal? ShippingVatRate { get; private set; }
+    public string? ShippingNatureCode { get; private set; }
+    public string? InternalNotes { get; private set; }
+    public string? TerminalId { get; private set; }
+    public string? DocumentReference { get; private set; }
     public OrderType OrderType { get; set; } = OrderType.Standard;
+    public OrderFulfillmentType FulfillmentType { get; private set; }
+    public Guid? FulfillmentWarehouseId { get; private set; }
+    public Guid? WarehouseOperatorId { get; private set; }
+    public int? BoxCount { get; private set; }
+    public decimal? WeightKg { get; private set; }
+    public string? CarrierName { get; private set; }
+    public string? TrackingCode { get; private set; }
+    public string? DdtNumber { get; private set; }
+    public string? PaymentMethod { get; private set; }
+    public string? PaymentTransactionDetails { get; private set; }
+    public string? ApprovalReason { get; private set; }
+    public string? HoldReason { get; private set; }
+    public OrderStatus? StatusBeforeHold { get; private set; }
 
-    // Navigation
     public Contact Contact { get; set; } = null!;
-    public ICollection<OrderItem> Items { get; set; } = [];
+    public Warehouse? FulfillmentWarehouse { get; private set; }
+    public ICollection<OrderItem> Items { get; private set; } = [];
+    public IReadOnlyCollection<Shipment> Shipments => _shipments;
 
     public Order(
         Guid contactId,
         string orderNumber,
-        decimal customerDiscountRate = 0
-    )
+        decimal customerDiscountRate = 0,
+        OrderFulfillmentType fulfillmentType = OrderFulfillmentType.StandardShipping)
     {
+        Id = Guid.NewGuid();
         ContactId = contactId;
         OrderNumber = orderNumber;
         Status = OrderStatus.Draft;
         OrderDate = DateTime.UtcNow;
         CustomerDiscountRate = customerDiscountRate;
+        FulfillmentType = fulfillmentType;
         TaxableTotal = 0;
         VatTotal = 0;
         GrossTotal = 0;
     }
 
-    /// <summary>
-    /// Adds an item to the order and updates totals.
-    /// </summary>
+    private Order() { }
+
+    public void AddShipment(Shipment shipment)
+    {
+        ArgumentNullException.ThrowIfNull(shipment);
+        if (shipment.OrderId != Id)
+            throw new InvalidOperationException("The shipment belongs to another order.");
+        if (_shipments.Any(existing => existing.Id == shipment.Id))
+            throw new InvalidOperationException("The shipment is already associated with this order.");
+
+        _shipments.Add(shipment);
+        UpdateTimestamp();
+    }
+
+    public void SetInternalNotes(string? notes)
+    {
+        InternalNotes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+    }
+
     public AccountingResult<CalculatedDocument> AddItem(OrderItem item, ItalianAccountingCalculator calculator)
     {
-        var result = calculator.CalculateAndApply(Items.Append(item));
+        EnsureEditable();
+        var result = calculator.CalculateAndApply(GetAccountingLines(Items.Append(item)));
         if (!result.Success)
             return result;
+
         Items.Add(item);
         ApplyTotals(result.Data!);
         return result;
     }
 
-    /// <summary>
-    /// Recalculates order totals from items.
-    /// </summary>
+    public AccountingResult<CalculatedDocument> AddCompletedBillingItem(
+        OrderItem item, ItalianAccountingCalculator calculator)
+    {
+        if (Status != OrderStatus.Completed)
+            return AccountingResult<CalculatedDocument>.Fail("Le righe contabili aggiuntive sono ammesse solo su ordini completati.");
+        if (item.OrderId != Id)
+            return AccountingResult<CalculatedDocument>.Fail("La riga appartiene a un altro ordine.");
+
+        item.MarkBillingOnly();
+        var result = calculator.CalculateAndApply(GetAccountingLines(Items.Append(item)));
+        if (!result.Success)
+            return result;
+
+        Items.Add(item);
+        ApplyTotals(result.Data!);
+        return result;
+    }
+
+    public AccountingResult<CalculatedDocument> ExcludeCompletedBillingItem(
+        Guid itemId, ItalianAccountingCalculator calculator)
+    {
+        if (Status != OrderStatus.Completed)
+            return AccountingResult<CalculatedDocument>.Fail("Le righe possono essere rimosse dalla fattura solo su ordini completati.");
+        var item = Items.FirstOrDefault(line => line.Id == itemId && !line.IsExcludedFromInvoice);
+        if (item is null)
+            return AccountingResult<CalculatedDocument>.Fail("Riga ordine non trovata.");
+
+        var remainingItems = Items.Where(line => line.Id != itemId && !line.IsExcludedFromInvoice).ToList();
+        if (remainingItems.Count == 0 && ShippingCost == 0m)
+            return AccountingResult<CalculatedDocument>.Fail("L'ordine deve conservare almeno una riga fatturabile o una spesa di spedizione.");
+
+        var result = calculator.CalculateAndApply(GetAccountingLines(remainingItems));
+        if (!result.Success)
+            return result;
+
+        item.ExcludeFromInvoice();
+        ApplyTotals(result.Data!);
+        return result;
+    }
+
+    public AccountingResult<CalculatedDocument> ReplaceItem(
+        Guid itemId,
+        OrderItem replacement,
+        ItalianAccountingCalculator calculator)
+    {
+        EnsureEditable();
+        var current = Items.FirstOrDefault(item => item.Id == itemId);
+        if (current is null)
+            return AccountingResult<CalculatedDocument>.Fail("Order item not found.");
+
+        var result = calculator.CalculateAndApply(
+            GetAccountingLines(Items.Where(item => item.Id != itemId).Append(replacement)));
+        if (!result.Success)
+            return result;
+
+        Items.Remove(current);
+        Items.Add(replacement);
+        ApplyTotals(result.Data!);
+        return result;
+    }
+
+    public AccountingResult<CalculatedDocument> RemoveItem(
+        Guid itemId, ItalianAccountingCalculator calculator)
+    {
+        EnsureEditable();
+        var item = Items.FirstOrDefault(line => line.Id == itemId);
+        if (item is null)
+            return AccountingResult<CalculatedDocument>.Fail("Order item not found.");
+
+        var result = calculator.CalculateAndApply(GetAccountingLines(Items.Where(line => line.Id != itemId)));
+        if (!result.Success)
+            return result;
+
+        Items.Remove(item);
+        ApplyTotals(result.Data!);
+        return result;
+    }
+
     public AccountingResult<CalculatedDocument> UpdateTotals(ItalianAccountingCalculator calculator)
     {
-        var result = calculator.CalculateAndApply(Items);
+        EnsureEditable();
+        var result = calculator.CalculateAndApply(GetAccountingLines(Items));
         if (result.Success)
             ApplyTotals(result.Data!);
         return result;
+    }
+
+    public AccountingResult<CalculatedDocument> SetShippingCharge(
+        decimal shippingCost,
+        decimal? vatRate,
+        string? natureCode,
+        ItalianAccountingCalculator calculator)
+    {
+        if (Status is not (OrderStatus.Draft or OrderStatus.Completed))
+            return AccountingResult<CalculatedDocument>.Fail("Il costo di spedizione può essere modificato solo su ordini in bozza o completati.");
+        if (shippingCost < 0m)
+            return AccountingResult<CalculatedDocument>.Fail("Shipping cost cannot be negative.");
+        if (decimal.Round(shippingCost, 2, MidpointRounding.AwayFromZero) != shippingCost)
+            return AccountingResult<CalculatedDocument>.Fail("Shipping cost must have at most two decimal places.");
+        if (shippingCost > 0m && !vatRate.HasValue)
+            return AccountingResult<CalculatedDocument>.Fail("VAT rate is required for a shipping charge.");
+
+        var effectiveVatRate = shippingCost > 0m ? vatRate : null;
+        var effectiveNatureCode = shippingCost > 0m ? natureCode : null;
+        var lines = GetAccountingLines(Items, shippingCost, effectiveVatRate, effectiveNatureCode);
+        var result = calculator.CalculateAndApply(lines);
+        if (!result.Success)
+            return result;
+
+        ShippingCost = shippingCost;
+        ShippingVatRate = effectiveVatRate;
+        ShippingNatureCode = effectiveNatureCode;
+        ApplyTotals(result.Data!);
+        return result;
+    }
+
+    private IEnumerable<ICommercialDocumentLine> GetAccountingLines(
+        IEnumerable<OrderItem> items,
+        decimal? shippingCost = null,
+        decimal? shippingVatRate = null,
+        string? shippingNatureCode = null)
+    {
+        var lines = items.Where(item => !item.IsExcludedFromInvoice)
+            .Cast<ICommercialDocumentLine>().ToList();
+        var amount = shippingCost ?? ShippingCost;
+        var rate = shippingCost.HasValue ? shippingVatRate : ShippingVatRate;
+        var nature = shippingCost.HasValue ? shippingNatureCode : ShippingNatureCode;
+        if (amount > 0m && rate.HasValue)
+            lines.Add(new ShippingChargeLine(amount, rate.Value, nature));
+        return lines;
     }
 
     private void ApplyTotals(CalculatedDocument document)
@@ -74,36 +280,238 @@ public class Order : Entity<Guid>
         UpdateTimestamp();
     }
 
-    /// <summary>
-    /// Marks order as confirmed.
-    /// </summary>
+    private sealed class ShippingChargeLine : ICommercialDocumentLine
+    {
+        public decimal Quantity => 1m;
+        public decimal UnitNetPrice { get; set; }
+        public decimal DiscountPercent { get; set; }
+        public decimal VatRate { get; }
+        public string? NatureCode { get; set; }
+        public decimal LineNetTotal { get; set; }
+        public decimal? LineVatTotal { get; set; }
+        public decimal? LineGrossTotal { get; set; }
+
+        public ShippingChargeLine(decimal unitNetPrice, decimal vatRate, string? natureCode)
+        {
+            UnitNetPrice = unitNetPrice;
+            VatRate = vatRate;
+            NatureCode = natureCode;
+        }
+    }
+
+    public void SetFulfillmentWarehouse(Guid warehouseId)
+    {
+        if (warehouseId == Guid.Empty)
+            throw new InvalidOperationException("A fulfillment warehouse is required.");
+        if (Status is not (OrderStatus.Draft or OrderStatus.PendingApproval))
+            throw new InvalidOperationException("The fulfillment warehouse can only be set on an open order.");
+
+        FulfillmentWarehouseId = warehouseId;
+        UpdateTimestamp();
+    }
+
+    public void RequireApproval(string reason)
+    {
+        if (Status != OrderStatus.Draft)
+            throw new InvalidOperationException("Only a draft order can be sent for approval.");
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("An approval reason is required.", nameof(reason));
+
+        EnsureHasLines();
+        TransitionTo(OrderStatus.PendingApproval);
+        ApprovalReason = reason.Trim();
+        UpdateTimestamp();
+    }
+
     public void Confirm()
     {
-        if (Items.Count == 0)
-            throw new InvalidOperationException("Cannot confirm an order without items.");
+        if (Status != OrderStatus.Draft)
+            throw new InvalidOperationException("Only a draft order can be confirmed.");
+        if (FulfillmentType != OrderFulfillmentType.StandardShipping)
+            throw new InvalidOperationException("Cash-desk orders must be finalized through FinalizeCashSale.");
 
-        Status = OrderStatus.Confirmed;
+        EnsureHasLines();
+        ConfirmAndRaiseEvent();
+    }
+
+    public void Approve()
+    {
+        if (Status != OrderStatus.PendingApproval)
+            throw new InvalidOperationException("Only an order pending approval can be approved.");
+        if (FulfillmentType != OrderFulfillmentType.StandardShipping)
+            throw new InvalidOperationException("Cash-desk orders do not use shipping approval.");
+
+        EnsureHasLines();
+        ApprovalReason = null;
+        ConfirmAndRaiseEvent();
+    }
+
+    private void ConfirmAndRaiseEvent()
+    {
+        TransitionTo(OrderStatus.Confirmed);
+    }
+
+    public void FinalizeCashSale(string paymentMethod, string? transactionDetails)
+    {
+        if (Status != OrderStatus.Draft)
+            throw new InvalidOperationException("A cash sale can only be finalized from Draft.");
+        if (FulfillmentType != OrderFulfillmentType.CashDesk)
+            throw new InvalidOperationException("Only cash-desk orders can be finalized as a cash sale.");
+        if (string.IsNullOrWhiteSpace(paymentMethod))
+            throw new ArgumentException("A payment method is required.", nameof(paymentMethod));
+        if (paymentMethod.Length > 50)
+            throw new ArgumentException("Payment method must be at most 50 characters.", nameof(paymentMethod));
+        if (transactionDetails?.Length > 500)
+            throw new ArgumentException("Transaction details must be at most 500 characters.", nameof(transactionDetails));
+
+        EnsureHasLines();
+        TransitionTo(OrderStatus.Completed);
+        PaymentMethod = paymentMethod.Trim();
+        PaymentTransactionDetails = string.IsNullOrWhiteSpace(transactionDetails)
+            ? null
+            : transactionDetails.Trim();
+        UpdateTimestamp();
+    }
+
+    public void StartPicking(Guid warehouseOperatorId)
+    {
+        if (warehouseOperatorId == Guid.Empty)
+            throw new ArgumentException("A warehouse operator is required.", nameof(warehouseOperatorId));
+        EnsureShippingOrder();
+        TransitionTo(OrderStatus.Picking);
+        WarehouseOperatorId = warehouseOperatorId;
+        UpdateTimestamp();
+    }
+
+    public void CompletePacking(int boxCount, decimal weightKg)
+    {
+        EnsureShippingOrder();
+        if (boxCount <= 0)
+            throw new ArgumentOutOfRangeException(nameof(boxCount), "At least one box is required.");
+        if (weightKg < 0)
+            throw new ArgumentOutOfRangeException(nameof(weightKg), "Weight cannot be negative.");
+
+        TransitionTo(OrderStatus.Packing);
+        BoxCount = boxCount;
+        WeightKg = weightKg;
+        UpdateTimestamp();
+    }
+
+    public void Ship(string carrierName, string? trackingCode, string ddtNumber, bool allRemainingItemsShipped = true)
+    {
+        EnsureShippingOrder();
+        if (string.IsNullOrWhiteSpace(carrierName))
+            throw new ArgumentException("A carrier name is required.", nameof(carrierName));
+        if (string.IsNullOrWhiteSpace(ddtNumber))
+            throw new ArgumentException("A DDT number is required.", nameof(ddtNumber));
+        if (!FulfillmentWarehouseId.HasValue)
+            throw new InvalidOperationException("The order has no fulfillment warehouse.");
+
+        if (Status is not (OrderStatus.Packing or OrderStatus.PartiallyShipped))
+            throw new InvalidOperationException("Only a packed or partially shipped order can be shipped.");
+
+        TransitionTo(allRemainingItemsShipped ? OrderStatus.Shipped : OrderStatus.PartiallyShipped);
+        CarrierName = carrierName.Trim();
+        TrackingCode = string.IsNullOrWhiteSpace(trackingCode) ? null : trackingCode.Trim();
+        DdtNumber = ddtNumber.Trim();
+        UpdateTimestamp();
+    }
+
+    public void MarkDelivered()
+    {
+        EnsureShippingOrder();
+        TransitionTo(OrderStatus.Delivered);
+    }
+
+    public void Complete()
+    {
+        EnsureShippingOrder();
+        TransitionTo(OrderStatus.Completed);
+    }
+
+    public void CancelRemainingLines(string reason)
+    {
+        if (Status != OrderStatus.PartiallyShipped)
+            throw new InvalidOperationException("Only a partially shipped order can close its remaining lines.");
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("A cancellation reason is required.", nameof(reason));
+
+        TransitionTo(OrderStatus.Completed);
+    }
+
+    public void Cancel(string reason)
+    {
+        if (Status is not (OrderStatus.Draft or OrderStatus.Confirmed or
+            OrderStatus.PendingApproval or OrderStatus.Picking or OrderStatus.Packing or OrderStatus.OnHold))
+            throw new InvalidOperationException($"An order in status {Status} cannot be cancelled.");
+        if (Status == OrderStatus.OnHold && StatusBeforeHold == OrderStatus.PartiallyShipped)
+            throw new InvalidOperationException("A partially shipped order cannot be cancelled as a whole.");
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("A cancellation reason is required.", nameof(reason));
+
+        TransitionTo(OrderStatus.Cancelled);
+    }
+
+    public void PlaceOnHold(string reason)
+    {
+        if (Status is OrderStatus.Completed or OrderStatus.Cancelled or
+            OrderStatus.Terminated or OrderStatus.OnHold)
+            throw new InvalidOperationException($"An order in status {Status} cannot be put on hold.");
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("A hold reason is required.", nameof(reason));
+
+        var previousStatus = Status;
+        TransitionTo(OrderStatus.OnHold);
+        StatusBeforeHold = previousStatus;
+        HoldReason = reason.Trim();
+        UpdateTimestamp();
+    }
+
+    public void ReleaseHold()
+    {
+        if (Status != OrderStatus.OnHold || !StatusBeforeHold.HasValue)
+            throw new InvalidOperationException("The order is not on hold.");
+
+        var previousStatus = StatusBeforeHold.Value;
+        TransitionTo(previousStatus);
+        StatusBeforeHold = null;
+        HoldReason = null;
         UpdateTimestamp();
     }
 
     public void Suspend(string? terminalId)
     {
-        Status = OrderStatus.Suspended;
+        if (Status is not (OrderStatus.Draft or OrderStatus.Suspended))
+            throw new InvalidOperationException($"An order in status {Status} cannot be suspended.");
+
+        TransitionTo(OrderStatus.Suspended);
         TerminalId = terminalId;
         UpdateTimestamp();
     }
 
     public void Resume(string? terminalId)
     {
-        Status = OrderStatus.Draft;
+        TransitionTo(OrderStatus.Draft);
         TerminalId = terminalId;
         UpdateTimestamp();
     }
 
+    public void ConfirmCassaSession()
+    {
+        if (Status is not (OrderStatus.Draft or OrderStatus.Suspended))
+            throw new InvalidOperationException("Only an open Cassa session can be confirmed.");
+        EnsureHasLines();
+        if (OrderType != OrderType.CassaSession)
+            throw new InvalidOperationException("Only legacy Cassa sessions can use this confirmation path.");
+        TransitionTo(OrderStatus.Confirmed);
+    }
+
     public void Terminate()
     {
-        Status = OrderStatus.Terminated;
-        UpdateTimestamp();
+        if (Status is not (OrderStatus.Draft or OrderStatus.Suspended))
+            throw new InvalidOperationException($"An order in status {Status} cannot be terminated.");
+
+        TransitionTo(OrderStatus.Terminated);
     }
 
     public void SetDocumentReference(string? docRef)
@@ -114,10 +522,45 @@ public class Order : Entity<Guid>
 
     public void ClearItems()
     {
+        EnsureEditable();
         Items.Clear();
         TaxableTotal = 0;
         VatTotal = 0;
         GrossTotal = 0;
         UpdateTimestamp();
+    }
+
+    private void EnsureEditable()
+    {
+        if (Status is not (OrderStatus.Draft or OrderStatus.Suspended))
+            throw new InvalidOperationException($"Order lines cannot be modified in status {Status}.");
+    }
+
+    private void EnsureShippingOrder()
+    {
+        if (FulfillmentType != OrderFulfillmentType.StandardShipping)
+            throw new InvalidOperationException("This transition is only valid for shipping orders.");
+    }
+
+    private void EnsureHasLines()
+    {
+        if (Items.Count == 0)
+            throw new InvalidOperationException("Cannot process an order without items.");
+    }
+
+    private void TransitionTo(OrderStatus nextStatus)
+    {
+        EnsureValidTransition(Status, nextStatus);
+        if (Status == nextStatus)
+            return;
+
+        Status = nextStatus;
+        UpdateTimestamp();
+    }
+
+    private static void EnsureValidTransition(OrderStatus current, OrderStatus next)
+    {
+        if (!ValidTransitions.TryGetValue(current, out var allowed) || !allowed.Contains(next))
+            throw new InvalidOperationException($"Invalid order status transition: {current} -> {next}.");
     }
 }

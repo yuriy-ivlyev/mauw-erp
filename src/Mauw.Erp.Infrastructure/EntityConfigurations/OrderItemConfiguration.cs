@@ -17,6 +17,17 @@ public class OrderItemConfiguration : IEntityTypeConfiguration<OrderItem>
         builder.Property(oi => oi.Quantity)
             .IsRequired();
 
+        builder.Property(oi => oi.QuantityShipped)
+            .IsRequired()
+            .HasDefaultValue(0);
+        builder.Property(oi => oi.IsBillingOnly)
+            .IsRequired()
+            .HasDefaultValue(false);
+        builder.Property(oi => oi.IsExcludedFromInvoice)
+            .IsRequired()
+            .HasDefaultValue(false);
+        builder.Ignore(oi => oi.QuantityRemaining);
+
         builder.Property(oi => oi.UnitNetPrice)
             .HasPrecision(22, 8);
 

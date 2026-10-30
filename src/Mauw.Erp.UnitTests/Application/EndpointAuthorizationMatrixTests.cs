@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text.Json;
 using Mauw.Erp.Api.Endpoints;
 using Mauw.Erp.Api.Extensions;
 using Mauw.Erp.Api.Services;
@@ -63,7 +64,6 @@ public sealed class AuthorizationMatrixHost : IAsyncLifetime
         services.AddScoped<IValidator<CreateOrderRequest>, CreateOrderRequestValidator>();
         services.AddScoped<IValidator<CreateOrderItemRequest>, CreateOrderItemRequestValidator>();
         services.AddScoped<IValidator<BarcodeScanRequest>, BarcodeScanRequestValidator>();
-        services.AddScoped<IValidator<CreateInvoiceRequest>, CreateInvoiceRequestValidator>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddPricingApi();
         services.AddInvoicePdfReporting();
@@ -225,10 +225,14 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
 
         // Orders and cassa
         Add("GET", "/api/v1/orders", AdminSales);
-        Add("GET", $"/api/v1/orders/{Id}", AdminSales);
+        Add("GET", $"/api/v1/orders/{Id}", All);
         Add("GET", $"/api/v1/orders/{Id}/pdf", AdminSales);
         Add("POST", "/api/v1/orders", AdminSales);
         Add("POST", $"/api/v1/orders/{Id}/items", AdminSales);
+        Add("DELETE", $"/api/v1/orders/{Id}/items/{Id2}", AdminSales);
+        Add("POST", $"/api/v1/orders/{Id}/invoice-items", Billing);
+        Add("DELETE", $"/api/v1/orders/{Id}/invoice-items/{Id2}", Billing);
+        Add("PUT", $"/api/v1/orders/{Id}/invoice-shipping-cost", Billing);
         Add("POST", $"/api/v1/orders/{Id}/confirm", AdminSales);
         Add("POST", "/api/v1/cassa/sessions", AdminSales);
         Add("POST", "/api/v1/cassa/sessions/preview", AdminSales);
@@ -242,12 +246,12 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
         Add("GET", "/api/v1/invoices", Billing);
         Add("GET", $"/api/v1/invoices/{Id}", All);
         Add("GET", $"/api/v1/invoices/{Id}/pdf", Billing);
-        Add("POST", "/api/v1/invoices", Billing);
+        Add("POST", $"/api/v1/invoices/from-order/{Id}", Billing);
         Add("POST", $"/api/v1/invoices/{Id}/payments", Billing);
 
         // DDT
         Add("GET", "/api/v1/ddts", AdminWarehouse);
-        Add("GET", $"/api/v1/ddts/{Id}", AdminWarehouseSales);
+        Add("GET", $"/api/v1/ddts/{Id}", All);
         Add("GET", $"/api/v1/ddts/{Id}/pdf", AdminWarehouseSales);
         Add("POST", "/api/v1/ddts", AdminWarehouseSales);
         Add("POST", $"/api/v1/ddts/{Id}/items", AdminWarehouseSales);
@@ -389,6 +393,21 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
     {
         Assert.Equal(HttpStatusCode.Unauthorized, await SendAsync(null, "GET", "/api/test/unmarked"));
         Assert.Equal(HttpStatusCode.OK, await SendAsync(Sales, "GET", "/api/test/unmarked"));
+    }
+
+    [Fact]
+    public async Task InvoiceListReturnsPagedResults()
+    {
+        using var client = host.CreateClient(Accounting);
+        using var response = await client.GetAsync("/api/v1/invoices?page=1&pageSize=10");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = json.RootElement;
+        Assert.True(root.GetProperty("items").ValueKind == JsonValueKind.Array);
+        Assert.Equal(1, root.GetProperty("pageNumber").GetInt32());
+        Assert.Equal(10, root.GetProperty("pageSize").GetInt32());
+        Assert.True(root.GetProperty("totalCount").GetInt32() >= 0);
     }
 
     [Theory]

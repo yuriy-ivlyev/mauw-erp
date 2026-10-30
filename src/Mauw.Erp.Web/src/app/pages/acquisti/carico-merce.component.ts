@@ -1,18 +1,24 @@
 import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ContactService } from '../../services/contact.service';
 import { SupplierDeliveryNoteService } from '../../services/supplier-delivery-note.service';
 import { ContactSummary } from '../../models/contact.model';
 import { SupplierDeliveryNoteListItem } from '../../models/supplier-delivery-note.model';
+import { PaginationComponent } from '../../shared/pagination/pagination.component';
+import { TableActionButtonComponent } from '../../shared/table-action-button/table-action-button.component';
+import { AddActionButtonComponent } from '../../shared/add-action-button/add-action-button.component';
 
 @Component({
   selector: 'app-carico-merce',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [
+    CommonModule, FormsModule, RouterLink, PaginationComponent,
+    TableActionButtonComponent, AddActionButtonComponent
+  ],
   templateUrl: './carico-merce.component.html',
   styles: [`
     :host { display: block; }
@@ -46,7 +52,8 @@ export class CaricoMerceComponent implements OnInit {
 
   constructor(
     private readonly service: SupplierDeliveryNoteService,
-    private readonly contacts: ContactService
+    private readonly contacts: ContactService,
+    private readonly router: Router
   ) {}
 
   ngOnInit(): void {
@@ -84,7 +91,7 @@ export class CaricoMerceComponent implements OnInit {
       status: this.status || undefined,
       dateFrom: this.dateFrom || undefined,
       dateTo: this.dateTo || undefined
-    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    }, this.pageSize).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: result => {
         this.notes = result.items;
         this.totalCount = result.totalCount;
@@ -105,9 +112,23 @@ export class CaricoMerceComponent implements OnInit {
     }
   }
 
-  changePage(delta: number): void {
-    this.page += delta;
+  changePage(page: number): void {
+    this.page = page;
     this.load();
+  }
+
+  changePageSize(pageSize: number): void {
+    this.pageSize = pageSize;
+    this.page = 1;
+    this.load();
+  }
+
+  openNote(id: string): void {
+    void this.router.navigate(['/acquisti/ddt-fornitore', id]);
+  }
+
+  openNewLoad(): void {
+    void this.router.navigate(['/acquisti/ddt-fornitore/nuovo']);
   }
 
   private showError(error: unknown): void {

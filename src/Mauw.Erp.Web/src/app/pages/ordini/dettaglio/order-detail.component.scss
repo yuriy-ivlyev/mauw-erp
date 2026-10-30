@@ -1,0 +1,12 @@
+.type-badge, .status-badge { border-radius: 999px; padding: .25rem .65rem; font-size: .75rem; font-weight: 700; }
+.type-cash { background: #f3e8ff; color: #7e22ce; }
+.type-shipping { background: #e0f2fe; color: #0369a1; }
+.status-draft { background: #f1f5f9; color: #475569; }
+.status-pending { background: #ffedd5; color: #c2410c; }
+.status-confirmed, .status-completed { background: #dcfce7; color: #15803d; }
+.status-processing { background: #dbeafe; color: #1d4ed8; }
+.status-partial, .status-hold { background: #fef3c7; color: #a16207; }
+.status-shipped { background: #cffafe; color: #0e7490; }
+.status-cancelled { background: #fee2e2; color: #b91c1c; }
+.status-default { background: #e2e8f0; color: #334155; }
+button:disabled { cursor: wait; opacity: .55; }

@@ -49,7 +49,8 @@ public class InvoicePdfGeneratorTests
             new("Pagamento immediato", "MP01", null, null, null, null),
             [new("SKU-1", "Caff\u00e8 e qualit\u00e0", null, 1, 100m, null, 22m, 100m)],
             [new(22m, 100m, 22m)],
-            new(1, 100m, 22m, 122m));
+            new(1, 100m, 22m, 122m),
+            FiscalNotes: documentType == "DDT" ? "Vettore: GLS | Tracking: GLS-123 | Colli: 2" : null);
 
         var bytes = await generator.GenerateInvoicePdfAsync(model);
 
@@ -79,6 +80,17 @@ public class InvoicePdfGeneratorTests
         if (documentType == "ORDINE")
             Assert.Equal("Ordine DOC-001", document.Info.Title);
         var resolver = Assert.IsAssignableFrom<IFontResolver>(GlobalFontSettings.FontResolver);
+        if (documentType == "DDT")
+        {
+            Assert.Equal("Documento di Trasporto (DDT) DOC-001", document.Info.Title);
+            using var ddtPdfText = UglyToad.PdfPig.PdfDocument.Open(bytes);
+            var text = string.Join(" ",
+                ddtPdfText.GetPages().SelectMany(page => page.GetWords()).Select(word => word.Text));
+            Assert.Contains("Vettore: GLS", text);
+            Assert.Contains("Tracking: GLS-123", text);
+            Assert.Contains("Colli: 2", text);
+        }
+
         foreach (var (bold, italic) in new[] { (false, false), (true, false), (false, true), (true, true) })
         {
             var font = Assert.IsType<FontResolverInfo>(resolver.ResolveTypeface("Arial", bold, italic));
@@ -178,6 +190,31 @@ public class InvoicePdfGeneratorTests
             .ToArray();
 
         Assert.Equal(["MARKER-S", "MARKER-XS", "MARKER-M", "MARKER-XXL", "MARKER-B"], markers);
+    }
+
+    [Fact]
+    public async Task PreservesFractionalFiscalQuantityInInvoicePdf()
+    {
+        var services = CreateServices();
+        services.AddInvoicePdfReporting();
+        using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var generator = scope.ServiceProvider.GetRequiredService<IInvoicePdfGenerator>();
+        var model = new InvoicePdfModel(
+            "F-DECIMAL", "TD01", new DateOnly(2026, 10, 29), "EUR",
+            new("Venditore", "00000000000", null, "Via Roma 1", "Roma", "00100", "RM",
+                null, null, "RF01", null, null),
+            new("Cliente", null, null, "Via Milano 2", "Roma", "00100", "RM", null, null),
+            new("A vista", "MP01", null, null, null, null),
+            [new("SKU-1", "Articolo", null, 1.25m, 10.12345678m, null, 22m, 12.65m)],
+            [new(22m, 12.65m, 2.78m)],
+            new(1.25m, 12.65m, 2.78m, 15.43m));
+
+        var bytes = await generator.GenerateInvoicePdfAsync(model);
+        using var document = UglyToad.PdfPig.PdfDocument.Open(bytes);
+        var text = string.Join(' ', document.GetPage(1).GetWords().Select(word => word.Text));
+
+        Assert.Contains("1,25", text);
     }
 
     [Theory]

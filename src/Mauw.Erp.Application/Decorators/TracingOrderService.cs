@@ -18,6 +18,9 @@ public sealed class TracingOrderService(IOrderService inner) : TracingDecoratorB
         string? search, string? status, string? orderType, int page, int pageSize, string? sortBy = null, bool sortDescending = false) =>
         inner.GetAllOrdersAsync(search, status, orderType, page, pageSize, sortBy, sortDescending);
 
+    public Task<OperationResult<PagedResult<OrderDto>>> GetFulfillmentQueueAsync(int page, int pageSize) =>
+        TraceAsync("Order.FulfillmentQueue", () => inner.GetFulfillmentQueueAsync(page, pageSize));
+
     public Task<OperationResult<PagedResult<OrderDto>>> GetOrdersByContactAsync(Guid contactId, int page, int pageSize) =>
         TraceAsync("Order.GetByContact", () => inner.GetOrdersByContactAsync(contactId, page, pageSize),
             a => a?.SetTag("contact.id", contactId));
@@ -29,6 +32,54 @@ public sealed class TracingOrderService(IOrderService inner) : TracingDecoratorB
                 a?.SetTag("order.id", orderId);
                 a?.SetTag("variant.id", request.VariantId);
             });
+
+    public Task<OperationResult<OrderDto>> AddCompletedBillingItemAsync(
+        Guid orderId, AddCompletedOrderItemRequest request) =>
+        TraceAsync("Order.AddBillingItem", () => inner.AddCompletedBillingItemAsync(orderId, request),
+            a =>
+            {
+                a?.SetTag("order.id", orderId);
+                a?.SetTag("variant.id", request.VariantId);
+            });
+
+    public Task<OperationResult<OrderDto>> UpdateItemAsync(
+        Guid orderId,
+        Guid itemId,
+        CreateOrderItemRequest request) =>
+        TraceAsync("Order.UpdateItem", () => inner.UpdateItemAsync(orderId, itemId, request),
+            a =>
+            {
+                a?.SetTag("order.id", orderId);
+                a?.SetTag("order.item.id", itemId);
+            });
+
+    public Task<OperationResult<OrderDto>> RemoveDraftItemAsync(Guid orderId, Guid itemId) =>
+        TraceAsync("Order.RemoveDraftItem", () => inner.RemoveDraftItemAsync(orderId, itemId),
+            a =>
+            {
+                a?.SetTag("order.id", orderId);
+                a?.SetTag("order.item.id", itemId);
+            });
+
+    public Task<OperationResult<OrderDto>> RemoveCompletedBillingItemAsync(Guid orderId, Guid itemId) =>
+        TraceAsync("Order.RemoveBillingItem", () => inner.RemoveCompletedBillingItemAsync(orderId, itemId),
+            a =>
+            {
+               a?.SetTag("order.id", orderId);
+               a?.SetTag("order.item.id", itemId);
+            });
+
+    public Task<OperationResult<OrderDto>> UpdateShippingChargeAsync(
+        Guid orderId,
+        UpdateOrderShippingChargeRequest request) =>
+        TraceAsync("Order.UpdateShippingCharge", () => inner.UpdateShippingChargeAsync(orderId, request),
+            a => a?.SetTag("order.id", orderId));
+
+    public Task<OperationResult<OrderDto>> UpdateCompletedInvoiceShippingChargeAsync(
+        Guid orderId, UpdateOrderShippingChargeRequest request) =>
+        TraceAsync("Order.UpdateInvoiceShippingCharge",
+            () => inner.UpdateCompletedInvoiceShippingChargeAsync(orderId, request),
+            a => a?.SetTag("order.id", orderId));
 
     public Task<OperationResult<OrderDto>> ConfirmOrderAsync(Guid orderId) =>
         TraceAsync("Order.Confirm", () => inner.ConfirmOrderAsync(orderId),

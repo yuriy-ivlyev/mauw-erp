@@ -10,7 +10,6 @@ public sealed class PriceListResolver(ItalianAccountingCalculator calculator)
     {
         if (input.VariantId == Guid.Empty || input.ProductId == Guid.Empty ||
             input.Quantity <= 0m || input.BaseUnitPrice < 0m ||
-            input.Quantity != decimal.Truncate(input.Quantity) ||
             decimal.Round(input.BaseUnitPrice, 8, MidpointRounding.AwayFromZero) != input.BaseUnitPrice)
             return AccountingResult<ResolvedPrice>.Fail("Dati di risoluzione del prezzo non validi.");
         if (list is { IsActive: false })

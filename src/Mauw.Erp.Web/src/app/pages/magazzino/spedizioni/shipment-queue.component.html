@@ -1,0 +1,155 @@
+<section class="shipment-page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">MAGAZZINO / FULFILLMENT</p>
+      <h1>Ordini da spedire</h1>
+      <p class="page-description">Preleva gli articoli residui, prepara i colli ed emetti il DDT.</p>
+    </div>
+    <button type="button" class="button button--secondary" (click)="loadQueue()" [disabled]="loading">
+      {{ loading ? 'Aggiornamento…' : 'Aggiorna coda' }}
+    </button>
+  </header>
+
+  <div *ngIf="successMessage" class="notice notice--success" role="status" aria-live="polite">
+    <span>{{ successMessage }}</span>
+    <button type="button" aria-label="Chiudi notifica" (click)="successMessage = ''">×</button>
+  </div>
+  <div *ngIf="errorMessage" class="notice notice--error" role="alert">{{ errorMessage }}</div>
+
+  <div class="queue-summary">
+    <strong>{{ totalCount }}</strong>
+    <span>ordini in coda logistica</span>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Numero ordine</th>
+          <th>Cliente</th>
+          <th>Data</th>
+          <th class="numeric">Pezzi residui</th>
+          <th>Stato</th>
+          <th><span class="sr-only">Azione</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="loading">
+          <td colspan="6" class="empty-state">Caricamento ordini…</td>
+        </tr>
+        <tr *ngIf="!loading && orders.length === 0">
+          <td colspan="6" class="empty-state">Nessun ordine da preparare.</td>
+        </tr>
+        <tr *ngFor="let order of orders">
+          <td class="order-number">{{ order.orderNumber }}</td>
+          <td>{{ order.contactName }}</td>
+          <td>{{ order.orderDate | date:'dd/MM/yyyy' }}</td>
+          <td class="numeric">{{ remainingForOrder(order) }}</td>
+          <td><span [class]="statusClass(order.status)">{{ order.statusDescription }}</span></td>
+          <td class="action-cell">
+            <button type="button" class="button button--primary"
+              [disabled]="preparingOrderId === order.id"
+              (click)="prepareShipment(order)">
+              {{ preparingOrderId === order.id ? 'Apertura…' : 'Prepara Spedizione' }}
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <app-pagination *ngIf="totalCount > 0" [page]="page" [pageSize]="pageSize" [totalCount]="totalCount"
+    (pageChange)="changePage($event)" (pageSizeChange)="changePageSize($event)">
+  </app-pagination>
+
+  <div *ngIf="selectedOrder as order" class="dialog-backdrop" (click)="closeShipment()">
+    <section class="fulfillment-dialog" role="dialog" aria-modal="true"
+      aria-labelledby="fulfillment-title" (click)="$event.stopPropagation()">
+      <header class="dialog-header">
+        <div>
+          <p class="eyebrow">PRELIEVO E IMBALLAGGIO</p>
+          <h2 id="fulfillment-title">{{ order.orderNumber }} <span>· {{ order.contactName }}</span></h2>
+        </div>
+        <button type="button" class="close-button" aria-label="Chiudi" (click)="closeShipment()">×</button>
+      </header>
+
+      <div class="shipment-type" [class]="shipmentTypeClass()" aria-live="polite">
+        {{ shipmentTypeLabel() }}
+        <span>{{ totalToShip }} / {{ remainingPieces }} pezzi da spedire</span>
+      </div>
+
+      <div class="items-table-wrap">
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>SKU / Articolo</th>
+              <th class="numeric">Ordinata</th>
+              <th class="numeric">Già spedita</th>
+              <th class="numeric">Residua</th>
+              <th class="numeric">Spedire oggi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of order.items | pageSlice:detailItemsPage:detailItemsPageSize">
+              <td>
+                <strong class="sku">{{ item.sku || 'SKU non disponibile' }}</strong>
+                <span class="product-description">
+                  {{ item.productName || 'Articolo' }}
+                  <ng-container *ngIf="item.colorName"> · {{ item.colorName }}</ng-container>
+                  <ng-container *ngIf="item.sizeName"> · {{ item.sizeName }}</ng-container>
+                </span>
+              </td>
+              <td class="numeric">{{ item.quantity }}</td>
+              <td class="numeric">{{ item.shippedQuantity }}</td>
+              <td class="numeric"><strong>{{ item.remainingQuantity }}</strong></td>
+              <td class="numeric">
+                <input class="quantity-input" type="number" min="0" [max]="item.remainingQuantity"
+                  step="1" inputmode="numeric" [attr.aria-label]="'Quantità da spedire per ' + (item.sku || item.productName)"
+                  [disabled]="item.remainingQuantity === 0"
+                  [(ngModel)]="shipmentQuantities[item.id]" (ngModelChange)="onQuantityChange(item)">
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <app-pagination *ngIf="order.items.length > 0" [page]="detailItemsPage" [pageSize]="detailItemsPageSize"
+        [totalCount]="order.items.length" (pageChange)="detailItemsPage = $event"
+        (pageSizeChange)="changeDetailItemsPageSize($event)">
+      </app-pagination>
+
+      <div class="shipping-details">
+        <label>
+          Corriere
+          <select [(ngModel)]="carrierName">
+            <option *ngFor="let carrier of carriers" [value]="carrier">{{ carrier }}</option>
+          </select>
+        </label>
+        <label>
+          Numero colli
+          <input type="number" min="1" step="1" inputmode="numeric" [(ngModel)]="boxCount"
+            (ngModelChange)="normalizeBoxCount()">
+        </label>
+        <label>
+          Tracking / note trasporto <span class="optional">(facoltativo)</span>
+          <input type="text" maxlength="200" [(ngModel)]="trackingCode" placeholder="Codice tracking o nota">
+        </label>
+        <label>
+          Peso totale kg <span class="optional">(facoltativo)</span>
+          <input type="number" min="0" step="0.001" inputmode="decimal" [(ngModel)]="weightKg">
+        </label>
+      </div>
+
+      <div *ngIf="errorMessage" class="notice notice--error dialog-error" role="alert">{{ errorMessage }}</div>
+
+      <footer class="dialog-actions">
+        <button type="button" class="button button--secondary" [disabled]="submitting" (click)="closeShipment()">
+          Annulla
+        </button>
+        <button type="button" class="button button--primary button--large"
+          [disabled]="submitting || totalToShip <= 0 || !carrierName || boxCount < 1 || (weightKg !== null && weightKg < 0)"
+          (click)="submitShipment()">
+          {{ submitting ? 'Emissione DDT in corso…' : 'Conferma Prelievo ed Emetti DDT' }}
+        </button>
+      </footer>
+    </section>
+  </div>
+</section>
