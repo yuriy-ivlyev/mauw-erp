@@ -1,6 +1,8 @@
 import { PageSortParams } from './pagination.model';
 export type { PagedResult } from './pagination.model';
 
+export type CustomerTaxRegime = 'Domestic' | 'IntraEu' | 'ExtraEu';
+
 export interface ContactSummary {
   id: string;
   businessName: string;
@@ -14,6 +16,11 @@ export interface ContactSummary {
   isSupplier: boolean;
   isAgent: boolean;
   createdAt: string;
+  countryCode?: string;
+  taxRegime?: CustomerTaxRegime | null;
+  /** Rate imposed by the server for foreign customers; null when the customer is not constrained. */
+  forcedVatRate?: number | null;
+  forcedVatNature?: string | null;
 }
 
 export interface ContactDetail {
@@ -35,6 +42,9 @@ export interface ContactDetail {
   agentProfile: AgentProfile | null;
   addresses: ContactAddress[];
   persons: ContactPerson[];
+  taxRegime?: CustomerTaxRegime | null;
+  forcedVatRate?: number | null;
+  forcedVatNature?: string | null;
 }
 
 export interface CustomerProfile {

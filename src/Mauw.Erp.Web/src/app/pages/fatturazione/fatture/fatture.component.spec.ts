@@ -26,6 +26,9 @@ describe('FattureComponent', () => {
       shippingVatRate: null,
       shippingNatureCode: null,
       sdiSubmittedAt: null,
+      sdiStatus: 'NotTransmitted',
+      isOrderUnderAdjustment: false,
+      canTransmitToSdi: true,
       paidAmount: 0,
       balanceDue: 122,
       status: 'Confirmed',
@@ -33,7 +36,7 @@ describe('FattureComponent', () => {
       payments: []
     };
     invoiceService = jasmine.createSpyObj<InvoiceService>('InvoiceService', [
-      'getList', 'generateFromOrder', 'downloadPdf'
+      'getList', 'generateFromOrder', 'downloadPdf', 'bulkTransmitToSdi'
     ]);
     invoiceService.getList.and.returnValue(of({
       items: [invoice], pageNumber: 1, pageSize: 20, totalCount: 1, totalPages: 1
@@ -67,6 +70,7 @@ describe('FattureComponent', () => {
       pageSize: 20,
       search: undefined,
       status: undefined,
+      sdiStatus: undefined,
       dateFrom: undefined,
       dateTo: undefined,
       unpaidOnly: false,
@@ -87,12 +91,75 @@ describe('FattureComponent', () => {
 
     expect(invoiceService.getList).toHaveBeenCalledWith(jasmine.objectContaining({
       status: 'Confirmed',
+      sdiStatus: undefined,
       dateFrom: '2026-10-01',
       dateTo: '2026-10-31',
       unpaidOnly: true,
       sortBy: 'invoiceDate',
       sortDescending: true
     }));
+  });
+
+  it('passes the SDI status quick filter to the server', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.sdiStatusFilter = 'NotTransmitted';
+
+    component.onFilterChange();
+
+    expect(invoiceService.getList).toHaveBeenCalledWith(jasmine.objectContaining({
+      sdiStatus: 'NotTransmitted'
+    }));
+  });
+
+  it('selects only invoices which the server marks as transmittable', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const underAdjustment: Invoice = {
+      ...invoice,
+      id: 'invoice-adjustment',
+      isOrderUnderAdjustment: true,
+      canTransmitToSdi: false
+    };
+    component.invoices = [invoice, underAdjustment];
+
+    component.toggleAllSelectableInvoices(true);
+
+    expect(component.selectedInvoices).toEqual([invoice.id]);
+    expect(component.selectableInvoices).toEqual([invoice]);
+  });
+
+  it('requires confirmation, submits selected invoices and shows the batch result dialog', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.selectedInvoiceIds.add(invoice.id);
+    invoiceService.bulkTransmitToSdi.and.returnValue(of({
+      requestedCount: 1,
+      successCount: 1,
+      failedCount: 0,
+      results: [{
+        invoiceId: invoice.id,
+        success: true,
+        invoiceNumber: invoice.invoiceNumber,
+        errorMessage: null
+      }]
+    }));
+
+    component.openBulkTransmitConfirmation();
+    fixture.detectChanges();
+
+    expect(invoiceService.bulkTransmitToSdi).not.toHaveBeenCalled();
+    const buttons = Array.from(
+      fixture.nativeElement.querySelectorAll('app-confirm-delete-modal button') as NodeListOf<HTMLButtonElement>
+    );
+    const confirmButton = buttons.find(button => button.textContent?.includes('Invia a SDI'))!;
+    confirmButton.click();
+    fixture.detectChanges();
+
+    expect(invoiceService.bulkTransmitToSdi).toHaveBeenCalledWith([invoice.id]);
+    expect(component.selectedInvoices).toEqual([]);
+    expect(fixture.nativeElement.textContent).toContain('1 trasmesse');
+    expect(fixture.nativeElement.querySelector('[role="dialog"]')).not.toBeNull();
   });
 
   it('does not request an invalid date range and displays a validation error', () => {

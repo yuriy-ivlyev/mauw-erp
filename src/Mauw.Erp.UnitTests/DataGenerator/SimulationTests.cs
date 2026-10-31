@@ -131,6 +131,14 @@ public class SimulationTests(PostgreSqlContainerFixture postgres)
         Assert.Equal(orders.Count, shipments.Count);
         Assert.All(invoices, invoice => Assert.Contains(invoice.ContactId, customerContactIds));
         Assert.All(invoices, invoice => Assert.Equal(InvoiceStatuses.Confirmed, invoice.Status));
+        Assert.All(invoices, invoice => Assert.Equal(SdiStatus.NotTransmitted, invoice.SdiStatus));
+        Assert.All(invoices, invoice =>
+        {
+            Assert.Null(invoice.SdiFileName);
+            Assert.Null(invoice.SdiStorageKey);
+            Assert.Null(invoice.SdiTransmissionId);
+            Assert.Null(invoice.SdiTransmittedAtUtc);
+        });
         Assert.All(invoices, invoice => Assert.Matches(
             "^FAT-[0-9]{6}-[0-9]{5}$", invoice.InvoiceNumber));
         foreach (var period in invoices.GroupBy(invoice => invoice.InvoiceNumber[4..10]))

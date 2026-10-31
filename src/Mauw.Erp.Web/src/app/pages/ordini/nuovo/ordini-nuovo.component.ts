@@ -38,6 +38,9 @@ interface DraftOrderLine {
   unitNetPrice: number;
   vatRate: number;
   natureCode: string | null;
+  /** Article classification, restored when the customer no longer forces the regime. */
+  baseVatRate?: number;
+  baseNatureCode?: string | null;
 }
 
 interface PreviewState {
@@ -98,6 +101,7 @@ export class OrdiniNuovoComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
   private readonly customerSearch$ = new Subject<string>();
   private readonly previewRequests$ = new Subject<CreateOrderItemRequest[]>();
+  private vatRegimeApplied = false;
 
   constructor(
     private readonly contacts: ContactService,
@@ -138,10 +142,12 @@ export class OrdiniNuovoComponent implements OnInit, OnDestroy {
     this.previewRequests$.pipe(
       debounceTime(200),
       switchMap(items => {
-        if (!items.length) {
+        const customer = this.selectedCustomer;
+        if (!items.length || !customer) {
           return of<PreviewState>({ data: null, error: null });
         }
         return this.orders.previewDraftItems(
+          customer.id,
           items,
           this.shippingCost,
           this.shippingCost > 0 ? this.shippingVatRate : null,
@@ -167,9 +173,23 @@ export class OrdiniNuovoComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
+  get forcedVatRate(): number | null {
+    return this.selectedCustomer?.forcedVatRate ?? null;
+  }
+
+  get forcedVatNature(): string | null {
+    return this.selectedCustomer?.forcedVatNature ?? null;
+  }
+
+  /** True when the server imposes the VAT classification of the selected foreign customer. */
+  get isVatForced(): boolean {
+    return this.forcedVatRate !== null && this.forcedVatNature !== null;
+  }
+
   onCustomerSearch(value: string): void {
     if (this.selectedCustomer && value !== this.selectedCustomer.businessName) {
       this.selectedCustomer = null;
+      this.applyCustomerTaxRegime();
     }
     this.customerSearch$.next(value.trim());
   }
@@ -179,12 +199,40 @@ export class OrdiniNuovoComponent implements OnInit, OnDestroy {
     this.customerSearch = customer.businessName;
     this.customerResults = [];
     this.errorMessage = '';
+    this.applyCustomerTaxRegime();
   }
 
   clearCustomer(): void {
     this.selectedCustomer = null;
     this.customerSearch = '';
     this.customerResults = [];
+    this.applyCustomerTaxRegime();
+  }
+
+  // Mirrors the server regime on the input fields; the VAT summary itself always comes from the backend preview.
+  private applyCustomerTaxRegime(): void {
+    if (this.isVatForced) {
+      this.vatRegimeApplied = true;
+      this.pendingNatureCode = this.forcedVatNature;
+      this.shippingVatRate = this.forcedVatRate;
+      this.shippingNatureCode = this.forcedVatNature;
+      for (const line of this.draftLines) {
+        line.vatRate = this.forcedVatRate!;
+        line.natureCode = this.forcedVatNature;
+      }
+    } else if (this.vatRegimeApplied) {
+      this.vatRegimeApplied = false;
+      this.pendingNatureCode = null;
+      this.shippingVatRate = null;
+      this.shippingNatureCode = null;
+      for (const line of this.draftLines) {
+        if (line.baseVatRate !== undefined) {
+          line.vatRate = line.baseVatRate;
+          line.natureCode = line.baseNatureCode ?? null;
+        }
+      }
+    }
+    this.requestPreview();
   }
 
   searchProducts(): void {
@@ -231,7 +279,7 @@ export class OrdiniNuovoComponent implements OnInit, OnDestroy {
           ?? details.sellingPrice
           ?? product.sellingPrice
           ?? 0;
-        this.pendingNatureCode = null;
+        this.pendingNatureCode = this.isVatForced ? this.forcedVatNature : null;
         this.productResults = [];
       },
       error: error => { this.errorMessage = this.describeError(error, 'Impossibile caricare i dati della variante.'); }
@@ -244,7 +292,7 @@ export class OrdiniNuovoComponent implements OnInit, OnDestroy {
     this.selectedVariantDetails = null;
     this.pendingQuantity = 1;
     this.pendingUnitNetPrice = 0;
-    this.pendingNatureCode = null;
+    this.pendingNatureCode = this.isVatForced ? this.forcedVatNature : null;
   }
 
   addDraftLine(): void {
@@ -263,11 +311,13 @@ export class OrdiniNuovoComponent implements OnInit, OnDestroy {
       this.errorMessage = 'Inserisci un prezzo unitario valido.';
       return;
     }
-    if (product.vatRate === 0 && !this.pendingNatureCode) {
+    const forced = this.isVatForced;
+    if (!forced && product.vatRate === 0 && !this.pendingNatureCode) {
       this.errorMessage = 'Seleziona la Natura IVA per l’articolo con aliquota zero.';
       return;
     }
 
+    const baseNatureCode = product.vatRate === 0 && !forced ? this.pendingNatureCode : null;
     this.draftLines.push({
       variantId: variant.variantId,
       sku: variant.sku || variant.barcode,
@@ -276,8 +326,10 @@ export class OrdiniNuovoComponent implements OnInit, OnDestroy {
       color: details.color || variant.colorName || '—',
       quantity: this.pendingQuantity,
       unitNetPrice: this.pendingUnitNetPrice,
-      vatRate: product.vatRate,
-      natureCode: product.vatRate === 0 ? this.pendingNatureCode : null
+      vatRate: forced ? this.forcedVatRate! : product.vatRate,
+      natureCode: forced ? this.forcedVatNature : baseNatureCode,
+      baseVatRate: product.vatRate,
+      baseNatureCode
     });
     this.draftLinesPage = Math.max(1, Math.ceil(this.draftLines.length / this.draftLinesPageSize));
     this.clearVariant();
@@ -324,7 +376,7 @@ export class OrdiniNuovoComponent implements OnInit, OnDestroy {
     const items = this.toCreateRequests();
     this.preview = null;
     this.previewError = '';
-    this.previewPending = items.length > 0;
+    this.previewPending = items.length > 0 && !!this.selectedCustomer;
     this.previewRequests$.next(items);
   }
 
@@ -356,6 +408,10 @@ export class OrdiniNuovoComponent implements OnInit, OnDestroy {
     const items = this.toCreateRequests();
     if (items.some(item => !Number.isInteger(item.quantity) || item.quantity < 1)) {
       this.errorMessage = 'Tutte le quantità devono essere numeri interi maggiori di zero.';
+      return;
+    }
+    if (items.some(item => item.vatRate === 0 && !item.natureCode)) {
+      this.errorMessage = 'Seleziona la Natura IVA per le righe con aliquota zero.';
       return;
     }
 

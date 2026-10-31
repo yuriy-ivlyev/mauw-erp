@@ -10,6 +10,7 @@ public interface IOrderRepository : IRepository<Order, Guid>
 {
     Task<IEnumerable<Order>> GetByContactIdAsync(Guid contactId);
     Task<bool> IsUnderAdjustmentAsync(Guid orderId);
+    Task<HashSet<Guid>> GetUnderAdjustmentIdsAsync(IEnumerable<Guid> orderIds);
     Task<(IEnumerable<Order> Items, int Total)> GetByContactIdPagedAsync(Guid contactId, int page, int pageSize);
     Task<int> CountCassaSessionsAsync();
     Task<IEnumerable<Order>> GetSuspendedCassaSessionsAsync();

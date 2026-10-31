@@ -25,6 +25,11 @@ public static class OrderEndpoints
             .WithName("CreateOrder")
             .WithSummary("Create a new sales order");
 
+        group.MapPost("/preview", PreviewOrder)
+            .RequireAuthorization(AppPolicies.SalesOperations)
+            .WithName("PreviewOrder")
+            .WithSummary("Compute lines, VAT breakdown and totals of a draft order applying the customer tax regime");
+
         group.MapGet("/{id}", GetOrder)
             .RequireAuthorization(AppPolicies.AnyRole)
             .WithName("GetOrder")
@@ -176,6 +181,18 @@ public static class OrderEndpoints
         if (result.Error?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true)
             return Results.NotFound();
         return Results.BadRequest(result.Error);
+    }
+
+    private static async Task<Results<Ok<CassaPreviewDto>, BadRequest<string>, NotFound>> PreviewOrder(
+        OrderPreviewRequest request,
+        IOrderService orderService)
+    {
+        var result = await orderService.PreviewOrderAsync(request);
+        if (result.Success)
+            return TypedResults.Ok(result.Data!);
+        return result.Error?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true
+            ? TypedResults.NotFound()
+            : TypedResults.BadRequest(result.Error);
     }
 
     private static async Task<Results<Created<OrderDto>, BadRequest<string>>> CreateOrder(

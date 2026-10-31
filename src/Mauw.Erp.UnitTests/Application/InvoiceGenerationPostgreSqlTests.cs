@@ -197,7 +197,8 @@ public sealed class InvoiceGenerationPostgreSqlTests(PostgreSqlContainerFixture 
             new UnitOfWork(db, cache),
             calculator,
             Mock.Of<Mauw.Erp.Application.Services.ICompanySettingsService>(),
-            Mock.Of<Mauw.Erp.Contracts.Interfaces.IInvoicePdfGenerator>());
+            Mock.Of<Mauw.Erp.Contracts.Interfaces.IInvoicePdfGenerator>(),
+            Mock.Of<Mauw.Erp.Application.Services.ISdiDocumentStorage>());
         return await service.GenerateFromOrderAsync(orderId);
     }
 }

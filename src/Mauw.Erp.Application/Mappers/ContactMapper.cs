@@ -1,5 +1,6 @@
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Domain.Services;
 
 namespace Mauw.Erp.Application.Mappers;
 
@@ -12,6 +13,7 @@ public static class ContactMapper
     {
         var legalAddress = contact.Addresses.FirstOrDefault(a => a.Purpose == Domain.Enums.AddressPurpose.LegalHeadquarters)
                         ?? contact.Addresses.FirstOrDefault();
+        var tax = CustomerTaxPolicy.Resolve(contact.CountryCode).Data;
 
         return new(
             Id: contact.Id,
@@ -25,30 +27,41 @@ public static class ContactMapper
             IsCustomer: contact.IsCustomer,
             IsSupplier: contact.IsSupplier,
             IsAgent: contact.IsAgent,
-            CreatedAt: contact.CreatedAt
+            CreatedAt: contact.CreatedAt,
+            CountryCode: contact.CountryCode,
+            TaxRegime: tax?.Regime.ToString(),
+            ForcedVatRate: tax?.ForcedVatRate,
+            ForcedVatNature: tax?.ForcedVatNature
         );
     }
 
-    public static ContactDetailDto MapToDetail(Contact contact) => new(
-        Id: contact.Id,
-        BusinessName: contact.BusinessName,
-        TradeName: contact.TradeName,
-        VatNumber: contact.VatNumber,
-        TaxCode: contact.TaxCode,
-        SdiCode: contact.SdiCode,
-        PecEmail: contact.PecEmail,
-        CountryCode: contact.CountryCode,
-        FiscalRegime: contact.FiscalRegime,
-        Status: contact.Status.ToString(),
-        IsDeleted: contact.IsDeleted,
-        CreatedAt: contact.CreatedAt,
-        UpdatedAt: contact.UpdatedAt,
-        CustomerProfile: contact.CustomerProfile is null ? null : MapCustomerProfile(contact.CustomerProfile),
-        SupplierProfile: contact.SupplierProfile is null ? null : MapSupplierProfile(contact.SupplierProfile),
-        AgentProfile: contact.AgentProfile is null ? null : MapAgentProfile(contact.AgentProfile),
-        Addresses: contact.Addresses.Select(MapAddress).ToList(),
-        Persons: contact.Persons.Select(MapPerson).ToList()
-    );
+    public static ContactDetailDto MapToDetail(Contact contact)
+    {
+        var tax = CustomerTaxPolicy.Resolve(contact.CountryCode).Data;
+        return new(
+            Id: contact.Id,
+            BusinessName: contact.BusinessName,
+            TradeName: contact.TradeName,
+            VatNumber: contact.VatNumber,
+            TaxCode: contact.TaxCode,
+            SdiCode: contact.SdiCode,
+            PecEmail: contact.PecEmail,
+            CountryCode: contact.CountryCode,
+            FiscalRegime: contact.FiscalRegime,
+            Status: contact.Status.ToString(),
+            IsDeleted: contact.IsDeleted,
+            CreatedAt: contact.CreatedAt,
+            UpdatedAt: contact.UpdatedAt,
+            CustomerProfile: contact.CustomerProfile is null ? null : MapCustomerProfile(contact.CustomerProfile),
+            SupplierProfile: contact.SupplierProfile is null ? null : MapSupplierProfile(contact.SupplierProfile),
+            AgentProfile: contact.AgentProfile is null ? null : MapAgentProfile(contact.AgentProfile),
+            Addresses: contact.Addresses.Select(MapAddress).ToList(),
+            Persons: contact.Persons.Select(MapPerson).ToList(),
+            TaxRegime: tax?.Regime.ToString(),
+            ForcedVatRate: tax?.ForcedVatRate,
+            ForcedVatNature: tax?.ForcedVatNature
+        );
+    }
 
     private static CustomerProfileDto MapCustomerProfile(CustomerProfile p) => new(
         PriceListId: p.PriceListId,

@@ -228,6 +228,7 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
         Add("GET", $"/api/v1/orders/{Id}", All);
         Add("GET", $"/api/v1/orders/{Id}/pdf", AdminSales);
         Add("POST", "/api/v1/orders", AdminSales);
+        Add("POST", "/api/v1/orders/preview", AdminSales);
         Add("POST", $"/api/v1/orders/{Id}/items", AdminSales);
         Add("DELETE", $"/api/v1/orders/{Id}/items/{Id2}", AdminSales);
         Add("POST", $"/api/v1/orders/{Id}/invoice-items", Billing);
@@ -252,6 +253,8 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
         Add("GET", $"/api/v1/invoices/{Id}/xml", Billing);
         Add("POST", $"/api/v1/invoices/from-order/{Id}", Billing);
         Add("POST", $"/api/v1/invoices/{Id}/payments", Billing);
+        Add("POST", $"/api/v1/invoices/{Id}/transmit-sdi", Billing);
+        Add("POST", "/api/v1/invoices/bulk-transmit-sdi", Billing);
 
         // DDT
         Add("GET", "/api/v1/ddts", AdminWarehouse);

@@ -37,6 +37,10 @@
             <div>
               <p class="font-semibold text-green-900">{{ customer.businessName }}</p>
               <p class="mt-1 text-green-800">P.IVA: {{ customer.vatNumber || '—' }}</p>
+              <p *ngIf="isVatForced" data-testid="forced-vat-notice" class="mt-1 font-semibold text-green-900">
+                Cliente {{ customer.taxRegime === 'IntraEu' ? 'intra-UE' : 'extra-UE' }} ({{ customer.countryCode }}):
+                operazione non imponibile, aliquota {{ forcedVatRate }}% con Natura {{ forcedVatNature }} (non modificabile).
+              </p>
               <p class="text-green-800">Codice cliente (ID): <span class="font-mono">{{ customer.id }}</span></p>
             </div>
             <button type="button" class="text-sm font-semibold text-slate-600 hover:text-red-700" (click)="clearCustomer()">Rimuovi</button>
@@ -69,7 +73,7 @@
           <label class="block text-sm font-semibold text-slate-700">
             IVA spedizione
             <select name="shippingVatRate" [(ngModel)]="shippingVatRate" (ngModelChange)="requestPreview()"
-              [required]="shippingCost > 0" [disabled]="shippingCost <= 0"
+              [required]="shippingCost > 0" [disabled]="shippingCost <= 0 || isVatForced"
               class="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-100">
               <option [ngValue]="null">Seleziona aliquota</option>
               <option [ngValue]="22">22%</option>
@@ -82,7 +86,8 @@
           <label *ngIf="shippingCost > 0 && shippingVatRate === 0" class="block text-sm font-semibold text-slate-700">
             Natura spedizione
             <select name="shippingNatureCode" [(ngModel)]="shippingNatureCode" (ngModelChange)="requestPreview()"
-              required class="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
+              [disabled]="isVatForced" required
+              class="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-100">
               <option [ngValue]="null">Seleziona Natura</option>
               <option *ngFor="let code of natureCodes" [value]="code">{{ code }}</option>
             </select>
@@ -136,9 +141,15 @@
           <input name="pendingUnitNetPrice" type="number" min="0" step="0.00000001" required [(ngModel)]="pendingUnitNetPrice"
             class="mt-1 w-full rounded border border-slate-300 p-2" />
         </label>
-        <label *ngIf="selectedProduct.vatRate === 0" class="text-sm font-semibold text-slate-700">
+        <label *ngIf="isVatForced" class="text-sm font-semibold text-slate-700">
+          Aliquota IVA
+          <input name="pendingVatRate" type="text" readonly [value]="forcedVatRate + '%'"
+            class="mt-1 w-full rounded border border-slate-300 bg-slate-100 p-2" />
+        </label>
+        <label *ngIf="selectedProduct.vatRate === 0 || isVatForced" class="text-sm font-semibold text-slate-700">
           Natura IVA
-          <select name="pendingNatureCode" [(ngModel)]="pendingNatureCode" required class="mt-1 w-full rounded border border-slate-300 p-2">
+          <select name="pendingNatureCode" [(ngModel)]="pendingNatureCode" [disabled]="isVatForced" required
+            class="mt-1 w-full rounded border border-slate-300 p-2 disabled:bg-slate-100">
             <option [ngValue]="null">Seleziona</option>
             <option *ngFor="let code of natureCodes" [value]="code">{{ code }}</option>
           </select>

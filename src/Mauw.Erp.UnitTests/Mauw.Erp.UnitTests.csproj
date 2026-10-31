@@ -23,7 +23,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Resources\FatturaPA\*.xsd" />
+    <EmbeddedResource Include="..\Mauw.Erp.Application\Resources\FatturaPA\*.xsd"
+                      Link="Resources\FatturaPA\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

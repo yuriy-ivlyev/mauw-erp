@@ -197,7 +197,7 @@ public class CompanyInvoiceSettingsTests(PostgreSqlContainerFixture postgres)
         using var provider = services.BuildServiceProvider();
         var pdf = provider.GetRequiredService<IInvoicePdfGenerator>();
         var pricing = new DocumentPricingService(Mock.Of<Mauw.Erp.Domain.Repositories.IPriceListRepository>(), Mock.Of<IPriceListService>(), calculator);
-        var invoices = new InvoiceService(work, calculator, settings, pdf);
+        var invoices = new InvoiceService(work, calculator, settings, pdf, Mock.Of<ISdiDocumentStorage>());
         var orders = new OrderService(work, Mock.Of<IValidator<CreateOrderRequest>>(),
             new CreateOrderItemRequestValidator(), calculator, settings, pdf,
             NullLogger<OrderService>.Instance, pricing);
@@ -263,7 +263,8 @@ public class CompanyInvoiceSettingsTests(PostgreSqlContainerFixture postgres)
             work,
             calculator,
             settings,
-            Mock.Of<IInvoicePdfGenerator>());
+            Mock.Of<IInvoicePdfGenerator>(),
+            Mock.Of<ISdiDocumentStorage>());
 
         var result = await service.GetInvoicePdfAsync(
             (await db.Invoices.SingleAsync()).Id);
@@ -286,7 +287,8 @@ public class CompanyInvoiceSettingsTests(PostgreSqlContainerFixture postgres)
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var pdf = new Mock<IInvoicePdfGenerator>(MockBehavior.Strict);
         var service = new InvoiceService(new UnitOfWork(db, cache),
-            new ItalianAccountingCalculator(), Mock.Of<ICompanySettingsService>(), pdf.Object);
+            new ItalianAccountingCalculator(), Mock.Of<ICompanySettingsService>(), pdf.Object,
+            Mock.Of<ISdiDocumentStorage>());
 
         var result = await service.GetInvoicePdfAsync(invoice.Id);
 

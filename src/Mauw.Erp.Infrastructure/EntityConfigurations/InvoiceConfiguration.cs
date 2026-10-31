@@ -25,6 +25,13 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
 
         builder.Property(i => i.ConfirmedAt);
         builder.Property(i => i.SdiSubmittedAt);
+        builder.Property(i => i.SdiFileName)
+            .HasMaxLength(50);
+        builder.Property(i => i.SdiStorageKey)
+            .HasMaxLength(255);
+        builder.Property(i => i.SdiTransmissionId)
+            .HasMaxLength(100);
+        builder.Property(i => i.SdiTransmittedAtUtc);
         builder.Property<SdiStatus>("_sdiStatus")
             .HasColumnName("sdi_status")
             .HasConversion<int>()

@@ -14,7 +14,7 @@
       <h2 class="m-0 text-lg font-bold">Elenco fatture</h2>
     </div>
 
-    <div class="mb-4 grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-6">
+    <div class="mb-4 grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-7">
       <label class="text-sm font-semibold text-slate-700 lg:col-span-2">
         Cerca fattura o cliente
         <input name="invoiceSearch" [(ngModel)]="searchTerm" (ngModelChange)="onSearchChange()"
@@ -32,6 +32,14 @@
         </select>
       </label>
       <label class="text-sm font-semibold text-slate-700">
+        Stato SDI
+        <select name="invoiceSdiStatus" [(ngModel)]="sdiStatusFilter" (ngModelChange)="onFilterChange()"
+          class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal">
+          <option value="">Tutti gli stati SDI</option>
+          <option value="NotTransmitted">Non trasmesse</option>
+        </select>
+      </label>
+      <label class="text-sm font-semibold text-slate-700">
         Data da
         <input name="dateFrom" type="date" [(ngModel)]="dateFrom" (ngModelChange)="onFilterChange()"
           class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal" />
@@ -41,7 +49,7 @@
         <input name="dateTo" type="date" [(ngModel)]="dateTo" (ngModelChange)="onFilterChange()"
           class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal" />
       </label>
-      <div class="flex items-end justify-between gap-3 lg:col-span-6">
+      <div class="flex items-end justify-between gap-3 lg:col-span-7">
         <label class="inline-flex items-center gap-2 pb-2 text-sm font-medium text-slate-700">
           <input name="unpaidOnly" type="checkbox" [(ngModel)]="unpaidOnly" (ngModelChange)="onFilterChange()"
             class="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600" />
@@ -54,13 +62,32 @@
       </div>
     </div>
 
+    <div *ngIf="selectedInvoices.length > 0"
+      class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3"
+      role="region" aria-label="Azioni fatture selezionate" aria-live="polite">
+      <span class="font-semibold text-blue-900">{{ selectedInvoices.length }} fatture selezionate</span>
+      <button type="button" (click)="openBulkTransmitConfirmation()" [disabled]="transmittingSdi"
+        class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50">
+        {{ transmittingSdi ? 'Invio in corso…' : 'Invia selezionate a SDI' }}
+      </button>
+    </div>
+
     <div *ngIf="loading && invoices.length === 0" role="status" class="p-8 text-center text-slate-500">
       Caricamento fatture…
     </div>
     <div class="overflow-x-auto">
-      <table *ngIf="!loading || invoices.length > 0" class="w-full min-w-[850px] text-sm">
+      <table *ngIf="!loading || invoices.length > 0" class="w-full min-w-[1200px] text-sm">
         <thead class="border-b bg-slate-50">
           <tr class="text-left text-slate-600">
+            <th class="px-3 py-3">
+              <input *ngIf="selectableInvoices.length > 0" type="checkbox"
+                [checked]="allSelectableInvoicesSelected"
+                [indeterminate]="someSelectableInvoicesSelected"
+                [disabled]="transmittingSdi"
+                (change)="toggleAllSelectableInvoices($any($event.target).checked)"
+                aria-label="Seleziona tutte le fatture trasmissibili in questa pagina"
+                class="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600" />
+            </th>
             <th appSortHeader="invoiceNumber" [activeSortBy]="sortBy" [sortDescending]="sortDescending"
               (sortChange)="onSortChange($event)" class="px-3 py-3">Numero</th>
             <th appSortHeader="contactName" [activeSortBy]="sortBy" [sortDescending]="sortDescending"
@@ -69,6 +96,7 @@
               (sortChange)="onSortChange($event)" class="px-3 py-3">Data</th>
             <th appSortHeader="status" [activeSortBy]="sortBy" [sortDescending]="sortDescending"
               (sortChange)="onSortChange($event)" class="px-3 py-3">Stato</th>
+            <th class="px-3 py-3">Stato SDI</th>
             <th appSortHeader="taxableTotal" [activeSortBy]="sortBy" [sortDescending]="sortDescending"
               (sortChange)="onSortChange($event)" class="px-3 py-3 text-right">Imponibile</th>
             <th appSortHeader="vatTotal" [activeSortBy]="sortBy" [sortDescending]="sortDescending"
@@ -82,6 +110,13 @@
         </thead>
         <tbody>
           <tr *ngFor="let invoice of invoices" class="border-b hover:bg-blue-50">
+            <td class="px-3 py-3">
+              <input *ngIf="canTransmitToSdi(invoice)" type="checkbox"
+                [checked]="isInvoiceSelected(invoice.id)" [disabled]="transmittingSdi"
+                (change)="setInvoiceSelected(invoice, $any($event.target).checked)"
+                [attr.aria-label]="'Seleziona fattura ' + invoice.invoiceNumber + ' per invio SDI'"
+                class="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600" />
+            </td>
             <td class="px-3 py-3 font-mono font-semibold text-slate-900">
               {{ invoice.invoiceNumber }}
             </td>
@@ -90,6 +125,11 @@
             <td class="px-3 py-3">
               <span [class]="'rounded-full px-2 py-1 text-xs font-medium ' + statusClass(invoice.status)">
                 {{ statusLabel(invoice.status) }}
+              </span>
+            </td>
+            <td class="px-3 py-3">
+              <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+                {{ sdiStatusLabel(invoice.sdiStatus) }}
               </span>
             </td>
             <td class="px-3 py-3 text-right">{{ invoice.taxableTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
@@ -110,7 +150,7 @@
             </td>
           </tr>
           <tr *ngIf="!loading && invoices.length === 0">
-            <td colspan="9" class="p-8 text-center text-slate-500">Nessuna fattura trovata.</td>
+            <td colspan="11" class="p-8 text-center text-slate-500">Nessuna fattura trovata.</td>
           </tr>
         </tbody>
       </table>
@@ -118,4 +158,45 @@
     <app-pagination *ngIf="totalCount > 0" [page]="currentPage" [pageSize]="pageSize"
       [totalCount]="totalCount" (pageChange)="goToPage($event)" (pageSizeChange)="onPageSizeChange($event)" />
   </section>
+
+  <app-confirm-delete-modal
+    [isOpen]="confirmBulkTransmitOpen"
+    title="Conferma invio allo SDI"
+    [message]="'Confermi la trasmissione di ' + selectedInvoices.length + ' fatture selezionate? L’invio non è reversibile.'"
+    confirmLabel="Invia a SDI"
+    [showDeleteIcon]="false"
+    actionVariant="primary"
+    (confirmed)="confirmBulkTransmission()"
+    (cancelled)="confirmBulkTransmitOpen = false">
+  </app-confirm-delete-modal>
+
+  <div *ngIf="bulkResult" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+    role="dialog" aria-modal="true" aria-labelledby="bulk-sdi-result-title" (click)="closeBulkResult()">
+    <section class="w-full max-w-2xl rounded-xl bg-white p-6 shadow-2xl"
+      (click)="$event.stopPropagation()">
+      <h2 id="bulk-sdi-result-title" class="m-0 text-xl font-bold text-slate-900">Esito invio SDI</h2>
+      <p class="mt-2 text-sm text-slate-700" role="status">
+        {{ bulkResult.successCount }} trasmesse, {{ bulkResult.failedCount }} con errore
+        su {{ bulkResult.requestedCount }} selezionate.
+      </p>
+      <ul class="mt-4 max-h-80 space-y-2 overflow-y-auto" aria-label="Esiti individuali">
+        <li *ngFor="let item of bulkResult.results"
+          class="rounded-lg border p-3"
+          [class.border-green-200]="item.success" [class.bg-green-50]="item.success"
+          [class.border-red-200]="!item.success" [class.bg-red-50]="!item.success">
+          <p class="m-0 font-semibold text-slate-900">{{ item.invoiceNumber || item.invoiceId }}</p>
+          <p *ngIf="item.success" class="mb-0 mt-1 text-sm text-green-800">Trasmissione completata.</p>
+          <p *ngIf="!item.success" class="mb-0 mt-1 text-sm text-red-800">
+            {{ item.errorMessage || 'Trasmissione non riuscita.' }}
+          </p>
+        </li>
+      </ul>
+      <div class="mt-5 flex justify-end">
+        <button type="button" (click)="closeBulkResult()"
+          class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800">
+          Chiudi
+        </button>
+      </div>
+    </section>
+  </div>
 </main>

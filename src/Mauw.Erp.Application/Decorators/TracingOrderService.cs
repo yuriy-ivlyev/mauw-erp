@@ -112,4 +112,7 @@ public sealed class TracingOrderService(IOrderService inner) : TracingDecoratorB
 
     public OperationResult<CassaPreviewDto> PreviewCassaCart(CassaPreviewRequest request) =>
         inner.PreviewCassaCart(request);
+
+    public Task<OperationResult<CassaPreviewDto>> PreviewOrderAsync(OrderPreviewRequest request) =>
+        inner.PreviewOrderAsync(request);
 }

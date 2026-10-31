@@ -56,7 +56,10 @@ righe contabili aggiunte/escluse senza alterare lo storico di magazzino) e
 AddPreSdiOrderAdjustment (aggiunge lo stato SDI delle fatture, il flag di
 rettifica pre-SDI degli ordini e il registro di audit dei documenti: i dati
 sintetici nascono NotTransmitted e non in rettifica, e il generatore non
-crea mai movimenti OrderAdjustment, ne righe di audit):
+crea mai movimenti OrderAdjustment, ne righe di audit);
+AddInvoiceSdiStorageMetadata (aggiunge i metadati nullable dell'XML archiviato
+e della trasmissione: il generatore non simula l'invio SDI e lascia tali campi
+vuoti):
 il ciclo reset -> database update -> seed e
 percorribile su un database vuoto. Un database creato con le vecchie migrazioni
 va ricreato oppure la sua tabella __EFMigrationsHistory va allineata (riga con
@@ -201,6 +204,8 @@ fattura supportano quantita fiscali decimali fino a otto cifre. Non inventa
 pagamenti o riferimenti di transazione: le fatture simulate restano senza
 pagamenti registrati; le fatture emesse nello scenario vengono confermate
 internamente dopo il calcolo fiscale.
+Le fatture simulate restano NotTransmitted e non hanno metadati di storage,
+perche il generatore non carica XML su S3/MinIO e non simula il canale SDI.
 Gli ordini generati percorrono il ciclo Confermato -> Prelievo -> Imballaggio
 -> Spedito -> Completato; le righe della spedizione collegano le quantita evase
 alle righe d'ordine e il DDT rappresenta la spedizione integrale. I dati

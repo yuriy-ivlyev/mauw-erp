@@ -31,6 +31,19 @@ public class OrderRepository(MauwDbContext dbContext) : Repository<Order, Guid>(
     public async Task<bool> IsUnderAdjustmentAsync(Guid orderId) =>
         await _dbSet.AsNoTracking().AnyAsync(o => o.Id == orderId && o.IsUnderAdjustment);
 
+    public async Task<HashSet<Guid>> GetUnderAdjustmentIdsAsync(IEnumerable<Guid> orderIds)
+    {
+        var ids = orderIds.Distinct().ToArray();
+        if (ids.Length == 0)
+            return [];
+
+        return await _dbSet
+            .AsNoTracking()
+            .Where(order => ids.Contains(order.Id) && order.IsUnderAdjustment)
+            .Select(order => order.Id)
+            .ToHashSetAsync();
+    }
+
     public async Task<IEnumerable<Order>> GetByContactIdAsync(Guid contactId)
     {
         return await _dbSet

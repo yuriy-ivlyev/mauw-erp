@@ -15,5 +15,9 @@ public record ContactSummaryDto(
     bool IsCustomer,
     bool IsSupplier,
     bool IsAgent,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    string CountryCode,
+    string? TaxRegime,
+    decimal? ForcedVatRate,
+    string? ForcedVatNature
 );

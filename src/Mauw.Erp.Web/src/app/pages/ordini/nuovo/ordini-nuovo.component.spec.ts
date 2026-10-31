@@ -179,7 +179,7 @@ describe('OrdiniNuovoComponent', () => {
     tick(220);
     fixture.detectChanges();
 
-    expect(orders.previewDraftItems).toHaveBeenCalledWith([{
+    expect(orders.previewDraftItems).toHaveBeenCalledWith('contact-1', [{
         variantId: 'variant-1',
         quantity: 2,
         unitNetPrice: 49.9,
@@ -194,6 +194,89 @@ describe('OrdiniNuovoComponent', () => {
     expect(component.lineSubtotal(0)).toBe(99.8);
     expect(component.totalPieces).toBe(2);
     expect(fixture.nativeElement.textContent).toContain('127,26');
+  }));
+
+  it('forces and locks the VAT classification of a foreign customer and previews it through the backend', fakeAsync(() => {
+    const fixture = TestBed.createComponent(OrdiniNuovoComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const foreign: ContactSummary = {
+      ...customer,
+      id: 'contact-de',
+      businessName: 'Kunde GmbH',
+      countryCode: 'DE',
+      taxRegime: 'IntraEu',
+      forcedVatRate: 0,
+      forcedVatNature: 'N3.2'
+    };
+
+    component.selectCustomer(foreign);
+    component.shippingCost = 5;
+    component.selectVariant(variant);
+    component.pendingQuantity = 2;
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    expect(component.isVatForced).toBeTrue();
+    expect(component.pendingNatureCode).toBe('N3.2');
+    expect(component.shippingVatRate).toBe(0);
+    expect(component.shippingNatureCode).toBe('N3.2');
+    const root = fixture.nativeElement as HTMLElement;
+    expect((root.querySelector('select[name="pendingNatureCode"]') as HTMLSelectElement).disabled).toBeTrue();
+    expect((root.querySelector('input[name="pendingVatRate"]') as HTMLInputElement).readOnly).toBeTrue();
+    expect((root.querySelector('select[name="shippingVatRate"]') as HTMLSelectElement).disabled).toBeTrue();
+    expect((root.querySelector('select[name="shippingNatureCode"]') as HTMLSelectElement).disabled).toBeTrue();
+    expect(root.querySelector('[data-testid="forced-vat-notice"]')?.textContent).toContain('N3.2');
+
+    component.addDraftLine();
+    tick(220);
+
+    expect(component.draftLines[0].vatRate).toBe(0);
+    expect(component.draftLines[0].natureCode).toBe('N3.2');
+    expect(orders.previewDraftItems).toHaveBeenCalledWith('contact-de', [{
+        variantId: 'variant-1',
+        quantity: 2,
+        unitNetPrice: 49.9,
+        vatRate: 0,
+        natureCode: 'N3.2',
+        discountPercent: 0
+      }],
+      5,
+      0,
+      'N3.2'
+    );
+  }));
+
+  it('aligns lines already entered to the foreign regime and restores them when the customer is removed', fakeAsync(() => {
+    const fixture = TestBed.createComponent(OrdiniNuovoComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.selectCustomer(customer);
+    component.selectVariant(variant);
+    component.addDraftLine();
+    tick(220);
+    expect(component.draftLines[0].vatRate).toBe(22);
+
+    component.selectCustomer({
+      ...customer,
+      id: 'contact-us',
+      countryCode: 'US',
+      taxRegime: 'ExtraEu',
+      forcedVatRate: 0,
+      forcedVatNature: 'N3.1'
+    });
+    tick(220);
+    expect(component.draftLines[0].vatRate).toBe(0);
+    expect(component.draftLines[0].natureCode).toBe('N3.1');
+
+    component.clearCustomer();
+    tick(220);
+    expect(component.isVatForced).toBeFalse();
+    expect(component.draftLines[0].vatRate).toBe(22);
+    expect(component.draftLines[0].natureCode).toBeNull();
+    expect(component.shippingVatRate).toBeNull();
+    expect(component.pendingNatureCode).toBeNull();
   }));
 
   it('creates the order header, adds its lines, and navigates to the permitted-action detail', () => {

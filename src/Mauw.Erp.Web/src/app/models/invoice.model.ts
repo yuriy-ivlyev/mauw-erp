@@ -40,6 +40,7 @@ export interface Invoice {
   sdiSubmittedAt: string | null;
   sdiStatus?: string;
   isOrderUnderAdjustment?: boolean;
+  canTransmitToSdi?: boolean;
   paidAmount: number;
   balanceDue: number;
   status: string;
@@ -60,6 +61,7 @@ export interface InvoiceListParams {
   pageSize: number;
   search?: string;
   status?: string;
+  sdiStatus?: string;
   dateFrom?: string;
   dateTo?: string;
   unpaidOnly?: boolean;
@@ -72,4 +74,18 @@ export interface RecordInvoicePaymentRequest {
   paymentDate: string;
   paymentMethod: string;
   transactionDetails: string | null;
+}
+
+export interface BulkTransmissionItemResult {
+  invoiceId: string;
+  success: boolean;
+  invoiceNumber: string | null;
+  errorMessage: string | null;
+}
+
+export interface BulkTransmissionResult {
+  requestedCount: number;
+  successCount: number;
+  failedCount: number;
+  results: BulkTransmissionItemResult[];
 }

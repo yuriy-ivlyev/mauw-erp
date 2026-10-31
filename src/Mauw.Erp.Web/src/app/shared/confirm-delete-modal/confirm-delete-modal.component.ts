@@ -15,6 +15,9 @@ export class ConfirmDeleteModalComponent {
   @Input() isOpen = false;
   @Input() title = 'Conferma eliminazione';
   @Input() message = 'Sei sicuro di voler eliminare questo elemento? L\'operazione non è reversibile.';
+  @Input() confirmLabel = 'Elimina';
+  @Input() showDeleteIcon = true;
+  @Input() actionVariant: 'danger' | 'primary' = 'danger';
   @Output() confirmed = new EventEmitter<void>();
   @Output() cancelled = new EventEmitter<void>();
 }

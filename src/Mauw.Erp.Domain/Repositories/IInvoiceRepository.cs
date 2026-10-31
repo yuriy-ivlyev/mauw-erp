@@ -9,7 +9,9 @@ public interface IInvoiceRepository : IRepository<Invoice, Guid>
 {
     Task<Invoice?> GetByNumberAsync(string invoiceNumber);
     Task<Invoice?> GetByOrderIdAsync(Guid orderId);
+    Task<Guid?> GetOrderIdAsync(Guid invoiceId);
     Task AcquireOrderInvoiceLockAsync(Guid orderId);
+    Task AcquireSdiTransmissionLockAsync(Guid invoiceId);
     Task AcquireInvoiceNumberLockAsync(string prefix);
     Task<List<string>> GetInvoiceNumbersByPrefixAsync(string prefix);
     Task<IEnumerable<Invoice>> GetByContactIdAsync(Guid contactId);
@@ -24,6 +26,7 @@ public interface IInvoiceRepository : IRepository<Invoice, Guid>
         DateOnly? dateTo = null,
         bool unpaidOnly = false,
         string? sortBy = null,
-        bool sortDescending = true);
+        bool sortDescending = true,
+        string? sdiStatus = null);
     Task<IEnumerable<Invoice>> GetByOrderIdsAsync(IEnumerable<Guid> orderIds);
 }

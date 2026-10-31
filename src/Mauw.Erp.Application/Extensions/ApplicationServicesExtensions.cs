@@ -4,6 +4,7 @@ using Mauw.Erp.Application.Services;
 using Mauw.Erp.Domain.Services;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Mauw.Erp.Application.Extensions;
 
@@ -11,6 +12,7 @@ public static class ApplicationServicesExtensions
 {
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
+        services.TryAddScoped<ISdiTransmissionProvider, UnconfiguredSdiTransmissionProvider>();
         services.AddMediatR(configuration =>
             configuration.RegisterServicesFromAssembly(typeof(ApplicationServicesExtensions).Assembly));
         services.AddCostVisibility();
@@ -66,6 +68,12 @@ public static class ApplicationServicesExtensions
         services.AddScoped<PhotonGeocodingService>();
         services.AddScoped<IGeocodingService, FallbackGeocodingService>();
 
+        return services;
+    }
+
+    public static IServiceCollection AddSimulatedSdiTransmissionProvider(this IServiceCollection services)
+    {
+        services.Replace(ServiceDescriptor.Scoped<ISdiTransmissionProvider, LocalOrSimulatedSdiTransmissionProvider>());
         return services;
     }
 }

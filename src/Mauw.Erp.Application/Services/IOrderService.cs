@@ -35,4 +35,5 @@ public interface IOrderService
     Task<OperationResult<IEnumerable<CassaSessionSummaryDto>>> GetSuspendedSessionsAsync();
     Task<OperationResult<CassaSessionDetailDto>> GetCassaSessionAsync(Guid orderId);
     OperationResult<CassaPreviewDto> PreviewCassaCart(CassaPreviewRequest request);
+    Task<OperationResult<CassaPreviewDto>> PreviewOrderAsync(OrderPreviewRequest request);
 }

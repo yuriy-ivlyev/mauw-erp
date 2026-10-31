@@ -51,6 +51,8 @@ builder.Services.AddSupplierDeliveryNotes();
 
 // Register application services with tracing decorators
 builder.Services.AddApplicationServices();
+if (builder.Environment.IsDevelopment())
+    builder.Services.AddSimulatedSdiTransmissionProvider();
 
 // Memory cache (usato da CompanySettingsService)
 builder.Services.AddMemoryCache();

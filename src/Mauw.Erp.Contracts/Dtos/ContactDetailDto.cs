@@ -21,5 +21,8 @@ public record ContactDetailDto(
     SupplierProfileDto? SupplierProfile,
     AgentProfileDto? AgentProfile,
     List<ContactAddressDto> Addresses,
-    List<ContactPersonDto> Persons
+    List<ContactPersonDto> Persons,
+    string? TaxRegime = null,
+    decimal? ForcedVatRate = null,
+    string? ForcedVatNature = null
 );

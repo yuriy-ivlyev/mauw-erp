@@ -161,8 +161,13 @@ public sealed class UpdateOrderAdjustmentLinesCommandHandler(
         if (product is null)
             return OperationResult<OrderItem>.Fail("Prodotto non trovato.");
 
+        var classification = await unitOfWork.ClassifyAsync(order.ContactId, null, line.NatureCode);
+        if (!classification.Success)
+            return OperationResult<OrderItem>.Fail(classification.Error!);
+
         var pricing = await documentPricing.PrepareAsync(order.ContactId,
-            [new(variant.Id, line.Quantity, null, null, product.VatRate, line.NatureCode, null,
+            [new(variant.Id, line.Quantity, null, null, classification.Data!.VatRate ?? product.VatRate,
+                classification.Data.NatureCode, null,
                 DefaultDiscountPercent: order.CustomerDiscountRate)],
             DateTimeOffset.UtcNow);
         if (!pricing.Success)

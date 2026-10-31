@@ -47,9 +47,22 @@ public class InvoiceRepository(MauwDbContext dbContext) : Repository<Invoice, Gu
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.OrderId == orderId);
 
+    public Task<Guid?> GetOrderIdAsync(Guid invoiceId) =>
+        _dbSet
+            .Where(invoice => invoice.Id == invoiceId)
+            .Select(invoice => invoice.OrderId)
+            .FirstOrDefaultAsync();
+
     public async Task AcquireOrderInvoiceLockAsync(Guid orderId)
     {
         var lockKey = $"invoice-order:{orderId:N}";
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))");
+    }
+
+    public async Task AcquireSdiTransmissionLockAsync(Guid invoiceId)
+    {
+        var lockKey = $"invoice-sdi-transmission:{invoiceId:N}";
         await _dbContext.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))");
     }
@@ -95,7 +108,8 @@ public class InvoiceRepository(MauwDbContext dbContext) : Repository<Invoice, Gu
         DateOnly? dateTo = null,
         bool unpaidOnly = false,
         string? sortBy = null,
-        bool sortDescending = true)
+        bool sortDescending = true,
+        string? sdiStatus = null)
     {
         var query = _dbSet
             .Where(i => !contactId.HasValue || i.ContactId == contactId.Value);
@@ -134,6 +148,27 @@ public class InvoiceRepository(MauwDbContext dbContext) : Repository<Invoice, Gu
 
         if (unpaidOnly)
             query = query.Where(i => i.GrossTotal > i.PaidAmount);
+
+        if (Enum.TryParse<SdiStatus>(sdiStatus, true, out var sdiStatusValue) &&
+            Enum.IsDefined(sdiStatusValue))
+        {
+            query = sdiStatusValue switch
+            {
+                SdiStatus.NotTransmitted => query.Where(invoice =>
+                    invoice.SdiSubmittedAt == null &&
+                    EF.Property<SdiStatus>(invoice, "_sdiStatus") == SdiStatus.NotTransmitted),
+                SdiStatus.Pending => query.Where(invoice =>
+                    invoice.SdiSubmittedAt == null &&
+                    EF.Property<SdiStatus>(invoice, "_sdiStatus") == SdiStatus.Pending),
+                SdiStatus.Transmitted => query.Where(invoice =>
+                    EF.Property<SdiStatus>(invoice, "_sdiStatus") == SdiStatus.Transmitted ||
+                    invoice.SdiSubmittedAt != null &&
+                    EF.Property<SdiStatus>(invoice, "_sdiStatus") < SdiStatus.Transmitted),
+                SdiStatus.Accepted => query.Where(invoice =>
+                    EF.Property<SdiStatus>(invoice, "_sdiStatus") == SdiStatus.Accepted),
+                _ => query
+            };
+        }
 
         var total = await query.CountAsync();
         IOrderedQueryable<Invoice> orderedQuery = (sortBy?.ToLowerInvariant(), sortDescending) switch

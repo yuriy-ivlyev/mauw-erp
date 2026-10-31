@@ -31,21 +31,14 @@ public static partial class FatturaPaInvoiceXmlBuilder
         "N6.1", "N6.2", "N6.3", "N6.4", "N6.5", "N6.6", "N6.7", "N6.8", "N6.9", "N7"
     ];
 
-    // Member states other than Italy (ISO 3166-1 alpha-2).
-    private static readonly HashSet<string> EuropeanUnionCountries =
-    [
-        "AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GR", "HR", "HU", "IE",
-        "LT", "LU", "LV", "MT", "NL", "PL", "PT", "RO", "SE", "SI", "SK"
-    ];
-
     /// <summary>CodiceDestinatario mandated for customers resident outside Italy.</summary>
     public const string ForeignRecipientCode = "XXXXXXX";
 
     /// <summary>Non taxable intra-community supply.</summary>
-    public const string IntraEuNature = "N3.2";
+    public const string IntraEuNature = CustomerTaxPolicy.IntraEuNature;
 
     /// <summary>Non taxable export to a non-EU country.</summary>
-    public const string ExtraEuNature = "N3.1";
+    public const string ExtraEuNature = CustomerTaxPolicy.ExtraEuNature;
 
     // Placeholder CAP for foreign addresses without a five-digit postal code (the schema requires five digits).
     private const string NoPostalCode = "99999";
@@ -321,7 +314,7 @@ public static partial class FatturaPaInvoiceXmlBuilder
     private static CustomerParty ResolveForeignCustomer(
         InvoicePdfCustomerDetails customer, string country, List<string> errors)
     {
-        var isEuropeanUnion = EuropeanUnionCountries.Contains(country);
+        var isEuropeanUnion = CustomerTaxPolicy.IsIntraEuCountry(country);
 
         // Foreign tax identifier: the community VAT number, otherwise the foreign tax code.
         var vat = NormalizeTaxId(customer.VatNumber);

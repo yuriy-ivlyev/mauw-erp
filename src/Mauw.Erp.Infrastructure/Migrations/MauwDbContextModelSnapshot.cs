@@ -1333,9 +1333,28 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("paid_amount");
 
+                    b.Property<string>("SdiFileName")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("sdi_file_name");
+
+                    b.Property<string>("SdiStorageKey")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("sdi_storage_key");
+
                     b.Property<DateTime?>("SdiSubmittedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("sdi_submitted_at");
+
+                    b.Property<string>("SdiTransmissionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("sdi_transmission_id");
+
+                    b.Property<DateTime?>("SdiTransmittedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sdi_transmitted_at_utc");
 
                     b.Property<decimal>("ShippingCost")
                         .HasPrecision(18, 2)

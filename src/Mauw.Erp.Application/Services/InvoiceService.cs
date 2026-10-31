@@ -21,7 +21,8 @@ public class InvoiceService(
     IUnitOfWork unitOfWork,
     ItalianAccountingCalculator accountingCalculator,
     ICompanySettingsService companySettingsService,
-    IInvoicePdfGenerator pdfGenerator)
+    IInvoicePdfGenerator pdfGenerator,
+    ISdiDocumentStorage sdiDocumentStorage)
     : IInvoiceService
 {
     private static readonly CultureInfo ItalianCulture = CultureInfo.GetCultureInfo("it-IT");
@@ -152,7 +153,8 @@ public class InvoiceService(
         DateOnly? dateTo = null,
         bool unpaidOnly = false,
         string? sortBy = null,
-        bool sortDescending = true)
+        bool sortDescending = true,
+        string? sdiStatus = null)
     {
         if (page < 1 || pageSize is < 1 or > 100)
             return OperationResult<PagedResult<InvoiceDto>>.Fail("Page must be positive and pageSize must be between 1 and 100.");
@@ -161,10 +163,21 @@ public class InvoiceService(
         if (!string.IsNullOrWhiteSpace(status) &&
             !InvoiceStatuses.IsSupported(status.Trim()))
             return OperationResult<PagedResult<InvoiceDto>>.Fail($"Unsupported invoice status '{status}'.");
+        if (!string.IsNullOrWhiteSpace(sdiStatus) &&
+            (!Enum.TryParse<SdiStatus>(sdiStatus, true, out var parsedSdiStatus) ||
+             !Enum.IsDefined(parsedSdiStatus)))
+            return OperationResult<PagedResult<InvoiceDto>>.Fail($"Unsupported SDI status '{sdiStatus}'.");
 
         var (invoices, total) = await unitOfWork.Invoices.GetPagedAsync(
-            contactId, search, page, pageSize, status, dateFrom, dateTo, unpaidOnly, sortBy, sortDescending);
-        var dtos = InvoiceMapper.MapToListDto(invoices);
+            contactId, search, page, pageSize, status, dateFrom, dateTo, unpaidOnly, sortBy, sortDescending,
+            sdiStatus?.Trim());
+        var invoiceList = invoices.ToList();
+        var ordersUnderAdjustment = await unitOfWork.Orders.GetUnderAdjustmentIdsAsync(
+            invoiceList.Where(invoice => invoice.OrderId.HasValue)
+                .Select(invoice => invoice.OrderId!.Value));
+        var dtos = invoiceList.Select(invoice => InvoiceMapper.MapToDto(
+            invoice,
+            invoice.OrderId.HasValue && ordersUnderAdjustment.Contains(invoice.OrderId.Value))).ToList();
         var result = new PagedResult<InvoiceDto>(dtos, page, pageSize, total);
 
         return OperationResult<PagedResult<InvoiceDto>>.Ok(result);
@@ -252,6 +265,36 @@ public class InvoiceService(
         if (invoice is null)
             return OperationResult<string>.Fail("Invoice not found");
 
+        return await BuildInvoiceXmlAsync(invoice);
+    }
+
+    public async Task<OperationResult<InvoiceXmlDownload>> GetInvoiceXmlDownloadAsync(Guid id)
+    {
+        var invoice = await unitOfWork.Invoices.GetByIdAsync(id);
+        if (invoice is null)
+            return OperationResult<InvoiceXmlDownload>.Fail("Invoice not found");
+
+        if (invoice.SdiStorageKey is not null)
+        {
+            if (string.IsNullOrWhiteSpace(invoice.SdiFileName))
+                return OperationResult<InvoiceXmlDownload>.Fail(
+                    "La fattura archiviata allo SDI non ha un nome file associato.");
+
+            var storedContent = await sdiDocumentStorage.GetInvoiceXmlAsync(invoice.SdiStorageKey);
+            return OperationResult<InvoiceXmlDownload>.Ok(
+                new InvoiceXmlDownload(storedContent, invoice.SdiFileName));
+        }
+
+        var xml = await BuildInvoiceXmlAsync(invoice);
+        return xml.Success
+            ? OperationResult<InvoiceXmlDownload>.Ok(
+                new InvoiceXmlDownload(
+                    System.Text.Encoding.UTF8.GetBytes(xml.Data!), $"fattura-{id}.xml"))
+            : OperationResult<InvoiceXmlDownload>.Fail(xml.Error!);
+    }
+
+    private async Task<OperationResult<string>> BuildInvoiceXmlAsync(Invoice invoice)
+    {
         var model = await BuildInvoicePdfModelAsync(invoice);
         return model.Success
             ? FatturaPaInvoiceXmlBuilder.Build(model.Data!, accountingCalculator)

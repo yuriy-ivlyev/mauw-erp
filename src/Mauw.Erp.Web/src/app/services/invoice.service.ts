@@ -6,6 +6,7 @@ import {
   Invoice,
   InvoiceListParams,
   InvoicePagedResult,
+  BulkTransmissionResult,
   RecordInvoicePaymentRequest
 } from '../models/invoice.model';
 
@@ -43,5 +44,9 @@ export class InvoiceService {
 
   downloadPdf(invoiceId: string): Observable<Blob> {
     return this.http.get(`${this.base}/${invoiceId}/pdf`, { responseType: 'blob' });
+  }
+
+  bulkTransmitToSdi(invoiceIds: string[]): Observable<BulkTransmissionResult> {
+    return this.http.post<BulkTransmissionResult>(`${this.base}/bulk-transmit-sdi`, { invoiceIds });
   }
 }

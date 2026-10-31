@@ -146,7 +146,7 @@ public class InvoiceManagementServiceTests
         repository.Verify(value => value.GetPagedAsync(
             It.IsAny<Guid?>(), It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<int>(),
             It.IsAny<string?>(), It.IsAny<DateOnly?>(), It.IsAny<DateOnly?>(), It.IsAny<bool>(),
-            It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
+            It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<string?>()), Times.Never);
     }
 
     [Fact]
@@ -162,7 +162,22 @@ public class InvoiceManagementServiceTests
         repository.Verify(value => value.GetPagedAsync(
             It.IsAny<Guid?>(), It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<int>(),
             It.IsAny<string?>(), It.IsAny<DateOnly?>(), It.IsAny<DateOnly?>(), It.IsAny<bool>(),
-            It.IsAny<string?>(), It.IsAny<bool>()), Times.Never);
+            It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<string?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RejectsInvalidSdiStatusBeforeQueryingInvoices()
+    {
+        var (service, _, repository, _) = CreateService();
+
+        var result = await service.GetInvoicesAsync(null, null, 1, 20, sdiStatus: "Unknown");
+
+        Assert.False(result.Success);
+        Assert.Contains("SDI status", result.Error);
+        repository.Verify(value => value.GetPagedAsync(
+            It.IsAny<Guid?>(), It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<int>(),
+            It.IsAny<string?>(), It.IsAny<DateOnly?>(), It.IsAny<DateOnly?>(), It.IsAny<bool>(),
+            It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<string?>()), Times.Never);
     }
 
     private static (InvoiceService Service, Mock<IUnitOfWork> UnitOfWork,
@@ -187,7 +202,8 @@ public class InvoiceManagementServiceTests
             unitOfWork.Object,
             calculator,
             Mock.Of<ICompanySettingsService>(),
-            Mock.Of<IInvoicePdfGenerator>());
+            Mock.Of<IInvoicePdfGenerator>(),
+            Mock.Of<ISdiDocumentStorage>());
         return (service, unitOfWork, repository, invoice);
     }
 }

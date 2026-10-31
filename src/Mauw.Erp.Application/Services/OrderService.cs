@@ -73,10 +73,20 @@ public partial class OrderService(
             fulfillmentType: fulfillmentType
         ) { OrderType = orderType };
         order.SetInternalNotes(request.InternalNotes);
+        var shippingVatRate = request.ShippingVatRate;
+        var shippingNatureCode = request.ShippingNatureCode;
+        if ((request.ShippingCost ?? 0m) > 0m)
+        {
+            var classification = CustomerTaxPolicy.Classify(contact.CountryCode, shippingVatRate, shippingNatureCode);
+            if (!classification.Success)
+                return OperationResult<OrderDto>.Fail(classification.Error);
+            shippingVatRate = classification.Data!.VatRate;
+            shippingNatureCode = classification.Data.NatureCode;
+        }
         var shippingCharge = order.SetShippingCharge(
             request.ShippingCost ?? 0.00m,
-            request.ShippingVatRate,
-            request.ShippingNatureCode,
+            shippingVatRate,
+            shippingNatureCode,
             accountingCalculator);
         if (!shippingCharge.Success)
             return OperationResult<OrderDto>.Fail(shippingCharge.Error);
@@ -292,10 +302,22 @@ public partial class OrderService(
             if (product == null)
                 return await FailAsync("Product not found");
 
+            var isSourceLine = request.SourceOrderItemId.HasValue || request.SourceLineId.HasValue;
+            var requestedVatRate = request.VatRate;
+            var requestedNatureCode = request.NatureCode;
+            if (!isSourceLine)
+            {
+                var classification = await unitOfWork.ClassifyAsync(order.ContactId, requestedVatRate, requestedNatureCode);
+                if (!classification.Success)
+                    return await FailAsync(classification.Error!);
+                requestedVatRate = classification.Data!.VatRate;
+                requestedNatureCode = classification.Data.NatureCode;
+            }
+
             var pricing = await documentPricing.PrepareAsync(order.ContactId,
                 [new(request.VariantId, request.Quantity, request.UnitNetPrice, request.UnitGrossPrice,
-                    request.SourceOrderItemId.HasValue || request.SourceLineId.HasValue ? request.VatRate : request.VatRate ?? product.VatRate,
-                    request.NatureCode, request.DiscountPercent,
+                    isSourceLine ? requestedVatRate : requestedVatRate ?? product.VatRate,
+                    requestedNatureCode, request.DiscountPercent,
                     request.PriceListId, request.OverrideReason, request.IsCustomerReturn, request.SourceLineId,
                     DefaultDiscountPercent: order.CustomerDiscountRate, SourceOrderItemId: request.SourceOrderItemId)],
                 DateTimeOffset.UtcNow);
@@ -381,8 +403,13 @@ public partial class OrderService(
             if (product is null)
                 return await FailAsync("Prodotto non trovato.");
 
+            var classification = await unitOfWork.ClassifyAsync(order.ContactId, null, request.NatureCode);
+            if (!classification.Success)
+                return await FailAsync(classification.Error!);
+
             var pricing = await documentPricing.PrepareAsync(order.ContactId,
-                [new(request.VariantId, request.Quantity, null, null, null, request.NatureCode, null,
+                [new(request.VariantId, request.Quantity, null, null, classification.Data!.VatRate,
+                    classification.Data.NatureCode, null,
                     DefaultDiscountPercent: order.CustomerDiscountRate)],
                 DateTimeOffset.UtcNow);
             if (!pricing.Success)
@@ -452,9 +479,21 @@ public partial class OrderService(
         if (product is null)
             return OperationResult<OrderDto>.Fail("Product not found");
 
+        var isSourceLine = request.SourceOrderItemId.HasValue || request.SourceLineId.HasValue;
+        var requestedVatRate = request.VatRate;
+        var requestedNatureCode = request.NatureCode;
+        if (!isSourceLine)
+        {
+            var classification = await unitOfWork.ClassifyAsync(order.ContactId, requestedVatRate, requestedNatureCode);
+            if (!classification.Success)
+                return OperationResult<OrderDto>.Fail(classification.Error!);
+            requestedVatRate = classification.Data!.VatRate;
+            requestedNatureCode = classification.Data.NatureCode;
+        }
+
         var pricing = await documentPricing.PrepareAsync(order.ContactId,
             [new(request.VariantId, request.Quantity, request.UnitNetPrice, request.UnitGrossPrice,
-                request.VatRate ?? product.VatRate, request.NatureCode, request.DiscountPercent,
+                requestedVatRate ?? product.VatRate, requestedNatureCode, request.DiscountPercent,
                 request.PriceListId, request.OverrideReason, request.IsCustomerReturn, request.SourceLineId,
                 DefaultDiscountPercent: order.CustomerDiscountRate, SourceOrderItemId: request.SourceOrderItemId)],
             DateTimeOffset.UtcNow);
@@ -630,10 +669,21 @@ public partial class OrderService(
             if (allowCompletedEdit && invoice?.IsSdiSubmitted == true)
                 return await FailAsync("La fattura è già stata inviata allo SDI e l'ordine non può essere modificato.");
 
+            var vatRate = request.VatRate;
+            var natureCode = request.NatureCode;
+            if (request.ShippingCost > 0m)
+            {
+                var classification = await unitOfWork.ClassifyAsync(order.ContactId, vatRate, natureCode);
+                if (!classification.Success)
+                    return await FailAsync(classification.Error!);
+                vatRate = classification.Data!.VatRate;
+                natureCode = classification.Data.NatureCode;
+            }
+
             var result = order.SetShippingCharge(
                 request.ShippingCost,
-                request.VatRate,
-                request.NatureCode,
+                vatRate,
+                natureCode,
                 accountingCalculator);
             if (!result.Success)
                 return await FailAsync(result.Error);
@@ -1085,6 +1135,34 @@ public partial class OrderService(
             return company.ReaOffice;
 
         return $"{company.ReaOffice}-{company.ReaNumber}";
+    }
+
+    public async Task<OperationResult<CassaPreviewDto>> PreviewOrderAsync(OrderPreviewRequest request)
+    {
+        if (request?.Items is null || request.Items.Any(item => item is null))
+            return OperationResult<CassaPreviewDto>.Fail("Le righe dell'ordine non possono essere null.");
+
+        var contact = await unitOfWork.Contacts.GetByIdAsync(request.ContactId);
+        if (contact is null)
+            return OperationResult<CassaPreviewDto>.Fail("Contact not found");
+
+        var resolution = CustomerTaxPolicy.Resolve(contact.CountryCode);
+        if (!resolution.Success)
+            return OperationResult<CassaPreviewDto>.Fail(resolution.Error);
+
+        // Foreign customers: the classification is forced before the calculation so the VAT breakdown has no tax.
+        var forced = resolution.Data!;
+        var items = forced.IsVatForced
+            ? request.Items.Select(item => item.IsCustomerReturn || item.SourceLineId.HasValue
+                ? item
+                : item with { VatRate = forced.ForcedVatRate!.Value, NatureCode = forced.ForcedVatNature }).ToList()
+            : request.Items;
+        var shippingForced = forced.IsVatForced && request.ShippingCost > 0m;
+        return PreviewCassaCart(new CassaPreviewRequest(
+            items,
+            request.ShippingCost,
+            shippingForced ? forced.ForcedVatRate : request.ShippingVatRate,
+            shippingForced ? forced.ForcedVatNature : request.ShippingNatureCode));
     }
 
     public OperationResult<CassaPreviewDto> PreviewCassaCart(CassaPreviewRequest request)

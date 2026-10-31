@@ -23,6 +23,10 @@ public class Invoice : Entity<Guid>
     public string? ShippingNatureCode { get; private set; }
     public DateTime? ConfirmedAt { get; private set; }
     public DateTime? SdiSubmittedAt { get; private set; }
+    public string? SdiFileName { get; private set; }
+    public string? SdiStorageKey { get; private set; }
+    public string? SdiTransmissionId { get; private set; }
+    public DateTime? SdiTransmittedAtUtc { get; private set; }
 
     private SdiStatus _sdiStatus = SdiStatus.NotTransmitted;
 
@@ -179,6 +183,35 @@ public class Invoice : Entity<Guid>
             return InvoiceWorkflowResult.Fail("La fattura è già stata inviata allo SDI.");
 
         SdiSubmittedAt = submittedAt;
+        _sdiStatus = SdiStatus.Transmitted;
+        UpdateTimestamp();
+        return InvoiceWorkflowResult.Ok();
+    }
+
+    public InvoiceWorkflowResult MarkAsTransmitted(
+        string fileName,
+        string storageKey,
+        string? transmissionId,
+        DateTime transmittedAtUtc)
+    {
+        if (SdiStatus is not (SdiStatus.NotTransmitted or SdiStatus.Pending))
+            return InvoiceWorkflowResult.Fail("La fattura è già stata trasmessa o accettata dallo SDI.");
+        if (!ConfirmedAt.HasValue)
+            return InvoiceWorkflowResult.Fail("Confermare la fattura prima di trasmetterla allo SDI.");
+        if (string.IsNullOrWhiteSpace(fileName) || fileName.Length > 50)
+            return InvoiceWorkflowResult.Fail("Il nome del file SDI è obbligatorio e non può superare 50 caratteri.");
+        if (string.IsNullOrWhiteSpace(storageKey) || storageKey.Length > 255)
+            return InvoiceWorkflowResult.Fail("La chiave di archiviazione SDI è obbligatoria e non può superare 255 caratteri.");
+        if (transmissionId?.Length > 100)
+            return InvoiceWorkflowResult.Fail("L'identificativo di trasmissione SDI non può superare 100 caratteri.");
+        if (transmittedAtUtc.Kind != DateTimeKind.Utc)
+            return InvoiceWorkflowResult.Fail("La data di trasmissione deve essere espressa in UTC.");
+
+        SdiFileName = fileName;
+        SdiStorageKey = storageKey;
+        SdiTransmissionId = string.IsNullOrWhiteSpace(transmissionId) ? null : transmissionId;
+        SdiTransmittedAtUtc = transmittedAtUtc;
+        SdiSubmittedAt = transmittedAtUtc;
         _sdiStatus = SdiStatus.Transmitted;
         UpdateTimestamp();
         return InvoiceWorkflowResult.Ok();

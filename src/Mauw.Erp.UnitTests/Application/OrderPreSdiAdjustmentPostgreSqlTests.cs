@@ -326,6 +326,52 @@ public sealed class OrderPreSdiAdjustmentPostgreSqlTests(PostgreSqlContainerFixt
         Assert.Empty(document.Descendants("PECDestinatario"));
     }
 
+    [Theory]
+    [InlineData("DE", "N3.2")]
+    [InlineData("GR", "N3.2")]
+    [InlineData("CH", "N3.1")]
+    [InlineData("US", "N3.1")]
+    public async Task NewAdjustmentLineOfAForeignCustomerIsForcedToZeroRateWithTheRegimeNature(
+        string country, string nature)
+    {
+        var database = postgres.CreateDatabase();
+        var seed = await SeedCompletedCashOrderWithInvoiceAsync(database);
+        await SetCustomerCountryAsync(database, country);
+        await ReopenAsync(database, seed);
+
+        // Historical lines stay untouched; only the new line (10% article rate) is classified.
+        var result = await UpdateAsync(database, seed, new OrderAdjustmentLine(seed.Line22Id, null, 2),
+            new OrderAdjustmentLine(seed.Line4Id, null, 1), new OrderAdjustmentLine(null, seed.VariantNewId, 2));
+
+        Assert.True(result.Success, result.Error);
+        await using var verify = database.CreateDbContext();
+        var order = await verify.Orders.Include(item => item.Items).SingleAsync();
+        var added = order.Items.Single(item => item.VariantId == seed.VariantNewId);
+        Assert.Equal(0m, added.VatRate);
+        Assert.Equal(nature, added.NatureCode);
+        Assert.Equal(22m, order.Items.Single(item => item.VariantId == seed.Variant22Id).VatRate);
+    }
+
+    [Theory]
+    [InlineData("DE", "N3.1")]
+    [InlineData("US", "N3.2")]
+    public async Task NewAdjustmentLineWithAMismatchingNatureIsRejectedForAForeignCustomer(string country, string nature)
+    {
+        var database = postgres.CreateDatabase();
+        var seed = await SeedCompletedCashOrderWithInvoiceAsync(database);
+        await SetCustomerCountryAsync(database, country);
+        await ReopenAsync(database, seed);
+
+        var result = await UpdateAsync(database, seed, new OrderAdjustmentLine(seed.Line22Id, null, 2),
+            new OrderAdjustmentLine(seed.Line4Id, null, 1), new OrderAdjustmentLine(null, seed.VariantNewId, 2, nature));
+
+        Assert.False(result.Success);
+        Assert.Contains("Natura IVA ammessa", result.Error);
+        Assert.Equal(10m, await OnHandAsync(database, seed.VariantNewId));
+        await using var verify = database.CreateDbContext();
+        Assert.Equal(2, (await verify.Orders.Include(item => item.Items).SingleAsync()).Items.Count);
+    }
+
     [Fact]
     public async Task FailureWhileRegeneratingTheXmlRollsBackInvoiceAndOrderTogether()
     {
@@ -442,6 +488,13 @@ public sealed class OrderPreSdiAdjustmentPostgreSqlTests(PostgreSqlContainerFixt
         var movements = await verify.StockMovements.OrderBy(movement => movement.CreatedAt).ToListAsync();
         Assert.Equal([-1m, 2m], movements.Select(movement => movement.QuantityDelta!.Value).ToArray());
         Assert.All(movements, movement => Assert.Equal(seed.WarehouseId, movement.WarehouseId));
+    }
+
+    private static async Task SetCustomerCountryAsync(PostgreSqlTestDatabase database, string country)
+    {
+        await using var db = database.CreateDbContext();
+        (await db.Contacts.SingleAsync()).CountryCode = country;
+        await db.SaveChangesAsync();
     }
 
     private static async Task ReopenAsync(PostgreSqlTestDatabase database, Seed seed)
@@ -635,7 +688,8 @@ public sealed class OrderPreSdiAdjustmentPostgreSqlTests(PostgreSqlContainerFixt
             var orders = new OrderService(
                 work, new CreateOrderRequestValidator(), new CreateOrderItemRequestValidator(), calculator,
                 company.Object, pdf.Object, NullLogger<OrderService>.Instance, pricing);
-            var invoices = new InvoiceService(work, calculator, company.Object, pdf.Object);
+            var invoices = new InvoiceService(
+                work, calculator, company.Object, pdf.Object, Mock.Of<ISdiDocumentStorage>());
             return new Harness
             {
                 Pdf = pdf,

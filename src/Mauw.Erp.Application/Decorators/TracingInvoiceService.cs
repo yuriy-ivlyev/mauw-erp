@@ -24,15 +24,18 @@ public sealed class TracingInvoiceService(IInvoiceService inner) : TracingDecora
         DateOnly? dateTo = null,
         bool unpaidOnly = false,
         string? sortBy = null,
-        bool sortDescending = true) =>
+        bool sortDescending = true,
+        string? sdiStatus = null) =>
         TraceAsync("Invoice.List", () => inner.GetInvoicesAsync(
-                contactId, search, page, pageSize, status, dateFrom, dateTo, unpaidOnly, sortBy, sortDescending),
+                contactId, search, page, pageSize, status, dateFrom, dateTo, unpaidOnly, sortBy, sortDescending,
+                sdiStatus),
             a =>
             {
                 if (contactId.HasValue)
                     a?.SetTag("contact.id", contactId.Value);
                 a?.SetTag("invoice.search", search);
                 a?.SetTag("invoice.status", status);
+                a?.SetTag("invoice.sdi_status", sdiStatus);
                 a?.SetTag("invoice.date_from", dateFrom?.ToString("yyyy-MM-dd"));
                 a?.SetTag("invoice.date_to", dateTo?.ToString("yyyy-MM-dd"));
                 a?.SetTag("invoice.unpaid_only", unpaidOnly);
@@ -56,5 +59,9 @@ public sealed class TracingInvoiceService(IInvoiceService inner) : TracingDecora
 
     public Task<OperationResult<string>> GetInvoiceXmlAsync(Guid id) =>
         TraceAsync("Invoice.Xml", () => inner.GetInvoiceXmlAsync(id),
+            a => a?.SetTag("invoice.id", id));
+
+    public Task<OperationResult<InvoiceXmlDownload>> GetInvoiceXmlDownloadAsync(Guid id) =>
+        TraceAsync("Invoice.XmlDownload", () => inner.GetInvoiceXmlDownloadAsync(id),
             a => a?.SetTag("invoice.id", id));
 }

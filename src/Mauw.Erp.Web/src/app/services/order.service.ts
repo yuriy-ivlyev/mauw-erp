@@ -82,12 +82,14 @@ export class OrderService {
   }
 
   previewDraftItems(
+    contactId: string,
     items: CreateOrderItemRequest[],
     shippingCost = 0,
     shippingVatRate: number | null = null,
     shippingNatureCode: string | null = null
   ): Observable<DraftOrderPreview> {
-    return this.http.post<DraftOrderPreview>(`${environment.apiUrl}/v1/cassa/sessions/preview`, {
+    return this.http.post<DraftOrderPreview>(`${this.base}/preview`, {
+      contactId,
       items: items.map(item => ({ ...item, maxQuantity: item.quantity })),
       shippingCost,
       shippingVatRate,

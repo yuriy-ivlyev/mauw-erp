@@ -1,4 +1,5 @@
 using Mauw.Erp.Api.Authorization;
+using Mauw.Erp.Application.Commands.Invoices;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
@@ -38,6 +39,16 @@ public static class InvoiceEndpoints
             .WithName("RecordPayment")
             .WithSummary("Record a payment on an invoice (triggers commission accrual when paid)");
 
+        group.MapPost("/{id}/transmit-sdi", TransmitInvoiceToSdi)
+            .RequireAuthorization(AppPolicies.Billing)
+            .WithName("TransmitInvoiceToSdi")
+            .WithSummary("Validate, archive and transmit an invoice to the SDI");
+
+        group.MapPost("/bulk-transmit-sdi", BulkTransmitInvoicesToSdi)
+            .RequireAuthorization(AppPolicies.Billing)
+            .WithName("BulkTransmitInvoicesToSdi")
+            .WithSummary("Transmit multiple eligible invoices to the SDI");
+
         group.MapGet("/{id}/pdf", GetInvoicePdf)
             .RequireAuthorization(AppPolicies.Billing)
             .WithName("GetInvoicePdf")
@@ -62,7 +73,7 @@ public static class InvoiceEndpoints
         if (!result.Success && result.Error?.Contains("già", StringComparison.OrdinalIgnoreCase) == true)
             return TypedResults.Conflict(result.Error);
         if (!result.Success)
-            return TypedResults.BadRequest(result.Error);
+            return TypedResults.BadRequest(result.Error ?? "Trasmissione SDI non riuscita.");
 
         return TypedResults.Created($"/api/v1/invoices/{result.Data!.Id}", result.Data);
     }
@@ -90,10 +101,12 @@ public static class InvoiceEndpoints
         DateOnly? dateTo = null,
         bool unpaidOnly = false,
         string? sortBy = null,
-        bool sortDescending = true)
+        bool sortDescending = true,
+        string? sdiStatus = null)
     {
         var result = await invoiceService.GetInvoicesAsync(
-            contactId, search, page, pageSize, status, dateFrom, dateTo, unpaidOnly, sortBy, sortDescending);
+            contactId, search, page, pageSize, status, dateFrom, dateTo, unpaidOnly, sortBy, sortDescending,
+            sdiStatus);
         if (!result.Success)
             return TypedResults.BadRequest(result.Error);
 
@@ -131,13 +144,44 @@ public static class InvoiceEndpoints
         Guid id,
         IInvoiceService invoiceService)
     {
-        var result = await invoiceService.GetInvoiceXmlAsync(id);
+        var result = await invoiceService.GetInvoiceXmlDownloadAsync(id);
         if (!result.Success)
             return result.Error?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true
                 ? TypedResults.NotFound()
                 : TypedResults.BadRequest(result.Error!);
 
-        return TypedResults.File(
-            System.Text.Encoding.UTF8.GetBytes(result.Data!), "application/xml", $"fattura-{id}.xml");
+        return TypedResults.File(result.Data!.Content, "application/xml", result.Data.FileName);
+    }
+
+    private static async Task<Results<Ok<InvoiceDto>, NotFound, BadRequest<string>, Conflict<string>>>
+        TransmitInvoiceToSdi(
+            Guid id,
+            MediatR.ISender sender,
+            CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new TransmitInvoiceToSdiCommand(id), cancellationToken);
+        if (!result.Success)
+        {
+            if (result.Error?.Contains("non trovata", StringComparison.OrdinalIgnoreCase) == true)
+                return TypedResults.NotFound();
+            if (result.Error?.Contains("stato NotTransmitted", StringComparison.OrdinalIgnoreCase) == true)
+                return TypedResults.Conflict(result.Error);
+            return TypedResults.BadRequest(result.Error);
+        }
+
+        return TypedResults.Ok(result.Data!);
+    }
+
+    private static async Task<Results<Ok<BulkTransmissionResultDto>, BadRequest<string>>>
+        BulkTransmitInvoicesToSdi(
+            BulkTransmitInvoicesToSdiRequest request,
+            MediatR.ISender sender,
+            CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new BulkTransmitInvoicesToSdiCommand(request.InvoiceIds), cancellationToken);
+        return result.Success
+            ? TypedResults.Ok(result.Data!)
+            : TypedResults.BadRequest(result.Error ?? "Invio batch SDI non riuscito.");
     }
 }

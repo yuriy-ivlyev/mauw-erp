@@ -11,6 +11,7 @@ public static class AuditActions
     public const string OrderReopenedForAdjustment = nameof(OrderReopenedForAdjustment);
     public const string OrderLinesAdjusted = nameof(OrderLinesAdjusted);
     public const string InvoiceSynchronizedFromOrder = nameof(InvoiceSynchronizedFromOrder);
+    public const string InvoiceTransmittedToSdi = nameof(InvoiceTransmittedToSdi);
 }
 
 /// <summary>
