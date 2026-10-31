@@ -132,7 +132,9 @@ public class InvoiceService(
         if (invoice == null)
             return OperationResult<InvoiceDto>.Fail("Invoice not found");
 
-        return OperationResult<InvoiceDto>.Ok(InvoiceMapper.MapToDto(invoice));
+        var isOrderUnderAdjustment = invoice.OrderId.HasValue &&
+            await unitOfWork.Orders.IsUnderAdjustmentAsync(invoice.OrderId.Value);
+        return OperationResult<InvoiceDto>.Ok(InvoiceMapper.MapToDto(invoice, isOrderUnderAdjustment));
     }
 
     public async Task<OperationResult<PagedResult<InvoiceDto>>> GetInvoicesByContactAsync(Guid contactId, int page, int pageSize)
@@ -242,6 +244,18 @@ public class InvoiceService(
         if (!creditNoteModel.Success)
             return OperationResult<byte[]>.Fail(creditNoteModel.Error!);
         return OperationResult<byte[]>.Ok(await pdfGenerator.GenerateInvoicePdfAsync(creditNoteModel.Data!));
+    }
+
+    public async Task<OperationResult<string>> GetInvoiceXmlAsync(Guid id)
+    {
+        var invoice = await unitOfWork.Invoices.GetByIdAsync(id);
+        if (invoice is null)
+            return OperationResult<string>.Fail("Invoice not found");
+
+        var model = await BuildInvoicePdfModelAsync(invoice);
+        return model.Success
+            ? FatturaPaInvoiceXmlBuilder.Build(model.Data!, accountingCalculator)
+            : OperationResult<string>.Fail(model.Error!);
     }
 
     private async Task<OperationResult<InvoicePdfModel>> BuildInvoicePdfModelAsync(Invoice invoice)
@@ -445,7 +459,8 @@ public class InvoiceService(
             PostalCode: customerAddress?.ZipCode ?? string.Empty,
             Province: customerAddress?.Province ?? string.Empty,
             SdiCode: contact?.SdiCode,
-            Pec: contact?.PecEmail
+            Pec: contact?.PecEmail,
+            CountryCode: contact?.CountryCode ?? "IT"
         );
 
     private static string? BuildRea(CompanySettingsDto? company)

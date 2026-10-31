@@ -135,6 +135,47 @@ public static class OrderEndpoints
             .RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("CancelRemainingOrderLines")
             .WithSummary("Close the unshipped remainder of a partially shipped order");
+
+        group.MapPost("/{id}/reopen-adjustment", ReopenOrderForAdjustment)
+            .RequireAuthorization(AppPolicies.Billing)
+            .WithName("ReopenOrderForAdjustment")
+            .WithSummary("Reopen a completed order whose invoice is not yet transmitted to the SDI");
+
+        group.MapPut("/{id}/adjustment-lines", UpdateOrderAdjustmentLines)
+            .RequireAuthorization(AppPolicies.Billing)
+            .WithName("UpdateOrderAdjustmentLines")
+            .WithSummary("Add, remove or re-quantify the lines of an order reopened for adjustment");
+
+        group.MapPost("/{id}/sync-invoice", SyncAndFinalizeInvoice)
+            .RequireAuthorization(AppPolicies.Billing)
+            .WithName("SyncAndFinalizeInvoice")
+            .WithSummary("Overwrite the untransmitted invoice with the adjusted order and close the adjustment");
+    }
+
+    private static async Task<IResult> ReopenOrderForAdjustment(Guid id, ISender sender) =>
+        ToResult(await sender.Send(new ReopenOrderForAdjustmentCommand(id)));
+
+    private static async Task<IResult> UpdateOrderAdjustmentLines(
+        Guid id,
+        UpdateOrderAdjustmentLinesRequest request,
+        ISender sender) =>
+        ToResult(await sender.Send(new UpdateOrderAdjustmentLinesCommand(
+            id,
+            (request.Lines ?? [])
+                .Select(line => new OrderAdjustmentLine(
+                    line.OrderItemId, line.VariantId, line.Quantity, line.NatureCode))
+                .ToList())));
+
+    private static async Task<IResult> SyncAndFinalizeInvoice(Guid id, ISender sender) =>
+        ToResult(await sender.Send(new SyncAndFinalizeInvoiceCommand(id)));
+
+    private static IResult ToResult(OperationResult<OrderDto> result)
+    {
+        if (result.Success)
+            return Results.Ok(result.Data);
+        if (result.Error?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true)
+            return Results.NotFound();
+        return Results.BadRequest(result.Error);
     }
 
     private static async Task<Results<Created<OrderDto>, BadRequest<string>>> CreateOrder(

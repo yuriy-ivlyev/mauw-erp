@@ -24,7 +24,9 @@ public record OrderDto(
     string? InternalNotes = null,
     decimal ShippingCost = 0.00m,
     decimal? ShippingVatRate = null,
-    string? ShippingNatureCode = null
+    string? ShippingNatureCode = null,
+    bool IsUnderAdjustment = false,
+    string? InvoiceSdiStatus = null
 );
 
 public record OrderPermittedActionDto(

@@ -23,6 +23,22 @@ public class Invoice : Entity<Guid>
     public string? ShippingNatureCode { get; private set; }
     public DateTime? ConfirmedAt { get; private set; }
     public DateTime? SdiSubmittedAt { get; private set; }
+
+    private SdiStatus _sdiStatus = SdiStatus.NotTransmitted;
+
+    /// <summary>
+    /// Transmission state; legacy rows that only carry <see cref="SdiSubmittedAt"/> are reported as transmitted.
+    /// </summary>
+    public SdiStatus SdiStatus => SdiSubmittedAt.HasValue && _sdiStatus < SdiStatus.Transmitted
+        ? SdiStatus.Transmitted
+        : _sdiStatus;
+
+    /// <summary>True once the document has left for the SDI: its content is frozen.</summary>
+    public bool IsSdiSubmitted => SdiStatus >= SdiStatus.Transmitted;
+
+    /// <summary>Only a never-submitted invoice can be re-synchronized from a reopened order.</summary>
+    public bool CanBeAdjustedBeforeSdi => SdiStatus == SdiStatus.NotTransmitted;
+
     public string Status => GrossTotal > 0m && PaidAmount >= GrossTotal
         ? InvoiceStatuses.Paid
         : PaidAmount > 0m
@@ -56,7 +72,7 @@ public class Invoice : Entity<Guid>
     /// </summary>
     public AccountingResult<CalculatedDocument> AddItem(InvoiceItem item, ItalianAccountingCalculator calculator)
     {
-        if (SdiSubmittedAt.HasValue)
+        if (IsSdiSubmitted)
             return AccountingResult<CalculatedDocument>.Fail("Una fattura inviata allo SDI non può essere modificata.");
 
         var result = calculator.CalculateAndApply(GetAccountingLines(Items.Append(item)));
@@ -72,7 +88,7 @@ public class Invoice : Entity<Guid>
     /// </summary>
     public AccountingResult<CalculatedDocument> UpdateTotals(ItalianAccountingCalculator calculator)
     {
-        if (SdiSubmittedAt.HasValue)
+        if (IsSdiSubmitted)
             return AccountingResult<CalculatedDocument>.Fail("I totali di una fattura inviata allo SDI non possono essere modificati.");
 
         var result = calculator.CalculateAndApply(GetAccountingLines(Items));
@@ -105,7 +121,7 @@ public class Invoice : Entity<Guid>
             return AccountingResult<CalculatedDocument>.Fail("Solo un ordine completato può essere sincronizzato con una fattura.");
         if (OrderId != order.Id)
             return AccountingResult<CalculatedDocument>.Fail("L'ordine non corrisponde alla fattura.");
-        if (SdiSubmittedAt.HasValue)
+        if (IsSdiSubmitted)
             return AccountingResult<CalculatedDocument>.Fail("La fattura inviata allo SDI non può essere modificata.");
 
         var replacementItems = order.Items
@@ -141,6 +157,41 @@ public class Invoice : Entity<Guid>
         ShippingNatureCode = order.ShippingNatureCode;
         ApplyTotals(result.Data);
         return result;
+    }
+
+    public InvoiceWorkflowResult MarkSdiPending()
+    {
+        if (!ConfirmedAt.HasValue)
+            return InvoiceWorkflowResult.Fail("Confermare la fattura prima di accodarla allo SDI.");
+        if (SdiStatus != SdiStatus.NotTransmitted)
+            return InvoiceWorkflowResult.Fail("La fattura è già stata accodata o inviata allo SDI.");
+
+        _sdiStatus = SdiStatus.Pending;
+        UpdateTimestamp();
+        return InvoiceWorkflowResult.Ok();
+    }
+
+    public InvoiceWorkflowResult MarkSdiTransmitted(DateTime submittedAt)
+    {
+        if (!ConfirmedAt.HasValue)
+            return InvoiceWorkflowResult.Fail("Confermare la fattura prima di trasmetterla allo SDI.");
+        if (IsSdiSubmitted)
+            return InvoiceWorkflowResult.Fail("La fattura è già stata inviata allo SDI.");
+
+        SdiSubmittedAt = submittedAt;
+        _sdiStatus = SdiStatus.Transmitted;
+        UpdateTimestamp();
+        return InvoiceWorkflowResult.Ok();
+    }
+
+    public InvoiceWorkflowResult MarkSdiAccepted()
+    {
+        if (SdiStatus != SdiStatus.Transmitted)
+            return InvoiceWorkflowResult.Fail("Solo una fattura trasmessa può essere accettata dallo SDI.");
+
+        _sdiStatus = SdiStatus.Accepted;
+        UpdateTimestamp();
+        return InvoiceWorkflowResult.Ok();
     }
 
     private IEnumerable<ICommercialDocumentLine> GetAccountingLines(

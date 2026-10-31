@@ -51,6 +51,7 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
     public DbSet<SupplierPurchaseOrderLine> SupplierPurchaseOrderLines { get; set; }
     public DbSet<SupplierReturnDraft> SupplierReturnDrafts { get; set; }
     public DbSet<SupplierReturnDraftLine> SupplierReturnDraftLines { get; set; }
+    public DbSet<DocumentAuditEntry> DocumentAuditEntries { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -127,6 +128,7 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
         modelBuilder.ApplyConfiguration(new SupplierPurchaseOrderLineConfiguration());
         modelBuilder.ApplyConfiguration(new SupplierReturnDraftConfiguration());
         modelBuilder.ApplyConfiguration(new SupplierReturnDraftLineConfiguration());
+        modelBuilder.ApplyConfiguration(new DocumentAuditEntryConfiguration());
 
     }
 

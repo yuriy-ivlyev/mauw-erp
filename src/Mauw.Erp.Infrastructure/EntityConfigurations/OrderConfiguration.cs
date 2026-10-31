@@ -42,6 +42,9 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.PaymentTransactionDetails).HasMaxLength(500);
         builder.Property(o => o.ApprovalReason).HasMaxLength(500);
         builder.Property(o => o.HoldReason).HasMaxLength(500);
+        builder.Property(o => o.IsUnderAdjustment).HasDefaultValue(false);
+        builder.Property(o => o.AdjustmentStartedAt);
+        builder.Property(o => o.AdjustmentStartedBy).HasMaxLength(200);
 
         builder.Property(o => o.OrderDate)
             .IsRequired();

@@ -13,7 +13,8 @@ public static class OrderMapper
         Order order,
         OrderLinkedDocumentsDto? linked = null,
         IReadOnlyDictionary<Guid, int>? shippedQuantities = null,
-        bool canEditInvoice = false)
+        bool canEditInvoice = false,
+        Invoice? invoice = null)
     {
         return new(
             Id: order.Id,
@@ -31,13 +32,15 @@ public static class OrderMapper
             Items: order.Items.Select(item => MapItemToDto(item, shippedQuantities)).ToList(),
             LinkedDocuments: linked,
             StatusDescription: OrderPermittedActionsPolicy.GetStatusDescription(order.Status),
-            IsReadOnly: order.Status != Domain.Enums.OrderStatus.Draft,
-            PermittedActions: OrderPermittedActionsPolicy.GetFor(order),
+            IsReadOnly: OrderPermittedActionsPolicy.IsReadOnly(order, invoice),
+            PermittedActions: OrderPermittedActionsPolicy.GetFor(order, invoice),
             CanEditInvoice: canEditInvoice,
             InternalNotes: order.InternalNotes,
             ShippingCost: order.ShippingCost,
             ShippingVatRate: order.ShippingVatRate,
-            ShippingNatureCode: order.ShippingNatureCode
+            ShippingNatureCode: order.ShippingNatureCode,
+            IsUnderAdjustment: order.IsUnderAdjustment,
+            InvoiceSdiStatus: invoice?.SdiStatus.ToString()
         );
     }
 

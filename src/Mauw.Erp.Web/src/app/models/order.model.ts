@@ -17,6 +17,7 @@ export interface OrderItem {
   remainingQuantity: number;
   isBillingOnly?: boolean;
   isExcludedFromInvoice?: boolean;
+  pricingSnapshot?: { isCustomerReturn?: boolean } | null;
   sku?: string | null;
   productName?: string | null;
   sizeName?: string | null;
@@ -74,6 +75,8 @@ export interface Order {
   statusDescription: string;
   isReadOnly: boolean;
   canEditInvoice?: boolean;
+  isUnderAdjustment?: boolean;
+  invoiceSdiStatus?: string | null;
   permittedActions: OrderPermittedAction[];
   internalNotes?: string | null;
   shippingCost?: number;
@@ -153,6 +156,17 @@ export interface AddCompletedOrderItemRequest {
   variantId: string;
   quantity: number;
   natureCode: string | null;
+}
+
+export interface OrderAdjustmentLineRequest {
+  orderItemId: string | null;
+  variantId: string | null;
+  quantity: number;
+  natureCode?: string | null;
+}
+
+export interface UpdateOrderAdjustmentLinesRequest {
+  lines: OrderAdjustmentLineRequest[];
 }
 
 export interface DraftOrderPreview {

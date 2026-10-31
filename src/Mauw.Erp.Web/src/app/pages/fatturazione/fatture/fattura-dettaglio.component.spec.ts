@@ -231,6 +231,41 @@ describe('FatturaDettaglioComponent', () => {
     expect(component.invoice?.balanceDue).toBe(96.5);
   });
 
+  it('flags the invoice while the related order is under pre-SDI adjustment and stays read-only', async () => {
+    invoiceService.getById.and.returnValue(of({
+      ...invoice,
+      sdiStatus: 'NotTransmitted',
+      isOrderUnderAdjustment: true
+    }));
+    await navigateToInvoice();
+    const root = harness.routeNativeElement as HTMLElement;
+    const header = root.querySelector('header') as HTMLElement;
+    const badge = root.querySelector('[data-testid="invoice-adjustment-badge"]');
+
+    expect(badge?.textContent?.trim()).toBe('Rettifica in corso dall\'ordine correlato');
+    expect(header.contains(badge)).toBeTrue();
+    expect(root.querySelectorAll('input[aria-label^="Quantità"]').length).toBe(0);
+    expect(root.textContent).not.toContain('Salva modifiche righe');
+  });
+
+  it('hides the adjustment badge when the related order is not under adjustment', async () => {
+    invoiceService.getById.and.returnValue(of({
+      ...invoice,
+      sdiStatus: 'NotTransmitted',
+      isOrderUnderAdjustment: false
+    }));
+    await navigateToInvoice();
+
+    expect(harness.routeNativeElement?.querySelector('[data-testid="invoice-adjustment-badge"]')).toBeNull();
+    expect(harness.routeNativeElement?.textContent).not.toContain('Rettifica in corso');
+  });
+
+  it('hides the adjustment badge when the payload does not carry the adjustment flag', async () => {
+    await navigateToInvoice();
+
+    expect(harness.routeNativeElement?.textContent).not.toContain('Rettifica in corso');
+  });
+
   it('returns to the originating invoice list when the back button is used', async () => {
     const component = await navigateToInvoice();
     const navigation = spyOn(TestBed.inject(Router), 'navigateByUrl')

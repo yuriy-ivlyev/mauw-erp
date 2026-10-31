@@ -9,6 +9,10 @@
 
   <div *ngIf="loading && !order" class="p-8 text-center text-slate-500">Caricamento ordine…</div>
   <ng-container *ngIf="order as currentOrder">
+    <div *ngIf="currentOrder.isUnderAdjustment" role="status" data-testid="adjustment-banner"
+      class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+      Attenzione: Modifica in corso per fattura non ancora trasmessa allo SDI
+    </div>
     <header class="mb-5 flex items-end justify-between gap-4 max-[700px]:items-start max-[700px]:flex-col">
       <div>
         <p class="mb-1 text-xs font-bold uppercase tracking-wider text-slate-500">Ordine vendita</p>
@@ -41,7 +45,8 @@
         *ngFor="let action of currentOrder.permittedActions"
         type="button"
         [class]="'rounded-lg px-4 py-2 font-bold ' + actionClass(action.style)"
-        [disabled]="submitting"
+        [disabled]="submitting || isActionBlocked(action)"
+        [attr.title]="actionHint(action)"
         (click)="openAction(action)">
         {{ action.label }}
       </button>
@@ -59,7 +64,7 @@
           <h2 class="m-0 text-lg font-bold">Costo di spedizione</h2>
           <p class="mt-1 text-xs text-slate-500">L’importo netto e la classificazione IVA partecipano ai totali e al PDF ordine.</p>
         </div>
-        <ng-container *ngIf="currentOrder.isReadOnly && !canEditCompletedInvoice(currentOrder); else editableShipping">
+        <ng-container *ngIf="!canEditShippingCharge(currentOrder); else editableShipping">
           <div class="text-right">
             <p class="font-semibold">{{ (currentOrder.shippingCost ?? 0) | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</p>
             <p *ngIf="currentOrder.shippingCost" class="text-xs text-slate-500">
@@ -115,25 +120,109 @@
           <h2 class="m-0 text-lg font-bold">Articoli</h2>
           <p class="mt-1 text-sm text-slate-500">{{ currentOrder.items.length }} righe</p>
         </div>
-        <span *ngIf="currentOrder.isReadOnly && !canEditCompletedInvoice(currentOrder)"
+        <span *ngIf="!isDraftEditable(currentOrder) && !canEditCompletedInvoice(currentOrder) && !canEditAdjustmentLines(currentOrder)"
           class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">Sola lettura</span>
         <span *ngIf="canEditCompletedInvoice(currentOrder)"
           class="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">Modifica fattura abilitata · invio SDI non effettuato</span>
+        <span *ngIf="canEditAdjustmentLines(currentOrder)"
+          class="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">Modifica righe pre-SDI in corso</span>
       </div>
 
-      <div class="mt-4 overflow-x-auto">
+      <div *ngIf="canEditAdjustmentLines(currentOrder)" class="mt-4 overflow-x-auto" data-testid="adjustment-lines">
+        <table class="w-full min-w-[760px] table-fixed border-collapse text-left">
+          <thead>
+            <tr>
+              <th class="w-[34%]">Articolo</th>
+              <th class="w-[12%]">Quantità</th>
+              <th class="w-[18%] text-right">Prezzo unitario netto</th>
+              <th class="w-[9%] text-right">Sconto</th>
+              <th class="w-[15%] text-right">Totale riga</th>
+              <th class="w-[12%]"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of adjustmentRows | pageSlice:itemsPage:itemsPageSize; trackBy: trackAdjustmentRow">
+              <td class="overflow-hidden p-2">
+                <span class="block truncate font-mono text-sm font-semibold" [class.line-through]="row.isExcluded" [title]="row.sku || ''">{{ row.sku || 'SKU non disponibile' }}</span>
+                <span class="block truncate text-xs text-slate-500" [class.line-through]="row.isExcluded">
+                  {{ row.productName || 'Articolo' }} · {{ row.sizeName || '—' }} · {{ row.colorName || '—' }}
+                </span>
+                <span *ngIf="row.isNew" class="mt-1 inline-block rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">
+                  Nuova riga, da salvare
+                </span>
+                <span *ngIf="row.isExcluded" class="mt-1 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+                  Esclusa dalla fattura
+                </span>
+                <span *ngIf="row.isReturn && !row.isExcluded" class="mt-1 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+                  Reso cliente, non modificabile
+                </span>
+              </td>
+              <td class="p-2">
+                <input *ngIf="!isLockedAdjustmentRow(row); else lockedQuantity"
+                  [attr.aria-label]="'Quantità riga ' + (row.sku || row.productName || '')"
+                  class="w-20 rounded border border-slate-300 p-1.5 text-right" type="number" min="1" step="1"
+                  [disabled]="savingAdjustment" [(ngModel)]="row.quantity" />
+                <ng-template #lockedQuantity>
+                  <span class="block pr-2 text-right">{{ row.quantity }}</span>
+                </ng-template>
+              </td>
+              <td class="text-right">
+                <ng-container *ngIf="row.unitNetPrice !== null; else pricePending">
+                  {{ row.unitNetPrice | currency:'EUR':'symbol':'1.2-2':'it-IT' }}
+                </ng-container>
+                <ng-template #pricePending><span class="text-xs text-slate-500">Calcolato al salvataggio</span></ng-template>
+              </td>
+              <td class="text-right">{{ row.discountPercent }}%</td>
+              <td class="text-right">
+                <ng-container *ngIf="row.lineNetTotal !== null; else totalPending">
+                  {{ row.lineNetTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}
+                </ng-container>
+                <ng-template #totalPending>—</ng-template>
+              </td>
+              <td class="text-center">
+                <app-table-action-button *ngIf="!isLockedAdjustmentRow(row)" action="delete"
+                  [label]="'Rimuovi ' + (row.productName || 'articolo') + ' dalla modifica'"
+                  [disabled]="savingAdjustment" (activated)="askRemoveAdjustmentLine(row)">
+                </app-table-action-button>
+              </td>
+            </tr>
+            <tr *ngIf="adjustmentRows.length === 0">
+              <td colspan="6" class="p-8 text-center text-slate-500">Nessun articolo presente.</td>
+            </tr>
+          </tbody>
+        </table>
+        <app-pagination *ngIf="adjustmentRows.length > 0" [page]="itemsPage" [pageSize]="itemsPageSize"
+          [totalCount]="adjustmentRows.length" (pageChange)="itemsPage = $event"
+          (pageSizeChange)="itemsPageSize = $event; itemsPage = 1">
+        </app-pagination>
+        <div class="mt-3 flex flex-wrap items-center justify-end gap-3">
+          <p *ngIf="hasPendingAdjustments()" class="m-0 mr-auto text-xs font-semibold text-amber-800" role="status">
+            Modifiche non salvate. Salva le modifiche alle righe prima di aggiornare la fattura. Importi e totali verranno ricalcolati dal server al salvataggio.
+          </p>
+          <button type="button" [disabled]="!hasPendingAdjustments() || savingAdjustment"
+            class="rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            (click)="discardAdjustmentChanges()">Annulla modifiche</button>
+          <button type="button" [disabled]="!hasPendingAdjustments() || savingAdjustment"
+            class="rounded-lg bg-blue-700 px-4 py-2 font-bold text-white hover:bg-blue-800 disabled:opacity-50"
+            (click)="saveAdjustmentLines()">
+            {{ savingAdjustment ? 'Salvataggio…' : 'Salva modifiche righe' }}
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="!canEditAdjustmentLines(currentOrder)" class="mt-4 overflow-x-auto">
         <table class="w-full min-w-[760px] table-fixed border-collapse text-left">
           <thead>
             <tr>
               <th class="w-[32%]">Articolo</th>
-              <th *ngIf="!currentOrder.isReadOnly" class="w-[9%]">Quantità</th>
-              <th *ngIf="currentOrder.isReadOnly" class="w-[8%] text-right">Q.tà ordinata</th>
-              <th *ngIf="currentOrder.isReadOnly" class="w-[8%] text-right">Q.tà spedita</th>
-              <th *ngIf="currentOrder.isReadOnly" class="w-[8%] text-right">Q.tà residua</th>
-              <th class="w-[17%]" [class.text-right]="currentOrder.isReadOnly">Prezzo unitario netto</th>
+              <th *ngIf="isDraftEditable(currentOrder)" class="w-[9%]">Quantità</th>
+              <th *ngIf="!isDraftEditable(currentOrder)" class="w-[8%] text-right">Q.tà ordinata</th>
+              <th *ngIf="!isDraftEditable(currentOrder)" class="w-[8%] text-right">Q.tà spedita</th>
+              <th *ngIf="!isDraftEditable(currentOrder)" class="w-[8%] text-right">Q.tà residua</th>
+              <th class="w-[17%]" [class.text-right]="!isDraftEditable(currentOrder)">Prezzo unitario netto</th>
               <th class="w-[9%] text-right">Sconto</th>
               <th class="w-[13%] text-right">Totale riga</th>
-              <th *ngIf="!currentOrder.isReadOnly || canEditCompletedInvoice(currentOrder)" class="w-[12%]"></th>
+              <th *ngIf="isDraftEditable(currentOrder) || canEditCompletedInvoice(currentOrder)" class="w-[12%]"></th>
             </tr>
           </thead>
           <tbody>
@@ -150,7 +239,7 @@
                   Esclusa dalla fattura
                 </span>
               </td>
-              <ng-container *ngIf="currentOrder.isReadOnly; else editableLine">
+              <ng-container *ngIf="!isDraftEditable(currentOrder); else editableLine">
                 <td class="text-right">{{ item.quantity }}</td>
                 <td class="text-right">{{ item.shippedQuantity }}</td>
                 <td class="text-right">{{ item.remainingQuantity }}</td>
@@ -158,7 +247,7 @@
                 <td class="text-right">{{ item.discountPercent }}%</td>
                 <td class="text-right">{{ item.lineNetTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
               </ng-container>
-              <td *ngIf="currentOrder.isReadOnly && canEditCompletedInvoice(currentOrder)" class="text-center">
+              <td *ngIf="!isDraftEditable(currentOrder) && canEditCompletedInvoice(currentOrder)" class="text-center">
                 <app-table-action-button *ngIf="!item.isExcludedFromInvoice" action="delete"
                   [label]="'Rimuovi ' + (item.productName || 'articolo') + ' dalla fattura'"
                   [disabled]="removingBillingItem" (activated)="askRemoveBillingItem(item)">
@@ -189,7 +278,7 @@
               </ng-template>
             </tr>
             <tr *ngIf="currentOrder.items.length === 0">
-              <td [attr.colspan]="currentOrder.isReadOnly ? (canEditCompletedInvoice(currentOrder) ? 8 : 7) : 6"
+              <td [attr.colspan]="!isDraftEditable(currentOrder) ? (canEditCompletedInvoice(currentOrder) ? 8 : 7) : 6"
                 class="p-8 text-center text-slate-500">Nessun articolo presente.</td>
             </tr>
           </tbody>
@@ -199,16 +288,17 @@
           (pageSizeChange)="itemsPageSize = $event; itemsPage = 1">
         </app-pagination>
       </div>
-      <section *ngIf="canAddDraftOrderItem(currentOrder) || canEditCompletedInvoice(currentOrder)"
+      <section *ngIf="canAddDraftOrderItem(currentOrder) || canEditCompletedInvoice(currentOrder) || canEditAdjustmentLines(currentOrder)"
         class="mt-5 rounded-lg border border-blue-100 bg-blue-50 p-4">
-        <h3 class="m-0 text-base font-bold">
-          {{ currentOrder.status === 'Draft' ? 'Aggiungi articolo all’ordine' : 'Aggiungi riga all’ordine e alla fattura' }}
-        </h3>
+        <h3 class="m-0 text-base font-bold">{{ addItemLabel(currentOrder) }}</h3>
         <p *ngIf="currentOrder.status === 'Draft'" class="mt-1 text-xs text-slate-600">
           L’articolo verrà aggiunto all’ordine in bozza e seguirà il normale flusso di evasione.
         </p>
-        <p *ngIf="currentOrder.status !== 'Draft'" class="mt-1 text-xs text-slate-600">
+        <p *ngIf="currentOrder.status !== 'Draft' && !canEditAdjustmentLines(currentOrder)" class="mt-1 text-xs text-slate-600">
           La riga aggiunta è contabile e non genera movimenti di magazzino o DDT.
+        </p>
+        <p *ngIf="canEditAdjustmentLines(currentOrder)" class="mt-1 text-xs text-slate-600">
+          L’articolo viene aggiunto alle modifiche in sospeso; prezzo e IVA sono calcolati dal server al salvataggio.
         </p>
         <div class="mt-3 flex flex-wrap gap-2">
           <input name="billingProductSearch" [(ngModel)]="billingProductSearch" type="search" autocomplete="off"
@@ -248,9 +338,9 @@
             </select>
           </label>
           <app-add-action-button class="sm:col-span-3"
-            [label]="currentOrder.status === 'Draft' ? 'Aggiungi articolo all’ordine' : 'Aggiungi riga all’ordine e alla fattura'"
-            [disabled]="addingBillingItem"
-            (activated)="currentOrder.status === 'Draft' ? addDraftItem() : addBillingItem()">
+            [label]="addItemLabel(currentOrder)"
+            [disabled]="addingBillingItem || savingAdjustment"
+            (activated)="currentOrder.status === 'Draft' ? addDraftItem() : (canEditAdjustmentLines(currentOrder) ? addAdjustmentLine() : addBillingItem())">
           </app-add-action-button>
         </div>
       </section>
@@ -397,6 +487,25 @@
           [disabled]="removingBillingItem" (click)="confirmRemoveBillingItem()">
           {{ removingBillingItem ? 'Rimozione…' : 'Conferma rimozione' }}
         </button>
+      </div>
+    </section>
+  </div>
+
+  <div *ngIf="pendingAdjustmentRemoval as item"
+    class="fixed inset-0 z-[1050] grid place-items-center bg-slate-900/60 p-4"
+    role="presentation">
+    <section class="w-full max-w-lg rounded-xl bg-white p-5 shadow-2xl"
+      role="alertdialog" aria-modal="true" aria-labelledby="remove-adjustment-line-title">
+      <h2 id="remove-adjustment-line-title" class="m-0 text-lg font-bold">Rimuovere la riga dall’ordine?</h2>
+      <p class="mt-2 text-sm text-slate-600">
+        {{ item.productName || item.sku || 'Articolo' }} verrà tolto dalle righe in modifica.
+        La rimozione diventa effettiva con «Salva modifiche righe».
+      </p>
+      <div class="mt-5 flex justify-end gap-3">
+        <button type="button" class="rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+          (click)="cancelRemoveAdjustmentLine()">Annulla</button>
+        <button type="button" class="rounded-lg bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700"
+          (click)="confirmRemoveAdjustmentLine()">Conferma rimozione</button>
       </div>
     </section>
   </div>

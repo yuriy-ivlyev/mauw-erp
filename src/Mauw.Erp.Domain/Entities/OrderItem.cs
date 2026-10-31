@@ -76,6 +76,25 @@ public class OrderItem : Entity<Guid>, ICommercialDocumentLine
         UpdateTimestamp();
     }
 
+    /// <summary>Changes the quantity of a line of an order reopened for a pre-SDI adjustment.</summary>
+    internal void AdjustQuantity(int quantity)
+    {
+        Quantity = quantity;
+        UpdateTimestamp();
+    }
+
+    /// <summary>Keeps a fully shipped line consistent with its adjusted quantity (no residual to ship).</summary>
+    internal void AlignShippedQuantityWithQuantity()
+    {
+        QuantityShipped = Math.Max(0, Quantity);
+        UpdateTimestamp();
+    }
+
+    /// <summary>True for lines that are posted to inventory (not billing-only and not excluded from the invoice).</summary>
+    public bool AffectsStock => !IsBillingOnly && !IsExcludedFromInvoice;
+
+    public bool IsCustomerReturnLine => PricingSnapshot?.IsCustomerReturn == true || Quantity < 0;
+
     public void ExcludeFromInvoice()
     {
         IsExcludedFromInvoice = true;

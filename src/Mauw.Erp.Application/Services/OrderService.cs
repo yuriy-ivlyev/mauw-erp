@@ -122,9 +122,10 @@ public partial class OrderService(
                 ddts.Select(ddt => new DdtDocumentRefDto(ddt.Id, ddt.DdtNumber, ddt.DdtDate)).ToList())
             : null;
         var shippedQuantities = OrderInventoryOperations.GetShippedQuantitiesByItem(order, ddts);
-        var canEditInvoice = order.Status == OrderStatus.Completed && invoice?.SdiSubmittedAt is null;
+        var canEditInvoice = order.Status == OrderStatus.Completed &&
+            !order.IsUnderAdjustment && invoice?.IsSdiSubmitted != true;
         return OperationResult<OrderDto>.Ok(
-            OrderMapper.MapToDto(order, linked, shippedQuantities, canEditInvoice));
+            OrderMapper.MapToDto(order, linked, shippedQuantities, canEditInvoice, invoice));
     }
 
     public async Task<OperationResult<PagedResult<OrderDto>>> GetAllOrdersAsync(
@@ -187,7 +188,7 @@ public partial class OrderService(
                     orderDdts?.Select(ddt => new DdtDocumentRefDto(ddt.Id, ddt.DdtNumber, ddt.DdtDate)).ToList())
                 : null;
 
-            return OrderMapper.MapToDto(o, linked);
+            return OrderMapper.MapToDto(o, linked, invoice: invoice);
         }).ToList();
 
         return OperationResult<PagedResult<OrderDto>>.Ok(new PagedResult<OrderDto>(dtos, page, pageSize, total));
@@ -234,7 +235,7 @@ public partial class OrderService(
         var invoice = await unitOfWork.Invoices.GetByOrderIdAsync(order.Id);
         if (invoice is null)
             return OperationResult<bool>.Ok(false);
-        if (invoice.SdiSubmittedAt.HasValue)
+        if (invoice.IsSdiSubmitted)
             return OperationResult<bool>.Fail("La fattura è già stata inviata allo SDI e l'ordine non può essere modificato.");
 
         var synchronized = invoice.SyncFromOrder(order, accountingCalculator);
@@ -370,7 +371,7 @@ public partial class OrderService(
                 return await FailAsync("È possibile aggiungere righe contabili solo a un ordine completato.");
 
             var invoice = await unitOfWork.Invoices.GetByOrderIdAsync(orderId);
-            if (invoice?.SdiSubmittedAt.HasValue == true)
+            if (invoice?.IsSdiSubmitted == true)
                 return await FailAsync("La fattura è già stata inviata allo SDI e l'ordine non può essere modificato.");
 
             var variant = await unitOfWork.ProductVariants.GetByIdAsync(request.VariantId);
@@ -626,7 +627,7 @@ public partial class OrderService(
             var invoice = allowCompletedEdit
                 ? await unitOfWork.Invoices.GetByOrderIdAsync(orderId)
                 : null;
-            if (allowCompletedEdit && invoice?.SdiSubmittedAt.HasValue == true)
+            if (allowCompletedEdit && invoice?.IsSdiSubmitted == true)
                 return await FailAsync("La fattura è già stata inviata allo SDI e l'ordine non può essere modificato.");
 
             var result = order.SetShippingCharge(

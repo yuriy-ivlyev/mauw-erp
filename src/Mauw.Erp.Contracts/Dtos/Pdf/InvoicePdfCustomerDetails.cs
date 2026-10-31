@@ -10,5 +10,7 @@ public sealed record InvoicePdfCustomerDetails(
     string  PostalCode,
     string  Province,
     string? SdiCode,
-    string? Pec
+    string? Pec,
+    /// <summary>ISO 3166-1 alpha-2 country of the customer; "IT" when not specified.</summary>
+    string  CountryCode = "IT"
 );

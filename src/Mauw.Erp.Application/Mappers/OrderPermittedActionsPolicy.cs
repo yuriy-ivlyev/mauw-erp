@@ -6,7 +6,23 @@ namespace Mauw.Erp.Application.Mappers;
 
 public static class OrderPermittedActionsPolicy
 {
-    public static List<OrderPermittedActionDto> GetFor(Order order)
+    public const string ReopenForAdjustmentAction = "ReopenForAdjustment";
+    public const string SyncAndFinalizeInvoiceAction = "SyncAndFinalizeInvoice";
+
+    /// <summary>
+    /// Lines are editable on drafts and, for a completed order, only while it is reopened for a
+    /// pre-SDI adjustment whose invoice has not left for the SDI yet.
+    /// </summary>
+    public static bool IsReadOnly(Order order, Invoice? invoice = null)
+    {
+        if (order.Status == OrderStatus.Draft)
+            return false;
+
+        return !(order.IsUnderAdjustment && order.Status == OrderStatus.Completed &&
+                 (invoice is null || invoice.CanBeAdjustedBeforeSdi));
+    }
+
+    public static List<OrderPermittedActionDto> GetFor(Order order, Invoice? invoice = null)
     {
         var id = order.Id;
         var endpoint = $"/api/v1/orders/{id}";
@@ -81,6 +97,13 @@ public static class OrderPermittedActionsPolicy
                 if (order.StatusBeforeHold != OrderStatus.PartiallyShipped)
                     Add("Cancel", "Annulla Ordine Definitivamente", "cancel",
                         "danger", true, "CancelReason");
+                break;
+
+            case OrderStatus.Completed when invoice is { CanBeAdjustedBeforeSdi: true }:
+                if (order.IsUnderAdjustment)
+                    Add(SyncAndFinalizeInvoiceAction, "Aggiorna Fattura e Chiudi", "sync-invoice", "primary");
+                else
+                    Add(ReopenForAdjustmentAction, "Modifica Righe (Pre-SDI)", "reopen-adjustment", "warning");
                 break;
         }
 

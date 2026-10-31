@@ -253,6 +253,48 @@ internal static class OrderInventoryOperations
         }
     }
 
+    public static async Task<(Guid? WarehouseId, string? Error)> ResolveAdjustmentWarehouseAsync(
+        IUnitOfWork unitOfWork,
+        Order order)
+    {
+        if (order.FulfillmentWarehouseId.HasValue)
+            return (order.FulfillmentWarehouseId, null);
+
+        var warehouse = await unitOfWork.Warehouses.GetDefaultWarehouseAsync();
+        return warehouse is { IsActive: true, IsSellable: true }
+            ? (warehouse.Id, null)
+            : (null, "Non è disponibile un magazzino predefinito attivo e abilitato alla vendita.");
+    }
+
+    /// <summary>
+    /// Posts the stock delta of an order adjustment: an integrative discharge when quantities grow,
+    /// a return when they shrink. Nothing is recorded if any discharge exceeds the available stock.
+    /// </summary>
+    public static async Task<string?> RecordAdjustmentMovementsAsync(
+        IUnitOfWork unitOfWork,
+        Order order,
+        Guid warehouseId,
+        IReadOnlyList<OrderAdjustmentStockDelta> deltas,
+        string? createdByUserId,
+        string notes)
+    {
+        foreach (var delta in deltas.Where(delta => delta.DeltaOnHand < 0))
+        {
+            var available = await unitOfWork.Stock.GetAvailableQtyAsync(warehouseId, delta.VariantId);
+            if (available < -delta.DeltaOnHand)
+                return $"Giacenza insufficiente per la variante {delta.VariantId}: disponibili {available}.";
+        }
+
+        foreach (var delta in deltas)
+        {
+            var movement = StockMovement.FromOrderAdjustment(
+                order, delta.VariantId, delta.DeltaOnHand, warehouseId, createdByUserId, notes);
+            await unitOfWork.Stock.RecordMovementAsync(movement, delta.DeltaOnHand);
+        }
+
+        return null;
+    }
+
     private static IEnumerable<(Guid VariantId, decimal Quantity)> GetSaleQuantities(Order order) =>
         order.Items
             .Where(item => item.Quantity > 0 && !IsReturn(item))

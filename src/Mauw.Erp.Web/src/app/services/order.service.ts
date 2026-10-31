@@ -13,6 +13,7 @@ import {
   DraftOrderPreview,
   OrderPermittedAction,
   UpdateOrderShippingChargeRequest,
+  UpdateOrderAdjustmentLinesRequest,
   PagedResult,
   CreateShipmentRequest,
   OrderFulfillmentResult
@@ -74,6 +75,10 @@ export class OrderService {
 
   updateCompletedInvoiceShippingCharge(orderId: string, request: UpdateOrderShippingChargeRequest): Observable<Order> {
     return this.http.put<Order>(`${this.base}/${orderId}/invoice-shipping-cost`, request);
+  }
+
+  updateAdjustmentLines(orderId: string, request: UpdateOrderAdjustmentLinesRequest): Observable<Order> {
+    return this.http.put<Order>(`${this.base}/${orderId}/adjustment-lines`, request);
   }
 
   previewDraftItems(

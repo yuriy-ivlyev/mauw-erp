@@ -15,7 +15,7 @@ public class InitialCreateBaselineMigrationTests(PostgreSqlContainerFixture post
         await using var db = await MigratedDbAsync();
 
         var migrations = db.Database.GetMigrations().ToList();
-        Assert.Equal(12, migrations.Count);
+        Assert.Equal(14, migrations.Count);
         Assert.EndsWith("_InitialCreate", migrations[0]);
         Assert.EndsWith("_AddVariantForeignKeys", migrations[1]);
         Assert.EndsWith("_EnforceWholeMerchandiseQuantities", migrations[2]);
@@ -28,6 +28,8 @@ public class InitialCreateBaselineMigrationTests(PostgreSqlContainerFixture post
         Assert.EndsWith("_AddInvoicePaymentMetadata", migrations[9]);
         Assert.EndsWith("_AddInvoiceConfirmationWorkflow", migrations[10]);
         Assert.EndsWith("_AddInvoiceOrderSynchronization", migrations[11]);
+        Assert.EndsWith("_AddStockItemXminConcurrencyToken", migrations[12]);
+        Assert.EndsWith("_AddPreSdiOrderAdjustment", migrations[13]);
         Assert.Equal(migrations, await db.Database.GetAppliedMigrationsAsync());
         Assert.Empty(await db.Database.GetPendingMigrationsAsync());
         Assert.False(db.Database.HasPendingModelChanges());

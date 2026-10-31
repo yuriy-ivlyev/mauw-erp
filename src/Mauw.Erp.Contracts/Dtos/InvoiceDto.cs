@@ -21,5 +21,7 @@ public record InvoiceDto(
     decimal BalanceDue,
     string Status,
     List<InvoiceItemDto> Items,
-    List<PaymentDto> Payments
+    List<PaymentDto> Payments,
+    string SdiStatus = "NotTransmitted",
+    bool IsOrderUnderAdjustment = false
 );

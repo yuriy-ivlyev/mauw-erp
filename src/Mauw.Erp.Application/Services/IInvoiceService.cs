@@ -25,4 +25,7 @@ public interface IInvoiceService
     Task<OperationResult<PagedResult<InvoiceDto>>> GetInvoicesByContactAsync(Guid contactId, int page, int pageSize);
     Task<OperationResult<InvoiceDto>> RecordPaymentAsync(Guid invoiceId, RecordPaymentRequest request);
     Task<OperationResult<byte[]>> GetInvoicePdfAsync(Guid id);
+
+    /// <summary>FatturaPA (FPR12) XML regenerated from the persisted invoice.</summary>
+    Task<OperationResult<string>> GetInvoiceXmlAsync(Guid id);
 }

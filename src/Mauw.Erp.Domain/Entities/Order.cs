@@ -86,6 +86,13 @@ public class Order : Entity<Guid>
     public string? HoldReason { get; private set; }
     public OrderStatus? StatusBeforeHold { get; private set; }
 
+    /// <summary>
+    /// A completed order temporarily reopened to adjust lines before its invoice is transmitted to the SDI.
+    /// The status stays <see cref="OrderStatus.Completed"/>; only lines become editable.
+    /// </summary>
+    public bool IsUnderAdjustment { get; private set; }
+    public DateTime? AdjustmentStartedAt { get; private set; }
+    public string? AdjustmentStartedBy { get; private set; }
     public Contact Contact { get; set; } = null!;
     public Warehouse? FulfillmentWarehouse { get; private set; }
     public ICollection<OrderItem> Items { get; private set; } = [];
@@ -145,6 +152,8 @@ public class Order : Entity<Guid>
     {
         if (Status != OrderStatus.Completed)
             return AccountingResult<CalculatedDocument>.Fail("Le righe contabili aggiuntive sono ammesse solo su ordini completati.");
+        if (IsUnderAdjustment)
+            return AccountingResult<CalculatedDocument>.Fail(AdjustmentInProgressMessage);
         if (item.OrderId != Id)
             return AccountingResult<CalculatedDocument>.Fail("La riga appartiene a un altro ordine.");
 
@@ -163,6 +172,8 @@ public class Order : Entity<Guid>
     {
         if (Status != OrderStatus.Completed)
             return AccountingResult<CalculatedDocument>.Fail("Le righe possono essere rimosse dalla fattura solo su ordini completati.");
+        if (IsUnderAdjustment)
+            return AccountingResult<CalculatedDocument>.Fail(AdjustmentInProgressMessage);
         var item = Items.FirstOrDefault(line => line.Id == itemId && !line.IsExcludedFromInvoice);
         if (item is null)
             return AccountingResult<CalculatedDocument>.Fail("Riga ordine non trovata.");
@@ -176,6 +187,119 @@ public class Order : Entity<Guid>
             return result;
 
         item.ExcludeFromInvoice();
+        ApplyTotals(result.Data!);
+        return result;
+    }
+
+    private const string AdjustmentInProgressMessage =
+        "L'ordine è in rettifica pre-SDI: usare il flusso di modifica righe e aggiornare la fattura.";
+
+    /// <summary>Reopens a completed order so its lines can be adjusted before the invoice reaches the SDI.</summary>
+    public OrderWorkflowResult BeginAdjustment(string? startedBy, DateTime? startedAt = null)
+    {
+        if (Status != OrderStatus.Completed)
+            return OrderWorkflowResult.Fail("Solo un ordine completato può essere riaperto per variazione.");
+        if (IsUnderAdjustment)
+            return OrderWorkflowResult.Fail("L'ordine è già in rettifica.");
+
+        IsUnderAdjustment = true;
+        AdjustmentStartedAt = startedAt ?? DateTime.UtcNow;
+        AdjustmentStartedBy = string.IsNullOrWhiteSpace(startedBy) ? null : startedBy.Trim();
+        UpdateTimestamp();
+        return OrderWorkflowResult.Ok();
+    }
+
+    /// <summary>Closes the adjustment: the order returns to its plain completed state.</summary>
+    public OrderWorkflowResult CompleteAdjustment()
+    {
+        if (!IsUnderAdjustment)
+            return OrderWorkflowResult.Fail("L'ordine non è in rettifica.");
+
+        IsUnderAdjustment = false;
+        AdjustmentStartedAt = null;
+        AdjustmentStartedBy = null;
+        UpdateTimestamp();
+        return OrderWorkflowResult.Ok();
+    }
+
+    /// <summary>
+    /// Replaces the adjustable lines of an order under adjustment: lines missing from
+    /// <paramref name="keptLines"/> are removed, listed lines get the new quantity and
+    /// <paramref name="addedItems"/> are appended. Nothing changes when the result is a failure.
+    /// </summary>
+    public AccountingResult<CalculatedDocument> AdjustLines(
+        IReadOnlyCollection<OrderLineQuantityChange> keptLines,
+        IReadOnlyCollection<OrderItem> addedItems,
+        ItalianAccountingCalculator calculator)
+    {
+        if (Status != OrderStatus.Completed || !IsUnderAdjustment)
+            return AccountingResult<CalculatedDocument>.Fail("Le righe sono modificabili solo su un ordine riaperto per rettifica.");
+        if (keptLines.Any(line => line is null) || addedItems.Any(item => item is null))
+            return AccountingResult<CalculatedDocument>.Fail("Una riga della rettifica non può essere null.");
+        if (keptLines.Select(line => line.OrderItemId).Distinct().Count() != keptLines.Count)
+            return AccountingResult<CalculatedDocument>.Fail("Una riga ordine è indicata più volte nella rettifica.");
+
+        var currentItems = Items.Where(item => !item.IsExcludedFromInvoice).ToDictionary(item => item.Id);
+        var inputs = new List<DocumentLineInput>();
+        foreach (var kept in keptLines)
+        {
+            if (!currentItems.TryGetValue(kept.OrderItemId, out var current))
+                return AccountingResult<CalculatedDocument>.Fail("Riga ordine non trovata.");
+            if (current.IsCustomerReturnLine)
+            {
+                if (kept.Quantity != current.Quantity)
+                    return AccountingResult<CalculatedDocument>.Fail("Le righe di reso non sono modificabili in rettifica.");
+            }
+            else if (kept.Quantity <= 0)
+            {
+                return AccountingResult<CalculatedDocument>.Fail("La quantità di una riga deve essere un intero maggiore di zero.");
+            }
+
+            inputs.Add(new DocumentLineInput(
+                kept.Quantity, current.UnitNetPrice, current.VatRate, current.NatureCode, current.DiscountPercent));
+        }
+
+        foreach (var added in addedItems)
+        {
+            if (added.OrderId != Id)
+                return AccountingResult<CalculatedDocument>.Fail("La riga appartiene a un altro ordine.");
+            if (added.Quantity <= 0 || added.IsCustomerReturnLine)
+                return AccountingResult<CalculatedDocument>.Fail("Le nuove righe devono avere una quantità positiva e non essere resi.");
+            if (added.IsBillingOnly || added.IsExcludedFromInvoice)
+                return AccountingResult<CalculatedDocument>.Fail("Le nuove righe di rettifica devono movimentare il magazzino.");
+
+            inputs.Add(new DocumentLineInput(
+                added.Quantity, added.UnitNetPrice, added.VatRate, added.NatureCode, added.DiscountPercent));
+        }
+
+        if (inputs.Count == 0 && ShippingCost == 0m)
+            return AccountingResult<CalculatedDocument>.Fail("L'ordine deve conservare almeno una riga fatturabile o una spesa di spedizione.");
+        if (ShippingCost > 0m && ShippingVatRate.HasValue)
+            inputs.Add(new DocumentLineInput(1m, ShippingCost, ShippingVatRate.Value, ShippingNatureCode));
+
+        // Pure pre-check so that an invalid adjustment never leaves the aggregate half-modified.
+        var validation = calculator.Calculate(inputs);
+        if (!validation.Success)
+            return validation;
+
+        var keptIds = keptLines.ToDictionary(line => line.OrderItemId, line => line.Quantity);
+        foreach (var removed in currentItems.Values.Where(item => !keptIds.ContainsKey(item.Id)).ToList())
+            Items.Remove(removed);
+        foreach (var item in Items.Where(item => keptIds.ContainsKey(item.Id)))
+            item.AdjustQuantity(keptIds[item.Id]);
+        foreach (var added in addedItems)
+            Items.Add(added);
+
+        var result = calculator.CalculateAndApply(GetAccountingLines(Items));
+        if (!result.Success)
+            return result;
+
+        if (FulfillmentType == OrderFulfillmentType.StandardShipping)
+        {
+            foreach (var item in Items.Where(item => item.AffectsStock && item.Quantity > 0))
+                item.AlignShippedQuantityWithQuantity();
+        }
+
         ApplyTotals(result.Data!);
         return result;
     }
@@ -235,6 +359,8 @@ public class Order : Entity<Guid>
     {
         if (Status is not (OrderStatus.Draft or OrderStatus.Completed))
             return AccountingResult<CalculatedDocument>.Fail("Il costo di spedizione può essere modificato solo su ordini in bozza o completati.");
+        if (IsUnderAdjustment)
+            return AccountingResult<CalculatedDocument>.Fail(AdjustmentInProgressMessage);
         if (shippingCost < 0m)
             return AccountingResult<CalculatedDocument>.Fail("Shipping cost cannot be negative.");
         if (decimal.Round(shippingCost, 2, MidpointRounding.AwayFromZero) != shippingCost)

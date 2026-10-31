@@ -185,6 +185,7 @@ public class StockService(
         StockMovementReason.CustomerReturn      => "Reso Cliente",
         StockMovementReason.SupplierReturn      => "Reso Fornitore",
         StockMovementReason.InventoryAdjustment => "Rettifica Inventario",
+        StockMovementReason.OrderAdjustment     => "Rettifica Ordine",
         _                                       => null
     };
 

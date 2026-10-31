@@ -42,6 +42,11 @@ public static class InvoiceEndpoints
             .RequireAuthorization(AppPolicies.Billing)
             .WithName("GetInvoicePdf")
             .WithSummary("Generate and download invoice PDF");
+
+        group.MapGet("/{id}/xml", GetInvoiceXml)
+            .RequireAuthorization(AppPolicies.Billing)
+            .WithName("GetInvoiceXml")
+            .WithSummary("Generate and download the FatturaPA XML of an invoice");
     }
 
     private static async Task<Results<Created<InvoiceDto>, BadRequest<string>, NotFound, Conflict<string>>> GenerateFromOrder(
@@ -120,5 +125,19 @@ public static class InvoiceEndpoints
                 : TypedResults.BadRequest(result.Error!);
 
         return TypedResults.File(result.Data!, "application/pdf", $"fattura-{id}.pdf");
+    }
+
+    private static async Task<Results<FileContentHttpResult, NotFound, BadRequest<string>>> GetInvoiceXml(
+        Guid id,
+        IInvoiceService invoiceService)
+    {
+        var result = await invoiceService.GetInvoiceXmlAsync(id);
+        if (!result.Success)
+            return result.Error?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true
+                ? TypedResults.NotFound()
+                : TypedResults.BadRequest(result.Error!);
+
+        return TypedResults.File(
+            System.Text.Encoding.UTF8.GetBytes(result.Data!), "application/xml", $"fattura-{id}.xml");
     }
 }

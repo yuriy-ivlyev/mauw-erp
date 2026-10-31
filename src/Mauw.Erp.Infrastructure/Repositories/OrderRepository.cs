@@ -25,7 +25,11 @@ public class OrderRepository(MauwDbContext dbContext) : Repository<Order, Guid>(
                     .ThenInclude(variant => variant.Color)
             .Include(o => o.Shipments)
                 .ThenInclude(shipment => shipment.Lines)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(o => o.Id == id);
+
+    public async Task<bool> IsUnderAdjustmentAsync(Guid orderId) =>
+        await _dbSet.AsNoTracking().AnyAsync(o => o.Id == orderId && o.IsUnderAdjustment);
 
     public async Task<IEnumerable<Order>> GetByContactIdAsync(Guid contactId)
     {

@@ -52,7 +52,11 @@ righe fattura senza modificare i valori storici), AddInvoicePaymentMetadata
 (aggiunge metodo di pagamento e riferimento transazione nullable, preservando
 i pagamenti storici non classificati), AddInvoiceConfirmationWorkflow e
 AddInvoiceOrderSynchronization (aggiunge spesa di spedizione, lock SDI e
-righe contabili aggiunte/escluse senza alterare lo storico di magazzino):
+righe contabili aggiunte/escluse senza alterare lo storico di magazzino) e
+AddPreSdiOrderAdjustment (aggiunge lo stato SDI delle fatture, il flag di
+rettifica pre-SDI degli ordini e il registro di audit dei documenti: i dati
+sintetici nascono NotTransmitted e non in rettifica, e il generatore non
+crea mai movimenti OrderAdjustment, ne righe di audit):
 il ciclo reset -> database update -> seed e
 percorribile su un database vuoto. Un database creato con le vecchie migrazioni
 va ricreato oppure la sua tabella __EFMigrationsHistory va allineata (riga con

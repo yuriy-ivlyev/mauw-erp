@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Mauw.Erp.Domain.Entities;
+using Mauw.Erp.Domain.Enums;
 
 namespace Mauw.Erp.Infrastructure.DbContext;
 
@@ -24,6 +25,11 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
 
         builder.Property(i => i.ConfirmedAt);
         builder.Property(i => i.SdiSubmittedAt);
+        builder.Property<SdiStatus>("_sdiStatus")
+            .HasColumnName("sdi_status")
+            .HasConversion<int>()
+            .HasDefaultValue(SdiStatus.NotTransmitted)
+            .IsRequired();
 
         builder.Property(i => i.ShippingCost)
             .HasPrecision(18, 2);

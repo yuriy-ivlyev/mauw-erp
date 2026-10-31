@@ -1,6 +1,7 @@
 using Mauw.Erp.Application.Mappers;
 using Mauw.Erp.Domain.Entities;
 using Mauw.Erp.Domain.Enums;
+using Mauw.Erp.Domain.Services;
 
 namespace Mauw.Erp.UnitTests.Application;
 
@@ -90,6 +91,94 @@ public sealed class OrderPermittedActionsPolicyTests
         var confirmedDto = OrderMapper.MapToDto(draft);
         Assert.Equal("Confermato", confirmedDto.StatusDescription);
         Assert.True(confirmedDto.IsReadOnly);
+    }
+
+    [Fact]
+    public void CompletedOrderWithUntransmittedInvoiceOffersOnlyTheReopenAction()
+    {
+        var (order, invoice) = CompletedOrderWithInvoice();
+
+        var action = Assert.Single(OrderPermittedActionsPolicy.GetFor(order, invoice));
+
+        Assert.Equal("ReopenForAdjustment", action.Action);
+        Assert.Equal("Modifica Righe (Pre-SDI)", action.Label);
+        Assert.Equal("warning", action.Style);
+        Assert.False(action.RequiresDialog);
+        Assert.Equal("POST", action.Method);
+        Assert.Equal($"/api/v1/orders/{order.Id}/reopen-adjustment", action.Endpoint);
+        Assert.True(OrderPermittedActionsPolicy.IsReadOnly(order, invoice));
+    }
+
+    [Fact]
+    public void OrderUnderAdjustmentUnlocksLinesAndOffersTheSyncActionOnly()
+    {
+        var (order, invoice) = CompletedOrderWithInvoice();
+        Assert.True(order.BeginAdjustment("tester").Success);
+
+        var action = Assert.Single(OrderPermittedActionsPolicy.GetFor(order, invoice));
+
+        Assert.Equal("SyncAndFinalizeInvoice", action.Action);
+        Assert.Equal("Aggiorna Fattura e Chiudi", action.Label);
+        Assert.Equal("primary", action.Style);
+        Assert.False(action.RequiresDialog);
+        Assert.Equal($"/api/v1/orders/{order.Id}/sync-invoice", action.Endpoint);
+        Assert.False(OrderPermittedActionsPolicy.IsReadOnly(order, invoice));
+        var dto = OrderMapper.MapToDto(order, invoice: invoice);
+        Assert.True(dto.IsUnderAdjustment);
+        Assert.False(dto.IsReadOnly);
+        Assert.Equal("NotTransmitted", dto.InvoiceSdiStatus);
+    }
+
+    [Theory]
+    [InlineData("Pending")]
+    [InlineData("Transmitted")]
+    [InlineData("Accepted")]
+    public void InvoiceAlreadyQueuedOrTransmittedLocksTheOrderEvenIfFlaggedUnderAdjustment(string state)
+    {
+        var (order, invoice) = CompletedOrderWithInvoice();
+        Assert.True(order.BeginAdjustment("tester").Success);
+        MoveInvoiceTo(invoice, state);
+
+        Assert.Empty(OrderPermittedActionsPolicy.GetFor(order, invoice));
+        Assert.True(OrderPermittedActionsPolicy.IsReadOnly(order, invoice));
+        Assert.True(OrderMapper.MapToDto(order, invoice: invoice).IsReadOnly);
+
+        var reopened = CompletedOrderWithInvoice();
+        MoveInvoiceTo(reopened.Invoice, state);
+        Assert.Empty(OrderPermittedActionsPolicy.GetFor(reopened.Order, reopened.Invoice));
+        Assert.True(OrderPermittedActionsPolicy.IsReadOnly(reopened.Order, reopened.Invoice));
+    }
+
+    [Fact]
+    public void CompletedOrderWithoutInvoiceOffersNoAdjustmentAction()
+    {
+        var (order, _) = CompletedOrderWithInvoice();
+
+        Assert.Empty(OrderPermittedActionsPolicy.GetFor(order));
+        Assert.True(OrderPermittedActionsPolicy.IsReadOnly(order));
+    }
+
+    private static (Order Order, Invoice Invoice) CompletedOrderWithInvoice()
+    {
+        var calculator = new ItalianAccountingCalculator();
+        var order = new Order(Guid.NewGuid(), "ORD-CASH", fulfillmentType: OrderFulfillmentType.CashDesk);
+        Assert.True(order.AddItem(new OrderItem(order.Id, Guid.NewGuid(), 2, 10m, 22m), calculator).Success);
+        order.FinalizeCashSale("Contanti", null);
+        var invoice = new Invoice(order.ContactId, "FAT-202610-00001") { OrderId = order.Id };
+        Assert.True(invoice.SyncFromOrder(order, calculator).Success);
+        Assert.True(invoice.Confirm(calculator).Success);
+        return (order, invoice);
+    }
+
+    private static void MoveInvoiceTo(Invoice invoice, string state)
+    {
+        Assert.True(invoice.MarkSdiPending().Success);
+        if (state == "Pending")
+            return;
+
+        Assert.True(invoice.MarkSdiTransmitted(DateTime.UtcNow).Success);
+        if (state == "Accepted")
+            Assert.True(invoice.MarkSdiAccepted().Success);
     }
 
     private static Order NewOrder()

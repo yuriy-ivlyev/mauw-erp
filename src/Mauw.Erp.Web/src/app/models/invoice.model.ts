@@ -38,6 +38,8 @@ export interface Invoice {
   shippingVatRate: number | null;
   shippingNatureCode: string | null;
   sdiSubmittedAt: string | null;
+  sdiStatus?: string;
+  isOrderUnderAdjustment?: boolean;
   paidAmount: number;
   balanceDue: number;
   status: string;

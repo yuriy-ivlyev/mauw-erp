@@ -9,7 +9,7 @@ namespace Mauw.Erp.Application.Mappers;
 /// </summary>
 public static class InvoiceMapper
 {
-    public static InvoiceDto MapToDto(Invoice invoice)
+    public static InvoiceDto MapToDto(Invoice invoice, bool isOrderUnderAdjustment = false)
     {
         return new(
             Id: invoice.Id,
@@ -29,7 +29,9 @@ public static class InvoiceMapper
             BalanceDue: invoice.GrossTotal - invoice.PaidAmount,
             Status: invoice.Status,
             Items: invoice.Items.Select(MapItemToDto).ToList(),
-            Payments: invoice.Payments.Select(MapPaymentToDto).ToList()
+            Payments: invoice.Payments.Select(MapPaymentToDto).ToList(),
+            SdiStatus: invoice.SdiStatus.ToString(),
+            IsOrderUnderAdjustment: isOrderUnderAdjustment
         );
     }
 
@@ -68,6 +70,6 @@ public static class InvoiceMapper
 
     public static List<InvoiceDto> MapToListDto(IEnumerable<Invoice> invoices)
     {
-        return invoices.Select(MapToDto).ToList();
+        return invoices.Select(invoice => MapToDto(invoice)).ToList();
     }
 }

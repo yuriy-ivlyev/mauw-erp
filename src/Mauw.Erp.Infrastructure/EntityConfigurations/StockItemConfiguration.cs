@@ -8,6 +8,9 @@ public class StockItemConfiguration : IEntityTypeConfiguration<StockItem>
 {
     public void Configure(EntityTypeBuilder<StockItem> builder)
     {
+        builder.Property<uint>("xmin")
+            .IsRowVersion();
+
         builder.ToTable("stock_items", table => table.HasCheckConstraint(
             "ck_stock_items_whole_quantities",
             "quantity_on_hand = trunc(quantity_on_hand) AND quantity_reserved = trunc(quantity_reserved)"));

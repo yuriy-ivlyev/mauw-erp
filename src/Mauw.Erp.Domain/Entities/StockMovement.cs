@@ -166,6 +166,40 @@ public class StockMovement : Entity<Guid>
         return reversal;
     }
 
+    /// <summary>
+    /// Ledger movement for a pre-SDI order adjustment. <paramref name="deltaOnHand"/> is signed:
+    /// negative for an integrative sale discharge, positive for an adjustment return.
+    /// </summary>
+    public static StockMovement FromOrderAdjustment(
+        Order order,
+        Guid variantId,
+        int deltaOnHand,
+        Guid warehouseId,
+        string? createdByUserId,
+        string? notes)
+    {
+        if (deltaOnHand == 0)
+            throw new Mauw.Erp.Domain.Exceptions.DomainException("Una rettifica di magazzino richiede una variazione diversa da zero.");
+
+        var quantity = Math.Abs(deltaOnHand);
+        return new StockMovement
+        {
+            Id = Guid.NewGuid(),
+            VariantId = variantId,
+            WarehouseId = warehouseId,
+            Type = deltaOnHand < 0 ? StockMovementType.SalesDelivery : StockMovementType.CustomerReturn,
+            Reason = StockMovementReason.OrderAdjustment,
+            Quantity = quantity,
+            QuantityDelta = deltaOnHand,
+            UnitCost = 0m,
+            MovementDateUtc = DateTime.UtcNow,
+            ReferenceDoc = order.OrderNumber,
+            ReferenceId = order.Id,
+            CreatedByUserId = createdByUserId,
+            Notes = notes
+        };
+    }
+
     public decimal? GetEffectiveQuantityDelta()
     {
         if (QuantityDelta.HasValue)

@@ -24,6 +24,7 @@ public interface IUnitOfWork : IDisposable
     IMaterialRepository Materials { get; }
     IMacroCategoryRepository MacroCategories { get; }
     IWarehouseRepository Warehouses { get; }
+    IAuditTrailRepository AuditTrail { get; }
 
     Task SaveChangesAsync();
     Task BeginTransactionAsync(IsolationLevel isolationLevel = IsolationLevel.ReadCommitted);

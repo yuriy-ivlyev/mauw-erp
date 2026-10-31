@@ -29,6 +29,7 @@ public class UnitOfWork(MauwDbContext dbContext, IMemoryCache _cache) : IUnitOfW
     private IMaterialRepository? _materialRepository;
     private IMacroCategoryRepository? _macroCategoryRepository;
     private IWarehouseRepository? _warehouseRepository;
+    private IAuditTrailRepository? _auditTrailRepository;
 
     public IProductRepository Products => _productRepository ??= new ProductRepository(dbContext);
     public IProductVariantRepository ProductVariants => _productVariantRepository ??= new ProductVariantRepository(dbContext);
@@ -48,6 +49,7 @@ public class UnitOfWork(MauwDbContext dbContext, IMemoryCache _cache) : IUnitOfW
     public IMaterialRepository Materials => _materialRepository ??= new MaterialRepository(dbContext);
     public IMacroCategoryRepository MacroCategories => _macroCategoryRepository ??= new MacroCategoryRepository(dbContext);
     public IWarehouseRepository Warehouses => _warehouseRepository ??= new WarehouseRepository(dbContext);
+    public IAuditTrailRepository AuditTrail => _auditTrailRepository ??= new AuditTrailRepository(dbContext);
 
     public async Task SaveChangesAsync()
     {

@@ -8,6 +8,7 @@ import {
   CreateOrderItemRequest,
   Order,
   OrderActionResponse,
+  OrderAdjustmentLineRequest,
   OrderItem,
   OrderPermittedAction
 } from '../../../models/order.model';
@@ -31,6 +32,32 @@ interface DraftOrderItemEdit {
   natureCode: string | null;
   discountPercent: number;
 }
+
+interface AdjustmentRow {
+  key: string;
+  orderItemId: string | null;
+  variantId: string | null;
+  quantity: number | null;
+  originalQuantity: number | null;
+  natureCode: string | null;
+  sku: string | null;
+  productName: string | null;
+  sizeName: string | null;
+  colorName: string | null;
+  unitNetPrice: number | null;
+  discountPercent: number;
+  lineNetTotal: number | null;
+  isNew: boolean;
+  isExcluded: boolean;
+  isReturn: boolean;
+}
+
+const REOPEN_ACTION = 'ReopenForAdjustment';
+const SYNC_ACTION = 'SyncAndFinalizeInvoice';
+const ACTION_SUCCESS_MESSAGES: Record<string, string> = {
+  [REOPEN_ACTION]: 'Ordine riaperto per modifica righe pre-SDI.',
+  [SYNC_ACTION]: 'Fattura aggiornata e rigenerata con successo'
+};
 
 @Component({
   selector: 'app-order-detail',
@@ -61,6 +88,10 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   pendingDraftRemoval: OrderItem | null = null;
   removingDraftItem = false;
   pendingBillingRemoval: OrderItem | null = null;
+  adjustmentRows: AdjustmentRow[] = [];
+  removedAdjustmentCount = 0;
+  pendingAdjustmentRemoval: AdjustmentRow | null = null;
+  savingAdjustment = false;
   savingShippingCharge = false;
   savingItemId: string | null = null;
   itemsPage = 1;
@@ -90,6 +121,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   transactionDetails = '';
 
   private readonly destroy$ = new Subject<void>();
+  private newAdjustmentSequence = 0;
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -140,7 +172,55 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   }
 
   canEditCompletedInvoice(order: Order): boolean {
-    return this.canManageBilling && order.canEditInvoice === true;
+    return this.canManageBilling && order.canEditInvoice === true && order.isUnderAdjustment !== true;
+  }
+
+  isDraftEditable(order: Order): boolean {
+    return order.status === 'Draft' && !order.isReadOnly;
+  }
+
+  canEditShippingCharge(order: Order): boolean {
+    return this.isDraftEditable(order) || this.canEditCompletedInvoice(order);
+  }
+
+  isAdjusting(order: Order): boolean {
+    return order.status === 'Completed' && order.isUnderAdjustment === true && !order.isReadOnly;
+  }
+
+  canEditAdjustmentLines(order: Order): boolean {
+    return this.canManageBilling && this.isAdjusting(order);
+  }
+
+  hasPendingAdjustments(): boolean {
+    return this.removedAdjustmentCount > 0 ||
+      this.adjustmentRows.some(row => row.isNew || (!this.isLockedAdjustmentRow(row) && row.quantity !== row.originalQuantity));
+  }
+
+  isLockedAdjustmentRow(row: AdjustmentRow): boolean {
+    return row.isExcluded || row.isReturn;
+  }
+
+  isActionBlocked(action: OrderPermittedAction): boolean {
+    return action.action === SYNC_ACTION && (this.hasPendingAdjustments() || this.savingAdjustment);
+  }
+
+  actionHint(action: OrderPermittedAction): string | null {
+    return action.action === SYNC_ACTION && this.hasPendingAdjustments()
+      ? 'Salva le modifiche alle righe prima di aggiornare la fattura'
+      : null;
+  }
+
+  trackAdjustmentRow(_index: number, row: AdjustmentRow): string {
+    return row.key;
+  }
+
+  addItemLabel(order: Order): string {
+    if (order.status === 'Draft') {
+      return 'Aggiungi articolo all’ordine';
+    }
+    return this.isAdjusting(order)
+      ? 'Aggiungi articolo alle righe in modifica'
+      : 'Aggiungi riga all’ordine e alla fattura';
   }
 
   canAddDraftOrderItem(order: Order): boolean {
@@ -324,6 +404,155 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     });
   }
 
+  askRemoveAdjustmentLine(row: AdjustmentRow): void {
+    if (!this.order || !this.canEditAdjustmentLines(this.order) || this.isLockedAdjustmentRow(row) || this.savingAdjustment) {
+      return;
+    }
+    this.pendingAdjustmentRemoval = row;
+  }
+
+  cancelRemoveAdjustmentLine(): void {
+    this.pendingAdjustmentRemoval = null;
+  }
+
+  confirmRemoveAdjustmentLine(): void {
+    const row = this.pendingAdjustmentRemoval;
+    if (!row || !this.order || !this.canEditAdjustmentLines(this.order) || this.savingAdjustment) {
+      return;
+    }
+
+    this.adjustmentRows = this.adjustmentRows.filter(current => current !== row);
+    if (!row.isNew) {
+      this.removedAdjustmentCount++;
+    }
+    this.pendingAdjustmentRemoval = null;
+    this.itemsPage = Math.min(this.itemsPage, Math.max(1, Math.ceil(this.adjustmentRows.length / this.itemsPageSize)));
+  }
+
+  addAdjustmentLine(): void {
+    const order = this.order;
+    const variant = this.selectedBillingVariant;
+    const product = this.selectedBillingProduct;
+    if (!order || !variant || !product || !this.canEditAdjustmentLines(order) || this.savingAdjustment) {
+      return;
+    }
+    if (!Number.isInteger(this.billingQuantity) || this.billingQuantity < 1) {
+      this.errorMessage = 'La quantità deve essere un numero intero maggiore di zero.';
+      return;
+    }
+    if (product.vatRate === 0 && !this.billingNatureCode) {
+      this.errorMessage = 'Seleziona la Natura IVA per l’articolo con aliquota zero.';
+      return;
+    }
+
+    const natureCode = product.vatRate === 0 ? this.billingNatureCode : null;
+    const pending = this.adjustmentRows.find(row =>
+      row.isNew && row.variantId === variant.variantId && row.natureCode === natureCode);
+    if (pending) {
+      pending.quantity = (pending.quantity ?? 0) + this.billingQuantity;
+    } else {
+      this.adjustmentRows = [...this.adjustmentRows, {
+        key: `new-${++this.newAdjustmentSequence}`,
+        orderItemId: null,
+        variantId: variant.variantId,
+        quantity: this.billingQuantity,
+        originalQuantity: null,
+        natureCode,
+        sku: variant.sku || variant.barcode,
+        productName: product.name || variant.productName,
+        sizeName: variant.sizeName,
+        colorName: variant.colorName,
+        unitNetPrice: null,
+        discountPercent: 0,
+        lineNetTotal: null,
+        isNew: true,
+        isExcluded: false,
+        isReturn: false
+      }];
+      this.itemsPage = Math.max(1, Math.ceil(this.adjustmentRows.length / this.itemsPageSize));
+    }
+    this.errorMessage = '';
+    this.clearBillingProduct();
+  }
+
+  discardAdjustmentChanges(): void {
+    if (!this.order || this.savingAdjustment) {
+      return;
+    }
+    this.errorMessage = '';
+    this.clearBillingProduct();
+    this.rebuildAdjustmentRows(this.order);
+  }
+
+  saveAdjustmentLines(): void {
+    const order = this.order;
+    if (!order || !this.canEditAdjustmentLines(order) || this.savingAdjustment || !this.hasPendingAdjustments()) {
+      return;
+    }
+    if (this.adjustmentRows.some(row =>
+      !this.isLockedAdjustmentRow(row) && (!Number.isInteger(row.quantity) || (row.quantity ?? 0) < 1))) {
+      this.errorMessage = 'La quantità di ogni riga deve essere un numero intero maggiore di zero.';
+      return;
+    }
+
+    this.savingAdjustment = true;
+    this.errorMessage = '';
+    this.orderService.updateAdjustmentLines(order.id, { lines: this.buildAdjustmentLines() }).pipe(
+      takeUntil(this.destroy$),
+      finalize(() => { this.savingAdjustment = false; })
+    ).subscribe({
+      next: updated => {
+        this.order = updated;
+        this.rebuildAdjustmentRows(updated);
+        this.clearBillingProduct();
+        this.successMessage = 'Righe ordine salvate. Aggiorna la fattura per chiudere la modifica.';
+        this.loadOrder(order.id);
+      },
+      error: error => { this.errorMessage = this.describeError(error, 'Impossibile salvare le modifiche alle righe.'); }
+    });
+  }
+
+  private buildAdjustmentLines(): OrderAdjustmentLineRequest[] {
+    return this.adjustmentRows
+      .filter(row => !row.isExcluded)
+      .map(row => row.orderItemId
+        ? { orderItemId: row.orderItemId, variantId: null, quantity: row.quantity as number }
+        : {
+          orderItemId: null,
+          variantId: row.variantId,
+          quantity: row.quantity as number,
+          natureCode: row.natureCode
+        });
+  }
+
+  private rebuildAdjustmentRows(order: Order): void {
+    this.removedAdjustmentCount = 0;
+    this.pendingAdjustmentRemoval = null;
+    this.adjustmentRows = this.isAdjusting(order)
+      ? order.items.map(item => ({
+        key: item.id,
+        orderItemId: item.id,
+        variantId: item.variantId,
+        quantity: item.quantity,
+        originalQuantity: item.quantity,
+        natureCode: item.natureCode,
+        sku: item.sku ?? null,
+        productName: item.productName ?? null,
+        sizeName: item.sizeName ?? null,
+        colorName: item.colorName ?? null,
+        unitNetPrice: item.unitNetPrice,
+        discountPercent: item.discountPercent,
+        lineNetTotal: item.lineNetTotal,
+        isNew: false,
+        isExcluded: item.isExcludedFromInvoice === true,
+        isReturn: item.quantity < 0 || item.pricingSnapshot?.isCustomerReturn === true
+      }))
+      : [];
+    if (this.adjustmentRows.length > 0) {
+      this.itemsPage = Math.min(this.itemsPage, Math.ceil(this.adjustmentRows.length / this.itemsPageSize));
+    }
+  }
+
   private clearBillingProduct(): void {
     this.billingProductSearch = '';
     this.billingProductResults = [];
@@ -347,6 +576,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     ).subscribe({
       next: order => {
         this.order = order;
+        this.rebuildAdjustmentRows(order);
         this.itemsPage = Math.min(this.itemsPage, Math.max(1, Math.ceil(order.items.length / this.itemsPageSize)));
         this.shippingCostEdit = order.shippingCost ?? 0;
         this.shippingVatRateEdit = order.shippingVatRate ?? null;
@@ -369,6 +599,10 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   openAction(action: OrderPermittedAction): void {
     this.errorMessage = '';
     this.successMessage = '';
+    if (this.isActionBlocked(action)) {
+      this.errorMessage = 'Salva le modifiche alle righe prima di aggiornare la fattura.';
+      return;
+    }
     if (!action.requiresDialog) {
       this.executeAction(action);
       return;
@@ -430,7 +664,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
   }
 
   saveItem(item: OrderItem): void {
-    if (!this.order || this.order.isReadOnly || this.savingItemId !== null) {
+    if (!this.order || !this.isDraftEditable(this.order) || this.savingItemId !== null) {
       return;
     }
 
@@ -495,7 +729,7 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
 
   saveShippingCharge(): void {
     if (!this.order ||
-        (this.order.isReadOnly && !this.canEditCompletedInvoice(this.order)) ||
+        !this.canEditShippingCharge(this.order) ||
         this.savingShippingCharge) {
       return;
     }
@@ -612,13 +846,18 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     ).subscribe({
       next: response => {
         this.order = this.extractOrder(response);
+        this.rebuildAdjustmentRows(this.order);
+        const completedMessage = ACTION_SUCCESS_MESSAGES[action.action] ?? `Azione completata: ${action.label}.`;
         if ('order' in response) {
           this.successMessage = response.shipment
             ? `DDT ${response.shipment.ddtNumber} emesso correttamente.`
-            : `Azione completata: ${action.label}.`;
+            : completedMessage;
           this.openFulfillmentPdf(response);
         } else {
-          this.successMessage = `Azione completata: ${action.label}.`;
+          this.successMessage = completedMessage;
+        }
+        if (action.action === REOPEN_ACTION || action.action === SYNC_ACTION) {
+          this.clearBillingProduct();
         }
         this.dialogAction = null;
         this.loadOrder(this.order.id);

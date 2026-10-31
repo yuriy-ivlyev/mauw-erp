@@ -233,6 +233,9 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
         Add("POST", $"/api/v1/orders/{Id}/invoice-items", Billing);
         Add("DELETE", $"/api/v1/orders/{Id}/invoice-items/{Id2}", Billing);
         Add("PUT", $"/api/v1/orders/{Id}/invoice-shipping-cost", Billing);
+        Add("POST", $"/api/v1/orders/{Id}/reopen-adjustment", Billing);
+        Add("PUT", $"/api/v1/orders/{Id}/adjustment-lines", Billing);
+        Add("POST", $"/api/v1/orders/{Id}/sync-invoice", Billing);
         Add("POST", $"/api/v1/orders/{Id}/confirm", AdminSales);
         Add("POST", "/api/v1/cassa/sessions", AdminSales);
         Add("POST", "/api/v1/cassa/sessions/preview", AdminSales);
@@ -246,6 +249,7 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
         Add("GET", "/api/v1/invoices", Billing);
         Add("GET", $"/api/v1/invoices/{Id}", All);
         Add("GET", $"/api/v1/invoices/{Id}/pdf", Billing);
+        Add("GET", $"/api/v1/invoices/{Id}/xml", Billing);
         Add("POST", $"/api/v1/invoices/from-order/{Id}", Billing);
         Add("POST", $"/api/v1/invoices/{Id}/payments", Billing);
 
