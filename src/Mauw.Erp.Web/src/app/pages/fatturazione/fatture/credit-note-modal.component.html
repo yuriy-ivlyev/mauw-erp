@@ -1,0 +1,182 @@
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 sm:p-6"
+  role="dialog" aria-modal="true" aria-labelledby="credit-note-title">
+  <section class="flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+    <header class="flex items-start justify-between gap-4 border-b border-slate-200 p-4 sm:p-6">
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Fattura {{ invoice.invoiceNumber }}</p>
+        <h2 id="credit-note-title" class="mt-1 text-xl font-bold text-slate-900">Emetti Nota di Credito TD04</h2>
+      </div>
+      <button type="button" (click)="close()" [disabled]="submitting"
+        aria-label="Chiudi emissione nota di credito" title="Chiudi"
+        class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-50">
+        <svg aria-hidden="true" focusable="false" class="h-5 w-5" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="m18 6-12 12M6 6l12 12" />
+        </svg>
+      </button>
+    </header>
+
+    <div class="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
+      <div class="grid gap-4 lg:grid-cols-2">
+        <fieldset>
+          <legend class="mb-2 text-sm font-semibold text-slate-700">Modalità di storno</legend>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" (click)="setMode('partial')" [attr.aria-pressed]="mode === 'partial'"
+              class="rounded-lg border px-3 py-2 text-sm font-semibold"
+              [class.border-blue-700]="mode === 'partial'" [class.bg-blue-50]="mode === 'partial'"
+              [class.text-blue-800]="mode === 'partial'">
+              Storno Parziale / Reso Capi
+            </button>
+            <button type="button" (click)="setMode('full')" [attr.aria-pressed]="mode === 'full'"
+              class="rounded-lg border px-3 py-2 text-sm font-semibold"
+              [class.border-blue-700]="mode === 'full'" [class.bg-blue-50]="mode === 'full'"
+              [class.text-blue-800]="mode === 'full'">
+              Storno Totale
+            </button>
+          </div>
+        </fieldset>
+
+        <label class="text-sm font-semibold text-slate-700">
+          Causale storno
+          <select [ngModel]="reason" (ngModelChange)="onReasonChange($event)"
+            [disabled]="mode === 'full'"
+            class="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-100">
+            <option *ngFor="let option of reasons" [ngValue]="option.value"
+              [disabled]="option.value === 'FullCancellation' && mode !== 'full'">
+              {{ option.label }}
+            </option>
+          </select>
+        </label>
+      </div>
+
+      <div class="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2">
+        <label class="flex items-start gap-2 text-sm font-medium text-slate-700">
+          <input type="checkbox" [ngModel]="returnToWarehouse"
+            (ngModelChange)="onReturnToWarehouseChange($event)" class="mt-1">
+          <span>
+            Rientro fisico a magazzino
+            <span class="mt-1 block text-xs font-normal text-slate-500">
+              Disattivato per abbuoni e rettifiche senza movimentazione delle giacenze.
+            </span>
+          </span>
+        </label>
+        <label class="text-sm font-semibold text-slate-700">
+          Magazzino di destinazione
+          <select [(ngModel)]="warehouseId" (ngModelChange)="refreshPreview()"
+            [disabled]="!returnToWarehouse" [required]="returnToWarehouse"
+            class="mt-1 w-full rounded-lg border border-slate-300 p-2.5 disabled:bg-slate-100">
+            <option value="">Seleziona un magazzino</option>
+            <option *ngFor="let warehouse of warehouses" [value]="warehouse.id">
+              {{ warehouse.code }} · {{ warehouse.name }}
+            </option>
+          </select>
+          <span *ngIf="returnToWarehouse && warehouses.length === 0" class="mt-1 block text-xs text-amber-700">
+            Non sono disponibili magazzini attivi.
+          </span>
+        </label>
+      </div>
+
+      <div *ngIf="previewError" role="alert" class="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        {{ previewError }}
+      </div>
+      <div *ngIf="submitError" role="alert" class="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        {{ submitError }}
+      </div>
+
+      <section aria-labelledby="credit-note-lines-title">
+        <div class="mb-2 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h3 id="credit-note-lines-title" class="font-bold text-slate-900">Righe fattura</h3>
+            <p class="text-xs text-slate-500">Le quantità disponibili sono al netto delle note di credito già emesse.</p>
+          </div>
+          <span *ngIf="previewLoading" role="status" class="text-sm text-slate-500">Calcolo anteprima…</span>
+        </div>
+        <div class="overflow-x-auto rounded-lg border border-slate-200">
+          <table class="w-full min-w-[980px] text-sm">
+            <thead class="bg-slate-50 text-left text-xs uppercase text-slate-600">
+              <tr>
+                <th scope="col" class="px-3 py-2">Seleziona</th>
+                <th scope="col" class="px-3 py-2">Descrizione / SKU</th>
+                <th scope="col" class="px-3 py-2 text-right">Fatturata / residua</th>
+                <th scope="col" class="px-3 py-2 text-right">Quantità da stornare</th>
+                <th scope="col" class="px-3 py-2 text-right">Prezzo unitario</th>
+                <th scope="col" class="px-3 py-2 text-right">IVA / Natura</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let line of lines | pageSlice:page:pageSize" class="border-t border-slate-100">
+                <td class="px-3 py-2">
+                  <input type="checkbox" [checked]="line.selected"
+                    (change)="onLineSelectionChange(line, $any($event.target).checked)"
+                    [disabled]="line.remainingQuantity <= 0 || mode === 'full'"
+                    [attr.aria-label]="'Seleziona ' + line.description">
+                </td>
+                <td class="px-3 py-2">
+                  <span class="font-medium">{{ line.description }}</span>
+                  <span *ngIf="line.sku" class="block font-mono text-xs text-slate-500">{{ line.sku }}</span>
+                </td>
+                <td class="px-3 py-2 text-right">
+                  {{ line.originalQuantity }} / {{ line.remainingQuantity }}
+                  <span *ngIf="line.creditedQuantity > 0" class="block text-xs text-slate-500">
+                    Già stornata: {{ line.creditedQuantity }}
+                  </span>
+                </td>
+                <td class="px-3 py-2 text-right">
+                  <input type="number" min="1" step="any" [max]="line.remainingQuantity"
+                    [ngModel]="line.quantity" (ngModelChange)="onQuantityChange(line, $event)"
+                    [disabled]="!line.selected || mode === 'full'"
+                    class="w-28 rounded border border-slate-300 p-1.5 text-right disabled:bg-slate-100"
+                    [attr.aria-label]="'Quantità da stornare per ' + line.description">
+                </td>
+                <td class="px-3 py-2 text-right">
+                  {{ line.unitNetPrice | currency:'EUR':'symbol':'1.2-2':'it-IT' }}
+                  <span *ngIf="line.discountPercent > 0" class="block text-xs text-slate-500">
+                    Sconto {{ line.discountPercent }}%
+                  </span>
+                </td>
+                <td class="px-3 py-2 text-right">
+                  {{ line.vatRate }}%<span *ngIf="line.natureCode"> · {{ line.natureCode }}</span>
+                </td>
+              </tr>
+              <tr *ngIf="lines.length === 0">
+                <td colspan="6" class="px-3 py-6 text-center text-slate-500">
+                  Nessuna riga disponibile per lo storno.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <app-pagination *ngIf="lines.length > 0" [page]="page" [pageSize]="pageSize"
+            [totalCount]="lines.length" (pageChange)="page = $event"
+            (pageSizeChange)="onPageSizeChange($event)">
+          </app-pagination>
+        </div>
+      </section>
+
+      <section class="rounded-lg border border-blue-200 bg-blue-50 p-4" aria-live="polite">
+        <h3 class="font-bold text-blue-950">Anteprima calcolata dal backend</h3>
+        <dl class="mt-2 grid gap-2 text-sm sm:grid-cols-3">
+          <div class="flex justify-between gap-2"><dt>Imponibile</dt><dd class="font-semibold">{{ preview?.taxableTotal ?? 0 | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</dd></div>
+          <div class="flex justify-between gap-2"><dt>Imposta</dt><dd class="font-semibold">{{ preview?.vatTotal ?? 0 | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</dd></div>
+          <div class="flex justify-between gap-2 text-base"><dt>Totale a credito</dt><dd class="font-bold">{{ preview?.grossTotal ?? 0 | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</dd></div>
+        </dl>
+        <ul *ngIf="preview?.vatSummary?.length" class="mt-3 space-y-1 border-t border-blue-200 pt-2 text-xs">
+          <li *ngFor="let group of preview?.vatSummary" class="flex justify-between gap-3">
+            <span>IVA {{ group.vatRate }}%<span *ngIf="group.natureCode"> · {{ group.natureCode }}</span></span>
+            <span>Imponibile {{ group.taxableAmount | currency:'EUR':'symbol':'1.2-2':'it-IT' }} · Imposta {{ group.vatAmount | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</span>
+          </li>
+        </ul>
+      </section>
+    </div>
+
+    <footer class="flex flex-wrap justify-end gap-2 border-t border-slate-200 p-4 sm:px-6">
+      <button type="button" (click)="close()" [disabled]="submitting"
+        class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+        Annulla
+      </button>
+      <button type="button" (click)="submit()" [disabled]="!canIssue"
+        class="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-50">
+        {{ submitting ? 'Emissione…' : 'Conferma emissione' }}
+      </button>
+    </footer>
+  </section>
+</div>

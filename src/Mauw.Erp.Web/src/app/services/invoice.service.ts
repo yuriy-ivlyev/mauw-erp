@@ -7,8 +7,13 @@ import {
   InvoiceListParams,
   InvoicePagedResult,
   BulkTransmissionResult,
-  RecordInvoicePaymentRequest
+  RecordInvoicePaymentRequest,
+  RecordInvoicePaymentsRequest
 } from '../models/invoice.model';
+import {
+  BulkFiscalTransmissionResult,
+  FiscalDocumentTransmissionRequest
+} from '../models/credit-note.model';
 
 @Injectable({ providedIn: 'root' })
 export class InvoiceService {
@@ -42,11 +47,23 @@ export class InvoiceService {
     return this.http.post<Invoice>(`${this.base}/${invoiceId}/payments`, request);
   }
 
+  recordPayments(invoiceId: string, request: RecordInvoicePaymentsRequest): Observable<Invoice> {
+    return this.http.post<Invoice>(`${this.base}/${invoiceId}/payments/batch`, request);
+  }
+
   downloadPdf(invoiceId: string): Observable<Blob> {
     return this.http.get(`${this.base}/${invoiceId}/pdf`, { responseType: 'blob' });
   }
 
   bulkTransmitToSdi(invoiceIds: string[]): Observable<BulkTransmissionResult> {
     return this.http.post<BulkTransmissionResult>(`${this.base}/bulk-transmit-sdi`, { invoiceIds });
+  }
+
+  bulkTransmitFiscalDocuments(
+    documents: FiscalDocumentTransmissionRequest[]
+  ): Observable<BulkFiscalTransmissionResult> {
+    return this.http.post<BulkFiscalTransmissionResult>(
+      `${environment.apiUrl}/v1/fiscal-documents/bulk-transmit-sdi`,
+      { documents });
   }
 }

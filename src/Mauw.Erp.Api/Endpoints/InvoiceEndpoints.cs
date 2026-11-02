@@ -39,6 +39,11 @@ public static class InvoiceEndpoints
             .WithName("RecordPayment")
             .WithSummary("Record a payment on an invoice (triggers commission accrual when paid)");
 
+        group.MapPost("/{id}/payments/batch", RecordPayments)
+            .RequireAuthorization(AppPolicies.Billing)
+            .WithName("RecordInvoicePayments")
+            .WithSummary("Atomically record multiple payment entries on an invoice");
+
         group.MapPost("/{id}/transmit-sdi", TransmitInvoiceToSdi)
             .RequireAuthorization(AppPolicies.Billing)
             .WithName("TransmitInvoiceToSdi")
@@ -124,6 +129,23 @@ public static class InvoiceEndpoints
             return TypedResults.NotFound();
         if (!result.Success)
             return TypedResults.BadRequest(result.Error);
+        return TypedResults.Ok(result.Data!);
+    }
+
+    private static async Task<Results<Ok<InvoiceDto>, BadRequest<string>, NotFound>> RecordPayments(
+        Guid id,
+        RecordPaymentsRequest request,
+        IInvoiceService invoiceService)
+    {
+        var result = await invoiceService.RecordPaymentsAsync(id, request?.Payments);
+
+        if (!result.Success && result.Error?.Contains("non trovata", StringComparison.OrdinalIgnoreCase) == true)
+            return TypedResults.NotFound();
+        if (!result.Success && result.Error?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true)
+            return TypedResults.NotFound();
+        if (!result.Success)
+            return TypedResults.BadRequest(result.Error);
+
         return TypedResults.Ok(result.Data!);
     }
 

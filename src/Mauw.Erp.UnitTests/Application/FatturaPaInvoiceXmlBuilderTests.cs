@@ -1,10 +1,12 @@
 using System.Reflection;
+using System.Globalization;
 using System.Xml;
 using System.Xml.Linq;
 using System.Xml.Schema;
 using Mauw.Erp.Application.Mappers;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos.Pdf;
+using Mauw.Erp.Domain.Entities;
 using Mauw.Erp.Domain.Services;
 
 namespace Mauw.Erp.UnitTests.Application;
@@ -377,6 +379,85 @@ public class FatturaPaInvoiceXmlBuilderTests
         Assert.NotEmpty(ValidateAgainstOfficialSchema(document.ToString()));
     }
 
+    [Fact]
+    public void CreditNoteBuildsPositiveTd04WithLinkedInvoiceAndGroupedVatAndPassesOfficialSchema()
+    {
+        var sourceInvoice = new Invoice(Guid.NewGuid(), "FAT-202610-00001")
+        {
+            InvoiceDate = new DateTime(2026, 10, 15, 0, 0, 0, DateTimeKind.Utc)
+        };
+        SetId(sourceInvoice, Guid.NewGuid());
+        var creditNote = new CreditNote(
+            sourceInvoice,
+            "NC-202610-00001",
+            "GoodsReturn",
+            false,
+            null,
+            new DateTime(2026, 10, 31, 0, 0, 0, DateTimeKind.Utc))
+        {
+            TaxableTotal = 170m,
+            VatTotal = 27m,
+            GrossTotal = 197m
+        };
+        creditNote.Items.Add(new(
+            creditNote, Guid.NewGuid(), Guid.NewGuid(), "Articolo IVA 22%", false,
+            1m, 100m, 100m, 22m, null, 0m));
+        creditNote.Items.Add(new(
+            creditNote, Guid.NewGuid(), Guid.NewGuid(), "Articolo IVA 10%", false,
+            1m, 50m, 50m, 10m, null, 0m));
+        creditNote.Items.Add(new(
+            creditNote, Guid.NewGuid(), Guid.NewGuid(), "Articolo N3.2", false,
+            1m, 20m, 20m, 0m, "N3.2", 0m));
+        var model = Model(
+            [
+                Line("Articolo IVA 22%", 1m, 100m, 22m, null),
+                Line("Articolo IVA 10%", 1m, 50m, 10m, null),
+                Line("Articolo N3.2", 1m, 20m, 0m, "N3.2")
+            ],
+            [
+                new(22m, 100m, 22m, null),
+                new(10m, 50m, 5m, null),
+                new(0m, 20m, 0m, "N3.2")
+            ],
+            grossTotal: 197m);
+
+        var result = FatturaPaInvoiceXmlBuilder.Build(
+            creditNote, sourceInvoice, model, Calculator);
+
+        Assert.True(result.Success, result.Error);
+        Assert.Empty(ValidateAgainstOfficialSchema(result.Data!));
+        var document = XDocument.Parse(result.Data!);
+        Assert.Equal("TD04", document.Descendants("TipoDocumento").Single().Value);
+        var progressive = document.Descendants("ProgressivoInvio").Single().Value;
+        Assert.StartsWith("N", progressive, StringComparison.Ordinal);
+        Assert.InRange(progressive.Length, 1, 10);
+        Assert.Equal($"IT01234567890_{progressive}.xml", SdiFileNameBuilder.Build(result.Data!).Data);
+        var linkedInvoice = document.Descendants("DatiFattureCollegate").Single();
+        Assert.Equal(sourceInvoice.InvoiceNumber, linkedInvoice.Element("IdDocumento")!.Value);
+        Assert.Equal("2026-10-15", linkedInvoice.Element("Data")!.Value);
+        Assert.Equal("197.00", document.Descendants("ImportoTotaleDocumento").Single().Value);
+        Assert.All(document.Descendants("DettaglioLinee"), line =>
+        {
+            Assert.True(decimal.Parse(line.Element("Quantita")!.Value, CultureInfo.InvariantCulture) > 0m);
+            Assert.True(decimal.Parse(line.Element("PrezzoUnitario")!.Value, CultureInfo.InvariantCulture) > 0m);
+            Assert.True(decimal.Parse(line.Element("PrezzoTotale")!.Value, CultureInfo.InvariantCulture) > 0m);
+        });
+        Assert.Equal(3, document.Descendants("DatiRiepilogo").Count());
+        Assert.Contains(document.Descendants("DatiRiepilogo"), summary =>
+            summary.Element("AliquotaIVA")?.Value == "22.00" &&
+            summary.Element("ImponibileImporto")?.Value == "100.00" &&
+            summary.Element("Imposta")?.Value == "22.00");
+        Assert.Contains(document.Descendants("DatiRiepilogo"), summary =>
+            summary.Element("AliquotaIVA")?.Value == "10.00" &&
+            summary.Element("ImponibileImporto")?.Value == "50.00" &&
+            summary.Element("Imposta")?.Value == "5.00");
+        Assert.Contains(document.Descendants("DatiRiepilogo"), summary =>
+            summary.Element("AliquotaIVA")?.Value == "0.00" &&
+            summary.Element("Natura")?.Value == "N3.2" &&
+            summary.Element("ImponibileImporto")?.Value == "20.00" &&
+            summary.Element("Imposta")?.Value == "0.00");
+    }
+
     private static InvoicePdfModel Model(
         List<InvoicePdfLineModel> lines, List<InvoiceVatBreakdownModel> summary, decimal grossTotal) => new(
         DocumentNumber: "FAT-202610-00001",
@@ -409,4 +490,7 @@ public class FatturaPaInvoiceXmlBuilderTests
         NatureCode: nature);
 
     private static List<string> ValidateAgainstOfficialSchema(string xml) => FatturaPaSchemaValidator.Validate(xml);
+
+    private static void SetId(Entity<Guid> entity, Guid id) =>
+        typeof(Entity<Guid>).GetProperty(nameof(Entity<Guid>.Id))!.SetValue(entity, id);
 }

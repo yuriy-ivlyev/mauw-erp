@@ -101,6 +101,8 @@ public sealed class AuthorizationMatrixHost : IAsyncLifetime
         _app.MapOrderEndpoints();
         _app.MapDashboardEndpoints();
         _app.MapInvoiceEndpoints();
+        _app.MapCreditNoteEndpoints();
+        _app.MapFiscalDocumentEndpoints();
         _app.MapDdtEndpoints();
         _app.MapCassaSessionEndpoints();
         _app.MapPriceListEndpoints();
@@ -253,8 +255,17 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
         Add("GET", $"/api/v1/invoices/{Id}/xml", Billing);
         Add("POST", $"/api/v1/invoices/from-order/{Id}", Billing);
         Add("POST", $"/api/v1/invoices/{Id}/payments", Billing);
+        Add("POST", $"/api/v1/invoices/{Id}/payments/batch", Billing);
         Add("POST", $"/api/v1/invoices/{Id}/transmit-sdi", Billing);
         Add("POST", "/api/v1/invoices/bulk-transmit-sdi", Billing);
+        Add("GET", $"/api/v1/credit-notes/{Id}", Billing);
+        Add("GET", $"/api/v1/contacts/{Id}/available-credit-notes", Billing);
+        Add("GET", $"/api/v1/contacts/{Id}/statement", Billing);
+        Add("GET", $"/api/v1/credit-notes/{Id}/xml", Billing);
+        Add("POST", "/api/v1/credit-notes/preview", Billing);
+        Add("POST", "/api/v1/credit-notes", Billing);
+        Add("POST", $"/api/v1/credit-notes/{Id}/transmit-sdi", Billing);
+        Add("POST", "/api/v1/fiscal-documents/bulk-transmit-sdi", Billing);
 
         // DDT
         Add("GET", "/api/v1/ddts", AdminWarehouse);

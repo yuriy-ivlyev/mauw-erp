@@ -36,7 +36,8 @@ describe('FattureComponent', () => {
       payments: []
     };
     invoiceService = jasmine.createSpyObj<InvoiceService>('InvoiceService', [
-      'getList', 'generateFromOrder', 'downloadPdf', 'bulkTransmitToSdi'
+      'getList', 'generateFromOrder', 'downloadPdf', 'bulkTransmitToSdi',
+      'bulkTransmitFiscalDocuments'
     ]);
     invoiceService.getList.and.returnValue(of({
       items: [invoice], pageNumber: 1, pageSize: 20, totalCount: 1, totalPages: 1
@@ -129,18 +130,19 @@ describe('FattureComponent', () => {
     expect(component.selectableInvoices).toEqual([invoice]);
   });
 
-  it('requires confirmation, submits selected invoices and shows the batch result dialog', () => {
+  it('requires confirmation, submits fiscal document types and shows the batch result dialog', () => {
     fixture.detectChanges();
     const component = fixture.componentInstance;
     component.selectedInvoiceIds.add(invoice.id);
-    invoiceService.bulkTransmitToSdi.and.returnValue(of({
-      requestedCount: 1,
+    invoiceService.bulkTransmitFiscalDocuments.and.returnValue(of({
+      processedCount: 1,
       successCount: 1,
       failedCount: 0,
       results: [{
-        invoiceId: invoice.id,
+        id: invoice.id,
+        documentType: 'Invoice',
         success: true,
-        invoiceNumber: invoice.invoiceNumber,
+        documentNumber: invoice.invoiceNumber,
         errorMessage: null
       }]
     }));
@@ -148,7 +150,7 @@ describe('FattureComponent', () => {
     component.openBulkTransmitConfirmation();
     fixture.detectChanges();
 
-    expect(invoiceService.bulkTransmitToSdi).not.toHaveBeenCalled();
+    expect(invoiceService.bulkTransmitFiscalDocuments).not.toHaveBeenCalled();
     const buttons = Array.from(
       fixture.nativeElement.querySelectorAll('app-confirm-delete-modal button') as NodeListOf<HTMLButtonElement>
     );
@@ -156,10 +158,74 @@ describe('FattureComponent', () => {
     confirmButton.click();
     fixture.detectChanges();
 
-    expect(invoiceService.bulkTransmitToSdi).toHaveBeenCalledWith([invoice.id]);
+    expect(invoiceService.bulkTransmitFiscalDocuments).toHaveBeenCalledWith([
+      { id: invoice.id, documentType: 'Invoice' }
+    ]);
     expect(component.selectedInvoices).toEqual([]);
-    expect(fixture.nativeElement.textContent).toContain('1 trasmesse');
+    expect(fixture.nativeElement.textContent).toContain('1 fatture e 0 note di credito trasmesse');
     expect(fixture.nativeElement.querySelector('[role="dialog"]')).not.toBeNull();
+  });
+
+  it('selects and batches a credit note alongside its source invoice with distinct type badges', () => {
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const note = {
+      id: 'credit-note-1',
+      creditNoteNumber: 'NC-202610-00001',
+      creditNoteDate: '2026-10-30T00:00:00Z',
+      taxableTotal: 10,
+      vatTotal: 2.2,
+      grossTotal: 12.2,
+      reason: 'GoodsReturn',
+      sdiStatus: 'NotTransmitted'
+    };
+    component.invoices = [{ ...invoice, creditNotes: [note] }];
+    invoiceService.getList.and.returnValue(of({
+      items: [{ ...invoice, creditNotes: [note] }],
+      pageNumber: 1,
+      pageSize: 20,
+      totalCount: 1,
+      totalPages: 1
+    }));
+    invoiceService.bulkTransmitFiscalDocuments.and.returnValue(of({
+      processedCount: 2,
+      successCount: 2,
+      failedCount: 0,
+      results: [
+        {
+          id: invoice.id,
+          documentType: 'Invoice',
+          success: true,
+          documentNumber: invoice.invoiceNumber,
+          errorMessage: null
+        },
+        {
+          id: note.id,
+          documentType: 'CreditNote',
+          success: true,
+          documentNumber: note.creditNoteNumber,
+          errorMessage: null
+        }
+      ]
+    }));
+
+    component.toggleAllSelectableInvoices(true);
+    fixture.detectChanges();
+    expect(component.selectedDocuments).toEqual([
+      { id: invoice.id, documentType: 'Invoice' },
+      { id: note.id, documentType: 'CreditNote' }
+    ]);
+    expect(fixture.nativeElement.textContent).toContain('1 fatture e 1 note di credito selezionate');
+    component.confirmBulkTransmission();
+
+    expect(invoiceService.bulkTransmitFiscalDocuments).toHaveBeenCalledWith([
+      { id: invoice.id, documentType: 'Invoice' },
+      { id: note.id, documentType: 'CreditNote' }
+    ]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Fattura TD01');
+    expect(fixture.nativeElement.textContent).toContain('Nota di Credito TD04');
+    expect(fixture.nativeElement.textContent).toContain(note.creditNoteNumber);
   });
 
   it('does not request an invalid date range and displays a validation error', () => {

@@ -12,6 +12,16 @@ namespace Mauw.Erp.Infrastructure.Repositories;
 /// </summary>
 public class ContactRepository(MauwDbContext dbContext) : Repository<Contact, Guid>(dbContext), IContactRepository
 {
+    public Task<Contact?> GetCustomerForStatementAsync(
+        Guid id,
+        CancellationToken cancellationToken = default) =>
+        _dbSet
+            .AsNoTracking()
+            .Include(contact => contact.CustomerProfile)
+            .FirstOrDefaultAsync(
+                contact => contact.Id == id && contact.CustomerProfile != null && !contact.IsInternalCompany,
+                cancellationToken);
+
     public async Task<Contact?> GetByVatNumberAsync(string vatNumber) =>
         await _dbSet
             .AsNoTracking()

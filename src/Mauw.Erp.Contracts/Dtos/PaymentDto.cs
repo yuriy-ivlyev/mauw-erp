@@ -8,5 +8,7 @@ public record PaymentDto(
     decimal Amount,
     DateTime PaymentDate,
     string? PaymentMethod,
-    string? TransactionDetails
+    string? TransactionDetails,
+    Guid? SourceCreditNoteId = null,
+    string? SourceCreditNoteNumber = null
 );

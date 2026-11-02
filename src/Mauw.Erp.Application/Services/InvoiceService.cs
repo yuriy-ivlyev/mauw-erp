@@ -183,56 +183,158 @@ public class InvoiceService(
         return OperationResult<PagedResult<InvoiceDto>>.Ok(result);
     }
 
-    public async Task<OperationResult<InvoiceDto>> RecordPaymentAsync(Guid invoiceId, RecordPaymentRequest request)
+    public Task<OperationResult<InvoiceDto>> RecordPaymentAsync(Guid invoiceId, RecordPaymentRequest request) =>
+        RecordPaymentsAsync(invoiceId, [request]);
+
+    public async Task<OperationResult<InvoiceDto>> RecordPaymentsAsync(
+        Guid invoiceId,
+        IReadOnlyList<RecordPaymentRequest>? requests)
     {
-        var invoice = await unitOfWork.Invoices.GetByIdAsync(invoiceId);
-        if (invoice == null)
-            return OperationResult<InvoiceDto>.Fail("Invoice not found");
-        if (request.Amount <= 0m ||
-            decimal.Round(request.Amount, 2, MidpointRounding.AwayFromZero) != request.Amount)
-            return OperationResult<InvoiceDto>.Fail("Payment amount must be positive and have at most two decimal places.");
-        if (string.IsNullOrWhiteSpace(request.PaymentMethod) || request.PaymentMethod.Trim().Length > 50)
-            return OperationResult<InvoiceDto>.Fail("Specify a payment method of at most 50 characters.");
-        if (request.TransactionDetails?.Length > 500)
-            return OperationResult<InvoiceDto>.Fail("Payment details cannot exceed 500 characters.");
-        var paymentMethod = request.PaymentMethod.Trim();
-        var transactionDetails = string.IsNullOrWhiteSpace(request.TransactionDetails)
-            ? null
-            : request.TransactionDetails.Trim();
-        if (string.Equals(paymentMethod, "Bonifico bancario", StringComparison.OrdinalIgnoreCase) &&
-            transactionDetails is null)
-            return OperationResult<InvoiceDto>.Fail("Specify the bank transfer reference (CRO/TRN).");
-        if (invoice.GrossTotal <= 0m)
-            return OperationResult<InvoiceDto>.Fail("A payment cannot be recorded on an invoice without a positive total.");
-        if (request.Amount > invoice.GrossTotal - invoice.PaidAmount)
-            return OperationResult<InvoiceDto>.Fail("Payment amount exceeds the invoice balance.");
+        if (requests is null || requests.Count == 0 || requests.Any(request => request is null))
+            return OperationResult<InvoiceDto>.Fail("Indicare almeno una quota di pagamento valida.");
 
-        var payment = new Payment(
-            invoiceId: invoiceId,
-            amount: request.Amount,
-            paymentMethod: paymentMethod,
-            transactionDetails: transactionDetails,
-            paymentDate: request.PaymentDate
-        );
+        foreach (var request in requests)
+        {
+            if (request.Amount <= 0m ||
+                decimal.Round(request.Amount, 2, MidpointRounding.AwayFromZero) != request.Amount)
+                return OperationResult<InvoiceDto>.Fail(
+                    "Payment amount must be positive and have at most two decimal places.");
+            if (string.IsNullOrWhiteSpace(request.PaymentMethod) || request.PaymentMethod.Trim().Length > 50)
+                return OperationResult<InvoiceDto>.Fail("Specify a payment method of at most 50 characters.");
+            if (request.TransactionDetails?.Length > 500)
+                return OperationResult<InvoiceDto>.Fail("Payment details cannot exceed 500 characters.");
 
-        var recordedPayment = invoice.RecordPayment(request.Amount);
-        if (!recordedPayment.Success)
-            return OperationResult<InvoiceDto>.Fail(recordedPayment.Error ?? "Pagamento non registrato.");
+            var isCreditNoteOffset = IsCreditNoteOffset(request.PaymentMethod);
+            if (isCreditNoteOffset &&
+                (!request.SourceCreditNoteId.HasValue || request.SourceCreditNoteId.Value == Guid.Empty))
+                return OperationResult<InvoiceDto>.Fail("Selezionare la nota di credito da compensare.");
+            if (!isCreditNoteOffset && request.SourceCreditNoteId.HasValue)
+                return OperationResult<InvoiceDto>.Fail(
+                    "La nota di credito sorgente è ammessa solo per una compensazione.");
 
-        invoice.Payments.Add(payment);
-        await unitOfWork.Invoices.UpdateAsync(invoice);
+            if (string.Equals(request.PaymentMethod.Trim(), "Bonifico bancario", StringComparison.OrdinalIgnoreCase) &&
+                string.IsNullOrWhiteSpace(request.TransactionDetails))
+                return OperationResult<InvoiceDto>.Fail("Specify the bank transfer reference (CRO/TRN).");
+        }
+
+        var creditAllocations = requests
+            .Where(request => IsCreditNoteOffset(request.PaymentMethod))
+            .GroupBy(request => request.SourceCreditNoteId!.Value)
+            .ToDictionary(group => group.Key, group => group.ToList());
+        var transactionStarted = false;
+        async Task<OperationResult<InvoiceDto>> RollbackFailureAsync(string error)
+        {
+            if (transactionStarted)
+            {
+                await unitOfWork.RollbackAsync();
+                transactionStarted = false;
+            }
+            return OperationResult<InvoiceDto>.Fail(error);
+        }
+
         try
         {
+            await unitOfWork.BeginTransactionAsync(IsolationLevel.ReadCommitted);
+            transactionStarted = true;
+
+            foreach (var creditNoteId in creditAllocations.Keys.Order())
+                await unitOfWork.CreditNotes.AcquireCreditNoteAllocationLockAsync(creditNoteId);
+
+            var invoice = await unitOfWork.Invoices.GetByIdAsync(invoiceId);
+            if (invoice is null)
+                return await RollbackFailureAsync("Invoice not found");
+            if (invoice.GrossTotal <= 0m)
+                return await RollbackFailureAsync(
+                    "A payment cannot be recorded on an invoice without a positive total.");
+
+            var outstanding = invoice.GrossTotal - invoice.PaidAmount;
+            decimal paymentTotal = 0m;
+            foreach (var request in requests)
+            {
+                if (request.Amount > outstanding - paymentTotal)
+                    return await RollbackFailureAsync("Payment amount exceeds the invoice balance.");
+                paymentTotal += request.Amount;
+            }
+
+            var creditNotes = new Dictionary<Guid, CreditNote>();
+            foreach (var allocation in creditAllocations)
+            {
+                var creditNote = await unitOfWork.CreditNotes.GetForAllocationAsync(allocation.Key);
+                if (creditNote is null)
+                    return await RollbackFailureAsync("Nota di credito non trovata.");
+                if (creditNote.Invoice.ContactId != invoice.ContactId)
+                    return await RollbackFailureAsync(
+                        "La nota di credito appartiene a un cliente diverso dalla fattura.");
+
+                decimal requestedCredit = 0m;
+                foreach (var request in allocation.Value)
+                    requestedCredit += request.Amount;
+                if (requestedCredit > creditNote.RemainingCredit)
+                    return await RollbackFailureAsync(
+                        $"Credito residuo insufficiente ({creditNote.RemainingCredit:C2}).");
+
+                creditNotes.Add(allocation.Key, creditNote);
+            }
+
+            var recordedPayment = invoice.RecordPayment(paymentTotal);
+            if (!recordedPayment.Success)
+                return await RollbackFailureAsync(recordedPayment.Error ?? "Pagamento non registrato.");
+
+            foreach (var allocation in creditAllocations)
+            {
+                var creditNote = creditNotes[allocation.Key];
+                var amount = allocation.Value.Sum(request => request.Amount);
+                var allocated = creditNote.AllocateCredit(amount);
+                if (!allocated.Success)
+                    return await RollbackFailureAsync(allocated.Error ?? "Compensazione non registrata.");
+            }
+
+            foreach (var request in requests)
+            {
+                var isCreditNoteOffset = IsCreditNoteOffset(request.PaymentMethod);
+                var sourceCreditNote = isCreditNoteOffset
+                    ? creditNotes[request.SourceCreditNoteId!.Value]
+                    : null;
+                invoice.Payments.Add(new Payment(
+                    invoiceId: invoiceId,
+                    amount: request.Amount,
+                    paymentMethod: isCreditNoteOffset
+                        ? nameof(PaymentMethod.CreditNoteOffset)
+                        : request.PaymentMethod.Trim(),
+                    transactionDetails: string.IsNullOrWhiteSpace(request.TransactionDetails)
+                        ? null
+                        : request.TransactionDetails.Trim(),
+                    paymentDate: request.PaymentDate,
+                    sourceCreditNoteId: request.SourceCreditNoteId,
+                    sourceCreditNote: sourceCreditNote));
+            }
+
+            await unitOfWork.Invoices.UpdateAsync(invoice);
             await unitOfWork.SaveChangesAsync();
+            await unitOfWork.CommitAsync();
+            transactionStarted = false;
+
+            return OperationResult<InvoiceDto>.Ok(InvoiceMapper.MapToDto(invoice));
         }
         catch (ConcurrencyException ex)
         {
+            if (transactionStarted)
+                await unitOfWork.RollbackAsync();
             return OperationResult<InvoiceDto>.Fail(ex.Message);
         }
-
-        var updated = await unitOfWork.Invoices.GetByIdAsync(invoiceId);
-        return OperationResult<InvoiceDto>.Ok(InvoiceMapper.MapToDto(updated!));
+        catch
+        {
+            if (transactionStarted)
+                await unitOfWork.RollbackAsync();
+            throw;
+        }
     }
+
+    private static bool IsCreditNoteOffset(string paymentMethod) =>
+        string.Equals(
+            paymentMethod.Trim(),
+            nameof(PaymentMethod.CreditNoteOffset),
+            StringComparison.OrdinalIgnoreCase);
 
     public async Task<OperationResult<byte[]>> GetInvoicePdfAsync(Guid id)
     {
@@ -293,11 +395,67 @@ public class InvoiceService(
             : OperationResult<InvoiceXmlDownload>.Fail(xml.Error!);
     }
 
+    public async Task<OperationResult<string>> GetCreditNoteXmlAsync(Guid id)
+    {
+        var creditNote = await unitOfWork.CreditNotes.GetByIdAsync(id);
+        if (creditNote is null)
+            return OperationResult<string>.Fail("Nota di credito non trovata.");
+
+        var invoice = await unitOfWork.Invoices.GetByIdAsync(creditNote.InvoiceId);
+        if (invoice is null)
+            return OperationResult<string>.Fail("Fattura collegata non trovata.");
+
+        return await BuildCreditNoteXmlAsync(creditNote, invoice);
+    }
+
+    public async Task<OperationResult<InvoiceXmlDownload>> GetCreditNoteXmlDownloadAsync(Guid id)
+    {
+        var creditNote = await unitOfWork.CreditNotes.GetByIdAsync(id);
+        if (creditNote is null)
+            return OperationResult<InvoiceXmlDownload>.Fail("Nota di credito non trovata.");
+
+        if (creditNote.SdiStorageKey is not null)
+        {
+            if (string.IsNullOrWhiteSpace(creditNote.SdiFileName))
+                return OperationResult<InvoiceXmlDownload>.Fail(
+                    "La nota di credito archiviata allo SDI non ha un nome file associato.");
+
+            var storedContent = await sdiDocumentStorage.GetCreditNoteXmlAsync(creditNote.SdiStorageKey);
+            return OperationResult<InvoiceXmlDownload>.Ok(
+                new InvoiceXmlDownload(storedContent, creditNote.SdiFileName));
+        }
+        if (creditNote.SdiStatus >= SdiStatus.Transmitted)
+            return OperationResult<InvoiceXmlDownload>.Fail(
+                "La nota di credito trasmessa non dispone della chiave XML congelata in S3.");
+
+        var invoice = await unitOfWork.Invoices.GetByIdAsync(creditNote.InvoiceId);
+        if (invoice is null)
+            return OperationResult<InvoiceXmlDownload>.Fail("Fattura collegata non trovata.");
+
+        var xml = await BuildCreditNoteXmlAsync(creditNote, invoice);
+        return xml.Success
+            ? OperationResult<InvoiceXmlDownload>.Ok(new InvoiceXmlDownload(
+                System.Text.Encoding.UTF8.GetBytes(xml.Data!),
+                $"nota-di-credito-{creditNote.CreditNoteNumber}.xml"))
+            : OperationResult<InvoiceXmlDownload>.Fail(xml.Error!);
+    }
+
     private async Task<OperationResult<string>> BuildInvoiceXmlAsync(Invoice invoice)
     {
         var model = await BuildInvoicePdfModelAsync(invoice);
         return model.Success
             ? FatturaPaInvoiceXmlBuilder.Build(model.Data!, accountingCalculator)
+            : OperationResult<string>.Fail(model.Error!);
+    }
+
+    private async Task<OperationResult<string>> BuildCreditNoteXmlAsync(
+        CreditNote creditNote,
+        Invoice relatedInvoice)
+    {
+        var model = await BuildCreditNotePdfModelAsync(creditNote, relatedInvoice);
+        return model.Success
+            ? FatturaPaInvoiceXmlBuilder.Build(
+                creditNote, relatedInvoice, model.Data!, accountingCalculator)
             : OperationResult<string>.Fail(model.Error!);
     }
 
@@ -416,60 +574,121 @@ public class InvoiceService(
             ?? company?.OperationalSites.FirstOrDefault(s => s.IsMainOperationalSite)
             ?? company?.OperationalSites.FirstOrDefault();
         var customerAddress = relatedInvoice.Contact?.LegalHeadquarters ?? relatedInvoice.Contact?.Addresses.FirstOrDefault();
-        var originalGroups = relatedInvoice.Items.Select(item => (item.VatRate, item.NatureCode)).Distinct().ToArray();
-        if (originalGroups.Length != 1)
-            return OperationResult<InvoicePdfModel>.Fail("La nota di credito richiede la ripartizione esplicita per aliquota e Natura della fattura originale.");
-        var (vatRate, natureCode) = originalGroups[0];
-        var accounting = accountingCalculator.Calculate(
-            [new DocumentLineInput(1m, creditNote.TaxableTotal, vatRate, natureCode)]);
-        if (!accounting.Success)
-            return OperationResult<InvoicePdfModel>.Fail(accounting.Error);
-        var calculated = accounting.Data!;
-        if (calculated.TotalVat != creditNote.VatTotal || calculated.TotalGross != creditNote.GrossTotal)
-            return OperationResult<InvoicePdfModel>.Fail("I totali della nota di credito non coincidono con il calcolo per aliquota e Natura.");
+        List<InvoicePdfLineModel> lines;
+        List<InvoiceVatBreakdownModel> vatSummary;
+        decimal totalPieces;
 
-        return OperationResult<InvoicePdfModel>.Ok(new InvoicePdfModel(
-            DocumentNumber: creditNote.CreditNoteNumber,
-            DocumentType: "NOTA CREDITO",
-            IssueDate: DateOnly.FromDateTime(creditNote.CreditNoteDate),
-            Currency: "EUR",
-            Seller: BuildSeller(company, sellerAddress),
-            Customer: BuildCustomer(relatedInvoice.Contact, customerAddress),
-            Payment: new InvoicePdfPaymentInfo("Storno", "MP01", null, null, null, null),
-            Lines:
+        if (creditNote.Items.Count > 0)
+        {
+            var accounting = accountingCalculator.Calculate(creditNote.Items.Select(item =>
+                new DocumentLineInput(
+                    item.Quantity,
+                    item.UnitNetPrice,
+                    item.VatRate,
+                    item.NatureCode,
+                    item.DiscountPercent)));
+            if (!accounting.Success)
+                return OperationResult<InvoicePdfModel>.Fail(accounting.Error);
+            var calculated = accounting.Data!;
+            if (calculated.TotalTaxable != creditNote.TaxableTotal ||
+                calculated.TotalVat != creditNote.VatTotal ||
+                calculated.TotalGross != creditNote.GrossTotal)
+                return OperationResult<InvoicePdfModel>.Fail(
+                    "I totali della nota di credito non coincidono con le righe e il calcolo fiscale.");
+
+            lines = creditNote.Items.Select((item, index) =>
+            {
+                var line = calculated.Lines[index];
+                return new InvoicePdfLineModel(
+                    Sku: item.Variant?.Barcode ?? string.Empty,
+                    Description: item.Description,
+                    SeasonCollection: null,
+                    Pieces: item.IsShippingCharge ? 0m : line.Quantity,
+                    UnitPrice: line.UnitNetPrice,
+                    DiscountPercent: line.DiscountPercent > 0m ? line.DiscountPercent : null,
+                    VatRate: line.VatRate,
+                    LineTotal: line.LineNetTotal,
+                    NatureCode: line.NatureCode,
+                    Color: item.Variant?.Color?.Name,
+                    Size: item.Variant?.Size?.Name);
+            }).ToList();
+            vatSummary = calculated.VatSummary
+                .Select(group => new InvoiceVatBreakdownModel(
+                    group.VatRate, group.TaxableAmount, group.VatAmount, group.NatureCode))
+                .ToList();
+            totalPieces = creditNote.Items
+                .Where(item => !item.IsShippingCharge)
+                .Sum(item => item.Quantity);
+        }
+        else
+        {
+            var originalGroups = relatedInvoice.Items
+                .Select(item => (item.VatRate, item.NatureCode))
+                .Distinct()
+                .ToArray();
+            if (originalGroups.Length != 1)
+                return OperationResult<InvoicePdfModel>.Fail(
+                    "La nota di credito storica richiede la ripartizione esplicita per aliquota e Natura.");
+            var (vatRate, natureCode) = originalGroups[0];
+            var accounting = accountingCalculator.Calculate(
+                [new DocumentLineInput(1m, creditNote.TaxableTotal, vatRate, natureCode)]);
+            if (!accounting.Success)
+                return OperationResult<InvoicePdfModel>.Fail(accounting.Error);
+            var calculated = accounting.Data!;
+            if (calculated.TotalVat != creditNote.VatTotal || calculated.TotalGross != creditNote.GrossTotal)
+                return OperationResult<InvoicePdfModel>.Fail(
+                    "I totali della nota di credito non coincidono con il calcolo per aliquota e Natura.");
+
+            lines =
             [
                 new InvoicePdfLineModel(
                     Sku: string.Empty,
                     Description: string.IsNullOrWhiteSpace(creditNote.Reason)
                         ? $"Nota di credito per fattura {relatedInvoice.InvoiceNumber}"
-                        : creditNote.Reason!,
+                        : GetCreditNoteReasonDescription(creditNote.Reason)!,
                     SeasonCollection: null,
-                    Pieces: 1,
+                    Pieces: 1m,
                     UnitPrice: creditNote.TaxableTotal,
                     DiscountPercent: null,
                     VatRate: vatRate,
                     LineTotal: calculated.Lines[0].LineNetTotal,
                     NatureCode: natureCode)
-            ],
-            VatSummary:
+            ];
+            vatSummary =
             [
                 new InvoiceVatBreakdownModel(
-                    VatRate: vatRate,
-                    TaxableAmount: creditNote.TaxableTotal,
-                    VatAmount: creditNote.VatTotal,
-                    ExemptionNature: natureCode)
-            ],
+                    vatRate, creditNote.TaxableTotal, creditNote.VatTotal, natureCode)
+            ];
+            totalPieces = 1m;
+        }
+
+        return OperationResult<InvoicePdfModel>.Ok(new InvoicePdfModel(
+            DocumentNumber: creditNote.CreditNoteNumber,
+            DocumentType: "TD04",
+            IssueDate: DateOnly.FromDateTime(creditNote.CreditNoteDate),
+            Currency: "EUR",
+            Seller: BuildSeller(company, sellerAddress),
+            Customer: BuildCustomer(relatedInvoice.Contact, customerAddress),
+            Payment: new InvoicePdfPaymentInfo("Storno", "MP01", null, null, null, null),
+            Lines: lines,
+            VatSummary: vatSummary,
             Totals: new InvoicePdfTotals(
-                TotalPieces: 1,
+                TotalPieces: totalPieces,
                 TotalNet: creditNote.TaxableTotal,
                 TotalVat: creditNote.VatTotal,
                 TotalGross: creditNote.GrossTotal,
                 ShippingCost: 0m),
-            FiscalNotes: creditNote.Reason,
+            FiscalNotes: string.IsNullOrWhiteSpace(creditNote.Reason)
+                ? null
+                : GetCreditNoteReasonDescription(creditNote.Reason),
             CustomerOrderRef: relatedInvoice.InvoiceNumber,
+            CustomerOrderDate: DateOnly.FromDateTime(relatedInvoice.InvoiceDate),
             Agent: agent.Data
         ));
     }
+
+    private static string? GetCreditNoteReasonDescription(string? reason) =>
+        CreditNoteReasons.IsSupported(reason) ? CreditNoteReasons.GetLabel(reason) : reason;
 
     private static InvoicePdfSellerDetails BuildSeller(CompanySettingsDto? company, CompanyAddressSiteDto? sellerAddress) =>
         new(

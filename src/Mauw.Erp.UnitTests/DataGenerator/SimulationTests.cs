@@ -119,6 +119,7 @@ public class SimulationTests(PostgreSqlContainerFixture postgres)
             .Include(item => item.Items)
             .Include(item => item.Payments)
             .ToListAsync();
+        Assert.False(await db.Payments.AnyAsync());
         var customerContactIds = customers.Select(item => item.ContactId).ToHashSet();
         Assert.NotEmpty(orders);
         Assert.All(orders.Values, order => Assert.Equal(OrderStatus.Completed, order.Status));
@@ -323,6 +324,8 @@ public class SimulationTests(PostgreSqlContainerFixture postgres)
         Assert.Empty(db.ChangeTracker.Entries());
         Assert.False(await db.Products.AnyAsync());
         Assert.False(await db.Invoices.AnyAsync());
+        Assert.False(await db.CreditNotes.AnyAsync());
+        Assert.False(await db.CreditNoteItems.AnyAsync());
     }
 
     [Fact]

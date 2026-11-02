@@ -148,6 +148,28 @@ public class StockMovement : Entity<Guid>
         };
     }
 
+    public static StockMovement FromCreditNote(
+        CreditNote creditNote,
+        CreditNoteItem item,
+        Guid warehouseId,
+        string? createdByUserId) => new()
+    {
+        Id = Guid.NewGuid(),
+        VariantId = item.VariantId
+            ?? throw new Mauw.Erp.Domain.Exceptions.DomainException("La riga della nota di credito non contiene una variante."),
+        WarehouseId = warehouseId,
+        Type = StockMovementType.CustomerReturn,
+        Reason = StockMovementReason.CustomerReturn,
+        Quantity = checked((int)item.Quantity),
+        QuantityDelta = item.Quantity,
+        UnitCost = 0m,
+        MovementDateUtc = creditNote.CreditNoteDate,
+        ReferenceDoc = creditNote.CreditNoteNumber,
+        ReferenceId = creditNote.Id,
+        CreatedByUserId = createdByUserId,
+        Notes = $"Rientro merce da nota di credito {creditNote.CreditNoteNumber}"
+    };
+
     public static StockMovement FromDdtReversal(DdtDocument ddt, StockMovement movement)
     {
         var delta = movement.GetEffectiveQuantityDelta()

@@ -954,6 +954,13 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<decimal>("AllocatedAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0.00m)
+                        .HasColumnName("allocated_amount");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -984,6 +991,44 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("reason");
 
+                    b.Property<DateTime?>("RelatedInvoiceDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("related_invoice_date");
+
+                    b.Property<string>("RelatedInvoiceNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("related_invoice_number");
+
+                    b.Property<bool>("ReturnToWarehouse")
+                        .HasColumnType("boolean")
+                        .HasColumnName("return_to_warehouse");
+
+                    b.Property<string>("SdiFileName")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("sdi_file_name");
+
+                    b.Property<int>("SdiStatus")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("sdi_status");
+
+                    b.Property<string>("SdiStorageKey")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("sdi_storage_key");
+
+                    b.Property<string>("SdiTransmissionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("sdi_transmission_id");
+
+                    b.Property<DateTime?>("SdiTransmittedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sdi_transmitted_at_utc");
+
                     b.Property<decimal>("TaxableTotal")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -1000,6 +1045,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("vat_total");
 
+                    b.Property<Guid?>("WarehouseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("warehouse_id");
+
                     b.HasKey("Id")
                         .HasName("p_k_credit_notes");
 
@@ -1009,7 +1058,104 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasIndex("InvoiceId")
                         .HasDatabaseName("i_x_credit_notes_invoice_id");
 
+                    b.HasIndex("WarehouseId")
+                        .HasDatabaseName("i_x_credit_notes_warehouse_id");
+
                     b.ToTable("credit_notes");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.CreditNoteItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("CreditNoteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("credit_note_id");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<decimal>("DiscountPercent")
+                        .HasColumnType("numeric")
+                        .HasColumnName("discount_percent");
+
+                    b.Property<bool>("IsShippingCharge")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_shipping_charge");
+
+                    b.Property<decimal?>("LineGrossTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("line_gross_total");
+
+                    b.Property<decimal>("LineNetTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("line_net_total");
+
+                    b.Property<decimal?>("LineVatTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("line_vat_total");
+
+                    b.Property<string>("NatureCode")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("nature_code");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(22, 8)
+                        .HasColumnType("numeric(22,8)")
+                        .HasColumnName("quantity");
+
+                    b.Property<Guid?>("SourceInvoiceItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_invoice_item_id");
+
+                    b.Property<decimal>("UnitNetPrice")
+                        .HasPrecision(22, 8)
+                        .HasColumnType("numeric(22,8)")
+                        .HasColumnName("unit_net_price");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("VariantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("variant_id");
+
+                    b.Property<decimal>("VatRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("vat_rate");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_credit_note_items");
+
+                    b.HasIndex("SourceInvoiceItemId")
+                        .HasDatabaseName("i_x_credit_note_items_source_invoice_item_id");
+
+                    b.HasIndex("VariantId")
+                        .HasDatabaseName("i_x_credit_note_items_variant_id");
+
+                    b.HasIndex("CreditNoteId", "SourceInvoiceItemId");
+
+                    b.ToTable("credit_note_items");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.CustomerProfile", b =>
@@ -1907,6 +2053,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("payment_method");
 
+                    b.Property<Guid?>("SourceCreditNoteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_credit_note_id");
+
                     b.Property<string>("TransactionDetails")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -1923,6 +2073,9 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
                     b.HasIndex("InvoiceId")
                         .HasDatabaseName("i_x_payments_invoice_id");
+
+                    b.HasIndex("SourceCreditNoteId")
+                        .HasDatabaseName("i_x_payments_source_credit_note_id");
 
                     b.ToTable("payments");
                 });
@@ -3312,7 +3465,43 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("f_k_credit_notes__invoices_invoice_id");
 
+                    b.HasOne("Mauw.Erp.Domain.Entities.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("f_k_credit_notes__warehouses_warehouse_id");
+
                     b.Navigation("Invoice");
+
+                    b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.CreditNoteItem", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.CreditNote", "CreditNote")
+                        .WithMany("Items")
+                        .HasForeignKey("CreditNoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("f_k_credit_note_items_credit_notes_credit_note_id");
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.InvoiceItem", "SourceInvoiceItem")
+                        .WithMany()
+                        .HasForeignKey("SourceInvoiceItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("f_k_credit_note_items__invoice_items_source_invoice_item_id");
+
+                    b.HasOne("Mauw.Erp.Domain.Entities.ProductVariant", "Variant")
+                        .WithMany()
+                        .HasForeignKey("VariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("f_k_credit_note_items__product_variants_variant_id");
+
+                    b.Navigation("CreditNote");
+
+                    b.Navigation("SourceInvoiceItem");
+
+                    b.Navigation("Variant");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.CustomerProfile", b =>
@@ -3641,7 +3830,15 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("f_k_payments_invoices_invoice_id");
 
+                    b.HasOne("Mauw.Erp.Domain.Entities.CreditNote", "SourceCreditNote")
+                        .WithMany()
+                        .HasForeignKey("SourceCreditNoteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("f_k_payments_credit_notes_source_credit_note_id");
+
                     b.Navigation("Invoice");
+
+                    b.Navigation("SourceCreditNote");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.PriceFormulaStep", b =>
@@ -4026,6 +4223,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Navigation("Persons");
 
                     b.Navigation("SupplierProfile");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.CreditNote", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.DdtDocument", b =>

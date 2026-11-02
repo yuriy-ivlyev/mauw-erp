@@ -31,7 +31,21 @@ public static class InvoiceMapper
             Items: invoice.Items.Select(MapItemToDto).ToList(),
             Payments: invoice.Payments.Select(MapPaymentToDto).ToList(),
             SdiStatus: invoice.SdiStatus.ToString(),
-            IsOrderUnderAdjustment: isOrderUnderAdjustment
+            IsOrderUnderAdjustment: isOrderUnderAdjustment,
+            CreditNotes: invoice.CreditNotes
+                .OrderByDescending(note => note.CreditNoteDate)
+                .Select(note => new CreditNoteSummaryDto(
+                    note.Id,
+                    note.CreditNoteNumber,
+                    note.CreditNoteDate,
+                    note.TaxableTotal,
+                    note.VatTotal,
+                    note.GrossTotal,
+                    note.Reason,
+                    note.SdiStatus.ToString(),
+                    note.AllocatedAmount,
+                    note.RemainingCredit))
+                .ToList()
         );
     }
 
@@ -64,7 +78,9 @@ public static class InvoiceMapper
             Amount: payment.Amount,
             PaymentDate: payment.PaymentDate,
             PaymentMethod: payment.PaymentMethod,
-            TransactionDetails: payment.TransactionDetails
+            TransactionDetails: payment.TransactionDetails,
+            SourceCreditNoteId: payment.SourceCreditNoteId,
+            SourceCreditNoteNumber: payment.SourceCreditNote?.CreditNoteNumber
         );
     }
 

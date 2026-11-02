@@ -53,6 +53,16 @@ public sealed class TracingInvoiceService(IInvoiceService inner) : TracingDecora
         TraceAsync("Invoice.RecordPayment", () => inner.RecordPaymentAsync(invoiceId, request),
             a => a?.SetTag("invoice.id", invoiceId));
 
+    public Task<OperationResult<InvoiceDto>> RecordPaymentsAsync(
+        Guid invoiceId,
+        IReadOnlyList<RecordPaymentRequest>? requests) =>
+        TraceAsync("Invoice.RecordPayments", () => inner.RecordPaymentsAsync(invoiceId, requests),
+            a =>
+            {
+                a?.SetTag("invoice.id", invoiceId);
+                a?.SetTag("payment.entry_count", requests?.Count ?? 0);
+            });
+
     public Task<OperationResult<byte[]>> GetInvoicePdfAsync(Guid id) =>
         TraceAsync("Invoice.Pdf", () => inner.GetInvoicePdfAsync(id),
             a => a?.SetTag("invoice.id", id));
@@ -64,4 +74,12 @@ public sealed class TracingInvoiceService(IInvoiceService inner) : TracingDecora
     public Task<OperationResult<InvoiceXmlDownload>> GetInvoiceXmlDownloadAsync(Guid id) =>
         TraceAsync("Invoice.XmlDownload", () => inner.GetInvoiceXmlDownloadAsync(id),
             a => a?.SetTag("invoice.id", id));
+
+    public Task<OperationResult<string>> GetCreditNoteXmlAsync(Guid id) =>
+        TraceAsync("CreditNote.Xml", () => inner.GetCreditNoteXmlAsync(id),
+            a => a?.SetTag("credit_note.id", id));
+
+    public Task<OperationResult<InvoiceXmlDownload>> GetCreditNoteXmlDownloadAsync(Guid id) =>
+        TraceAsync("CreditNote.XmlDownload", () => inner.GetCreditNoteXmlDownloadAsync(id),
+            a => a?.SetTag("credit_note.id", id));
 }

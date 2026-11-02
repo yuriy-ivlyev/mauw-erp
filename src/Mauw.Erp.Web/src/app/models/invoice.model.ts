@@ -1,3 +1,5 @@
+import { CreditNoteSummary } from './credit-note.model';
+
 export interface InvoiceItem {
   id: string;
   invoiceId: string;
@@ -22,6 +24,8 @@ export interface InvoicePayment {
   paymentDate: string;
   paymentMethod: string | null;
   transactionDetails: string | null;
+  sourceCreditNoteId?: string | null;
+  sourceCreditNoteNumber?: string | null;
 }
 
 export interface Invoice {
@@ -46,6 +50,7 @@ export interface Invoice {
   status: string;
   items: InvoiceItem[];
   payments: InvoicePayment[];
+  creditNotes?: CreditNoteSummary[];
 }
 
 export interface InvoicePagedResult {
@@ -74,6 +79,11 @@ export interface RecordInvoicePaymentRequest {
   paymentDate: string;
   paymentMethod: string;
   transactionDetails: string | null;
+  sourceCreditNoteId?: string | null;
+}
+
+export interface RecordInvoicePaymentsRequest {
+  payments: RecordInvoicePaymentRequest[];
 }
 
 export interface BulkTransmissionItemResult {

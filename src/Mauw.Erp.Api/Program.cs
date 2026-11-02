@@ -152,6 +152,8 @@ app.MapGeoEndpoints();
 app.MapOrderEndpoints();
 app.MapDashboardEndpoints();
 app.MapInvoiceEndpoints();
+app.MapCreditNoteEndpoints();
+app.MapFiscalDocumentEndpoints();
 app.MapDdtEndpoints();
 app.MapCassaSessionEndpoints();
 app.MapPriceListEndpoints();

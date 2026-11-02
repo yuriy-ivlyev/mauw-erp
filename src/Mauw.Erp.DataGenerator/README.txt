@@ -59,7 +59,13 @@ sintetici nascono NotTransmitted e non in rettifica, e il generatore non
 crea mai movimenti OrderAdjustment, ne righe di audit);
 AddInvoiceSdiStorageMetadata (aggiunge i metadati nullable dell'XML archiviato
 e della trasmissione: il generatore non simula l'invio SDI e lascia tali campi
-vuoti):
+vuoti), AddCreditNoteIssuance (aggiunge lo stato SDI e i dettagli fiscali delle
+note di credito senza riscrivere i documenti storici) e
+AddCreditNoteSdiStorageMetadata (aggiunge il nome file, la chiave S3 e
+l'identificativo/data di trasmissione nullable delle note senza modificare lo
+stato dei documenti storici) e AddCreditNoteAllocation (aggiunge il credito
+allocato, inizializzato a zero per le note storiche, e il riferimento alla nota
+sui pagamenti con eliminazione restrittiva):
 il ciclo reset -> database update -> seed e
 percorribile su un database vuoto. Un database creato con le vecchie migrazioni
 va ricreato oppure la sua tabella __EFMigrationsHistory va allineata (riga con
@@ -71,6 +77,9 @@ dati sintetici creati prima dell'introduzione di quantity_delta, database update
 aggiunge la colonna nullable ma non puo ricostruire in sicurezza tutte le
 rettifiche storiche: per riavere uno scenario coerente usare reset -> database
 update -> seed, non migrare in-place il vecchio dataset.
+Il generatore non emette note di credito né pagamenti: le fatture sintetiche
+restano NotTransmitted e non costituiscono documenti accettati dallo SDI. I
+test verificano che il seed non crei note, compensazioni o pagamenti fittizi.
 
 Non conservare password nel repository o nella cronologia della shell.
 Impostare MAUW_LOADTEST_CONNECTION nel proprio secret manager/ambiente:

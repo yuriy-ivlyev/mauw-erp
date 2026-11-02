@@ -23,5 +23,7 @@ public sealed record InvoicePdfModel(
     DateOnly?                    CustomerOrderDate = null,
     string?                      DdtRef            = null,
     string?                      DeliveryTerms     = null,
-    string?                      FiscalNotes       = null
+    string?                      FiscalNotes       = null,
+    string?                      RelatedInvoiceNumber = null,
+    DateOnly?                    RelatedInvoiceDate   = null
 );

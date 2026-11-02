@@ -11,6 +11,7 @@ import {
   UpdateContactRequest,
   ToggleBlockRequest
 } from '../models/contact.model';
+import { CustomerStatementDto } from '../models/customer-statement.models';
 
 @Injectable({ providedIn: 'root' })
 export class ContactService {
@@ -37,6 +38,10 @@ export class ContactService {
 
   getById(id: string): Observable<ContactDetail> {
     return this.http.get<ContactDetail>(`${this.base}/${id}`);
+  }
+
+  getCustomerStatement(customerId: string): Observable<CustomerStatementDto> {
+    return this.http.get<CustomerStatementDto>(`${this.base}/${customerId}/statement`);
   }
 
   create(request: CreateContactRequest): Observable<ContactDetail> {

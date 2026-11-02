@@ -9,4 +9,5 @@ public class RecordPaymentRequest
     public DateTime? PaymentDate { get; set; }
     public string PaymentMethod { get; set; } = string.Empty;
     public string? TransactionDetails { get; set; }
+    public Guid? SourceCreditNoteId { get; set; }
 }

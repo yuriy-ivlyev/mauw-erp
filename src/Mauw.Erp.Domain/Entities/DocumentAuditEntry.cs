@@ -4,6 +4,7 @@ public static class AuditDocumentTypes
 {
     public const string Order = nameof(Order);
     public const string Invoice = nameof(Invoice);
+    public const string CreditNote = nameof(CreditNote);
 }
 
 public static class AuditActions
@@ -12,6 +13,8 @@ public static class AuditActions
     public const string OrderLinesAdjusted = nameof(OrderLinesAdjusted);
     public const string InvoiceSynchronizedFromOrder = nameof(InvoiceSynchronizedFromOrder);
     public const string InvoiceTransmittedToSdi = nameof(InvoiceTransmittedToSdi);
+    public const string CreditNoteIssued = nameof(CreditNoteIssued);
+    public const string CreditNoteTransmittedToSdi = nameof(CreditNoteTransmittedToSdi);
 }
 
 /// <summary>

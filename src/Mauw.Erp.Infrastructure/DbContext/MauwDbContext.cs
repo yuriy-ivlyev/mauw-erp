@@ -41,6 +41,7 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
     public DbSet<Invoice> Invoices { get; set; }
     public DbSet<InvoiceItem> InvoiceItems { get; set; }
     public DbSet<CreditNote> CreditNotes { get; set; }
+    public DbSet<CreditNoteItem> CreditNoteItems { get; set; }
     public DbSet<Payment> Payments { get; set; }
     public DbSet<AgentCommission> AgentCommissions { get; set; }
     public DbSet<Warehouse> Warehouses { get; set; }
@@ -118,6 +119,7 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
         modelBuilder.ApplyConfiguration(new InvoiceConfiguration());
         modelBuilder.ApplyConfiguration(new InvoiceItemConfiguration());
         modelBuilder.ApplyConfiguration(new CreditNoteConfiguration());
+        modelBuilder.ApplyConfiguration(new CreditNoteItemConfiguration());
         modelBuilder.ApplyConfiguration(new PaymentConfiguration());
         modelBuilder.ApplyConfiguration(new AgentCommissionConfiguration());
         modelBuilder.ApplyConfiguration(new WarehouseConfiguration());

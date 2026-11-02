@@ -37,7 +37,13 @@ public class PaymentConfiguration : IEntityTypeConfiguration<Payment>
             .HasForeignKey(p => p.InvoiceId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasOne(p => p.SourceCreditNote)
+            .WithMany()
+            .HasForeignKey(p => p.SourceCreditNoteId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Index for payment lookup by invoice
         builder.HasIndex(p => p.InvoiceId);
+        builder.HasIndex(p => p.SourceCreditNoteId);
     }
 }

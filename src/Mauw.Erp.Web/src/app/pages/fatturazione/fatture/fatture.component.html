@@ -11,12 +11,12 @@
   </div>
   <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <h2 class="m-0 text-lg font-bold">Elenco fatture</h2>
+      <h2 class="m-0 text-lg font-bold">Elenco documenti fiscali</h2>
     </div>
 
     <div class="mb-4 grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-7">
       <label class="text-sm font-semibold text-slate-700 lg:col-span-2">
-        Cerca fattura o cliente
+        Cerca fattura, nota di credito o cliente
         <input name="invoiceSearch" [(ngModel)]="searchTerm" (ngModelChange)="onSearchChange()"
           type="search" placeholder="Numero o cliente..."
           class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal focus:border-blue-500 focus:outline-none" />
@@ -62,10 +62,12 @@
       </div>
     </div>
 
-    <div *ngIf="selectedInvoices.length > 0"
+    <div *ngIf="selectedDocuments.length > 0"
       class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3"
       role="region" aria-label="Azioni fatture selezionate" aria-live="polite">
-      <span class="font-semibold text-blue-900">{{ selectedInvoices.length }} fatture selezionate</span>
+      <span class="font-semibold text-blue-900">
+        {{ selectedInvoiceIds.size }} fatture e {{ selectedCreditNoteIds.size }} note di credito selezionate
+      </span>
       <button type="button" (click)="openBulkTransmitConfirmation()" [disabled]="transmittingSdi"
         class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50">
         {{ transmittingSdi ? 'Invio in corso…' : 'Invia selezionate a SDI' }}
@@ -80,12 +82,12 @@
         <thead class="border-b bg-slate-50">
           <tr class="text-left text-slate-600">
             <th class="px-3 py-3">
-              <input *ngIf="selectableInvoices.length > 0" type="checkbox"
+              <input *ngIf="selectableFiscalDocuments.length > 0" type="checkbox"
                 [checked]="allSelectableInvoicesSelected"
                 [indeterminate]="someSelectableInvoicesSelected"
                 [disabled]="transmittingSdi"
                 (change)="toggleAllSelectableInvoices($any($event.target).checked)"
-                aria-label="Seleziona tutte le fatture trasmissibili in questa pagina"
+                aria-label="Seleziona tutti i documenti fiscali trasmissibili in questa pagina"
                 class="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600" />
             </th>
             <th appSortHeader="invoiceNumber" [activeSortBy]="sortBy" [sortDescending]="sortDescending"
@@ -109,7 +111,8 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let invoice of invoices" class="border-b hover:bg-blue-50">
+          <ng-container *ngFor="let invoice of invoices">
+          <tr class="border-b hover:bg-blue-50">
             <td class="px-3 py-3">
               <input *ngIf="canTransmitToSdi(invoice)" type="checkbox"
                 [checked]="isInvoiceSelected(invoice.id)" [disabled]="transmittingSdi"
@@ -118,6 +121,7 @@
                 class="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600" />
             </td>
             <td class="px-3 py-3 font-mono font-semibold text-slate-900">
+              <span class="mr-2 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-700">Fattura TD01</span>
               {{ invoice.invoiceNumber }}
             </td>
             <td class="px-3 py-3">{{ invoice.contactName }}</td>
@@ -149,6 +153,38 @@
               </div>
             </td>
           </tr>
+          <tr *ngFor="let note of invoice.creditNotes || []" class="border-b bg-amber-50/40 hover:bg-amber-50">
+            <td class="px-3 py-3">
+              <input *ngIf="canTransmitCreditNote(note)" type="checkbox"
+                [checked]="isCreditNoteSelected(note.id)" [disabled]="transmittingSdi"
+                (change)="setCreditNoteSelected(note, $any($event.target).checked)"
+                [attr.aria-label]="'Seleziona nota di credito ' + note.creditNoteNumber + ' per invio SDI'"
+                class="h-4 w-4 rounded border-amber-400 text-amber-700 focus:ring-amber-600" />
+            </td>
+            <td class="px-3 py-3 font-mono font-semibold text-slate-900">
+              <span class="mr-2 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-800">Nota di Credito TD04</span>
+              {{ note.creditNoteNumber }}
+            </td>
+            <td class="px-3 py-3">{{ invoice.contactName }}</td>
+            <td class="px-3 py-3">{{ note.creditNoteDate | date:'dd/MM/yyyy' }}</td>
+            <td class="px-3 py-3 text-slate-500">Nota di credito</td>
+            <td class="px-3 py-3">
+              <span [class]="'rounded-full px-2 py-1 text-xs font-medium ' + sdiStatusClass(note.sdiStatus)">
+                {{ sdiStatusLabel(note.sdiStatus) }}
+              </span>
+            </td>
+            <td class="px-3 py-3 text-right">{{ note.taxableTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+            <td class="px-3 py-3 text-right">{{ note.vatTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+            <td class="px-3 py-3 text-right font-semibold">{{ note.grossTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+            <td class="px-3 py-3 text-right">—</td>
+            <td class="px-3 py-3">
+              <button type="button" (click)="openCreditNote(note.id)"
+                class="inline-flex h-7 items-center rounded-lg border border-amber-200 bg-amber-50 px-3 text-xs font-semibold text-amber-800 transition hover:bg-amber-100">
+                Dettaglio
+              </button>
+            </td>
+          </tr>
+          </ng-container>
           <tr *ngIf="!loading && invoices.length === 0">
             <td colspan="11" class="p-8 text-center text-slate-500">Nessuna fattura trovata.</td>
           </tr>
@@ -162,7 +198,7 @@
   <app-confirm-delete-modal
     [isOpen]="confirmBulkTransmitOpen"
     title="Conferma invio allo SDI"
-    [message]="'Confermi la trasmissione di ' + selectedInvoices.length + ' fatture selezionate? L’invio non è reversibile.'"
+    [message]="'Confermi la trasmissione di ' + selectedInvoiceIds.size + ' fatture e ' + selectedCreditNoteIds.size + ' note di credito? L’invio non è reversibile.'"
     confirmLabel="Invia a SDI"
     [showDeleteIcon]="false"
     actionVariant="primary"
@@ -176,15 +212,24 @@
       (click)="$event.stopPropagation()">
       <h2 id="bulk-sdi-result-title" class="m-0 text-xl font-bold text-slate-900">Esito invio SDI</h2>
       <p class="mt-2 text-sm text-slate-700" role="status">
-        {{ bulkResult.successCount }} trasmesse, {{ bulkResult.failedCount }} con errore
-        su {{ bulkResult.requestedCount }} selezionate.
+        {{ transmittedInvoiceCount }} fatture e {{ transmittedCreditNoteCount }} note di credito trasmesse;
+        {{ bulkResult.failedCount }} con errore su {{ bulkResult.processedCount }} documenti.
       </p>
       <ul class="mt-4 max-h-80 space-y-2 overflow-y-auto" aria-label="Esiti individuali">
         <li *ngFor="let item of bulkResult.results"
           class="rounded-lg border p-3"
           [class.border-green-200]="item.success" [class.bg-green-50]="item.success"
           [class.border-red-200]="!item.success" [class.bg-red-50]="!item.success">
-          <p class="m-0 font-semibold text-slate-900">{{ item.invoiceNumber || item.invoiceId }}</p>
+          <div class="flex items-center gap-2">
+            <span class="rounded-full px-2 py-1 text-[10px] font-bold"
+              [class.bg-slate-100]="item.documentType === 'Invoice'"
+              [class.text-slate-700]="item.documentType === 'Invoice'"
+              [class.bg-amber-100]="item.documentType === 'CreditNote'"
+              [class.text-amber-800]="item.documentType === 'CreditNote'">
+              {{ documentTypeLabel(item.documentType) }}
+            </span>
+            <p class="m-0 font-semibold text-slate-900">{{ item.documentNumber || item.id }}</p>
+          </div>
           <p *ngIf="item.success" class="mb-0 mt-1 text-sm text-green-800">Trasmissione completata.</p>
           <p *ngIf="!item.success" class="mb-0 mt-1 text-sm text-red-800">
             {{ item.errorMessage || 'Trasmissione non riuscita.' }}

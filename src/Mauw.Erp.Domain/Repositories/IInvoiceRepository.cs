@@ -15,6 +15,9 @@ public interface IInvoiceRepository : IRepository<Invoice, Guid>
     Task AcquireInvoiceNumberLockAsync(string prefix);
     Task<List<string>> GetInvoiceNumbersByPrefixAsync(string prefix);
     Task<IEnumerable<Invoice>> GetByContactIdAsync(Guid contactId);
+    Task<List<Invoice>> GetConfirmedForStatementByContactIdAsync(
+        Guid contactId,
+        CancellationToken cancellationToken = default);
     Task<(IEnumerable<Invoice> Items, int Total)> GetByContactIdPagedAsync(Guid contactId, int page, int pageSize);
     Task<(IEnumerable<Invoice> Items, int Total)> GetPagedAsync(
         Guid? contactId,

@@ -57,6 +57,8 @@ public sealed class SimulationGenerator(
         if (await db.Contacts.IgnoreQueryFilters().AnyAsync(token) || await db.Products.AnyAsync(token) ||
             await db.Warehouses.IgnoreQueryFilters().AnyAsync(token) || await db.StockMovements.AnyAsync(token) ||
             await db.Orders.AnyAsync(token) || await db.Invoices.AnyAsync(token) ||
+            await db.CreditNotes.AnyAsync(token) || await db.CreditNoteItems.AnyAsync(token) ||
+            await db.Payments.AnyAsync(token) ||
             await db.DdtDocuments.AnyAsync(token) || await db.Shipments.AnyAsync(token) ||
             await db.StockItems.AnyAsync(token))
             return Fail("The generator requires an empty business database; lookup data may already exist.");

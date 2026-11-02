@@ -1,4 +1,5 @@
 using Mauw.Erp.Api.Authorization;
+using Mauw.Erp.Application.Queries.CustomerStatements;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos;
 using Mauw.Erp.Contracts.Requests;
@@ -39,6 +40,16 @@ public static class ContactEndpoints
         group.MapGet("/{id:guid}", GetContact)
             .WithName("GetContact")
             .WithSummary("Get full contact detail by ID");
+
+        group.MapGet("/{customerId:guid}/available-credit-notes", GetAvailableCreditNotes)
+            .RequireAuthorization(AppPolicies.Billing)
+            .WithName("GetAvailableCreditNotes")
+            .WithSummary("Get a customer's credit notes with remaining credit");
+
+        group.MapGet("/{id:guid}/statement", GetCustomerStatement)
+            .RequireAuthorization(AppPolicies.Billing)
+            .WithName("GetCustomerStatement")
+            .WithSummary("Build the customer's on-demand account statement");
 
         group.MapPost("/", CreateContact)
             .RequireAuthorization(AppPolicies.SalesOperations)
@@ -93,6 +104,32 @@ public static class ContactEndpoints
     {
         var result = await vatService.ValidateAsync(countryCode, vatNumber);
         return TypedResults.Ok(result);
+    }
+
+    private static async Task<Results<Ok<List<CreditNoteAvailableCreditDto>>, BadRequest<string>>>
+        GetAvailableCreditNotes(
+            Guid customerId,
+            ICreditNoteService creditNoteService,
+            CancellationToken cancellationToken)
+    {
+        var result = await creditNoteService.GetAvailableForContactAsync(customerId, cancellationToken);
+        return result.Success
+            ? TypedResults.Ok(result.Data!)
+            : TypedResults.BadRequest(result.Error ?? "Impossibile caricare i crediti disponibili.");
+    }
+
+    private static async Task<Results<Ok<CustomerStatementDto>, NotFound, BadRequest<string>>>
+        GetCustomerStatement(
+            Guid id,
+            MediatR.ISender sender,
+            CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetCustomerStatementQuery(id), cancellationToken);
+        if (result.Success)
+            return TypedResults.Ok(result.Data!);
+        if (result.Error == "Cliente non trovato.")
+            return TypedResults.NotFound();
+        return TypedResults.BadRequest(result.Error ?? "Impossibile generare l'estratto conto.");
     }
 
     private static async Task<Ok<PagedResult<ContactSummaryDto>>> ListContacts(

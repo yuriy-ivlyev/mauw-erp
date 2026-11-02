@@ -3,20 +3,32 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { Subject, of } from 'rxjs';
-import { catchError, finalize, map, takeUntil } from 'rxjs/operators';
+import { Observable, Subject, of } from 'rxjs';
+import { catchError, finalize, map, switchMap, takeUntil } from 'rxjs/operators';
+import {
+  AvailableCreditNote,
+  CreditNoteIssued,
+  CreditNoteSummary
+} from '../../../models/credit-note.model';
 import { DdtDocumentRef, Order } from '../../../models/order.model';
 import { Invoice } from '../../../models/invoice.model';
+import { CreditNoteService } from '../../../services/credit-note.service';
 import { InvoiceService } from '../../../services/invoice.service';
 import { OrderService } from '../../../services/order.service';
+import { WarehouseService } from '../../../services/warehouse.service';
+import { WarehouseSummary } from '../../../models/warehouse.model';
 import { BackButtonComponent } from '../../../shared/back-button/back-button.component';
 import { PaginationComponent } from '../../../shared/pagination/pagination.component';
 import { PageSlicePipe } from '../../../shared/pagination/page-slice.pipe';
+import { CreditNoteModalComponent } from './credit-note-modal.component';
 
 @Component({
   selector: 'app-fattura-dettaglio',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, BackButtonComponent, PaginationComponent, PageSlicePipe],
+  imports: [
+    CommonModule, FormsModule, RouterLink, BackButtonComponent, PaginationComponent,
+    PageSlicePipe, CreditNoteModalComponent
+  ],
   templateUrl: './fattura-dettaglio.component.html'
 })
 export class FatturaDettaglioComponent implements OnInit, OnDestroy {
@@ -36,19 +48,33 @@ export class FatturaDettaglioComponent implements OnInit, OnDestroy {
   paymentDate = new Date().toISOString().slice(0, 10);
   paymentMethod = 'Bonifico bancario';
   transactionDetails = '';
+  availableCreditNotes: AvailableCreditNote[] = [];
+  selectedCreditNote: AvailableCreditNote | null = null;
+  creditNoteOffsetAmount: number | null = null;
+  loadingAvailableCreditNotes = false;
+  availableCreditNotesError = '';
   recordingPayment = false;
   downloadingPdf = false;
+  creditNoteModalOpen = false;
+  loadingCreditNoteWarehouses = false;
+  activeWarehouses: WarehouseSummary[] = [];
+  creditNoteToast = '';
+  creditNoteToastIsWarning = false;
 
-  readonly paymentMethods = ['Bonifico bancario', 'Contanti', 'Carta', 'Assegno', 'Altro'];
+  readonly paymentMethods = ['Bonifico bancario', 'Contanti', 'Carta', 'POS', 'Assegno', 'Altro'];
 
   private readonly destroy$ = new Subject<void>();
   private invoiceRequestVersion = 0;
+  private creditNoteRequestVersion = 0;
+  private creditNoteToastTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly route: ActivatedRoute,
     private readonly router: Router,
+    private readonly creditNotesApi: CreditNoteService,
     private readonly invoicesApi: InvoiceService,
-    private readonly ordersApi: OrderService
+    private readonly ordersApi: OrderService,
+    private readonly warehousesApi: WarehouseService
   ) {}
 
   ngOnInit(): void {
@@ -73,10 +99,40 @@ export class FatturaDettaglioComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    if (this.creditNoteToastTimer) {
+      clearTimeout(this.creditNoteToastTimer);
+    }
+  }
+
+  get canIssueCreditNote(): boolean {
+    return this.invoice?.sdiStatus === 'Transmitted' || this.invoice?.sdiStatus === 'Accepted';
   }
 
   get currentUrl(): string {
     return this.router.url;
+  }
+
+  get availableCreditTotal(): number {
+    const cents = this.availableCreditNotes.reduce(
+      (total, note) => total + Math.round(note.remainingCredit * 100),
+      0);
+    return cents / 100;
+  }
+
+  get canSubmitPayment(): boolean {
+    if (!this.invoice || this.recordingPayment) {
+      return false;
+    }
+
+    const hasCreditOffset = this.selectedCreditNote !== null &&
+      this.creditNoteOffsetAmount !== null &&
+      this.creditNoteOffsetAmount > 0;
+    const cashAmount = this.paymentAmount ?? 0;
+    const hasCashPayment = Number.isFinite(cashAmount) && cashAmount > 0 &&
+      /^\d+(?:\.\d{1,2})?$/.test(cashAmount.toString());
+
+    return (hasCreditOffset && (cashAmount === 0 || hasCashPayment)) ||
+      (!hasCreditOffset && hasCashPayment);
   }
 
   goBack(): void {
@@ -93,6 +149,10 @@ export class FatturaDettaglioComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.errorMessage = '';
     this.invoice = null;
+    this.creditNoteRequestVersion++;
+    this.availableCreditNotes = [];
+    this.availableCreditNotesError = '';
+    this.loadingAvailableCreditNotes = false;
     this.itemsPage = 1;
     this.relatedOrder = null;
     this.relatedDdts = [];
@@ -110,6 +170,7 @@ export class FatturaDettaglioComponent implements OnInit, OnDestroy {
         }
         this.invoice = invoice;
         this.resetPaymentEntry();
+        this.loadAvailableCreditNotes(invoice.contactId, requestVersion);
         this.loadRelatedOrder(invoice);
       },
       error: error => {
@@ -120,41 +181,82 @@ export class FatturaDettaglioComponent implements OnInit, OnDestroy {
     });
   }
 
-  recordPayment(): void {
+  applyCreditNote(note: AvailableCreditNote): void {
     const invoice = this.invoice;
-    if (!invoice || this.recordingPayment || this.paymentAmount === null) {
+    if (!invoice || invoice.balanceDue <= 0 || note.remainingCredit <= 0) {
       return;
     }
-    if (!Number.isFinite(this.paymentAmount) || this.paymentAmount <= 0 ||
-        !/^\d+(?:\.\d{1,2})?$/.test(this.paymentAmount.toString())) {
+
+    const outstandingCents = Math.max(0, Math.round(invoice.balanceDue * 100));
+    const availableCents = Math.max(0, Math.round(note.remainingCredit * 100));
+    const appliedCents = Math.min(outstandingCents, availableCents);
+    this.selectedCreditNote = note;
+    this.creditNoteOffsetAmount = appliedCents / 100;
+    this.paymentAmount = (outstandingCents - appliedCents) / 100;
+    this.paymentMethod = 'POS';
+    this.transactionDetails = '';
+    this.errorMessage = '';
+  }
+
+  clearCreditNoteOffset(): void {
+    this.selectedCreditNote = null;
+    this.creditNoteOffsetAmount = null;
+    this.paymentAmount = this.invoice?.balanceDue ?? null;
+  }
+
+  recordPayment(): void {
+    const invoice = this.invoice;
+    if (!invoice || !this.canSubmitPayment) {
+      return;
+    }
+    const cashAmount = this.paymentAmount ?? 0;
+    const hasCreditOffset = this.selectedCreditNote !== null &&
+      this.creditNoteOffsetAmount !== null &&
+      this.creditNoteOffsetAmount > 0;
+    if (cashAmount < 0 || cashAmount > 0 &&
+        (!Number.isFinite(cashAmount) || !/^\d+(?:\.\d{1,2})?$/.test(cashAmount.toString()))) {
       this.errorMessage = 'Inserisci un importo positivo con al massimo due decimali.';
       return;
     }
-    if (!this.paymentDate || !this.paymentMethod.trim()) {
+    if (!this.paymentDate || cashAmount > 0 && !this.paymentMethod.trim()) {
       this.errorMessage = 'Seleziona data e metodo di pagamento.';
       return;
     }
     const details = this.transactionDetails.trim();
-    if (this.paymentMethod === 'Bonifico bancario' && !details) {
+    if (cashAmount > 0 && this.paymentMethod === 'Bonifico bancario' && !details) {
       this.errorMessage = 'Inserisci il riferimento del bonifico (CRO/TRN).';
       return;
     }
 
+    const payments = [];
+    if (hasCreditOffset && this.selectedCreditNote) {
+      payments.push({
+        amount: this.creditNoteOffsetAmount!,
+        paymentDate: `${this.paymentDate}T00:00:00`,
+        paymentMethod: 'CreditNoteOffset',
+        transactionDetails: null,
+        sourceCreditNoteId: this.selectedCreditNote.id
+      });
+    }
+    if (cashAmount > 0) {
+      payments.push({
+        amount: cashAmount,
+        paymentDate: `${this.paymentDate}T00:00:00`,
+        paymentMethod: this.paymentMethod.trim(),
+        transactionDetails: details || null
+      });
+    }
+
     this.recordingPayment = true;
     this.errorMessage = '';
-    this.invoicesApi.recordPayment(invoice.id, {
-      amount: this.paymentAmount,
-      paymentDate: `${this.paymentDate}T00:00:00`,
-      paymentMethod: this.paymentMethod.trim(),
-      transactionDetails: details || null
-    }).pipe(
+    this.invoicesApi.recordPayments(invoice.id, { payments }).pipe(
       takeUntil(this.destroy$),
       finalize(() => { this.recordingPayment = false; })
     ).subscribe({
       next: updated => {
         this.invoice = updated;
-        this.paymentAmount = null;
-        this.transactionDetails = '';
+        this.resetPaymentEntry();
+        this.loadAvailableCreditNotes(updated.contactId, this.invoiceRequestVersion);
         this.successMessage = 'Pagamento registrato.';
       },
       error: error => { this.errorMessage = this.describeError(error, 'Impossibile registrare il pagamento.'); }
@@ -193,6 +295,91 @@ export class FatturaDettaglioComponent implements OnInit, OnDestroy {
     });
   }
 
+  openCreditNoteModal(): void {
+    if (!this.invoice || !this.canIssueCreditNote || this.loadingCreditNoteWarehouses) {
+      return;
+    }
+
+    this.loadingCreditNoteWarehouses = true;
+    this.errorMessage = '';
+    this.loadActiveWarehouses().pipe(
+      takeUntil(this.destroy$),
+      finalize(() => { this.loadingCreditNoteWarehouses = false; })
+    ).subscribe({
+      next: warehouses => {
+        this.activeWarehouses = warehouses;
+        this.creditNoteModalOpen = true;
+      },
+      error: error => {
+        this.errorMessage = this.describeError(error, 'Impossibile caricare i magazzini attivi.');
+      }
+    });
+  }
+
+  onCreditNoteCompleted(result: CreditNoteIssued): void {
+    this.creditNoteModalOpen = false;
+    this.showCreditNoteToast(
+      result.pdfGenerationError
+        ? `Nota ${result.creditNote.creditNoteNumber} emessa; PDF non generato: ${result.pdfGenerationError}`
+        : `Nota di credito ${result.creditNote.creditNoteNumber} emessa.`,
+      !!result.pdfGenerationError);
+    const invoiceId = this.invoice?.id;
+    if (invoiceId) {
+      this.loadInvoice(invoiceId);
+    }
+  }
+
+  downloadCreditNotePdf(note: CreditNoteSummary): void {
+    this.invoicesApi.downloadPdf(note.id).pipe(
+      takeUntil(this.destroy$)
+    ).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `nota-di-credito-${note.creditNoteNumber}.pdf`;
+        link.click();
+        URL.revokeObjectURL(url);
+      },
+      error: error => {
+        this.errorMessage = this.describeError(error, 'Impossibile scaricare il PDF della nota di credito.');
+      }
+    });
+  }
+
+  creditNoteReasonLabel(reason: string | null): string {
+    switch (reason) {
+      case 'GoodsReturn': return 'Reso merce';
+      case 'PriceAdjustment': return 'Rettifica prezzo';
+      case 'CommercialAllowance': return 'Abbuono commerciale';
+      case 'FullCancellation': return 'Storno totale';
+      default: return reason ?? 'Causale non specificata';
+    }
+  }
+
+  private loadActiveWarehouses(page = 1, collected: WarehouseSummary[] = []): Observable<WarehouseSummary[]> {
+    return this.warehousesApi.getList({ page, pageSize: 100, isActive: true }).pipe(
+      switchMap(result => {
+        const warehouses = [...collected, ...result.items];
+        return page < result.totalPages
+          ? this.loadActiveWarehouses(page + 1, warehouses)
+          : of(warehouses);
+      })
+    );
+  }
+
+  private showCreditNoteToast(message: string, warning: boolean): void {
+    this.creditNoteToast = message;
+    this.creditNoteToastIsWarning = warning;
+    if (this.creditNoteToastTimer) {
+      clearTimeout(this.creditNoteToastTimer);
+    }
+    this.creditNoteToastTimer = setTimeout(() => {
+      this.creditNoteToast = '';
+      this.creditNoteToastTimer = null;
+    }, 5000);
+  }
+
   private loadRelatedOrder(invoice: Invoice): void {
     this.relatedDocumentsError = '';
     if (!invoice.orderId) {
@@ -217,11 +404,43 @@ export class FatturaDettaglioComponent implements OnInit, OnDestroy {
     });
   }
 
+  private loadAvailableCreditNotes(contactId: string, requestVersion: number): void {
+    const creditNoteRequestVersion = ++this.creditNoteRequestVersion;
+    this.loadingAvailableCreditNotes = true;
+    this.availableCreditNotes = [];
+    this.availableCreditNotesError = '';
+    this.creditNotesApi.getAvailableForContact(contactId).pipe(
+      takeUntil(this.destroy$),
+      finalize(() => {
+        if (requestVersion === this.invoiceRequestVersion &&
+            creditNoteRequestVersion === this.creditNoteRequestVersion) {
+          this.loadingAvailableCreditNotes = false;
+        }
+      })
+    ).subscribe({
+      next: notes => {
+        if (requestVersion === this.invoiceRequestVersion &&
+            creditNoteRequestVersion === this.creditNoteRequestVersion) {
+          this.availableCreditNotes = notes;
+        }
+      },
+      error: error => {
+        if (requestVersion === this.invoiceRequestVersion &&
+            creditNoteRequestVersion === this.creditNoteRequestVersion) {
+          this.availableCreditNotesError = this.describeError(
+            error, 'Impossibile caricare i crediti disponibili dalle note di credito.');
+        }
+      }
+    });
+  }
+
   private resetPaymentEntry(): void {
     this.paymentAmount = null;
     this.paymentDate = new Date().toISOString().slice(0, 10);
     this.paymentMethod = 'Bonifico bancario';
     this.transactionDetails = '';
+    this.selectedCreditNote = null;
+    this.creditNoteOffsetAmount = null;
   }
 
   private safeReturnUrl(value: string | null): string | null {

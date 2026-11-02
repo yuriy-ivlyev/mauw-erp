@@ -70,7 +70,11 @@
       </thead>
       <tbody>
         <tr *ngFor="let c of contacts" class="border-b hover:bg-gray-50">
-          <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ c.businessName }}</td>
+          <td class="px-6 py-4 text-sm font-medium">
+            <a [routerLink]="['/anagrafiche', c.id]" class="text-blue-700 underline hover:text-blue-900">
+              {{ c.businessName }}
+            </a>
+          </td>
           <td class="px-6 py-4 text-sm text-gray-600">{{ c.tradeName || '—' }}</td>
           <td class="px-6 py-4 text-sm text-gray-600">
             <span *ngIf="c.vatNumber">{{ c.vatNumber }}</span>

@@ -5,6 +5,7 @@ using System.Xml;
 using System.Xml.Linq;
 using Mauw.Erp.Application.Services;
 using Mauw.Erp.Contracts.Dtos.Pdf;
+using Mauw.Erp.Domain.Entities;
 using Mauw.Erp.Domain.Services;
 
 namespace Mauw.Erp.Application.Mappers;
@@ -70,6 +71,17 @@ public static partial class FatturaPaInvoiceXmlBuilder
             errors.Add("Il numero documento deve contenere una cifra e al massimo 20 caratteri.");
         if (model.Lines.Count == 0)
             errors.Add("La fattura deve contenere almeno una riga.");
+        if (model.DocumentType == "TD04")
+        {
+            if (string.IsNullOrWhiteSpace(model.RelatedInvoiceNumber) ||
+                model.RelatedInvoiceNumber.Length > 20 ||
+                model.RelatedInvoiceDate is null)
+                errors.Add("La nota di credito TD04 richiede numero e data della fattura collegata.");
+            if (model.Totals.TotalGross <= 0m ||
+                model.Totals.TotalNet < 0m ||
+                model.Totals.TotalVat < 0m)
+                errors.Add("La nota di credito TD04 deve avere importi non negativi e un totale positivo.");
+        }
 
         var sellerVat = ParseVatId(seller.VatNumber);
         if (sellerVat is null)
@@ -85,6 +97,11 @@ public static partial class FatturaPaInvoiceXmlBuilder
         var lines = new List<XElement>();
         for (var index = 0; index < model.Lines.Count; index++)
         {
+            if (model.DocumentType == "TD04" &&
+                (model.Lines[index].Pieces <= 0m ||
+                 model.Lines[index].UnitPrice < 0m ||
+                 model.Lines[index].LineTotal < 0m))
+                errors.Add($"Riga {index + 1}: quantità e importi TD04 devono essere non negativi.");
             var line = BuildLine(
                 model.Lines[index], index + 1, calculator, customerParty.RequiredZeroRatedNature, errors);
             if (line is not null)
@@ -115,7 +132,8 @@ public static partial class FatturaPaInvoiceXmlBuilder
         var header = new XElement("FatturaElettronicaHeader",
             new XElement("DatiTrasmissione",
                 BuildIdFiscale("IdTrasmittente", sellerVat!.Value),
-                new XElement("ProgressivoInvio", BuildProgressive(model.DocumentNumber)),
+                new XElement("ProgressivoInvio", BuildProgressive(
+                    model.DocumentNumber, model.DocumentType ?? string.Empty)),
                 new XElement("FormatoTrasmissione", "FPR12"),
                 customerParty.RecipientElements),
             BuildSeller(seller, sellerVat.Value, regime.Value),
@@ -130,8 +148,16 @@ public static partial class FatturaPaInvoiceXmlBuilder
         foreach (var chunk in Chunk(Sanitize(model.FiscalNotes), 200))
             documentData.Add(new XElement("Causale", chunk));
 
+        var generalData = new XElement("DatiGenerali", documentData);
+        if (model.DocumentType == "TD04")
+        {
+            generalData.Add(new XElement("DatiFattureCollegate",
+                new XElement("IdDocumento", model.RelatedInvoiceNumber),
+                new XElement("Data", model.RelatedInvoiceDate!.Value.ToString("yyyy-MM-dd", Invariant))));
+        }
+
         var body = new XElement("FatturaElettronicaBody",
-            new XElement("DatiGenerali", documentData),
+            generalData,
             new XElement("DatiBeniServizi", lines, summaries),
             payment.Data);
 
@@ -145,6 +171,93 @@ public static partial class FatturaPaInvoiceXmlBuilder
             body);
 
         return OperationResult<string>.Ok(Serialize(new XDocument(new XDeclaration("1.0", "UTF-8", null), root)));
+    }
+
+    public static OperationResult<string> Build(
+        CreditNote creditNote,
+        Invoice sourceInvoice,
+        InvoicePdfModel model,
+        ItalianAccountingCalculator calculator)
+    {
+        if (creditNote.InvoiceId != sourceInvoice.Id)
+            return OperationResult<string>.Fail(
+                "La fattura collegata non corrisponde alla nota di credito.");
+        if (creditNote.Items.Count == 0 || creditNote.Items.Count != model.Lines.Count)
+            return OperationResult<string>.Fail(
+                "La nota di credito deve avere righe fiscali esplicite per generare il TD04.");
+
+        var calculation = calculator.Calculate(creditNote.Items.Select(item =>
+            new Mauw.Erp.Domain.Accounting.DocumentLineInput(
+                item.Quantity,
+                item.UnitNetPrice,
+                item.VatRate,
+                item.NatureCode,
+                item.DiscountPercent)));
+        if (!calculation.Success)
+            return OperationResult<string>.Fail(calculation.Error!);
+
+        var document = calculation.Data!;
+        if (document.TotalTaxable != creditNote.TaxableTotal ||
+            document.TotalVat != creditNote.VatTotal ||
+            document.TotalGross != creditNote.GrossTotal)
+            return OperationResult<string>.Fail(
+                "I totali TD04 non coincidono con le righe della nota di credito.");
+
+        var lines = model.Lines.Select((line, index) =>
+        {
+            var calculated = document.Lines[index];
+            return line with
+            {
+                Pieces = calculated.Quantity,
+                UnitPrice = calculated.UnitNetPrice,
+                DiscountPercent = calculated.DiscountPercent > 0m
+                    ? calculated.DiscountPercent
+                    : null,
+                VatRate = calculated.VatRate,
+                LineTotal = calculated.LineNetTotal,
+                NatureCode = calculated.NatureCode
+            };
+        }).ToList();
+        var summaries = document.VatSummary
+            .Select(summary => new InvoiceVatBreakdownModel(
+                summary.VatRate,
+                summary.TaxableAmount,
+                summary.VatAmount,
+                summary.NatureCode))
+            .ToList();
+        var sourceInvoiceDate = DateOnly.FromDateTime(sourceInvoice.InvoiceDate);
+        var td04Model = model with
+        {
+            DocumentNumber = creditNote.CreditNoteNumber,
+            DocumentType = "TD04",
+            IssueDate = DateOnly.FromDateTime(creditNote.CreditNoteDate),
+            Payment = model.Payment with { Amount = document.TotalGross },
+            Lines = lines,
+            VatSummary = summaries,
+            Totals = model.Totals with
+            {
+                TotalPieces = creditNote.Items
+                    .Where(item => !item.IsShippingCharge)
+                    .Sum(item => item.Quantity),
+                TotalNet = document.TotalTaxable,
+                TotalVat = document.TotalVat,
+                TotalGross = document.TotalGross,
+                ShippingCost = 0m
+            },
+            RelatedInvoiceNumber = sourceInvoice.InvoiceNumber,
+            RelatedInvoiceDate = sourceInvoiceDate
+        };
+
+        var xml = Build(td04Model, calculator);
+        if (!xml.Success)
+            return xml;
+
+        var schemaErrors = FatturaPaSchemaValidator.Validate(xml.Data!);
+        return schemaErrors.Count == 0
+            ? xml
+            : OperationResult<string>.Fail(
+                "L'XML TD04 non supera la validazione XSD ufficiale: " +
+                string.Join(" ", schemaErrors));
     }
 
     private static XElement? BuildLine(
@@ -466,9 +579,15 @@ public static partial class FatturaPaInvoiceXmlBuilder
     }
 
     // The file is transmitted by the seller itself; the progressive must be stable for the same invoice.
-    private static string BuildProgressive(string documentNumber)
+    private static string BuildProgressive(string documentNumber, string documentType)
     {
         var alphanumeric = new string(documentNumber.Where(char.IsAsciiLetterOrDigit).ToArray());
+        if (documentType == "TD04")
+        {
+            var digits = new string(documentNumber.Where(char.IsAsciiDigit).ToArray());
+            return $"N{(digits.Length <= 9 ? digits : digits[^9..])}";
+        }
+
         return alphanumeric.Length <= 10 ? alphanumeric : alphanumeric[^10..];
     }
 

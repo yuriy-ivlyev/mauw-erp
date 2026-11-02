@@ -13,6 +13,19 @@ public sealed class S3InvoiceXmlStorage(Lazy<IAmazonS3> client, IOptions<S3Stora
         string fileName,
         byte[] xmlContent,
         CancellationToken cancellationToken = default)
+        => await UploadXmlAsync("invoices", fileName, xmlContent, cancellationToken);
+
+    public async Task<string> UploadCreditNoteXmlAsync(
+        string fileName,
+        byte[] xmlContent,
+        CancellationToken cancellationToken = default)
+        => await UploadXmlAsync("credit-notes", fileName, xmlContent, cancellationToken);
+
+    private async Task<string> UploadXmlAsync(
+        string folder,
+        string fileName,
+        byte[] xmlContent,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(fileName) || fileName.Length > 50 ||
             fileName.Contains('/') || fileName.Contains('\\') ||
@@ -23,7 +36,7 @@ public sealed class S3InvoiceXmlStorage(Lazy<IAmazonS3> client, IOptions<S3Stora
 
         var now = DateTime.UtcNow;
         var key = string.Create(CultureInfo.InvariantCulture,
-            $"invoices/{now:yyyy}/{now:MM}/{fileName}");
+            $"{folder}/{now:yyyy}/{now:MM}/{fileName}");
         using var stream = new MemoryStream(xmlContent, writable: false);
         await client.Value.PutObjectAsync(new PutObjectRequest
         {
@@ -40,6 +53,16 @@ public sealed class S3InvoiceXmlStorage(Lazy<IAmazonS3> client, IOptions<S3Stora
     public async Task<byte[]> GetInvoiceXmlAsync(
         string storageKey,
         CancellationToken cancellationToken = default)
+        => await GetXmlAsync(storageKey, cancellationToken);
+
+    public async Task<byte[]> GetCreditNoteXmlAsync(
+        string storageKey,
+        CancellationToken cancellationToken = default)
+        => await GetXmlAsync(storageKey, cancellationToken);
+
+    private async Task<byte[]> GetXmlAsync(
+        string storageKey,
+        CancellationToken cancellationToken)
     {
         using var response = await client.Value.GetObjectAsync(
             options.Value.BucketName, storageKey, cancellationToken);
@@ -52,5 +75,13 @@ public sealed class S3InvoiceXmlStorage(Lazy<IAmazonS3> client, IOptions<S3Stora
     public Task DeleteInvoiceXmlAsync(
         string storageKey,
         CancellationToken cancellationToken = default) =>
+        DeleteXmlAsync(storageKey, cancellationToken);
+
+    public Task DeleteCreditNoteXmlAsync(
+        string storageKey,
+        CancellationToken cancellationToken = default) =>
+        DeleteXmlAsync(storageKey, cancellationToken);
+
+    private Task DeleteXmlAsync(string storageKey, CancellationToken cancellationToken) =>
         client.Value.DeleteObjectAsync(options.Value.BucketName, storageKey, cancellationToken);
 }

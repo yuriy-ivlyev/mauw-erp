@@ -44,6 +44,8 @@ public static class ApplicationServicesExtensions
             new TracingInventoryService(sp.GetRequiredService<InventoryService>()));
 
         services.AddScoped<IStockService, StockService>();
+        services.AddScoped<CreditNoteService>();
+        services.AddScoped<ICreditNoteService>(sp => sp.GetRequiredService<CreditNoteService>());
 
         services.AddScoped<DdtService>();
         services.AddScoped<IDdtService>(sp =>

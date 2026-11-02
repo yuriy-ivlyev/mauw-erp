@@ -23,7 +23,8 @@ public record InvoiceDto(
     List<InvoiceItemDto> Items,
     List<PaymentDto> Payments,
     string SdiStatus = "NotTransmitted",
-    bool IsOrderUnderAdjustment = false)
+    bool IsOrderUnderAdjustment = false,
+    List<CreditNoteSummaryDto>? CreditNotes = null)
 {
     public bool CanTransmitToSdi =>
         SdiStatus == "NotTransmitted" && !IsOrderUnderAdjustment;

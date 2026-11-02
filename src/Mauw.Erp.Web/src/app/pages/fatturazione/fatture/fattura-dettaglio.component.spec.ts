@@ -5,12 +5,14 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { of } from 'rxjs';
 import { Ddt } from '../../../models/ddt.model';
 import { Invoice } from '../../../models/invoice.model';
+import { CreditNoteService } from '../../../services/credit-note.service';
 import { Order } from '../../../models/order.model';
 import { AuthService } from '../../../services/auth.service';
 import { DdtService } from '../../../services/ddt.service';
 import { InvoiceService } from '../../../services/invoice.service';
 import { OrderService } from '../../../services/order.service';
 import { ProductService } from '../../../services/product.service';
+import { WarehouseService } from '../../../services/warehouse.service';
 import { FattureComponent } from './fatture.component';
 import { FatturaDettaglioComponent } from './fattura-dettaglio.component';
 import { DdtDettaglioComponent } from '../../ddt/dettaglio/ddt-dettaglio.component';
@@ -18,9 +20,11 @@ import { OrderDetailComponent } from '../../ordini/dettaglio/order-detail.compon
 
 describe('FatturaDettaglioComponent', () => {
   let invoiceService: jasmine.SpyObj<InvoiceService>;
+  let creditNoteService: jasmine.SpyObj<CreditNoteService>;
   let orderService: jasmine.SpyObj<OrderService>;
   let ddtService: jasmine.SpyObj<DdtService>;
   let productService: jasmine.SpyObj<ProductService>;
+  let warehouseService: jasmine.SpyObj<WarehouseService>;
   let authService: jasmine.SpyObj<AuthService>;
   let invoice: Invoice;
   let order: Order;
@@ -89,7 +93,11 @@ describe('FatturaDettaglioComponent', () => {
     };
 
     invoiceService = jasmine.createSpyObj<InvoiceService>('InvoiceService', [
-      'getList', 'getById', 'generateFromOrder', 'recordPayment', 'downloadPdf'
+      'getList', 'getById', 'generateFromOrder', 'recordPayment', 'recordPayments', 'downloadPdf'
+    ]);
+    creditNoteService = jasmine.createSpyObj<CreditNoteService>('CreditNoteService', [
+      'previewCreditNote', 'createCreditNote', 'getById', 'transmitToSdi', 'downloadXml',
+      'getAvailableForContact'
     ]);
     orderService = jasmine.createSpyObj<OrderService>('OrderService', [
       'getById', 'postAction', 'updateItem', 'updateShippingCharge',
@@ -97,6 +105,7 @@ describe('FatturaDettaglioComponent', () => {
     ]);
     ddtService = jasmine.createSpyObj<DdtService>('DdtService', ['getById']);
     productService = jasmine.createSpyObj<ProductService>('ProductService', ['searchVariants', 'getProduct']);
+    warehouseService = jasmine.createSpyObj<WarehouseService>('WarehouseService', ['getList']);
     authService = jasmine.createSpyObj<AuthService>('AuthService', ['hasRole']);
     authService.hasRole.and.returnValue(false);
     invoiceService.getList.and.returnValue(of({
@@ -116,6 +125,20 @@ describe('FatturaDettaglioComponent', () => {
         transactionDetails: 'CRO 123456'
       }]
     }));
+    invoiceService.recordPayments.and.returnValue(of({
+      ...invoice,
+      paidAmount: 25.5,
+      balanceDue: 96.5,
+      status: 'PartiallyPaid',
+      payments: [{
+        id: 'payment-1',
+        amount: 25.5,
+        paymentDate: '2026-10-29T00:00:00Z',
+        paymentMethod: 'Bonifico bancario',
+        transactionDetails: 'CRO 123456'
+      }]
+    }));
+    creditNoteService.getAvailableForContact.and.returnValue(of([]));
     orderService.getById.and.returnValue(of(order));
     ddtService.getById.and.returnValue(of(ddt));
 
@@ -128,9 +151,11 @@ describe('FatturaDettaglioComponent', () => {
           { path: 'ordini/:id', component: OrderDetailComponent }
         ]),
         { provide: InvoiceService, useValue: invoiceService },
+        { provide: CreditNoteService, useValue: creditNoteService },
         { provide: OrderService, useValue: orderService },
         { provide: DdtService, useValue: ddtService },
         { provide: ProductService, useValue: productService },
+        { provide: WarehouseService, useValue: warehouseService },
         { provide: AuthService, useValue: authService }
       ],
       imports: [
@@ -222,13 +247,80 @@ describe('FatturaDettaglioComponent', () => {
 
     component.recordPayment();
 
-    expect(invoiceService.recordPayment).toHaveBeenCalledWith(invoice.id, {
-      amount: 25.5,
-      paymentDate: '2026-10-29T00:00:00',
-      paymentMethod: 'Bonifico bancario',
-      transactionDetails: 'CRO 123456'
+    expect(invoiceService.recordPayments).toHaveBeenCalledWith(invoice.id, {
+      payments: [{
+        amount: 25.5,
+        paymentDate: '2026-10-29T00:00:00',
+        paymentMethod: 'Bonifico bancario',
+        transactionDetails: 'CRO 123456'
+      }]
     });
     expect(component.invoice?.balanceDue).toBe(96.5);
+  });
+
+  it('loads available credit notes and records a credit offset with the remaining POS amount', async () => {
+    const note = {
+      id: 'credit-note-1',
+      creditNoteNumber: 'NC-202610-00001',
+      creditNoteDate: '2026-10-30T12:00:00Z',
+      grossTotal: 60,
+      allocatedAmount: 0,
+      remainingCredit: 60
+    };
+    creditNoteService.getAvailableForContact.and.returnValue(of([note]));
+    invoiceService.recordPayments.and.returnValue(of({
+      ...invoice,
+      paidAmount: 122,
+      balanceDue: 0,
+      status: 'Paid',
+      payments: [
+        {
+          id: 'payment-offset',
+          amount: 60,
+          paymentDate: '2026-10-29T00:00:00Z',
+          paymentMethod: 'CreditNoteOffset',
+          transactionDetails: null,
+          sourceCreditNoteId: note.id,
+          sourceCreditNoteNumber: note.creditNoteNumber
+        },
+        {
+          id: 'payment-pos',
+          amount: 62,
+          paymentDate: '2026-10-29T00:00:00Z',
+          paymentMethod: 'POS',
+          transactionDetails: null
+        }
+      ]
+    }));
+
+    const component = await navigateToInvoice();
+    component.invoice = { ...invoice, balanceDue: 122 };
+    component.paymentDate = '2026-10-29';
+    component.applyCreditNote(note);
+    component.recordPayment();
+    harness.detectChanges();
+
+    expect(creditNoteService.getAvailableForContact).toHaveBeenCalledWith(invoice.contactId);
+    expect(component.availableCreditTotal).toBe(60);
+    expect(invoiceService.recordPayments).toHaveBeenCalledWith(invoice.id, {
+      payments: [
+        {
+          amount: 60,
+          paymentDate: '2026-10-29T00:00:00',
+          paymentMethod: 'CreditNoteOffset',
+          transactionDetails: null,
+          sourceCreditNoteId: note.id
+        },
+        {
+          amount: 62,
+          paymentDate: '2026-10-29T00:00:00',
+          paymentMethod: 'POS',
+          transactionDetails: null
+        }
+      ]
+    });
+    expect(harness.routeNativeElement?.textContent).toContain('NC-202610-00001');
+    expect(harness.routeNativeElement?.textContent).toContain('Compensazione nota di credito');
   });
 
   it('flags the invoice while the related order is under pre-SDI adjustment and stays read-only', async () => {
@@ -264,6 +356,51 @@ describe('FatturaDettaglioComponent', () => {
     await navigateToInvoice();
 
     expect(harness.routeNativeElement?.textContent).not.toContain('Rettifica in corso');
+  });
+
+  it('shows credit-note issuance only for invoices transmitted to or accepted by SDI', async () => {
+    const component = await navigateToInvoice();
+    invoiceService.getById.and.returnValue(of({ ...invoice, sdiStatus: 'Transmitted' }));
+    component.loadInvoice(invoice.id);
+    harness.detectChanges();
+    expect(harness.routeNativeElement?.textContent).toContain('Emetti Nota di Credito');
+
+    invoiceService.getById.and.returnValue(of({ ...invoice, sdiStatus: 'Accepted' }));
+    component.loadInvoice(invoice.id);
+    harness.detectChanges();
+    expect(harness.routeNativeElement?.textContent).toContain('Emetti Nota di Credito');
+
+    invoiceService.getById.and.returnValue(of({ ...invoice, sdiStatus: 'NotTransmitted' }));
+    component.loadInvoice(invoice.id);
+    harness.detectChanges();
+    expect(harness.routeNativeElement?.textContent).not.toContain('Emetti Nota di Credito');
+  });
+
+  it('refreshes the invoice and shows the emitted credit note in linked documents', async () => {
+    const component = await navigateToInvoice();
+    const note = {
+      id: 'credit-note-1',
+      creditNoteNumber: 'NC-202610-00001',
+      creditNoteDate: '2026-10-30T12:00:00Z',
+      taxableTotal: 10,
+      vatTotal: 2.2,
+      grossTotal: 12.2,
+      reason: 'GoodsReturn',
+      sdiStatus: 'NotTransmitted'
+    };
+    invoiceService.getById.and.returnValue(of({ ...invoice, creditNotes: [note] }));
+
+    component.onCreditNoteCompleted({
+      creditNote: note,
+      courtesyPdf: null,
+      pdfGenerationError: null
+    });
+    harness.detectChanges();
+
+    expect(invoiceService.getById).toHaveBeenCalledTimes(2);
+    expect(component.creditNoteToast).toContain(note.creditNoteNumber);
+    expect(harness.routeNativeElement?.textContent).toContain(note.creditNoteNumber);
+    harness.fixture.destroy();
   });
 
   it('returns to the originating invoice list when the back button is used', async () => {

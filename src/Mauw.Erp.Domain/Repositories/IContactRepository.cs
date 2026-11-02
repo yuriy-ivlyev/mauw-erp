@@ -8,6 +8,7 @@ namespace Mauw.Erp.Domain.Repositories;
 public interface IContactRepository : IRepository<Contact, Guid>
 {
     Task<Contact?> GetByVatNumberAsync(string vatNumber);
+    Task<Contact?> GetCustomerForStatementAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<(IEnumerable<Contact> Items, int Total)> GetPagedAsync(
         int page,

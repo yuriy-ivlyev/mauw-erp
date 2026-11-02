@@ -15,7 +15,7 @@ public class InitialCreateBaselineMigrationTests(PostgreSqlContainerFixture post
         await using var db = await MigratedDbAsync();
 
         var migrations = db.Database.GetMigrations().ToList();
-        Assert.Equal(15, migrations.Count);
+        Assert.Equal(18, migrations.Count);
         Assert.EndsWith("_InitialCreate", migrations[0]);
         Assert.EndsWith("_AddVariantForeignKeys", migrations[1]);
         Assert.EndsWith("_EnforceWholeMerchandiseQuantities", migrations[2]);
@@ -31,6 +31,9 @@ public class InitialCreateBaselineMigrationTests(PostgreSqlContainerFixture post
         Assert.EndsWith("_AddStockItemXminConcurrencyToken", migrations[12]);
         Assert.EndsWith("_AddPreSdiOrderAdjustment", migrations[13]);
         Assert.EndsWith("_AddInvoiceSdiStorageMetadata", migrations[14]);
+        Assert.EndsWith("_AddCreditNoteIssuance", migrations[15]);
+        Assert.EndsWith("_AddCreditNoteSdiStorageMetadata", migrations[16]);
+        Assert.EndsWith("_AddCreditNoteAllocation", migrations[17]);
         Assert.Equal(migrations, await db.Database.GetAppliedMigrationsAsync());
         Assert.Empty(await db.Database.GetPendingMigrationsAsync());
         Assert.False(db.Database.HasPendingModelChanges());
@@ -62,6 +65,26 @@ public class InitialCreateBaselineMigrationTests(PostgreSqlContainerFixture post
             """);
         Assert.Equal("YES", invoicePaymentColumns["payment_method"]);
         Assert.Equal("YES", invoicePaymentColumns["transaction_details"]);
+
+        var allocationColumns = await QueryAsync(db, """
+            SELECT column_name, is_nullable FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND ((table_name = 'credit_notes' AND column_name = 'allocated_amount')
+                OR (table_name = 'payments' AND column_name = 'source_credit_note_id'))
+            """);
+        Assert.Equal("NO", allocationColumns["allocated_amount"]);
+        Assert.Equal("YES", allocationColumns["source_credit_note_id"]);
+
+        var allocationForeignKey = await QueryAsync(db, """
+            SELECT tc.constraint_name, rc.delete_rule
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.referential_constraints rc
+              USING (constraint_catalog, constraint_schema, constraint_name)
+            WHERE tc.table_schema = 'public'
+              AND tc.table_name = 'payments'
+              AND tc.constraint_name = 'f_k_payments_credit_notes_source_credit_note_id'
+            """);
+        Assert.Equal("RESTRICT", allocationForeignKey["f_k_payments_credit_notes_source_credit_note_id"]);
 
         var confirmationColumn = await QueryAsync(db, """
             SELECT column_name, is_nullable FROM information_schema.columns

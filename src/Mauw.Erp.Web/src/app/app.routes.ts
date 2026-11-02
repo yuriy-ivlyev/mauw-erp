@@ -34,6 +34,7 @@ import { ShipmentQueueComponent } from './pages/magazzino/spedizioni/shipment-qu
 // Anagrafiche
 import { AnagraficheElencoComponent } from './pages/anagrafiche/elenco/anagrafiche-elenco.component';
 import { AnagraficaModificaComponent } from './pages/anagrafiche/modifica/anagrafica-modifica.component';
+import { AnagraficaDettaglioComponent } from './pages/anagrafiche/dettaglio/anagrafica-dettaglio.component';
 
 // Impostazioni
 import { ImpostazioniAziendaComponent } from './pages/impostazioni/azienda/impostazioni-azienda.component';
@@ -73,7 +74,8 @@ export const routes: Routes = [
       // Fatturazione
       { path: 'fatturazione/fatture',      component: FattureComponent,     canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Accounting'] }, title: 'Fatture | Mauw ERP' },
       { path: 'fatturazione/fatture/:id', component: FatturaDettaglioComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Accounting'] }, title: 'Dettaglio Fattura | Mauw ERP' },
-      { path: 'fatturazione/nota-credito', component: NotaCreditoComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Accounting'] }, title: 'Nota Credito | Mauw ERP' },
+      { path: 'fatturazione/nota-credito', component: NotaCreditoComponent, pathMatch: 'full', canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Accounting'] }, title: 'Nota Credito | Mauw ERP' },
+      { path: 'fatturazione/nota-credito/:id', loadComponent: () => import('./pages/fatturazione/fatture/credit-note-detail.component').then(m => m.CreditNoteDetailComponent), canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Accounting'] }, title: 'Dettaglio Nota di Credito | Mauw ERP' },
 
       // DDT
       { path: 'ddt/elenco', component: DdtElencoComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Warehouse'] }, title: 'Elenco DDT | Mauw ERP' },
@@ -95,6 +97,7 @@ export const routes: Routes = [
       // Anagrafiche
       { path: 'anagrafiche/elenco',       component: AnagraficheElencoComponent,  canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Accounting'] }, title: 'Anagrafiche | Mauw ERP' },
       { path: 'anagrafiche/nuovo',        component: AnagraficaModificaComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales'] }, title: 'Nuova Anagrafica | Mauw ERP' },
+      { path: 'anagrafiche/:id',          component: AnagraficaDettaglioComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales', 'Accounting'] }, title: 'Scheda Cliente | Mauw ERP' },
       { path: 'anagrafiche/:id/modifica', component: AnagraficaModificaComponent, canActivate: [roleGuard], data: { roles: ['Admin', 'Sales'] }, title: 'Modifica Anagrafica | Mauw ERP' },
 
       // Impostazioni â€” solo Admin

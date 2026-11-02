@@ -51,6 +51,11 @@
             <path d="M7 17 17 7M8 7h9v9" />
           </svg>
         </a>
+        <button *ngIf="canIssueCreditNote" type="button" (click)="openCreditNoteModal()"
+          [disabled]="loadingCreditNoteWarehouses"
+          class="inline-flex h-10 items-center gap-2 rounded-lg bg-green-700 px-3 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50">
+          {{ loadingCreditNoteWarehouses ? 'Caricamento…' : 'Emetti Nota di Credito' }}
+        </button>
         <button type="button" (click)="downloadPdf()" [disabled]="downloadingPdf"
           class="inline-flex h-10 items-center gap-2 rounded-lg bg-slate-700 px-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
           {{ downloadingPdf ? '…' : 'PDF' }}
@@ -143,7 +148,16 @@
         <ul *ngIf="currentInvoice.payments.length; else noPayments" class="divide-y">
           <li *ngFor="let payment of currentInvoice.payments" class="py-3 text-sm">
             <div class="flex justify-between gap-3">
-              <span>{{ payment.paymentDate | date:'dd/MM/yyyy' }} · {{ payment.paymentMethod || 'Metodo storico non specificato' }}</span>
+              <span>
+                {{ payment.paymentDate | date:'dd/MM/yyyy' }} ·
+                {{ payment.paymentMethod === 'CreditNoteOffset'
+                  ? 'Compensazione nota di credito'
+                  : payment.paymentMethod || 'Metodo storico non specificato' }}
+                <span *ngIf="payment.paymentMethod === 'CreditNoteOffset'"
+                  class="ml-2 inline-flex rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800">
+                  {{ payment.sourceCreditNoteNumber || 'Nota di credito' }}
+                </span>
+              </span>
               <strong>{{ payment.amount | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</strong>
             </div>
             <p *ngIf="payment.transactionDetails" class="mt-1 text-xs text-slate-500">
@@ -152,12 +166,54 @@
           </li>
         </ul>
         <ng-template #noPayments><p class="text-sm text-slate-500">Nessun pagamento registrato.</p></ng-template>
+        <div *ngIf="loadingAvailableCreditNotes" class="mt-4 text-sm text-slate-500" aria-live="polite">
+          Caricamento crediti disponibili…
+        </div>
+        <p *ngIf="availableCreditNotesError" class="mt-4 text-sm text-red-700" role="alert">
+          {{ availableCreditNotesError }}
+        </p>
+        <div *ngIf="availableCreditNotes.length" class="mt-4 rounded-lg border border-violet-200 bg-violet-50 p-3">
+          <p class="font-semibold text-violet-950">
+            Crediti disponibili da Note di Credito:
+            {{ availableCreditTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}
+          </p>
+          <ul class="mt-2 grid gap-2">
+            <li *ngFor="let note of availableCreditNotes" class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-sm text-violet-900">
+                {{ note.creditNoteNumber }} · residuo
+                {{ note.remainingCredit | currency:'EUR':'symbol':'1.2-2':'it-IT' }}
+              </span>
+              <button type="button" (click)="applyCreditNote(note)"
+                [attr.aria-label]="'Usa il credito della nota ' + note.creditNoteNumber"
+                class="rounded border border-violet-300 bg-white px-3 py-1.5 text-sm font-semibold text-violet-800 hover:bg-violet-100">
+                Usa credito
+              </button>
+            </li>
+          </ul>
+        </div>
         <form *ngIf="currentInvoice.balanceDue > 0 && (currentInvoice.items.length > 0 || currentInvoice.shippingCost > 0)"
           (ngSubmit)="recordPayment()" class="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2">
+          <div *ngIf="selectedCreditNote && creditNoteOffsetAmount !== null"
+            class="rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm sm:col-span-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p>
+                Compensazione {{ selectedCreditNote.creditNoteNumber }}:
+                <strong>{{ creditNoteOffsetAmount | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</strong>
+              </p>
+              <button type="button" (click)="clearCreditNoteOffset()"
+                class="rounded px-2 py-1 font-semibold text-violet-800 hover:bg-violet-100">
+                Rimuovi compensazione
+              </button>
+            </div>
+          </div>
           <label class="text-sm font-semibold">
-            Importo
-            <input name="paymentAmount" type="number" min="0.01" step="0.01" [max]="currentInvoice.balanceDue"
-              [(ngModel)]="paymentAmount" required class="mt-1 w-full rounded border border-slate-300 p-2" />
+            {{ selectedCreditNote ? 'Quota POS/contanti' : 'Importo' }}
+            <input name="paymentAmount" type="number" [min]="selectedCreditNote ? 0 : 0.01" step="0.01"
+              [max]="selectedCreditNote
+                ? currentInvoice.balanceDue - (creditNoteOffsetAmount || 0)
+                : currentInvoice.balanceDue"
+              [(ngModel)]="paymentAmount" [required]="!selectedCreditNote"
+              class="mt-1 w-full rounded border border-slate-300 p-2" />
           </label>
           <label class="text-sm font-semibold">
             Data
@@ -177,7 +233,7 @@
               [required]="paymentMethod === 'Bonifico bancario'"
               class="mt-1 w-full rounded border border-slate-300 p-2" />
           </label>
-          <button type="submit" [disabled]="recordingPayment || !paymentAmount"
+          <button type="submit" [disabled]="!canSubmitPayment"
             class="rounded bg-green-700 px-3 py-2 font-semibold text-white hover:bg-green-800 disabled:opacity-50 sm:col-span-2">
             {{ recordingPayment ? 'Registrazione…' : 'Registra pagamento' }}
           </button>
@@ -185,5 +241,56 @@
       </section>
     </div>
 
+    <section class="rounded-xl border border-slate-200 bg-white p-4" aria-labelledby="linked-credit-notes-title">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 id="linked-credit-notes-title" class="m-0 text-lg font-bold">Note di credito collegate</h2>
+          <p class="mt-1 text-sm text-slate-500">
+            {{ currentInvoice.creditNotes?.length ?? 0 }} documenti
+          </p>
+        </div>
+      </div>
+      <ul *ngIf="currentInvoice.creditNotes?.length; else noCreditNotes" class="mt-3 divide-y divide-slate-100">
+        <li *ngFor="let note of currentInvoice.creditNotes" class="flex flex-wrap items-center justify-between gap-3 py-3">
+          <div>
+            <p class="font-semibold text-slate-900">{{ note.creditNoteNumber }}</p>
+            <p class="text-xs text-slate-500">
+              {{ note.creditNoteDate | date:'dd/MM/yyyy' }} · {{ note.sdiStatus }}
+              <span *ngIf="note.reason"> · {{ creditNoteReasonLabel(note.reason) }}</span>
+            </p>
+            <a [routerLink]="['/fatturazione/nota-credito', note.id]"
+              [queryParams]="{ returnTo: currentUrl }"
+              class="mt-1 inline-block text-xs font-semibold text-amber-800 hover:underline">
+              Apri dettaglio nota di credito
+            </a>
+          </div>
+          <div class="flex items-center gap-3">
+            <strong>{{ note.grossTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</strong>
+            <button type="button" (click)="downloadCreditNotePdf(note)"
+              [attr.aria-label]="'Scarica PDF nota di credito ' + note.creditNoteNumber"
+              [title]="'Scarica PDF nota di credito ' + note.creditNoteNumber"
+              class="rounded border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+              PDF
+            </button>
+          </div>
+        </li>
+      </ul>
+      <ng-template #noCreditNotes>
+        <p class="mt-3 text-sm text-slate-500">Nessuna nota di credito collegata.</p>
+      </ng-template>
+    </section>
+
+    <app-credit-note-modal *ngIf="creditNoteModalOpen" [invoice]="currentInvoice"
+      [warehouses]="activeWarehouses" (completed)="onCreditNoteCompleted($event)"
+      (closed)="creditNoteModalOpen = false">
+    </app-credit-note-modal>
   </ng-container>
+
+  <div *ngIf="creditNoteToast" role="status" aria-live="polite"
+    class="fixed bottom-4 right-4 z-[60] max-w-md rounded-lg border p-4 text-sm font-semibold shadow-xl"
+    [class.border-green-300]="!creditNoteToastIsWarning" [class.bg-green-50]="!creditNoteToastIsWarning"
+    [class.text-green-900]="!creditNoteToastIsWarning" [class.border-amber-300]="creditNoteToastIsWarning"
+    [class.bg-amber-50]="creditNoteToastIsWarning" [class.text-amber-900]="creditNoteToastIsWarning">
+    {{ creditNoteToast }}
+  </div>
 </main>

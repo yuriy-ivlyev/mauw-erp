@@ -101,7 +101,9 @@ Draft ─Confirm─▶ Confirmed ─StartPicking─▶ Picking ─Ship─▶ Shi
 
 ### 2.5 Fatturazione e rettifica pre-SDI (FatturaPA 1.2.3 FPR12)
 
-**Generazione.** `POST /api/v1/invoices/from-order/{orderId}` (policy `Billing`) richiede un ordine `Completed`; genera **una fattura per ordine** (garantito da advisory lock `invoice-order:{id}` + controllo applicativo; l'indice su `OrderId` **non** è univoco). Numero `FAT-{yyyyMM}-{NNNNN}` con verifica di contiguità; fattura già confermata (`ConfirmedAt`). Pagamenti (`RecordPayment`, metodo/transazione), note di credito, righe «solo fatturazione» e spese di spedizione esplicite nel castelletto.
+**Generazione.** `POST /api/v1/invoices/from-order/{orderId}` (policy `Billing`) richiede un ordine `Completed`; genera **una fattura per ordine** (garantito da advisory lock `invoice-order:{id}` + controllo applicativo; l'indice su `OrderId` **non** è univoco). Numero `FAT-{yyyyMM}-{NNNNN}` con verifica di contiguità; fattura già confermata (`ConfirmedAt`). Pagamenti manuali singoli o in batch (`/payments`, `/payments/batch`), con residuo aggiornato e maturazione provvigioni al saldo; `CreditNoteOffset` registra la nota sorgente e ne scala il credito residuo in modo atomico. Note di credito, righe «solo fatturazione» e spese di spedizione esplicite nel castelletto.
+
+**Estratto cliente.** `GET /api/v1/contacts/{id}/statement` aggrega on-demand fatture confermate, note di credito e pagamenti con query EF Core `AsNoTracking`; non esiste una tabella movimenti né una migrazione dedicata. Le righe NC espongono il solo credito residuo non allocato: la quota già applicata è rappresentata dal pagamento `CreditNoteOffset`, evitando il doppio conteggio nel saldo progressivo.
 
 **Stato SDI** (`SdiStatus`): `NotTransmitted`, `Pending`, `Transmitted`, `Accepted`. Guardie: `IsSdiSubmitted` (≥ `Transmitted` ⇒ contenuto congelato), `Invoice.CanBeAdjustedBeforeSdi` (solo `NotTransmitted`). Le righe legacy con `SdiSubmittedAt` valorizzato risultano `Transmitted`.
 
@@ -178,6 +180,10 @@ PostgreSQL 16, **43 tabelle** + `__EFMigrationsHistory`, 2 sequenze (`shipment_d
 | 12 | `20261030165538_AddInvoiceOrderSynchronization` | `is_billing_only`, `is_excluded_from_invoice`, `sdi_submitted_at`, spedizione sulla fattura |
 | 13 | `20261030232428_AddStockItemXminConcurrencyToken` | Token di concorrenza `xmin` su `stock_items` (nessuna operazione DDL: colonna di sistema) — **non tracciata in git** |
 | 14 | `20261031114600_AddPreSdiOrderAdjustment` | `invoices.sdi_status`, `orders.is_under_adjustment/adjustment_started_at/adjustment_started_by`, tabella `document_audit_entries` con indice — **non tracciata in git** |
+| 15 | `20261031144416_AddInvoiceSdiStorageMetadata` | Metadati nullable dell'XML fattura archiviato e della trasmissione |
+| 16 | `20261031190947_AddCreditNoteIssuance` | Emissione e righe fiscali delle note di credito |
+| 17 | `20261101063125_AddCreditNoteSdiStorageMetadata` | Metadati dell'XML nota di credito e della trasmissione |
+| 18 | `20261101175138_AddCreditNoteAllocation` | `credit_notes.allocated_amount`, `payments.source_credit_note_id` nullable con FK `RESTRICT` |
 
 Note operative: i database locali creati prima del baseline vanno ricreati o riallineati nella `__EFMigrationsHistory`. Le migrazioni si creano/applicano **solo** con `dotnet ef migrations add` / `dotnet ef database update`; non riscrivono importi o classificazioni fiscali storiche (le righe storiche nascono `NotTransmitted` e non in rettifica).
 

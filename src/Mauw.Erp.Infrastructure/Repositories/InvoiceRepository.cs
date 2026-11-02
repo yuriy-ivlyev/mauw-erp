@@ -18,8 +18,8 @@ public class InvoiceRepository(MauwDbContext dbContext) : Repository<Invoice, Gu
             .Include(i => i.Items).ThenInclude(ii => ii.Variant).ThenInclude(v => v.Product)
             .Include(i => i.Items).ThenInclude(ii => ii.Variant).ThenInclude(v => v.Color)
             .Include(i => i.Items).ThenInclude(ii => ii.Variant).ThenInclude(v => v.Size)
-            .Include(i => i.Payments)
-            .Include(i => i.CreditNotes)
+            .Include(i => i.Payments).ThenInclude(payment => payment.SourceCreditNote)
+            .Include(i => i.CreditNotes).ThenInclude(note => note.Items)
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.Id == id);
 
@@ -29,7 +29,7 @@ public class InvoiceRepository(MauwDbContext dbContext) : Repository<Invoice, Gu
             .Include(i => i.Contact)
                 .ThenInclude(c => c.Addresses)
             .Include(i => i.Items)
-            .Include(i => i.Payments)
+            .Include(i => i.Payments).ThenInclude(payment => payment.SourceCreditNote)
             .Include(i => i.CreditNotes)
             .AsSplitQuery()
             .AsNoTracking()
@@ -42,7 +42,7 @@ public class InvoiceRepository(MauwDbContext dbContext) : Repository<Invoice, Gu
             .Include(i => i.Items).ThenInclude(item => item.Variant).ThenInclude(variant => variant.Product)
             .Include(i => i.Items).ThenInclude(item => item.Variant).ThenInclude(variant => variant.Color)
             .Include(i => i.Items).ThenInclude(item => item.Variant).ThenInclude(variant => variant.Size)
-            .Include(i => i.Payments)
+            .Include(i => i.Payments).ThenInclude(payment => payment.SourceCreditNote)
             .Include(i => i.CreditNotes)
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.OrderId == orderId);
@@ -85,12 +85,23 @@ public class InvoiceRepository(MauwDbContext dbContext) : Repository<Invoice, Gu
         return await _dbSet
             .Include(i => i.Contact)
             .Include(i => i.Items)
-            .Include(i => i.Payments)
+            .Include(i => i.Payments).ThenInclude(payment => payment.SourceCreditNote)
             .AsNoTracking()
             .Where(i => i.ContactId == contactId)
             .AsSplitQuery()
             .ToListAsync();
     }
+
+    public Task<List<Invoice>> GetConfirmedForStatementByContactIdAsync(
+        Guid contactId,
+        CancellationToken cancellationToken = default) =>
+        _dbSet
+            .AsNoTracking()
+            .Where(invoice => invoice.ContactId == contactId && invoice.ConfirmedAt.HasValue)
+            .Include(invoice => invoice.Payments)
+                .ThenInclude(payment => payment.SourceCreditNote)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
 
     public async Task<(IEnumerable<Invoice> Items, int Total)> GetByContactIdPagedAsync(
         Guid contactId,
@@ -119,7 +130,8 @@ public class InvoiceRepository(MauwDbContext dbContext) : Repository<Invoice, Gu
             var term = search.Trim();
             query = query.Where(i =>
                 i.InvoiceNumber.Contains(term) ||
-                i.Contact.BusinessName.Contains(term));
+                i.Contact.BusinessName.Contains(term) ||
+                i.CreditNotes.Any(note => note.CreditNoteNumber.Contains(term)));
         }
 
         if (!string.IsNullOrWhiteSpace(status))
@@ -156,7 +168,8 @@ public class InvoiceRepository(MauwDbContext dbContext) : Repository<Invoice, Gu
             {
                 SdiStatus.NotTransmitted => query.Where(invoice =>
                     invoice.SdiSubmittedAt == null &&
-                    EF.Property<SdiStatus>(invoice, "_sdiStatus") == SdiStatus.NotTransmitted),
+                    EF.Property<SdiStatus>(invoice, "_sdiStatus") == SdiStatus.NotTransmitted ||
+                    invoice.CreditNotes.Any(note => note.SdiStatus == SdiStatus.NotTransmitted)),
                 SdiStatus.Pending => query.Where(invoice =>
                     invoice.SdiSubmittedAt == null &&
                     EF.Property<SdiStatus>(invoice, "_sdiStatus") == SdiStatus.Pending),
@@ -196,7 +209,8 @@ public class InvoiceRepository(MauwDbContext dbContext) : Repository<Invoice, Gu
             .ThenByDescending(i => i.Id)
             .Include(i => i.Contact)
             .Include(i => i.Items)
-            .Include(i => i.Payments)
+            .Include(i => i.Payments).ThenInclude(payment => payment.SourceCreditNote)
+            .Include(i => i.CreditNotes)
             .AsSplitQuery()
             .AsNoTracking()
             .Skip((page - 1) * pageSize)
@@ -208,7 +222,7 @@ public class InvoiceRepository(MauwDbContext dbContext) : Repository<Invoice, Gu
 
     public async Task<IEnumerable<Invoice>> GetByOrderIdsAsync(IEnumerable<Guid> orderIds)
         => await _dbSet
-            .Include(i => i.Payments)
+            .Include(i => i.Payments).ThenInclude(payment => payment.SourceCreditNote)
             .Include(i => i.CreditNotes)
             .AsNoTracking()
             .Where(i => i.OrderId.HasValue && orderIds.Contains(i.OrderId.Value))

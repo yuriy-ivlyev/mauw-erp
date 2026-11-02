@@ -14,4 +14,17 @@ public interface ISdiDocumentStorage
     Task DeleteInvoiceXmlAsync(
         string storageKey,
         CancellationToken cancellationToken = default);
+
+    Task<string> UploadCreditNoteXmlAsync(
+        string fileName,
+        byte[] xmlContent,
+        CancellationToken cancellationToken = default);
+
+    Task<byte[]> GetCreditNoteXmlAsync(
+        string storageKey,
+        CancellationToken cancellationToken = default);
+
+    Task DeleteCreditNoteXmlAsync(
+        string storageKey,
+        CancellationToken cancellationToken = default);
 }

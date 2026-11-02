@@ -1,0 +1,124 @@
+<main class="mx-auto max-w-screen-2xl space-y-4 px-3 py-4 text-slate-800 sm:px-4">
+  <app-back-button (activated)="goBack()"></app-back-button>
+
+  <div *ngIf="errorMessage" role="alert" class="rounded-lg border border-red-300 bg-red-50 p-3 text-red-700">
+    {{ errorMessage }}
+  </div>
+  <div *ngIf="successMessage" role="status" class="rounded-lg border border-green-300 bg-green-50 p-3 text-green-800">
+    {{ successMessage }}
+  </div>
+  <div *ngIf="loading && !creditNote" role="status" class="p-8 text-center text-slate-500">
+    Caricamento nota di credito…
+  </div>
+
+  <ng-container *ngIf="creditNote as note">
+    <header class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4">
+      <div>
+        <p class="mb-1 text-xs font-bold uppercase tracking-wider text-slate-500">Nota di credito · TD04</p>
+        <h1 class="m-0 text-2xl font-bold">{{ note.creditNoteNumber }}</h1>
+        <p class="mt-2 text-sm text-slate-600">
+          {{ note.contactName }} · {{ note.creditNoteDate | date:'dd/MM/yyyy' }}
+        </p>
+        <span [class]="'mt-2 inline-flex rounded-full px-2 py-1 text-xs font-semibold ' + sdiStatusClass(note.sdiStatus)">
+          {{ sdiStatusLabel(note.sdiStatus) }}
+        </span>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" (click)="downloadXml()" [disabled]="downloadingXml"
+          class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+          {{ downloadingXml ? 'Download…' : 'Scarica XML TD04' }}
+        </button>
+        <button *ngIf="note.sdiStatus === 'NotTransmitted'" type="button"
+          (click)="openTransmitConfirmation()" [disabled]="transmitting"
+          class="rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50">
+          {{ transmitting ? 'Invio…' : 'Invia a SDI' }}
+        </button>
+      </div>
+    </header>
+
+    <section class="grid gap-4 lg:grid-cols-2">
+      <div class="rounded-xl border border-slate-200 bg-white p-4">
+        <h2 class="mb-3 text-lg font-bold">Documento collegato</h2>
+        <dl class="space-y-2 text-sm">
+          <div class="flex justify-between gap-3">
+            <dt>Fattura originaria</dt>
+            <dd>
+              <a [routerLink]="['/fatturazione/fatture', note.invoiceId]"
+                [queryParams]="{ returnTo: currentUrl }"
+                class="font-semibold text-blue-700 hover:underline">
+                {{ note.relatedInvoiceNumber }}
+              </a>
+            </dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt>Data fattura</dt><dd>{{ note.relatedInvoiceDate | date:'dd/MM/yyyy' }}</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt>Causale</dt><dd>{{ note.reason || 'Non specificata' }}</dd>
+          </div>
+          <div *ngIf="note.sdiTransmittedAtUtc" class="flex justify-between gap-3">
+            <dt>Trasmissione SDI</dt><dd>{{ note.sdiTransmittedAtUtc | date:'dd/MM/yyyy HH:mm' }}</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 bg-white p-4">
+        <h2 class="mb-3 text-lg font-bold">Riepilogo fiscale</h2>
+        <dl class="space-y-2 text-sm">
+          <div class="flex justify-between"><dt>Imponibile</dt><dd>{{ note.taxableTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</dd></div>
+          <div class="flex justify-between"><dt>IVA</dt><dd>{{ note.vatTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</dd></div>
+          <div class="flex justify-between border-t pt-2 text-base font-bold"><dt>Totale a credito</dt><dd>{{ note.grossTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="rounded-xl border border-slate-200 bg-white p-4">
+      <div class="mb-3">
+        <h2 class="m-0 text-lg font-bold">Righe della nota di credito</h2>
+        <p class="mt-1 text-sm text-slate-500">{{ note.items.length }} righe</p>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[900px] text-sm">
+          <thead class="border-b bg-slate-50 text-left text-slate-600">
+            <tr>
+              <th class="px-3 py-2">Descrizione</th>
+              <th class="px-3 py-2">SKU</th>
+              <th class="px-3 py-2 text-right">Quantità</th>
+              <th class="px-3 py-2 text-right">Prezzo unitario</th>
+              <th class="px-3 py-2 text-right">Sconto</th>
+              <th class="px-3 py-2">IVA / Natura</th>
+              <th class="px-3 py-2 text-right">Imponibile</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of note.items | pageSlice:itemsPage:itemsPageSize" class="border-b">
+              <td class="px-3 py-2">
+                {{ item.description }}
+                <span *ngIf="item.sizeName || item.colorName" class="block text-xs text-slate-500">
+                  {{ item.sizeName }} {{ item.colorName }}
+                </span>
+              </td>
+              <td class="px-3 py-2 font-mono">{{ item.sku || '—' }}</td>
+              <td class="px-3 py-2 text-right">{{ item.quantity }}</td>
+              <td class="px-3 py-2 text-right">{{ item.unitNetPrice | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+              <td class="px-3 py-2 text-right">{{ item.discountPercent }}%</td>
+              <td class="px-3 py-2">{{ item.vatRate }}%<span *ngIf="item.natureCode"> · {{ item.natureCode }}</span></td>
+              <td class="px-3 py-2 text-right font-semibold">{{ item.lineNetTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <app-pagination *ngIf="note.items.length > 0" [page]="itemsPage" [pageSize]="itemsPageSize"
+          [totalCount]="note.items.length" (pageChange)="itemsPage = $event"
+          (pageSizeChange)="onItemsPageSizeChange($event)">
+        </app-pagination>
+      </div>
+    </section>
+
+    <app-confirm-delete-modal [isOpen]="confirmTransmitOpen"
+      title="Conferma trasmissione TD04"
+      [message]="'Confermi la trasmissione irreversibile della nota ' + note.creditNoteNumber + ' allo SDI?'"
+      confirmLabel="Invia a SDI" [showDeleteIcon]="false" actionVariant="primary"
+      (confirmed)="confirmTransmission()" (cancelled)="confirmTransmitOpen = false">
+    </app-confirm-delete-modal>
+  </ng-container>
+</main>
