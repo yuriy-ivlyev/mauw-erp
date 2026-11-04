@@ -4,9 +4,15 @@ import { Observable, map } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
   Employee,
+  EmployeeDocument,
+  EmployeeDocumentPage,
+  EmployeeTimeEntry,
+  EmployeeTimeEntryPage,
   EmployeePage,
   EmployeePayrollCostRequest,
-  SaveEmployeeRequest
+  SaveEmployeeDocumentRequest,
+  SaveEmployeeRequest,
+  SaveEmployeeTimeEntryRequest
 } from '../models/employee.model';
 import { PayableDocumentPage } from '../models/payable-document.model';
 
@@ -38,10 +44,6 @@ export class EmployeeService {
     return this.http.put<Employee>(`${this.base}/${id}`, request);
   }
 
-  deactivate(id: string, version: string, endDate: string): Observable<Employee> {
-    return this.http.post<Employee>(`${this.base}/${id}/deactivate`, { version, endDate });
-  }
-
   payrollCosts(employeeId: string, page: number, pageSize: number): Observable<PayableDocumentPage> {
     const params = new HttpParams().set('page', String(page)).set('pageSize', String(pageSize));
     return this.http.get<PayableDocumentPage>(
@@ -60,5 +62,77 @@ export class EmployeeService {
     form.append('file', file, file.name);
     return this.http.post(`${this.base}/${employeeId}/payroll-costs`, form)
       .pipe(map(() => undefined));
+  }
+
+  documents(employeeId: string, page: number, pageSize: number): Observable<EmployeeDocumentPage> {
+    const params = new HttpParams().set('page', String(page)).set('pageSize', String(pageSize));
+    return this.http.get<EmployeeDocumentPage>(
+      `${this.base}/${employeeId}/documents`, { params });
+  }
+
+  createDocument(
+    employeeId: string,
+    request: SaveEmployeeDocumentRequest,
+    file: File
+  ): Observable<EmployeeDocument> {
+    const form = new FormData();
+    form.append('kind', request.kind);
+    form.append('title', request.title);
+    if (request.documentNumber) form.append('documentNumber', request.documentNumber);
+    if (request.issuerOrProvider) form.append('issuerOrProvider', request.issuerOrProvider);
+    if (request.issuedOn) form.append('issuedOn', request.issuedOn);
+    if (request.completedOn) form.append('completedOn', request.completedOn);
+    if (request.expiresOn) form.append('expiresOn', request.expiresOn);
+    if (request.notes) form.append('notes', request.notes);
+    form.append('file', file, file.name);
+    return this.http.post<EmployeeDocument>(`${this.base}/${employeeId}/documents`, form);
+  }
+
+  updateDocument(
+    employeeId: string,
+    documentId: string,
+    request: SaveEmployeeDocumentRequest
+  ): Observable<EmployeeDocument> {
+    return this.http.put<EmployeeDocument>(
+      `${this.base}/${employeeId}/documents/${documentId}`, request);
+  }
+
+  downloadDocument(employeeId: string, documentId: string): Observable<Blob> {
+    return this.http.get(`${this.base}/${employeeId}/documents/${documentId}/file`, {
+      responseType: 'blob'
+    });
+  }
+
+  timeEntries(
+    employeeId: string,
+    from: string,
+    to: string,
+    page: number,
+    pageSize: number
+  ): Observable<EmployeeTimeEntryPage> {
+    const params = new HttpParams()
+      .set('from', from)
+      .set('to', to)
+      .set('page', String(page))
+      .set('pageSize', String(pageSize));
+    return this.http.get<EmployeeTimeEntryPage>(
+      `${this.base}/${employeeId}/time-entries`, { params });
+  }
+
+  createTimeEntry(
+    employeeId: string,
+    request: SaveEmployeeTimeEntryRequest
+  ): Observable<EmployeeTimeEntry> {
+    return this.http.post<EmployeeTimeEntry>(
+      `${this.base}/${employeeId}/time-entries`, request);
+  }
+
+  updateTimeEntry(
+    employeeId: string,
+    entryId: string,
+    request: SaveEmployeeTimeEntryRequest
+  ): Observable<EmployeeTimeEntry> {
+    return this.http.put<EmployeeTimeEntry>(
+      `${this.base}/${employeeId}/time-entries/${entryId}`, request);
   }
 }

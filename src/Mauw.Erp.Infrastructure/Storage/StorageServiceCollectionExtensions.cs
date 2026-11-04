@@ -43,6 +43,7 @@ public static class StorageServiceCollectionExtensions
         services.AddSingleton<IImageStorageService, S3ImageStorageService>();
         services.AddSingleton<ISdiDocumentStorage, S3InvoiceXmlStorage>();
         services.AddSingleton<IPayableDocumentStorage, S3PayableDocumentStorage>();
+        services.AddSingleton<IEmployeeDocumentStorage, S3EmployeeDocumentStorage>();
         services.AddScoped<IProductVariantImageRepository, ProductVariantImageRepository>();
 
         return services;

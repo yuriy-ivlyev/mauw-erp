@@ -175,6 +175,9 @@ public sealed class PayableDocumentPostgreSqlTests(PostgreSqlContainerFixture po
         Assert.Null(result.Data!.SupplierId);
         Assert.Equal(employeeId, result.Data.EmployeeId);
         Assert.Equal("Mario Rossi", result.Data.BeneficiaryName);
+        var employeeDetails = await db.Employees.AsNoTracking().SingleAsync(item => item.Id == employeeId);
+        Assert.Equal("Via Roma 1", employeeDetails.StreetAddress);
+        Assert.Equal("mario.rossi@example.it", employeeDetails.Email);
         var accountant = new Mock<ICurrentUserService>();
         accountant.Setup(user => user.HasRole("Admin")).Returns(false);
         var accountingService = Service(db, new MemoryPayableDocumentStorage(), accountant.Object);
@@ -269,7 +272,15 @@ public sealed class PayableDocumentPostgreSqlTests(PostgreSqlContainerFixture po
             new DateOnly(2024, 1, 1),
             null,
             true,
-            null);
+            null,
+            "Via Roma 1",
+            "20100",
+            "Milano",
+            "MI",
+            "IT",
+            "mario.rossi@example.it",
+            "+39 02 1234567",
+            "+39 333 1234567");
         Assert.True(result.Success, result.Error);
         return employee;
     }

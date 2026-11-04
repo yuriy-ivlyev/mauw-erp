@@ -84,10 +84,10 @@ Il generatore non emette note di credito né pagamenti: le fatture sintetiche
 restano NotTransmitted e non costituiscono documenti accettati dallo SDI. I
 test verificano che il seed non crei note, compensazioni o pagamenti fittizi.
 Il generatore non simula fatture passive, pagamenti a fornitori, rimborsi,
-dipendenti, costi mensili o cedolini: questa suite misura vendite, stock e
-documenti attivi, non il ciclo passivo o i dati del personale. Database con
-dipendenti o documenti passivi già presenti vengono rifiutati come non vuoti;
-il seed non li sovrascrive né li integra.
+dipendenti, documenti HR, attestati, cartellini, costi mensili o cedolini:
+questa suite misura vendite, stock e documenti attivi, non il ciclo passivo o i
+dati del personale. Database con dipendenti o documenti passivi già presenti
+vengono rifiutati come non vuoti; il seed non li sovrascrive né li integra.
 
 Non conservare password nel repository o nella cronologia della shell.
 Impostare MAUW_LOADTEST_CONNECTION nel proprio secret manager/ambiente:

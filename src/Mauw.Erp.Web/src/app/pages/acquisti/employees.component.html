@@ -132,6 +132,33 @@
       <label class="grid gap-1 text-sm font-medium">Data cessazione
         <input type="date" [(ngModel)]="endDate" class="rounded border border-slate-300 p-2" />
       </label>
+      <div class="sm:col-span-2 lg:col-span-4">
+        <h3 class="font-semibold">Indirizzo e recapiti principali</h3>
+      </div>
+      <label class="grid gap-1 text-sm font-medium sm:col-span-2">Via e numero civico
+        <input [(ngModel)]="streetAddress" maxlength="250" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">CAP
+        <input [(ngModel)]="postalCode" maxlength="20" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Città
+        <input [(ngModel)]="city" maxlength="100" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Provincia
+        <input [(ngModel)]="province" maxlength="100" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Paese (codice ISO)
+        <input [(ngModel)]="countryCode" maxlength="2" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Email
+        <input type="email" [(ngModel)]="email" maxlength="254" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Telefono
+        <input type="tel" [(ngModel)]="phone" maxlength="50" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Cellulare
+        <input type="tel" [(ngModel)]="mobilePhone" maxlength="50" class="rounded border border-slate-300 p-2" />
+      </label>
       <label class="flex items-center gap-2 self-end rounded border border-slate-200 p-2 text-sm font-medium">
         <input type="checkbox" [(ngModel)]="isActive" />
         Dipendente attivo
@@ -168,7 +195,8 @@
       </label>
       <label class="grid gap-1 text-sm font-medium">Cedolino PDF / PNG / JPEG (max 20 MB)
         <input type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
-          (change)="onPayslipSelected($event)" class="rounded border border-slate-300 bg-white p-2" />
+          #payslipInput (change)="onPayslipSelected($event)"
+          class="rounded border border-slate-300 bg-white p-2" />
       </label>
       <label class="grid gap-1 text-sm font-medium">Note
         <input [(ngModel)]="payrollNotes" maxlength="2000" class="rounded border border-slate-300 p-2" />
@@ -218,6 +246,196 @@
     </div>
     <app-pagination [page]="payrollPage" [pageSize]="payrollPageSize" [totalCount]="payrollTotalCount"
       (pageChange)="changePayrollPage($event)" (pageSizeChange)="changePayrollPageSize($event)">
+    </app-pagination>
+  </section>
+
+  <section *ngIf="selectedEmployee && !editorOpen" class="space-y-4 rounded-xl border border-slate-200 bg-white p-5"
+    aria-label="Documenti personali e attestati">
+    <header>
+      <h2 class="text-lg font-bold">Documenti e attestati · {{ selectedEmployee.firstName }} {{ selectedEmployee.lastName }}</h2>
+      <p class="text-sm text-slate-600">
+        Documenti di identità, attestati di sicurezza e altri file personali. Accesso riservato Admin.
+      </p>
+    </header>
+
+    <div class="grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-4">
+      <label class="grid gap-1 text-sm font-medium">Tipo documento
+        <select [(ngModel)]="documentKind" class="rounded border border-slate-300 p-2">
+          <option value="IdentityDocument">Documento di identità</option>
+          <option value="SafetyTraining">Corso / attestato di sicurezza</option>
+          <option value="Other">Altro documento</option>
+        </select>
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Titolo / corso
+        <input [(ngModel)]="documentTitle" maxlength="150" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Numero documento
+        <input [(ngModel)]="documentNumber" maxlength="100" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Ente rilasciante / formatore
+        <input [(ngModel)]="documentIssuerOrProvider" maxlength="150" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Data rilascio
+        <input type="date" [(ngModel)]="documentIssuedOn" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Data corso svolto
+        <input type="date" [(ngModel)]="documentCompletedOn" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Scadenza / rinnovo
+        <input type="date" [(ngModel)]="documentExpiresOn" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Allegato PDF / PNG / JPEG (max 20 MB)
+        <input type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+          #employeeDocumentFileInput (change)="onEmployeeDocumentSelected($event)"
+          class="rounded border border-slate-300 bg-white p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium sm:col-span-2 lg:col-span-3">Note
+        <input [(ngModel)]="documentNotes" maxlength="1000" class="rounded border border-slate-300 p-2" />
+      </label>
+      <button type="button" [disabled]="documentSaving" (click)="saveEmployeeDocument()"
+        class="self-end rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white disabled:opacity-50">
+        {{ documentSaving ? 'Archiviazione…' : 'Archivia documento' }}
+      </button>
+    </div>
+    <p class="text-sm text-slate-500">{{ employeeDocumentFile?.name || 'Nessun file selezionato' }}</p>
+
+    <div *ngIf="documentsLoading" role="status" class="p-4 text-center text-slate-500">
+      Caricamento documenti…
+    </div>
+    <div *ngIf="!documentsLoading" class="overflow-x-auto rounded-lg border border-slate-200">
+      <table class="w-full min-w-[850px] text-sm">
+        <thead class="border-b bg-slate-50 text-left text-slate-600">
+          <tr>
+            <th class="px-3 py-3">Tipo</th>
+            <th class="px-3 py-3">Titolo</th>
+            <th class="px-3 py-3">Numero / ente</th>
+            <th class="px-3 py-3">Completato / rilasciato</th>
+            <th class="px-3 py-3">Scadenza</th>
+            <th class="px-3 py-3 text-center">File</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <tr *ngFor="let document of employeeDocuments">
+            <td class="px-3 py-3">{{ documentKindLabel(document.kind) }}</td>
+            <td class="px-3 py-3 font-semibold">{{ document.title }}</td>
+            <td class="px-3 py-3">
+              {{ document.documentNumber || '—' }}
+              <span *ngIf="document.issuerOrProvider"> · {{ document.issuerOrProvider }}</span>
+            </td>
+            <td class="px-3 py-3">
+              {{ (document.completedOn || document.issuedOn) ? ((document.completedOn || document.issuedOn) | date:'dd/MM/yyyy') : '—' }}
+            </td>
+            <td class="px-3 py-3">{{ document.expiresOn ? (document.expiresOn | date:'dd/MM/yyyy') : '—' }}</td>
+            <td class="px-3 py-3 text-center">
+              <button type="button" (click)="downloadEmployeeDocument(document)"
+                class="font-semibold text-blue-700 underline hover:text-blue-900">
+                Scarica
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="employeeDocuments.length === 0">
+            <td colspan="6" class="p-6 text-center text-slate-500">Nessun documento archiviato.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <app-pagination [page]="documentsPage" [pageSize]="documentsPageSize" [totalCount]="documentsTotalCount"
+      (pageChange)="changeDocumentsPage($event)" (pageSizeChange)="changeDocumentsPageSize($event)">
+    </app-pagination>
+  </section>
+
+  <section *ngIf="selectedEmployee && !editorOpen" class="space-y-4 rounded-xl border border-slate-200 bg-white p-5"
+    aria-label="Cartellino orario">
+    <header class="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-bold">Cartellino orario · {{ selectedEmployee.firstName }} {{ selectedEmployee.lastName }}</h2>
+        <p class="text-sm text-slate-600">Presenze giornaliere e assenze. Non calcola retribuzioni o paghe.</p>
+      </div>
+      <label class="grid gap-1 text-sm font-medium">Mese
+        <input type="month" [(ngModel)]="timeMonth" (ngModelChange)="changeTimeMonth()"
+          class="rounded border border-slate-300 p-2" />
+      </label>
+    </header>
+
+    <div class="grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-4">
+      <label class="grid gap-1 text-sm font-medium">Data
+        <input type="date" [(ngModel)]="timeWorkDate" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Tipo giornata
+        <select [(ngModel)]="timeType" class="rounded border border-slate-300 p-2">
+          <option value="Work">Lavoro</option>
+          <option value="Vacation">Ferie</option>
+          <option value="SickLeave">Malattia</option>
+          <option value="Permission">Permesso</option>
+          <option value="OtherAbsence">Altra assenza</option>
+        </select>
+      </label>
+      <label *ngIf="timeType === 'Work'" class="grid gap-1 text-sm font-medium">Entrata
+        <input type="time" [(ngModel)]="timeStart" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label *ngIf="timeType === 'Work'" class="grid gap-1 text-sm font-medium">Uscita
+        <input type="time" [(ngModel)]="timeEnd" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label *ngIf="timeType === 'Work'" class="grid gap-1 text-sm font-medium">Pausa (minuti)
+        <input type="number" min="0" max="360" step="1" [(ngModel)]="timeBreakMinutes"
+          class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium sm:col-span-2">Note
+        <input [(ngModel)]="timeNotes" maxlength="1000" class="rounded border border-slate-300 p-2" />
+      </label>
+      <div class="flex items-end gap-2">
+        <button type="button" [disabled]="timeEntrySaving" (click)="saveTimeEntry()"
+          class="rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white disabled:opacity-50">
+          {{ timeEntrySaving ? 'Salvataggio…' : (editingTimeEntry ? 'Aggiorna cartellino' : 'Registra giornata') }}
+        </button>
+        <button *ngIf="editingTimeEntry" type="button" (click)="cancelTimeEntryEdit()"
+          class="rounded-lg border border-slate-300 px-3 py-2 font-semibold text-slate-700">
+          Annulla
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="timeEntriesLoading" role="status" class="p-4 text-center text-slate-500">
+      Caricamento cartellini…
+    </div>
+    <div *ngIf="!timeEntriesLoading" class="overflow-x-auto rounded-lg border border-slate-200">
+      <table class="w-full min-w-[850px] text-sm">
+        <thead class="border-b bg-slate-50 text-left text-slate-600">
+          <tr>
+            <th class="px-3 py-3">Data</th>
+            <th class="px-3 py-3">Tipo</th>
+            <th class="px-3 py-3">Orario</th>
+            <th class="px-3 py-3 text-right">Pausa</th>
+            <th class="px-3 py-3 text-right">Ore nette</th>
+            <th class="px-3 py-3">Note</th>
+            <th class="px-3 py-3 text-center">Modifica</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <tr *ngFor="let entry of timeEntries">
+            <td class="whitespace-nowrap px-3 py-3">{{ entry.workDate | date:'dd/MM/yyyy' }}</td>
+            <td class="px-3 py-3">{{ timeTypeLabel(entry.type) }}</td>
+            <td class="px-3 py-3">
+              {{ entry.startTime ? (entry.startTime | slice:0:5) : '—' }}
+              <span *ngIf="entry.endTime"> – {{ entry.endTime | slice:0:5 }}</span>
+            </td>
+            <td class="px-3 py-3 text-right">{{ entry.breakMinutes }} min</td>
+            <td class="px-3 py-3 text-right">{{ entry.workedMinutes ? formatWorkedMinutes(entry.workedMinutes) : '—' }}</td>
+            <td class="px-3 py-3">{{ entry.notes || '—' }}</td>
+            <td class="px-3 py-3 text-center">
+              <app-table-action-button action="edit"
+                [label]="'Modifica cartellino ' + entry.workDate"
+                (activated)="editTimeEntry(entry)"></app-table-action-button>
+            </td>
+          </tr>
+          <tr *ngIf="timeEntries.length === 0">
+            <td colspan="7" class="p-6 text-center text-slate-500">Nessun cartellino per il mese selezionato.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <app-pagination [page]="timePage" [pageSize]="timePageSize" [totalCount]="timeTotalCount"
+      (pageChange)="changeTimePage($event)" (pageSizeChange)="changeTimePageSize($event)">
     </app-pagination>
   </section>
 </main>

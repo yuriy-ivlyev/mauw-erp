@@ -10,6 +10,8 @@ public static class PayableDocumentServiceCollectionExtensions
     {
         services.AddScoped<IPayableDocumentService, PayableDocumentService>();
         services.AddScoped<IEmployeeService, EmployeeService>();
+        services.AddScoped<IEmployeeDocumentService, EmployeeDocumentService>();
+        services.AddScoped<IEmployeeTimeEntryService, EmployeeTimeEntryService>();
         return services;
     }
 }

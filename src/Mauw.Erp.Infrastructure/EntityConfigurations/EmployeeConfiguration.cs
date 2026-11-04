@@ -19,6 +19,14 @@ public sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.Property(employee => employee.AnnualCompanyCost).HasPrecision(18, 2);
         builder.Property(employee => employee.HireDate);
         builder.Property(employee => employee.EndDate);
+        builder.Property(employee => employee.StreetAddress).HasMaxLength(250);
+        builder.Property(employee => employee.PostalCode).HasMaxLength(20);
+        builder.Property(employee => employee.City).HasMaxLength(100);
+        builder.Property(employee => employee.Province).HasMaxLength(100);
+        builder.Property(employee => employee.CountryCode).HasMaxLength(2);
+        builder.Property(employee => employee.Email).HasMaxLength(254);
+        builder.Property(employee => employee.Phone).HasMaxLength(50);
+        builder.Property(employee => employee.MobilePhone).HasMaxLength(50);
         builder.Property(employee => employee.IsActive).IsRequired();
         builder.Property(employee => employee.Notes).HasMaxLength(1000);
         builder.Property(employee => employee.Version).IsConcurrencyToken();
@@ -26,5 +34,13 @@ public sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.Property(employee => employee.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         builder.HasIndex(employee => employee.EmployeeNumber).IsUnique();
         builder.HasIndex(employee => new { employee.IsActive, employee.EmployeeNumber });
+        builder.HasMany(employee => employee.Documents)
+            .WithOne(document => document.Employee)
+            .HasForeignKey(document => document.EmployeeId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(employee => employee.TimeEntries)
+            .WithOne(entry => entry.Employee)
+            .HasForeignKey(entry => entry.EmployeeId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

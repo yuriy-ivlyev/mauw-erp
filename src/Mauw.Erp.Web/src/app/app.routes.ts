@@ -68,7 +68,7 @@ export const routes: Routes = [
       { path: 'acquisti/rimborsi/nuovo', loadComponent: () => import('./pages/acquisti/payable-documents.component').then(m => m.PayableDocumentsComponent), canActivate: [roleGuard], data: { roles: ['Admin'], reimbursementsOnly: true, editor: true, createKind: 'ExpenseReimbursement' }, title: 'Nuovo Rimborso | Mauw ERP' },
       { path: 'acquisti/rimborsi/:id', loadComponent: () => import('./pages/acquisti/payable-documents.component').then(m => m.PayableDocumentsComponent), canActivate: [roleGuard], data: { roles: ['Admin'], reimbursementsOnly: true, editor: true }, title: 'Dettaglio Rimborso | Mauw ERP' },
       { path: 'acquisti/rimborsi', loadComponent: () => import('./pages/acquisti/payable-documents.component').then(m => m.PayableDocumentsComponent), pathMatch: 'full', canActivate: [roleGuard], data: { roles: ['Admin'], reimbursementsOnly: true }, title: 'Rimborsi | Mauw ERP' },
-      { path: 'amministrazione/dipendenti', loadComponent: () => import('./pages/acquisti/employees.component').then(m => m.EmployeesComponent), canActivate: [roleGuard], data: { roles: ['Admin'] }, title: 'Dipendenti e paghe | Mauw ERP' },
+      { path: 'amministrazione/dipendenti', loadComponent: () => import('./pages/acquisti/employees.component').then(m => m.EmployeesComponent), canActivate: [roleGuard], data: { roles: ['Admin'] }, title: 'Personale' },
       { path: 'acquisti/carico-merce', redirectTo: 'acquisti/ddt-fornitore', pathMatch: 'full' },
 
       // Ordini

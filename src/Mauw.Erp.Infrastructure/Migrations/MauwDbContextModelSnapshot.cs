@@ -1451,6 +1451,11 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("annual_gross_salary");
 
+                    b.Property<string>("City")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("city");
+
                     b.Property<string>("ContractLevel")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
@@ -1461,11 +1466,21 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("contract_type");
 
+                    b.Property<string>("CountryCode")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("country_code");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email");
 
                     b.Property<string>("EmployeeNumber")
                         .IsRequired()
@@ -1497,15 +1512,40 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("last_name");
 
+                    b.Property<string>("MobilePhone")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("mobile_phone");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("notes");
 
+                    b.Property<string>("Phone")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("PostalCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("postal_code");
+
+                    b.Property<string>("Province")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("province");
+
                     b.Property<string>("Qualification")
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)")
                         .HasColumnName("qualification");
+
+                    b.Property<string>("StreetAddress")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("street_address");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -1527,6 +1567,175 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.HasIndex("IsActive", "EmployeeNumber");
 
                     b.ToTable("employees");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.EmployeeDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateOnly?>("CompletedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("completed_on");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("content_type");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("DocumentNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("document_number");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
+                    b.Property<DateOnly?>("ExpiresOn")
+                        .HasColumnType("date")
+                        .HasColumnName("expires_on");
+
+                    b.Property<long>("FileLength")
+                        .HasColumnType("bigint")
+                        .HasColumnName("file_length");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("file_name");
+
+                    b.Property<DateOnly?>("IssuedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("issued_on");
+
+                    b.Property<string>("IssuerOrProvider")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("issuer_or_provider");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("storage_key");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_employee_documents");
+
+                    b.HasIndex("EmployeeId", "CreatedAt");
+
+                    b.ToTable("employee_documents");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.EmployeeTimeEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("BreakMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("break_minutes");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
+                    b.Property<TimeOnly?>("EndTime")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("end_time");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<TimeOnly?>("StartTime")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("start_time");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer")
+                        .HasColumnName("type");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.Property<DateOnly>("WorkDate")
+                        .HasColumnType("date")
+                        .HasColumnName("work_date");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_employee_time_entries");
+
+                    b.HasIndex("WorkDate");
+
+                    b.HasIndex("EmployeeId", "WorkDate")
+                        .IsUnique();
+
+                    b.ToTable("employee_time_entries");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Invoice", b =>
@@ -4009,6 +4218,30 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.Navigation("Variant");
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.EmployeeDocument", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.Employee", "Employee")
+                        .WithMany("Documents")
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_employee_documents_employees_employee_id");
+
+                    b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.EmployeeTimeEntry", b =>
+                {
+                    b.HasOne("Mauw.Erp.Domain.Entities.Employee", "Employee")
+                        .WithMany("TimeEntries")
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("f_k_employee_time_entries_employees_employee_id");
+
+                    b.Navigation("Employee");
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Invoice", b =>
                 {
                     b.HasOne("Mauw.Erp.Domain.Entities.Contact", "Contact")
@@ -4658,6 +4891,13 @@ namespace Mauw.Erp.Infrastructure.Migrations
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.DdtDocument", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.Employee", b =>
+                {
+                    b.Navigation("Documents");
+
+                    b.Navigation("TimeEntries");
                 });
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Invoice", b =>

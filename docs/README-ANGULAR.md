@@ -150,17 +150,25 @@ approvazione; i rimborsi sono documenti passivi associati al dipendente, non
 all'utente ERP che li registra.
 
 La rotta Admin-only `/amministrazione/dipendenti` gestisce matricola,
-nominativo, inquadramento, livello/contratto, RAL e costo annuo aziendale.
+nominativo, inquadramento, livello/contratto, indirizzo principale, email,
+telefono/cellulare, RAL e costo annuo aziendale.
 Nella scheda del dipendente si registra per ogni mese il costo aziendale
 effettivo e si allega il cedolino (PDF/PNG/JPEG, massimo 20 MB). Il costo
 diventa un documento passivo approvato di categoria paghe, con IVA zero e
 senza gestione di pagamenti ERP; il cedolino e i dati dipendente non sono
 esposti alle API o alle schermate `Accounting`.
 
+La stessa scheda archivia documenti di identità, attestati di sicurezza e
+altri allegati, con numero/ente e date di rilascio, completamento e scadenza.
+I cartellini sono giornalieri: un record e un singolo intervallo diurno per
+dipendente/data, con entrata, uscita e pausa, oppure un'assenza. Le ore nette
+sono una durata operativa e non un calcolo retributivo; non sono gestiti turni
+notturni o spezzati, straordinari, timbrature automatiche o paghe.
+
 Queste funzioni sono per controllo operativo e passaggio dati al commercialista:
 non implementano contabilità generale, registri o liquidazioni IVA, calcolo
-delle paghe, adempimenti contributivi, registro cespiti o ammortamenti. Le
-fatture passive non sono ancora abbinate automaticamente a ordini o DDT
+delle paghe, adempimenti contributivi, registro cespiti o ammortamenti.
+Le fatture passive non sono ancora abbinate automaticamente a ordini o DDT
 fornitore.
 
 ## Acquisti / Carico Merce (DDT fornitore)

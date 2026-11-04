@@ -117,7 +117,15 @@ public sealed class EmployeeService(
             request.HireDate,
             request.EndDate,
             request.IsActive,
-            request.Notes);
+            request.Notes,
+            request.StreetAddress,
+            request.PostalCode,
+            request.City,
+            request.Province,
+            request.CountryCode,
+            request.Email,
+            request.Phone,
+            request.MobilePhone);
         if (!updated.Success)
             return OperationResult<EmployeeDto>.Fail(updated.Error!);
 
@@ -175,6 +183,14 @@ public sealed class EmployeeService(
         employee.AnnualCompanyCost,
         employee.HireDate,
         employee.EndDate,
+        employee.StreetAddress,
+        employee.PostalCode,
+        employee.City,
+        employee.Province,
+        employee.CountryCode,
+        employee.Email,
+        employee.Phone,
+        employee.MobilePhone,
         employee.IsActive,
         employee.Notes,
         employee.Version);

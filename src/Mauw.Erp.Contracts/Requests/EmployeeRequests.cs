@@ -13,6 +13,14 @@ public sealed record SaveEmployeeRequest(
     DateOnly? EndDate,
     bool IsActive,
     string? Notes,
-    Guid? Version = null);
+    Guid? Version = null,
+    string? StreetAddress = null,
+    string? PostalCode = null,
+    string? City = null,
+    string? Province = null,
+    string? CountryCode = null,
+    string? Email = null,
+    string? Phone = null,
+    string? MobilePhone = null);
 
 public sealed record DeactivateEmployeeRequest(Guid Version, DateOnly EndDate);

@@ -348,6 +348,13 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
         Add("POST", $"/api/v1/employees/{Id}/deactivate", AdminOnly);
         Add("GET", $"/api/v1/employees/{Id}/payroll-costs", AdminOnly);
         Add("POST", $"/api/v1/employees/{Id}/payroll-costs", AdminOnly);
+        Add("GET", $"/api/v1/employees/{Id}/documents", AdminOnly);
+        Add("POST", $"/api/v1/employees/{Id}/documents", AdminOnly);
+        Add("PUT", $"/api/v1/employees/{Id}/documents/{Id2}", AdminOnly);
+        Add("GET", $"/api/v1/employees/{Id}/documents/{Id2}/file", AdminOnly);
+        Add("GET", $"/api/v1/employees/{Id}/time-entries?from=2026-11-01&to=2026-11-30", AdminOnly);
+        Add("POST", $"/api/v1/employees/{Id}/time-entries", AdminOnly);
+        Add("PUT", $"/api/v1/employees/{Id}/time-entries/{Id2}", AdminOnly);
 
         var data = new TheoryData<string, string, string>();
         foreach (var (method, path, roles) in rows)
@@ -396,6 +403,32 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
     {
         _ = allowedRoles;
         Assert.Equal(HttpStatusCode.Forbidden, await SendAsync("Cashier", method, path));
+    }
+
+    [Fact]
+    public async Task EmployeeRecordsDocumentsAndTimecardsAreAdminOnly()
+    {
+        var routes = new (string Method, string Path)[]
+        {
+            ("GET", "/api/v1/employees"),
+            ("GET", $"/api/v1/employees/{Id}/documents"),
+            ("POST", $"/api/v1/employees/{Id}/documents"),
+            ("PUT", $"/api/v1/employees/{Id}/documents/{Id2}"),
+            ("GET", $"/api/v1/employees/{Id}/documents/{Id2}/file"),
+            ("GET", $"/api/v1/employees/{Id}/time-entries?from=2026-11-01&to=2026-11-30"),
+            ("POST", $"/api/v1/employees/{Id}/time-entries"),
+            ("PUT", $"/api/v1/employees/{Id}/time-entries/{Id2}")
+        };
+
+        foreach (var (method, path) in routes)
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, await SendAsync(null, method, path));
+            Assert.True(
+                await SendAsync(Admin, method, path) is not HttpStatusCode.Unauthorized and not HttpStatusCode.Forbidden,
+                $"{Admin} {method} {path} was denied");
+            foreach (var role in new[] { Sales, Warehouse, Accounting })
+                Assert.Equal(HttpStatusCode.Forbidden, await SendAsync(role, method, path));
+        }
     }
 
     [Theory]
@@ -535,16 +568,24 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
             && path.EndsWith("/attachment", StringComparison.Ordinal);
         var isPayrollCostCreate = method == "POST"
             && path.EndsWith("/payroll-costs", StringComparison.Ordinal);
+        var isEmployeeDocumentUpload = method == "POST"
+            && path.EndsWith("/documents", StringComparison.Ordinal);
         if (isAttachmentUpload)
             path = $"{path}?version={Id}";
         using var request = new HttpRequestMessage(new HttpMethod(method), path);
-        if (isAttachmentUpload || isPayrollCostCreate)
+        if (isAttachmentUpload || isPayrollCostCreate || isEmployeeDocumentUpload)
         {
             var multipart = new MultipartFormDataContent();
             if (isPayrollCostCreate)
             {
                 multipart.Add(new StringContent("2026-11-01"), "period");
                 multipart.Add(new StringContent("100.00"), "monthlyCompanyCost");
+            }
+            if (isEmployeeDocumentUpload)
+            {
+                multipart.Add(new StringContent("IdentityDocument"), "kind");
+                multipart.Add(new StringContent("Documento"), "title");
+                multipart.Add(new StringContent("AA123456"), "documentNumber");
             }
             multipart.Add(new ByteArrayContent("%PDF-1.4"u8.ToArray()), "file", "test.pdf");
             request.Content = multipart;

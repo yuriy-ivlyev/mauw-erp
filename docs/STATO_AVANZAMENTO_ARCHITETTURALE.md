@@ -213,10 +213,16 @@ modifica anagrafica. Dashboard analitiche disponibili a `Admin`.
   i rimborsi scegliendo il dipendente, senza legarli all'account ERP del
   richiedente.
 - `Employee` conserva matricola univoca, nominativo, inquadramento, livello,
-  contratto/CCNL, RAL e costo annuo informativi, date di impiego, stato e note.
+  contratto/CCNL, recapiti e indirizzo principale, RAL e costo annuo
+  informativi, date di impiego, stato e note.
   Per ogni mese l'Admin inserisce il costo aziendale effettivo e allega il
   cedolino in un'unica operazione; il costo diventa un documento `EmployeePayroll`
   approvato, IVA zero e non pagabile in ERP. La coppia dipendente/mese è univoca.
+- `EmployeeDocument` archivia documenti d'identità, attestati di sicurezza e
+  altri file privati su S3, con numero/ente e date di rilascio, completamento e
+  scadenza. `EmployeeTimeEntry` registra un cartellino al giorno per dipendente,
+  con un singolo intervallo diurno, entrata/uscita e pausa oppure un tipo di
+  assenza; le ore nette sono un dato operativo, non un calcolo retributivo.
 - Dati dipendenti, rimborsi, costi mensili e cedolini sono filtrati nelle API
   e disponibili solo a `Admin`; `Accounting` continua a vedere le fatture
   passive ordinarie.
@@ -237,9 +243,10 @@ emissione, dettaglio, XML e trasmissione; il PDF è servito dall'endpoint
 `invoices/{id}/pdf`), `fiscal-documents` (invio batch), `ddts`,
 `inventory`, `products`, `contacts` (incl. `/{id}/statement`), `warehouses`,
 `price-lists`, `settings`, `supplier-delivery-notes`, `payables` e
-`payables/reimbursements`, `employees` (incl. costi mensili/cedolini), `geo`,
-`lookups` e `dashboard`. Fatture passive ordinarie sono riservate ad
-`Admin`/`Accounting`; rimborsi, personale e cedolini sono esclusivi di `Admin`.
+`payables/reimbursements`, `employees` (anagrafica, documenti, cartellini,
+costi mensili e cedolini), `geo`, `lookups` e `dashboard`. Fatture passive
+ordinarie sono riservate ad `Admin`/`Accounting`; dati HR, rimborsi e allegati
+sono esclusivi di `Admin`.
 Il ciclo passivo non genera movimenti stock.
 Eccezioni al prefisso `v1`: gli ordini fornitore sono solo su
 `/api/supplier-purchase-orders`; i DDT fornitore e le giacenze sono esposti sia
@@ -260,11 +267,11 @@ PostgreSQL 16; schema gestito da EF Core e da migrazioni versionate in
 | Magazzino | `warehouses`, `stock_items` (token `xmin`), `stock_movements` |
 | Ordini e spedizioni | `orders`, `order_items`, `shipments`, `shipment_lines`, `ddt_documents`, `ddt_items` |
 | Fatturazione e audit | `invoices`, `invoice_items`, `payments`, `credit_notes`, `document_audit_entries` |
-| Personale | `employees` |
+| Personale | `employees`, `employee_documents`, `employee_time_entries` |
 | Ciclo passivo | `payable_documents`, `payable_document_lines`, `payable_document_payments` (`EmployeePayroll` incluso) |
 | Acquisti | `supplier_purchase_orders`, `supplier_purchase_order_lines`, `supplier_delivery_notes`, `supplier_delivery_note_lines`, `supplier_article_mappings`, `supplier_return_drafts`, `supplier_return_draft_lines` |
 
-### Migrazioni (21, inclusa la baseline)
+### Migrazioni (22, inclusa la baseline)
 
 | # | Migrazione | Contenuto |
 |---|---|---|
@@ -289,6 +296,7 @@ PostgreSQL 16; schema gestito da EF Core e da migrazioni versionate in
 | 19 | `20261104131620_AddPayableDocuments` | Documenti passivi, righe, pagamenti, allegati, stati e audit |
 | 20 | `20261104133730_PayableDocumentInvoiceNumberScopedByDate` | Unicità numero fattura fornitore per fornitore e data documento |
 | 21 | `20261104175345_AddEmployeeRegistryAndPayrollCosts` | Tabella `employees`, relazione del dipendente sui documenti passivi e unicità del costo mensile per dipendente |
+| 22 | `20261104182514_AddEmployeeHrRecordsAndTimecards` | Recapiti dipendente, archivio documenti HR/attestati su S3 e cartellini orari giornalieri |
 
 Note operative: i database locali creati prima del baseline vanno ricreati o
 riallineati nella `__EFMigrationsHistory`. Le migrazioni si creano/applicano
@@ -346,6 +354,7 @@ movimenti/resi di magazzino, acquisti, autorizzazioni e sicurezza dei costi.
 | P2 | OCR documenti fornitori | Il DDT fornitore accetta payload OCR/IA già strutturati; non contiene un motore OCR né invia file a provider IA esterni. |
 | P2 | Test storage S3 in CI | Il test di round-trip richiede endpoint e credenziali temporanei dedicati. |
 | P2 | Cespiti e paghe | Costi aziendali mensili e cedolini sono archiviati, ma non vengono calcolati paghe/contributi. `AssetCandidate` resta una segnalazione; registro cespiti e ammortamenti restano fuori. |
+| P2 | Rilevazione presenze avanzata | I cartellini giornalieri, a singolo intervallo diurno, sono inseriti dall'Admin; non sono integrati dispositivi di timbratura, turni, straordinari o workflow di approvazione. |
 | P3 | Regimi fiscali speciali | Bollo, ritenute, casse previdenziali, split payment ed esigibilità IVA non fanno parte del perimetro corrente. |
 
 ---

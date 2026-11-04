@@ -11,6 +11,8 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
 {
     public DbSet<Contact> Contacts { get; set; }
     public DbSet<Employee> Employees { get; set; }
+    public DbSet<EmployeeDocument> EmployeeDocuments { get; set; }
+    public DbSet<EmployeeTimeEntry> EmployeeTimeEntries { get; set; }
     public DbSet<CustomerProfile> CustomerProfiles { get; set; }
     public DbSet<PriceList> PriceLists { get; set; }
     public DbSet<PriceListRule> PriceListRules { get; set; }
@@ -93,6 +95,8 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
 
         modelBuilder.ApplyConfiguration(new ContactConfiguration());
         modelBuilder.ApplyConfiguration(new EmployeeConfiguration());
+        modelBuilder.ApplyConfiguration(new EmployeeDocumentConfiguration());
+        modelBuilder.ApplyConfiguration(new EmployeeTimeEntryConfiguration());
         modelBuilder.ApplyConfiguration(new CustomerProfileConfiguration());
         modelBuilder.ApplyConfiguration(new PriceListConfiguration());
         modelBuilder.ApplyConfiguration(new PriceListRuleConfiguration());

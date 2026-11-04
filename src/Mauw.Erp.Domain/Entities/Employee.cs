@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Mauw.Erp.Domain.Entities;
 
 public sealed class Employee : Entity<Guid>
@@ -13,9 +15,19 @@ public sealed class Employee : Entity<Guid>
     public decimal? AnnualCompanyCost { get; private set; }
     public DateOnly? HireDate { get; private set; }
     public DateOnly? EndDate { get; private set; }
+    public string? StreetAddress { get; private set; }
+    public string? PostalCode { get; private set; }
+    public string? City { get; private set; }
+    public string? Province { get; private set; }
+    public string? CountryCode { get; private set; }
+    public string? Email { get; private set; }
+    public string? Phone { get; private set; }
+    public string? MobilePhone { get; private set; }
     public bool IsActive { get; private set; }
     public string? Notes { get; private set; }
     public Guid Version { get; private set; } = Guid.NewGuid();
+    public ICollection<EmployeeDocument> Documents { get; private set; } = [];
+    public ICollection<EmployeeTimeEntry> TimeEntries { get; private set; } = [];
 
     public Employee() : base(Guid.NewGuid()) { }
 
@@ -31,7 +43,15 @@ public sealed class Employee : Entity<Guid>
         DateOnly? hireDate,
         DateOnly? endDate,
         bool isActive,
-        string? notes)
+        string? notes,
+        string? streetAddress = null,
+        string? postalCode = null,
+        string? city = null,
+        string? province = null,
+        string? countryCode = null,
+        string? email = null,
+        string? phone = null,
+        string? mobilePhone = null)
     {
         if (string.IsNullOrWhiteSpace(employeeNumber) || employeeNumber.Length > 50)
             return EmployeeOperationResult.Fail("La matricola è obbligatoria e non può superare 50 caratteri.");
@@ -42,6 +62,10 @@ public sealed class Employee : Entity<Guid>
         if (qualification?.Length > 150 || contractLevel?.Length > 100
             || contractType?.Length > 100 || notes?.Length > 1000)
             return EmployeeOperationResult.Fail("Uno dei dati anagrafici o note supera la lunghezza massima.");
+        if (streetAddress?.Length > 250 || postalCode?.Length > 20 || city?.Length > 100
+            || province?.Length > 100 || email?.Length > 254 || phone?.Length > 50
+            || mobilePhone?.Length > 50)
+            return EmployeeOperationResult.Fail("Indirizzo o recapiti superano la lunghezza massima.");
         if (!ValidAnnualAmount(annualGrossSalary) || !ValidAnnualAmount(annualCompanyCost))
             return EmployeeOperationResult.Fail("RAL e costo annuo aziendale devono essere importi non negativi a due decimali.");
         if (!annualGrossSalary.HasValue && !annualCompanyCost.HasValue)
@@ -50,6 +74,19 @@ public sealed class Employee : Entity<Guid>
             return EmployeeOperationResult.Fail("La data di cessazione non può precedere la data di assunzione.");
         if (isActive && endDate.HasValue)
             return EmployeeOperationResult.Fail("Un dipendente cessato non può essere attivo.");
+        var hasAddress = !string.IsNullOrWhiteSpace(streetAddress)
+            || !string.IsNullOrWhiteSpace(postalCode)
+            || !string.IsNullOrWhiteSpace(city);
+        if (hasAddress && (string.IsNullOrWhiteSpace(streetAddress)
+            || string.IsNullOrWhiteSpace(postalCode) || string.IsNullOrWhiteSpace(city)))
+            return EmployeeOperationResult.Fail("Per salvare l'indirizzo indicare via, CAP e città.");
+        var normalizedCountryCode = Normalize(countryCode) ?? (hasAddress ? "IT" : null);
+        if (normalizedCountryCode is not null
+            && (normalizedCountryCode.Length != 2 || !normalizedCountryCode.All(char.IsAsciiLetter)))
+            return EmployeeOperationResult.Fail("Il codice paese deve contenere due lettere.");
+        if (!string.IsNullOrWhiteSpace(email)
+            && !new EmailAddressAttribute().IsValid(email))
+            return EmployeeOperationResult.Fail("L'indirizzo email non è valido.");
 
         EmployeeNumber = employeeNumber.Trim();
         FirstName = firstName.Trim();
@@ -61,6 +98,14 @@ public sealed class Employee : Entity<Guid>
         AnnualCompanyCost = annualCompanyCost;
         HireDate = hireDate;
         EndDate = endDate;
+        StreetAddress = Normalize(streetAddress);
+        PostalCode = Normalize(postalCode);
+        City = Normalize(city);
+        Province = Normalize(province);
+        CountryCode = normalizedCountryCode?.ToUpperInvariant();
+        Email = Normalize(email);
+        Phone = Normalize(phone);
+        MobilePhone = Normalize(mobilePhone);
         IsActive = isActive;
         Notes = Normalize(notes);
         Version = Guid.NewGuid();
