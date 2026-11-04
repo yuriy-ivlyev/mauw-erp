@@ -69,7 +69,7 @@ export interface Order {
   vatTotal: number;
   grossTotal: number;
   orderType: 'Standard' | 'CassaSession' | 'Preventivo' | 'WebOrder' | string;
-  fulfillmentType: 'CashDesk' | 'StandardShipping' | string;
+  fulfillmentType: 'CashDesk' | 'StandardShipping' | 'ShowroomPickup' | string;
   items: OrderItem[];
   linkedDocuments: OrderLinkedDocuments | null;
   statusDescription: string;

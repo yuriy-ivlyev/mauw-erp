@@ -184,10 +184,13 @@ describe('FatturaDettaglioComponent', () => {
     const links = Array.from(harness.routeNativeElement?.querySelectorAll('a') ?? []);
     const orderLink = links.find(link => link.href.includes('/ordini/order-1'));
     const ddtLink = links.find(link => link.href.includes('/ddt/ddt-1'));
+    const statementLink = links.find(link => link.href.includes('/anagrafiche/contact-1'));
 
     expect(text).toContain('INV-102026-001');
     expect(orderLink).toBeDefined();
     expect(ddtLink).toBeDefined();
+    expect(statementLink).toBeDefined();
+    expect(new URL(statementLink!.href).searchParams.get('tab')).toBe('statement');
     expect(orderLink?.textContent?.trim()).toBe('ORD');
     expect(ddtLink?.textContent?.trim()).toBe('DDT');
     expect(header?.contains(orderLink!)).toBeTrue();
@@ -294,6 +297,8 @@ describe('FatturaDettaglioComponent', () => {
     }));
 
     const component = await navigateToInvoice();
+    expect(harness.routeNativeElement?.querySelector(
+      '[aria-label="Crediti spendibili da note di credito"]')).not.toBeNull();
     component.invoice = { ...invoice, balanceDue: 122 };
     component.paymentDate = '2026-10-29';
     component.applyCreditNote(note);
@@ -321,6 +326,8 @@ describe('FatturaDettaglioComponent', () => {
     });
     expect(harness.routeNativeElement?.textContent).toContain('NC-202610-00001');
     expect(harness.routeNativeElement?.textContent).toContain('Compensazione nota di credito');
+    expect(harness.routeNativeElement?.querySelector(
+      '[aria-label="Crediti spendibili da note di credito"]')).toBeNull();
   });
 
   it('flags the invoice while the related order is under pre-SDI adjustment and stays read-only', async () => {

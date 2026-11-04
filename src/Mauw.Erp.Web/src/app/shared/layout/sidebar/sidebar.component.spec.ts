@@ -41,16 +41,24 @@ describe('SidebarComponent', () => {
     expect(hasLink('Azienda')).toBeTrue();
   });
 
-  it('keeps unauthorized links hidden when opening sections', async () => {
+  it('shows Sales only the reimbursement entry under Purchases', async () => {
     const fixture = await createSidebar(['Sales']);
     const catalog = fixture.componentInstance.menuItems.find(item => item.label === 'Catalogo')!;
     fixture.componentInstance.toggleSubmenu(catalog);
+    const purchases = fixture.componentInstance.menuItems.find(item => item.label === 'Acquisti')!;
+    fixture.componentInstance.toggleSubmenu(purchases);
     fixture.detectChanges();
     const text = (fixture.nativeElement as HTMLElement).textContent!;
     expect(text).toContain('Listini');
     expect(text).not.toContain('Prodotti');
     expect(text).not.toContain('Sistema');
-    expect(text).not.toContain('Acquisti');
+    const links = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('nav a'))
+      .map(link => link.textContent?.trim());
+    expect(text).toContain('Acquisti');
+    expect(links).toContain('Rimborsi');
+    for (const label of ['Fatture passive', 'Ordini Fornitore', 'Carico Merce']) {
+      expect(links).not.toContain(label);
+    }
   });
 
   it('shows Sales the cassa, orders, invoices, credit notes and current stock entries', async () => {

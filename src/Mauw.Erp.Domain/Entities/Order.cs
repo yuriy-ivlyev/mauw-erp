@@ -25,7 +25,7 @@ public class Order : Entity<Guid>
             ],
             [OrderStatus.Confirmed] =
             [
-                OrderStatus.Picking, OrderStatus.Cancelled, OrderStatus.OnHold
+                OrderStatus.Picking, OrderStatus.Completed, OrderStatus.Cancelled, OrderStatus.OnHold
             ],
             [OrderStatus.Picking] =
             [
@@ -294,7 +294,7 @@ public class Order : Entity<Guid>
         if (!result.Success)
             return result;
 
-        if (FulfillmentType == OrderFulfillmentType.StandardShipping)
+        if (FulfillmentType is OrderFulfillmentType.StandardShipping or OrderFulfillmentType.ShowroomPickup)
         {
             foreach (var item in Items.Where(item => item.AffectsStock && item.Quantity > 0))
                 item.AlignShippedQuantityWithQuantity();
@@ -553,6 +553,23 @@ public class Order : Entity<Guid>
     {
         EnsureShippingOrder();
         TransitionTo(OrderStatus.Completed);
+    }
+
+    public void CompleteShowroomPickup()
+    {
+        if (FulfillmentType != OrderFulfillmentType.StandardShipping)
+            throw new InvalidOperationException("Only a standard order can be completed as a showroom pickup.");
+        if (Status != OrderStatus.Confirmed)
+            throw new InvalidOperationException("Only a confirmed order can be completed as a showroom pickup.");
+        if (!FulfillmentWarehouseId.HasValue)
+            throw new InvalidOperationException("The order has no fulfillment warehouse.");
+
+        EnsureHasLines();
+        TransitionTo(OrderStatus.Completed);
+        FulfillmentType = OrderFulfillmentType.ShowroomPickup;
+        foreach (var item in Items.Where(item => item.AffectsStock && item.Quantity > 0))
+            item.AlignShippedQuantityWithQuantity();
+        UpdateTimestamp();
     }
 
     public void CancelRemainingLines(string reason)

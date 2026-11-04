@@ -1,17 +1,18 @@
-# Mauw ERP - Angular Admin Dashboard
+# Mauw ERP — Documentazione frontend Angular
 
-La parte web è stata implementata come **sito amministrativo** usando **Angular 18** con **Tailwind CSS 3** e ispirato al template TailAdmin.
+Il frontend è un'applicazione amministrativa Angular 18 standalone, con
+Tailwind CSS 3 e layout autenticato. Copre vendite, ordini, fatturazione,
+anagrafiche, catalogo, magazzino e acquisti; le chiamate raggiungono l'API
+ASP.NET Core attraverso i servizi Angular e il reverse proxy.
 
 ## 🎨 Caratteristiche
 
-- ✅ Dashboard amministrativa moderna e responsive
-- ✅ Sidebar con navigazione
-- ✅ Header con user menu
-- ✅ Tabelle dati con badge di stato
-- ✅ Carte statistiche (KPI)
-- ✅ Dark mode supportato
-- ✅ Componenti standalone Angular
-- ✅ Styling con Tailwind CSS
+- Dashboard e navigazione filtrata per ruolo
+- Componenti standalone, guard di autenticazione/autorizzazione e interceptor di caricamento
+- Pagine operative per ordini, banco cassa, fatture, note di credito, DDT,
+  anagrafiche, magazzino, catalogo e acquisti
+- Componenti condivisi per paginazione, azioni tabella, conferme e pulsanti di
+  ritorno/aggiunta
 
 ## Loghi aziendali
 
@@ -62,7 +63,6 @@ e note modificabili nell'anagrafica aziendale. IBAN e BIC vengono normalizzati
 e validati prima del salvataggio. I dati sono riportati solo nelle fatture,
 non in ordini, DDT o note di credito. Il pulsante per le condizioni proposte
 compila il testo di trasporto, che va verificato e salvato dall'utente.
-Non viene dichiarata automaticamente emissione XML o trasmissione a SdI.
 
 Il riquadro agente usa l'agente predefinito associato al cliente del documento
 (`DefaultAgentId`), non un nome aziendale fisso. Non esiste attualmente una
@@ -87,7 +87,73 @@ dall'ordine, usando il calcolatore fiscale condiviso. Prima dell'invio a SdI,
 aggiunte/rimozioni contabili e variazioni della spedizione sull'ordine
 completato aggiornano la fattura nello stesso salvataggio; le righe rimosse
 restano nello storico fisico e nei DDT. Dopo l'invio, il timestamp SdI blocca
-le modifiche. Invio XML e trasmissione a SdI non sono ancora implementati.
+le modifiche. Il PDF è generato alla richiesta; l'XML FatturaPA FPR12 viene
+generato e validato contro lo schema prima della trasmissione. L'API archivia
+l'XML trasmesso e registra i relativi metadati.
+
+Il flusso di trasmissione usa `ISdiTransmissionProvider`: in Development è
+registrato un provider locale simulato; negli altri ambienti il provider
+predefinito restituisce un errore di configurazione. Il collegamento a un
+trasportatore SDI reale e la ricezione automatica degli esiti non sono
+configurati/implementati.
+
+I pagamenti possono essere registrati singolarmente o in gruppo. Le date
+ricevute senza fuso orario sono normalizzate a UTC prima della persistenza,
+evitando incompatibilità con PostgreSQL `timestamp with time zone`.
+
+Le note di credito TD04 sono emesse da una fattura già `Transmitted` o
+`Accepted`; la CTA **Emetti Nota di Credito** appare solo in questi stati. Il
+flusso supporta righe parziali, rientro merce facoltativo, generazione PDF/XML,
+archiviazione XML e invio attraverso lo stesso provider SDI. Un credito
+allocato a una fattura viene registrato come pagamento `CreditNoteOffset`.
+
+## Ritiro in showroom e partitario cliente
+
+Un ordine confermato può essere completato con **Ritiro in showroom** senza
+prelievo operatore, imballaggio o DDT. Il backend scarica la giacenza riservata
+dal magazzino assegnato e registra il movimento `ShowroomSale`; l'ordine
+completato può poi essere fatturato con il normale flusso.
+
+Il link **Estratto Conto Cliente** dal dettaglio fattura apre la scheda
+anagrafica in sola lettura sulla sezione del partitario. La vista contabile è
+un unico componente condiviso tra dettaglio e modifica anagrafica; cambiano
+solo l'intestazione e la cornice della pagina. Il partitario è ricavato da
+fatture, note di credito e pagamenti e non è una tabella di movimenti separata.
+
+## Fatture passive, spese e rimborsi
+
+La rotta `/acquisti/passivi` (ruoli `Admin`/`Accounting`) mostra solo l'elenco
+ricercabile e filtrabile. **Nuova fattura passiva** apre la schermata separata
+`/acquisti/passivi/nuovo`; aprire un documento porta a
+`/acquisti/passivi/:id`. Tornando indietro vengono ripristinati ricerca, filtri
+e pagina dell'elenco.
+
+La schermata registra fatture
+fornitore e documenti di spesa: fornitore e numero documento, date/scadenza,
+allegato PDF/PNG/JPEG fino a 20 MB, righe con categoria, centro di costo o
+progetto e aliquota/Natura riportate dalla fonte. Le categorie comprendono
+merce, utenze, servizi, manutenzioni/lavori, trasferte, compensi professionali
+e possibile cespite. I dati IVA vengono acquisiti dal documento sorgente; il
+gestionale non ricostruisce l'imponibile né calcola quote di ammortamento.
+
+Il documento resta in bozza fino al caricamento dell'allegato e all'invio in
+approvazione. `Admin`/`Accounting` possono approvare o respingere e registrare
+pagamenti parziali fino al saldo; ogni passaggio è auditato. La registrazione
+del documento passivo non genera movimenti di magazzino: l'entrata merce resta
+nel flusso DDT fornitore.
+
+La rotta `/acquisti/rimborsi` è disponibile agli utenti autenticati e mostra
+solo i rimborsi presentati dall'utente corrente. **Nuovo rimborso** e il
+dettaglio aprono schermate separate (`/acquisti/rimborsi/nuovo` e
+`/acquisti/rimborsi/:id`), preservando la lista personale. Il beneficiario è
+ricavato dall'identità autenticata; il giustificativo è obbligatorio per
+l'approvazione. Il back office approva e registra il rimborso come documento
+passivo.
+
+Queste funzioni sono per controllo operativo e passaggio dati al commercialista:
+non implementano contabilità generale, registri o liquidazioni IVA, registro
+cespiti/ammortamenti o paghe. Le fatture passive non sono ancora abbinate
+automaticamente a ordini o DDT fornitore.
 
 ## Acquisti / Carico Merce (DDT fornitore)
 
@@ -186,20 +252,17 @@ e `MAUW_TEST_S3_SECRET_KEY`: crea e rimuove un bucket temporaneo dedicato.
 src/Mauw.Erp.Web/
 ├── src/
 │   ├── app/
-│   │   ├── pages/
-│   │   │   └── dashboard/          # Dashboard principale
-│   │   ├── shared/
-│   │   │   └── layout/
-│   │   │       ├── sidebar/        # Navigazione sidebar
-│   │   │       ├── header/         # Header top bar
-│   │   │       └── admin-layout.component.ts
-│   │   ├── services/               # ApiService per backend
-│   │   ├── app.routes.ts           # Routing
-│   │   └── app.component.ts        # Root component
-│   ├── environments/               # Dev/prod config
-│   ├── index.html
-│   ├── main.ts
-│   └── styles.scss                 # Global Tailwind styles
+│   │   ├── components/             # Componenti riusabili di dominio
+│   │   ├── guards/                 # Autenticazione e ruoli
+│   │   ├── interceptors/           # Stato caricamento HTTP
+│   │   ├── models/                 # DTO e contratti frontend
+│   │   ├── pages/                  # Vendite, acquisti, magazzino, contabilità
+│   │   ├── services/               # Client HTTP per funzionalità
+│   │   ├── shared/                 # Layout e componenti UI condivisi
+│   │   ├── app.routes.ts
+│   │   └── app.config.ts
+│   ├── environments/
+│   └── styles.scss
 ├── tailwind.config.js              # Tailwind configuration
 ├── postcss.config.js               # PostCSS for Tailwind
 ├── package.json
@@ -212,7 +275,7 @@ src/Mauw.Erp.Web/
 
 ```bash
 cd src/Mauw.Erp.Web
-npm install
+npm ci
 npm start  # Dev server http://localhost:4200
 ```
 
@@ -240,32 +303,27 @@ proxy HTTPS; API e frontend restano sulla rete Docker.
 ## 🎯 Layout
 
 ### Admin Layout (`admin-layout.component.ts`)
-- Sidebar a sinistra (fixed 256px)
-- Header in alto
-- Main content area che scorre
-- Responsive: sidebar scompare su mobile, header rimane sempre visibile
+- Shell autenticato condiviso dalle pagine operative
+- Navigazione e azioni filtrate secondo i ruoli applicativi
 
 ### Sidebar
-- Logo/Branding
-- Menu con link ai moduli
-- Highlight del route attivo
-- Icon SVG per ogni voce
-- Sezioni espandibili con stato mantenuto dal `MenuService`; il filtro dei ruoli
-  nasconde le voci senza clonare le sezioni, per non perdere lo stato al clic.
+- Menu per vendite, ordini, fatturazione, anagrafiche, catalogo, magazzino e
+  acquisti; le voci sono filtrate per ruolo.
 
 ### Header
-- Search bar (hidden su mobile)
-- User profile avatar
-- Spazio per notifiche/menu aggiuntive
+- Contesto utente autenticato e controlli globali dell'applicazione
 
 ### Dashboard
-- 4 Stat Cards (Users, Sales, Orders, Revenue)
-- Chart placeholder (ready per ApexCharts)
-- Recent Orders table con status badges
+- Dashboard principale e pagine analitiche dedicate, con accesso analitico
+  riservato ad Admin.
 
 ## 🔌 API Communication
 
-Usa `ApiService` in `src/app/services/api.service.ts`:
+Le pagine usano servizi HTTP per funzionalità; `ApiService` resta disponibile
+per i moduli che lo utilizzano. Le richieste passano dall'URL configurato in
+`environment.apiUrl`, normalmente `/api`, e dal reverse proxy Docker.
+
+Esempio d'uso di `ApiService`:
 
 ```typescript
 import { ApiService } from '@app/services/api.service';
@@ -317,11 +375,17 @@ export class UsersComponent {}
 - `autoprefixer` ^10.6.0
 - `postcss` ^8.5.0
 
-## 🔄 Prossimi passi
+## Stato e limiti delle integrazioni
 
-- [ ] Integrare ApexCharts per grafici
-- [ ] Aggiungere pagina Utenti
-- [ ] Aggiungere modulo Form (reattivi)
-- [ ] Implementare autenticazione
-- [ ] Aggiungere notifiche/toast
-- [ ] Responsive mobile menu per sidebar
+- Il ciclo ordini include spedizione standard, banco cassa e ritiro in showroom.
+- Fatture e note di credito hanno generazione PDF/XML e workflow applicativo di
+  trasmissione SDI.
+- Per l'invio reale serve configurare un `ISdiTransmissionProvider` di
+  produzione; il provider locale è solo simulato e quello predefinito fuori da
+  Development non trasmette.
+- Gli esiti SDI non vengono acquisiti automaticamente da un servizio esterno.
+- Regimi fiscali speciali (bollo, ritenute, casse previdenziali, split payment
+  ed esigibilità IVA) non sono implementati.
+
+Per lo stato complessivo dei moduli, API, persistenza, test e attività aperte
+consultare [Stato di avanzamento architetturale](STATO_AVANZAMENTO_ARCHITETTURALE.md).

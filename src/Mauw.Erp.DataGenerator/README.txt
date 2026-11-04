@@ -80,6 +80,10 @@ update -> seed, non migrare in-place il vecchio dataset.
 Il generatore non emette note di credito né pagamenti: le fatture sintetiche
 restano NotTransmitted e non costituiscono documenti accettati dallo SDI. I
 test verificano che il seed non crei note, compensazioni o pagamenti fittizi.
+Il generatore non simula fatture passive, pagamenti a fornitori o rimborsi:
+questa suite misura vendite, stock e documenti attivi, non il ciclo passivo.
+Anche i database con documenti passivi già presenti vengono rifiutati come non
+vuoti; il seed non li sovrascrive né li integra.
 
 Non conservare password nel repository o nella cronologia della shell.
 Impostare MAUW_LOADTEST_CONNECTION nel proprio secret manager/ambiente:
@@ -204,7 +208,9 @@ Le quote sono applicate a pezzi interi; arrotondamenti e ultimo centinaio
 incompleto possono produrre piccoli scostamenti, riportati nel riepilogo.
 Il fallato non viene rivenduto come merce commerciale e resta separato.
 I movimenti distinguono carichi, vendite, resi al fornitore e fallati.
-Ogni vendita genera ordine, spedizione, DDT e fattura con le stesse righe e totali.
+Ogni vendita genera un ordine e una fattura con le stesse righe e totali;
+una vendita su cinque simula il ritiro in showroom senza DDT, le altre
+percorrono la spedizione standard con DDT.
 I numeri fattura simulati seguono FAT-AAAAmm-NNNNN con progressivo mensile
 contiguo; la generazione reale usa un lock transazionale per evitare collisioni
 e buchi.
@@ -215,10 +221,12 @@ pagamenti registrati; le fatture emesse nello scenario vengono confermate
 internamente dopo il calcolo fiscale.
 Le fatture simulate restano NotTransmitted e non hanno metadati di storage,
 perche il generatore non carica XML su S3/MinIO e non simula il canale SDI.
-Gli ordini generati percorrono il ciclo Confermato -> Prelievo -> Imballaggio
--> Spedito -> Completato; le righe della spedizione collegano le quantita evase
-alle righe d'ordine e il DDT rappresenta la spedizione integrale. I dati
-di vettore e tracking sono sintetici e servono soltanto a esercitare il ciclo.
+Gli ordini con spedizione percorrono il ciclo Confermato -> Prelievo ->
+Imballaggio -> Spedito -> Completato; le righe della spedizione collegano le
+quantita evase alle righe d'ordine e il DDT rappresenta la spedizione integrale.
+Gli ordini con ritiro in showroom passano da Confermato a Completato senza
+prelievo, imballaggio o DDT. I dati di vettore e tracking sono sintetici e
+servono soltanto a esercitare il ciclo di spedizione.
 Gli ordini sintetici di liquidazione stagionale includono una nota interna
 fittizia; gli altri ordini lasciano il campo facoltativo vuoto. Il costo
 spedizione sintetico resta a zero: il generatore non inventa un importo o

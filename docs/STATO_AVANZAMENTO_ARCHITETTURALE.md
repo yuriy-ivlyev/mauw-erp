@@ -1,20 +1,25 @@
-# Mauw ERP — Stato di avanzamento architetturale e funzionale
+# Mauw ERP — Stato architetturale e funzionale
 
-ERP B2B Pronto Moda Wholesale «mauw». Documento di riferimento (*single source of truth*) per riprendere lo sviluppo in una nuova sessione.
-
-| | |
-|---|---|
-| Data rilevazione | 2026-10-31 |
-| Branch / ultimo commit | `develop` / `0541704` |
-| Stato working tree | **Non committato**: 41 file modificati + 22 elementi non tracciati (rettifica pre-SDI, XML FatturaPA, audit, token `xmin`, relative migrazioni e test). Vedi §6. |
-| Metodo | Dati ricavati dal codice e da test/build eseguiti il 2026-10-31, non da documentazione precedente. |
+ERP B2B Pronto Moda Wholesale «mauw». Rilevazione aggiornata al **2026-11-04**,
+basata sull'implementazione presente e sui test mirati recenti; non descrive un
+particolare branch o stato Git.
 
 ## Sintesi esecutiva
 
-- Il ciclo **ordine → evasione/DDT → fattura → rettifica pre-SDI → XML FatturaPA** è implementato end-to-end, transazionale e coperto da test (anche su PostgreSQL reale via Testcontainers).
-- Il modulo **Acquisti è già implementato** (ordini fornitore, DDT fornitore con upload su S3, carico magazzino, riconciliazione, resi): non è un work item da zero (vedi §2.7 e §5).
-- **Manca il collegamento con lo SDI**: il dominio modella `SdiStatus`, ma nessun codice trasmette o fa avanzare lo stato oltre `NotTransmitted`. Oggi ogni fattura è quindi sempre rettificabile.
-- Test backend: **1244 verdi su 1246** (1 ignorato, 1 timeout infrastrutturale transitorio che passa in isolamento). Test frontend: **257 verdi su 260**, 3 falliti per spec obsolete preesistenti. Build Angular riuscita con warning di budget.
+- Vendite, banco cassa, ordini, magazzino, DDT e acquisti sono moduli
+  implementati; il ritiro in showroom completa un ordine confermato senza
+  prelievo, imballaggio o DDT, ma registra lo scarico delle giacenze.
+- Fatture, pagamenti, partitario cliente, note di credito, PDF e generazione
+  XML FatturaPA/TD04 sono integrati nei flussi applicativi.
+- Il ciclo passivo operativo registra fatture fornitori, spese e rimborsi con
+  allegati, categorie, approvazione e pagamenti parziali. Non è contabilità
+  generale né liquidazione IVA.
+- Il workflow SDI valida e archivia l'XML e usa `ISdiTransmissionProvider`.
+  Development usa un provider simulato; negli altri ambienti il provider
+  predefinito è non configurato. Non è quindi disponibile un collegamento SDI
+  reale pronto per la produzione, né l'acquisizione automatica degli esiti.
+- Il DataGenerator rimane opzionale e produce dati solo su database dedicati
+  `*_loadtest`; include sia ordini spediti sia ritiri in showroom.
 
 ---
 
@@ -40,10 +45,10 @@ Soluzione a livelli (`MauwErp`): `Mauw.Erp.Domain` → `Contracts` → `Applicat
 ### 1.2 Principi architetturali
 
 1. **DDD / monolite modulare.** Aggregati con invarianti nel dominio (`Order`, `Invoice`, `Shipment`, `StockItem`, `SupplierPurchaseOrder`). Le transizioni di stato sono metodi dell'aggregato (`Order.Confirm`, `Ship`, `BeginAdjustment`, `Invoice.SyncFromOrder`…), non assegnazioni di proprietà.
-2. **Persistenza transazionale atomica.** Ogni flusso che tocca documento, magazzino e PDF/XML è un'unica transazione (`IUnitOfWork.BeginTransactionAsync` … `CommitAsync`/`RollbackAsync`). Isolamento:
+2. **Persistenza transazionale.** I flussi locali che modificano documenti e magazzino usano `IUnitOfWork` e transazioni PostgreSQL. Le integrazioni esterne non partecipano a una transazione distribuita; i flussi SDI compensano gli errori con rollback e pulizia dello storage dove possibile. Isolamento:
    - `Serializable`: conferma ordine, vendita cassa, spedizione, carico DDT fornitore;
-   - `ReadCommitted` + **advisory lock** PostgreSQL (`pg_advisory_xact_lock`): generazione fattura, rettifica pre-SDI, numerazione ordini/fatture.
-3. **Flussi sincroni.** Nessun worker asincrono né outbox: la tabella `outbox_messages` introdotta da `AddOrderFulfillmentAndOutbox` è stata **rimossa** da `RemoveOrderOutboxAndAddPaymentInfo`. PDF e XML sono **derivati on-demand dallo stato persistito** (non sono salvati); nei flussi critici la loro generazione è verificata *dentro* la transazione e un errore provoca il rollback completo.
+   - `ReadCommitted` + **advisory lock** PostgreSQL (`pg_advisory_xact_lock`): generazione documenti, rettifica pre-SDI e numerazioni concorrenti.
+3. **Flussi sincroni.** Nessun worker asincrono né outbox: la tabella `outbox_messages` introdotta da `AddOrderFulfillmentAndOutbox` è stata rimossa da `RemoveOrderOutboxAndAddPaymentInfo`. I PDF sono generati on-demand; gli XML trasmessi sono archiviati nello storage SDI e i relativi metadati persistiti.
 4. **Backend-driven UI (HATEOAS).** `OrderDto` espone `PermittedActions` (azione, etichetta, endpoint, metodo, stile, dialogo richiesto), `IsReadOnly`, `StatusDescription`, `CanEditInvoice`, `IsUnderAdjustment`, `InvoiceSdiStatus`. La logica è in `OrderPermittedActionsPolicy`; il frontend esegue `postAction(action)` senza replicare le regole di stato.
 5. **Result pattern.** `OperationResult<T>` (applicazione), `AccountingResult<T>` (contabilità), `OrderWorkflowResult` / `InvoiceWorkflowResult` (dominio): niente eccezioni per input invalidi o stati non ammessi.
 6. **Contabilità italiana centralizzata.** `Mauw.Erp.Domain.Services.ItalianAccountingCalculator` (registrato via DI, puro, deterministico, senza I/O) è l'unica fonte di calcolo: `decimal`, `MidpointRounding.AwayFromZero`, `PrezzoTotale` di riga a 2 decimali, prezzi unitari fino a 8, **IVA calcolata una sola volta per gruppo `(AliquotaIVA, Natura)`**, mai per riga. Sconti composti solo in `CombineDiscounts`. UI e PDF non ricalcolano.
@@ -64,17 +69,20 @@ Soluzione a livelli (`MauwErp`): `Mauw.Erp.Domain` → `Contracts` → `Applicat
 
 ### 2.2 Vendite e ordini
 
-Flusso `StandardShipping` (ordine B2B con evasione):
+Flusso `StandardShipping` (ordine B2B con evasione) e chiusura alternativa per
+ritiro diretto:
 
 ```text
 Draft ─Confirm─▶ Confirmed ─StartPicking─▶ Picking ─Ship─▶ Shipped | PartiallyShipped ─Complete─▶ Completed
+                         └─CompleteShowroomPickup───────────────────────────────────────────────▶ Completed
   │ credito oltre fido ▶ PendingApproval ─Approve─▶ Confirmed
   └ Cancel / OnHold / Resume / CancelRemainingLines
 ```
 
-- **Creazione bozza** (`ordini-nuovo.component.ts`): ricerca varianti (`products.searchVariants` con `availableOnly=true`, solo varianti con giacenza disponibile), scelta **tipologia evasione** `StandardShipping` vs `CashDesk`, **note interne persistite** (`orders.internal_notes`), spedizione con aliquota/Natura espliciti, anteprima totali dal backend.
+- **Creazione bozza** (`ordini-nuovo.component.ts`): ricerca varianti (`products.searchVariants` con `availableOnly=true`), scelta iniziale `StandardShipping` o `CashDesk`, note interne e spese di spedizione classificate, anteprima totali dal backend.
 - **Numerazione ordine**: `ORD-MMyyyy-NNN` (`PRV-`/`WEB-` per preventivi/ordini web), calcolata sotto advisory lock sul prefisso.
 - **Conferma**: `ConfirmOrderAsync` (Serializable) imposta il magazzino di evasione predefinito, applica `CustomerCreditPolicy` (eventuale `PendingApproval`), **riserva** la giacenza.
+- **Ritiro in showroom**: da `Confirmed`, l'azione `CompleteShowroomPickup` consuma le riserve e registra i movimenti `ShowroomSale`; non crea `Shipment` o DDT e non richiede un operatore di magazzino. L'ordine salvato assume `FulfillmentType.ShowroomPickup`.
 - **Dettaglio guidato dal backend** (`order-detail.component.ts`): bottoni dalle `PermittedActions`, `IsReadOnly`, badge di stato (`StatusDescription`), dialoghi dichiarati dal backend (`CancelReason`, `ShipmentDetails`, `PaymentDetails`).
 - **Ruoli**: creazione ordine `Admin`/`Sales`; dettaglio anche `Warehouse` e `Accounting`.
 
@@ -99,13 +107,47 @@ Draft ─Confirm─▶ Confirmed ─StartPicking─▶ Picking ─Ship─▶ Shi
 - **Magazzino**: `StockItem` (`QuantityOnHand`, `QuantityReserved`, costo unitario, **token di concorrenza `xmin`**), `StockMovement` con motivi `SupplierReceipt`, `ShowroomSale`, `OrderShipment`, `InternalTransfer`, `CustomerReturn`, `SupplierReturn`, `InventoryAdjustment`, `OrderAdjustment`; tipi di magazzino Standard/Defective/Consignment/Subcontractor/Transit; trasferimenti; export giacenze CSV/PDF; **query di riconciliazione** sui movimenti ambigui (coppie `(WarehouseId, VariantId)`).
 - **DDT manuali** (`/api/v1/ddts`, pagine `ddt/*`) restano disponibili, con movimentazione di stock e rollback atomico.
 
-### 2.5 Fatturazione e rettifica pre-SDI (FatturaPA 1.2.3 FPR12)
+### 2.5 Fatturazione, rettifica e SDI (FatturaPA 1.2.3 FPR12)
 
-**Generazione.** `POST /api/v1/invoices/from-order/{orderId}` (policy `Billing`) richiede un ordine `Completed`; genera **una fattura per ordine** (garantito da advisory lock `invoice-order:{id}` + controllo applicativo; l'indice su `OrderId` **non** è univoco). Numero `FAT-{yyyyMM}-{NNNNN}` con verifica di contiguità; fattura già confermata (`ConfirmedAt`). Pagamenti manuali singoli o in batch (`/payments`, `/payments/batch`), con residuo aggiornato e maturazione provvigioni al saldo; `CreditNoteOffset` registra la nota sorgente e ne scala il credito residuo in modo atomico. Note di credito, righe «solo fatturazione» e spese di spedizione esplicite nel castelletto.
+**Generazione fatture.** `POST /api/v1/invoices/from-order/{orderId}` (policy
+`Billing`) richiede un ordine `Completed`; genera una fattura per ordine con
+numero `FAT-{yyyyMM}-{NNNNN}` e progressivo mensile contiguo. Il flusso usa
+advisory lock e verifica applicativa. La fattura è confermata alla creazione.
+Il PDF è generato alla richiesta; l'XML FPR12 TD01 è costruito dal backend e
+validato contro lo schema XSD prima della trasmissione.
 
-**Estratto cliente.** `GET /api/v1/contacts/{id}/statement` aggrega on-demand fatture confermate, note di credito e pagamenti con query EF Core `AsNoTracking`; non esiste una tabella movimenti né una migrazione dedicata. Le righe NC espongono il solo credito residuo non allocato: la quota già applicata è rappresentata dal pagamento `CreditNoteOffset`, evitando il doppio conteggio nel saldo progressivo.
+**Pagamenti.** Sono disponibili registrazione singola e batch (`/payments`,
+`/payments/batch`), aggiornamento del residuo e maturazione delle provvigioni al
+saldo. `CreditNoteOffset` collega il pagamento alla nota sorgente e ne scala il
+credito residuo in modo atomico. `Payment.PaymentDate` viene normalizzata a UTC
+anche quando l'API riceve un `DateTime` senza fuso, in coerenza con
+`timestamp with time zone` di PostgreSQL.
 
-**Stato SDI** (`SdiStatus`): `NotTransmitted`, `Pending`, `Transmitted`, `Accepted`. Guardie: `IsSdiSubmitted` (≥ `Transmitted` ⇒ contenuto congelato), `Invoice.CanBeAdjustedBeforeSdi` (solo `NotTransmitted`). Le righe legacy con `SdiSubmittedAt` valorizzato risultano `Transmitted`.
+**Estratto cliente.** `GET /api/v1/contacts/{id}/statement` aggrega on-demand
+fatture confermate, note di credito e pagamenti con query EF Core `AsNoTracking`;
+non esiste una tabella movimenti né una migrazione dedicata. Le righe NC
+espongono il solo credito residuo non allocato: la quota già applicata è
+rappresentata dal pagamento `CreditNoteOffset`, evitando il doppio conteggio nel
+saldo progressivo.
+
+**Note di credito.** Una TD04 può essere emessa solo per fatture `Transmitted`
+o `Accepted`. La UI mostra la CTA in questi stati; il backend ripete il
+controllo, valida righe e importi residui, permette il rientro fisico opzionale
+e aggiorna lo stock nella stessa operazione. Sono supportati PDF, generazione
+XML TD04 e archiviazione/trasmissione SDI; il credito allocato compare nel
+partitario come pagamento `CreditNoteOffset`.
+
+**Workflow SDI.** `SdiStatus` comprende `NotTransmitted`, `Pending`,
+`Transmitted`, `Accepted`. La trasmissione di fatture e note di credito valida
+l'XML, lo archivia via `ISdiDocumentStorage`, invoca
+`ISdiTransmissionProvider` e persiste i metadati/audit dell'invio. In
+Development viene registrato `LocalOrSimulatedSdiTransmissionProvider`, che
+simula l'invio; fuori da Development il provider predefinito è
+`UnconfiguredSdiTransmissionProvider` e rifiuta la trasmissione. Non è presente
+un connettore SDI di produzione né l'acquisizione automatica delle ricevute e
+degli stati successivi. `IsSdiSubmitted` congela i contenuti da `Transmitted`;
+la rettifica pre-SDI è ammessa solo per fatture `NotTransmitted`. Le righe
+legacy con `SdiSubmittedAt` valorizzato risultano `Transmitted`.
 
 **Rettifica pre-SDI** (ordine resta `Completed` con `IsUnderAdjustment`):
 
@@ -126,11 +168,21 @@ Le azioni `ReopenForAdjustment` / `SyncAndFinalizeInvoice` compaiono nelle `Perm
 - **Errori espliciti, nessuna Natura inventata**: aliquota 0 senza Natura, Natura con aliquota > 0, Natura incompatibile con l'area del cliente estero, dati parte mancanti (tutti i problemi vengono elencati).
 - **Validazione XSD ufficiale** (`Schema_VFPR12_v1.2.3.xsd`, risorsa embedded nel progetto test; `xmldsig` sostituito da uno stub).
 
+**XML note di credito**: il builder TD04 usa le righe e le classificazioni
+esplicite della nota, senza ricavare aliquote medie. Il download è disponibile
+da `/api/v1/credit-notes/{id}/xml`; per documenti trasmessi viene restituito
+l'XML archiviato.
+
 **Audit trail** (`document_audit_entries`): `DocumentType`, `DocumentId`, `Action`, `Note` (≤ 500), `Details` (≤ 4000), `UserId`, `UserName`, `OccurredAtUtc`; append-only.
 
 ### 2.6 Anagrafiche e impostazioni
 
-Contatti con profili cliente/fornitore/agente (provvigioni), indirizzi, persone, blocco cliente, assegnazione cliente–agente, paesi, **validazione P.IVA via VIES**, **autocomplete indirizzi** (Google Places → fallback Photon), impostazioni azienda (sedi, loghi), dashboard analitiche (`Admin`).
+Contatti con profili cliente/fornitore/agente (provvigioni), indirizzi, persone,
+blocco cliente, assegnazione cliente–agente, paesi, validazione P.IVA via VIES,
+autocomplete indirizzi (Google Places → fallback Photon) e impostazioni azienda
+(sedi, loghi e dati fattura). Il partitario cliente è aggregato dall'API e
+visualizzato tramite `CustomerStatementComponent`, condiviso tra dettaglio e
+modifica anagrafica. Dashboard analitiche disponibili a `Admin`.
 
 ### 2.7 Acquisti e carico fornitori (già implementato)
 
@@ -143,15 +195,51 @@ Contatti con profili cliente/fornitore/agente (provvigioni), indirizzi, persone,
 | Conferma carico | `SupplierDeliveryNoteService.ConfirmAsync` (Serializable): valida l'intero documento, incrementa la giacenza, imposta il costo unitario, registra `SupplierReceipt`, aggiorna l'ordine fornitore |
 | Frontend | `acquisti/ordini-fornitore`, `acquisti/ddt-fornitore`, wizard di carico (ruoli `Admin`/`Warehouse`) |
 
-### 2.8 Mappa API principale
+### 2.8 Ciclo passivo operativo
 
-`/api/v1/`: `orders` (incl. `fulfillment-queue`, `ship`, `reopen-adjustment`, `adjustment-lines`, `sync-invoice`), `cassa/sessions`, `invoices`, `ddts`, `inventory`, `products`, `contacts`, `warehouses`, `price-lists`, `settings/price-formula`, `settings/company`, `supplier-delivery-notes`, `geo`, `lookups`, `dashboard`. Eccezioni al prefisso `v1`: gli ordini fornitore sono solo su `/api/supplier-purchase-orders`; i DDT fornitore e le giacenze sono esposti sia su `/api/...` sia su `/api/v1/...`.
+- `PayableDocument` distingue fattura fornitore e rimborso; le righe conservano
+  gli importi e la classificazione IVA riportati nel documento sorgente, oltre a
+  categoria, centro di costo/progetto e segnalazione `AssetCandidate`.
+- Gli allegati PDF/PNG/JPEG sono archiviati su S3. Bozza, invio in approvazione,
+  approvazione/rifiuto e pagamenti parziali sono transizioni auditabili con
+  controllo di concorrenza.
+- Le liste di fatture passive e rimborsi sono separate dalle schermate di
+  creazione/dettaglio; ricerca, filtri e pagina vengono preservati al ritorno
+  dalla schermata documento.
+- Le fatture passive richiedono un fornitore attivo e il numero documento;
+  l'indice impedisce duplicati per fornitore, numero e data. I rimborsi sono
+  associati all'utente autenticato e visibili al richiedente e ai ruoli
+  `Admin`/`Accounting`.
+- La registrazione non produce movimenti di magazzino: i DDT fornitore restano
+  la fonte dell'entrata merce. Gli importi sono acquisiti dalla fattura, non
+  ricalcolati. `AssetCandidate` è solo una segnalazione per il commercialista:
+  non esistono registro cespiti o ammortamenti automatici.
+- Perimetro non incluso: contabilità generale, registri/liquidazioni IVA,
+  fatture passive abbinate automaticamente a ordini/DDT e paghe.
+
+### 2.9 Mappa API principale
+
+`/api/v1/`: `orders` (incl. `fulfillment-queue`, `ship`,
+`complete-showroom-pickup`, rettifica pre-SDI), `cassa/sessions`, `invoices`
+(pagamenti, PDF/XML, trasmissione singola e batch), `credit-notes` (preview,
+emissione, dettaglio, XML e trasmissione; il PDF è servito dall'endpoint
+`invoices/{id}/pdf`), `fiscal-documents` (invio batch), `ddts`,
+`inventory`, `products`, `contacts` (incl. `/{id}/statement`), `warehouses`,
+`price-lists`, `settings`, `supplier-delivery-notes`, `payables` e
+`payables/my-reimbursements`, `geo`, `lookups` e `dashboard`. Le fatture passive
+sono riservate ad `Admin`/`Accounting`; i rimborsi personali sono accessibili
+ai quattro ruoli applicativi. Il ciclo passivo non genera movimenti stock.
+Eccezioni al prefisso `v1`: gli ordini fornitore sono solo su
+`/api/supplier-purchase-orders`; i DDT fornitore e le giacenze sono esposti sia
+su `/api/...` sia su `/api/v1/...`.
 
 ---
 
 ## 3. Stato del database e migrazioni EF Core
 
-PostgreSQL 16, **43 tabelle** + `__EFMigrationsHistory`, 2 sequenze (`shipment_document_number_seq`, `supplier_purchase_order_number_seq`).
+PostgreSQL 16; schema gestito da EF Core e da migrazioni versionate in
+`src/Mauw.Erp.Infrastructure/Migrations`. Le sequenze applicative includono
+`shipment_document_number_seq` e `supplier_purchase_order_number_seq`.
 
 | Area | Tabelle |
 |---|---|
@@ -160,9 +248,10 @@ PostgreSQL 16, **43 tabelle** + `__EFMigrationsHistory`, 2 sequenze (`shipment_d
 | Magazzino | `warehouses`, `stock_items` (token `xmin`), `stock_movements` |
 | Ordini e spedizioni | `orders`, `order_items`, `shipments`, `shipment_lines`, `ddt_documents`, `ddt_items` |
 | Fatturazione e audit | `invoices`, `invoice_items`, `payments`, `credit_notes`, `document_audit_entries` |
+| Ciclo passivo | `payable_documents`, `payable_document_lines`, `payable_document_payments` |
 | Acquisti | `supplier_purchase_orders`, `supplier_purchase_order_lines`, `supplier_delivery_notes`, `supplier_delivery_note_lines`, `supplier_article_mappings`, `supplier_return_drafts`, `supplier_return_draft_lines` |
 
-### Migrazioni (14, in ordine)
+### Migrazioni (20, inclusa la baseline)
 
 | # | Migrazione | Contenuto |
 |---|---|---|
@@ -178,81 +267,91 @@ PostgreSQL 16, **43 tabelle** + `__EFMigrationsHistory`, 2 sequenze (`shipment_d
 | 10 | `20261030072032_AddInvoicePaymentMetadata` | Metodo/riferimento sui pagamenti (nullable, storico preservato) |
 | 11 | `20261030130229_AddInvoiceConfirmationWorkflow` | `invoices.confirmed_at` (valorizzato dalla data fattura per lo storico) |
 | 12 | `20261030165538_AddInvoiceOrderSynchronization` | `is_billing_only`, `is_excluded_from_invoice`, `sdi_submitted_at`, spedizione sulla fattura |
-| 13 | `20261030232428_AddStockItemXminConcurrencyToken` | Token di concorrenza `xmin` su `stock_items` (nessuna operazione DDL: colonna di sistema) — **non tracciata in git** |
-| 14 | `20261031114600_AddPreSdiOrderAdjustment` | `invoices.sdi_status`, `orders.is_under_adjustment/adjustment_started_at/adjustment_started_by`, tabella `document_audit_entries` con indice — **non tracciata in git** |
+| 13 | `20261030232428_AddStockItemXminConcurrencyToken` | Token di concorrenza `xmin` su `stock_items` (colonna di sistema) |
+| 14 | `20261031114600_AddPreSdiOrderAdjustment` | `invoices.sdi_status`, `orders.is_under_adjustment/adjustment_started_at/adjustment_started_by`, tabella `document_audit_entries` con indice |
 | 15 | `20261031144416_AddInvoiceSdiStorageMetadata` | Metadati nullable dell'XML fattura archiviato e della trasmissione |
 | 16 | `20261031190947_AddCreditNoteIssuance` | Emissione e righe fiscali delle note di credito |
 | 17 | `20261101063125_AddCreditNoteSdiStorageMetadata` | Metadati dell'XML nota di credito e della trasmissione |
 | 18 | `20261101175138_AddCreditNoteAllocation` | `credit_notes.allocated_amount`, `payments.source_credit_note_id` nullable con FK `RESTRICT` |
+| 19 | `20261104131620_AddPayableDocuments` | Documenti passivi, righe, pagamenti, allegati, stati e audit |
+| 20 | `20261104133730_PayableDocumentInvoiceNumberScopedByDate` | Unicità numero fattura fornitore per fornitore e data documento |
 
-Note operative: i database locali creati prima del baseline vanno ricreati o riallineati nella `__EFMigrationsHistory`. Le migrazioni si creano/applicano **solo** con `dotnet ef migrations add` / `dotnet ef database update`; non riscrivono importi o classificazioni fiscali storiche (le righe storiche nascono `NotTransmitted` e non in rettifica).
-
----
-
-## 4. Stato della suite di test e delle verifiche
-
-Esecuzione del 2026-10-31 (Docker disponibile per Testcontainers).
-
-### 4.1 Backend (.NET)
-
-`dotnet test src\Mauw.Erp.UnitTests\Mauw.Erp.UnitTests.csproj`
-
-| Esito | Numero |
-|---|---|
-| Totale | 1246 |
-| Superati | **1244** |
-| Ignorati | 1 — `SupplierDocumentStorageTests.OriginalBytesAndContentTypeRoundTripThroughS3AndAreDeleted` (richiede `MAUW_TEST_S3_ENDPOINT/ACCESS_KEY/SECRET_KEY`) |
-| Falliti | 1 — `OrderNumberPostgreSqlTests.ConcurrentStandardAndCassaOrderNumberAssignmentsAreUniqueAndSequential`: `NpgsqlException: The operation has timed out` durante `EnsureCreated` (connessione al container, 33 min). **Non riproducibile**: riesecuzione isolata 2/2 verdi. Da trattare come flakiness infrastrutturale (il run completo ha richiesto 43 min). |
-
-Copertura per area (classi principali):
-
-- **Contabilità** — `ItalianAccountingCalculatorTests`, `DiscountCompositionTests`, `DocumentAccountingServiceTests`, `CommercialDocumentAccountingTests`: scorpori (23,00×5; 94,18×5), due righe da 0,03 al 22%, quantità frazionarie, sconti composti, midpoint, overflow, immutabilità.
-- **FatturaPA** — `FatturaPaInvoiceXmlBuilderTests` (20): validazione contro l'**XSD ufficiale**, fattura mista 22/10/0%, cliente tedesco (N3.2), svizzero (N3.1, CAP segnaposto), USA senza P.IVA, UK con CAP alfanumerico, **Grecia `EL`**, determinismo, errori espliciti; `FatturaPaXmlMapperTests`.
-- **Flussi su PostgreSQL reale** — `OrderPreSdiAdjustmentPostgreSqlTests` (13: blocco con fattura `Pending`/`Transmitted`, audit, delta di stock, giacenza insufficiente, sync con stesso id/numero, cliente estero, rollback su errore XML, spedizione residua non riapribile), `DdtAndCassaStockMovementPostgreSqlTests` (14: DDT con PDF, **spedizione parziale con DDT sequenziali**, vendita cassa, rollback su errori di salvataggio/PDF, fido), `InvoiceGenerationPostgreSqlTests`, `OrderNumberPostgreSqlTests`, `InventoryStockQueryPostgreSqlTests`, `PriceListPostgreSql/PriceFormulaPostgreSql`, `SupplierDeliveryNote/PurchaseOrderPostgreSqlTests`, `OrderDraftItemRemovalPostgreSqlTests`.
-- **Dominio** — `OrderAdjustmentTests` (15), `OrderLifecycleTests`, `OrderShippingChargeTests`, `StockMovementTests`, `PriceFormula*`, `PriceListResolverTests`.
-- **Sicurezza** — `EndpointAuthorizationMatrixTests`, `CostVisibility*`, `EntraRoleClaimsTests`, `StockMovementRoleRestrictionTests`.
-- **Policy UI** — `OrderPermittedActionsPolicyTests`.
-- **Migrazioni** — `InitialCreateBaselineMigrationTests`, `AddVariantForeignKeysMigrationTests`.
-- **Generatore dati** — `DataGenerator/SimulationTests`, `GeneratorSafetyTests` (solo database `*_loadtest`, conferme esplicite, credenziali dedicate); `README.txt` aggiornato fino a `AddPreSdiOrderAdjustment`.
-- **PDF** — `InvoicePdfGeneratorTests`, `InventoryStockPdfGeneratorTests`.
-
-### 4.2 Frontend (Angular)
-
-`ng test --watch=false --browsers=ChromeHeadless`: **260 specifiche, 257 verdi, 3 fallite** (tutte **preesistenti e non correlate** al lavoro pre-SDI: i file non risultano modificati):
-
-| Spec | Causa |
-|---|---|
-| `listini.component.spec.ts` — «creates a global rule without inventing an ID or a target» | La spec usa `minimumQuantity: 0.00000001`, ma il componente impone quantità minima intera ≥ 1 (coerente col vincolo DB `whole_minimum_quantity`): spec obsoleta |
-| `app.component.spec.ts` — «should have the 'web' title» | Spec scaffold di default (si aspetta `web`, il titolo è `Mauw ERP`) |
-| `app.component.spec.ts` — «should render title» | Spec scaffold di default (si aspetta `Hello, web`) |
-
-**Build**: `ng build` (produzione) completata con successo; unico warning: **bundle iniziale 981,08 kB oltre il budget di 819,20 kB (+161,88 kB)**. Componenti caricati in lazy: acquisti, inventario, dashboard, formula prezzi.
+Note operative: i database locali creati prima del baseline vanno ricreati o
+riallineati nella `__EFMigrationsHistory`. Le migrazioni si creano/applicano
+solo con `dotnet ef migrations add` / `dotnet ef database update`; non
+riscrivono importi o classificazioni fiscali storiche. `ShowroomPickup` è un
+nuovo valore dell'enum persistito come intero e non richiede una migrazione;
+la normalizzazione UTC di `PaymentDate` non modifica lo schema.
 
 ---
 
-## 5. Roadmap e prossimi passi
+## 4. Test e verifiche
 
-Priorità proposta, in ordine.
+La suite automatizzata copre dominio, servizi, API, persistenza PostgreSQL via
+Testcontainers, PDF/XML e componenti Angular. Per una verifica completa:
 
-| P | Attività | Stato / motivazione |
+```powershell
+dotnet test src\Mauw.Erp.UnitTests\Mauw.Erp.UnitTests.csproj
+Set-Location src\Mauw.Erp.Web
+npm run test -- --watch=false --browsers=ChromeHeadless
+npm run build
+```
+
+I test PostgreSQL richiedono Docker; il round-trip S3 è opzionale e richiede le
+variabili `MAUW_TEST_S3_ENDPOINT`, `MAUW_TEST_S3_ACCESS_KEY` e
+`MAUW_TEST_S3_SECRET_KEY`. I risultati aggregati cambiano tra esecuzioni e non
+sono riportati come stato permanente.
+
+Verifiche mirate del 2026-11-04 (non equivalenti a una suite completa):
+
+- 403 test .NET superati, inclusi test di dominio e PostgreSQL del ciclo
+  passivo, matrice autorizzazioni e presidio DataGenerator.
+- 7 test Angular superati per la pagina passiva e la navigazione filtrata per
+  ruolo.
+- `dotnet build` e `npm run build` completati; la build Angular segnala il
+  bundle iniziale oltre il budget configurato.
+- `dotnet ef migrations has-pending-model-changes` conferma che il modello è
+  allineato alle migrazioni.
+
+Le aree principali comprendono calcolo contabile e sconti composti, validazione
+XSD FatturaPA, rettifica pre-SDI, trasmissione simulata, note di credito,
+movimenti/resi di magazzino, acquisti, autorizzazioni e sicurezza dei costi.
+
+---
+
+## 5. Attività aperte e limiti
+
+| Priorità | Attività | Stato |
 |---|---|---|
-| **P0** | **Consolidare il working tree** | 41 file modificati e 22 non tracciati (incluse 2 migrazioni) non sono committati: committare, poi valutare la PR. |
-| **P0** | **Connettore trasmissione SDI** | Il dominio ha `MarkSdiPending/Transmitted/Accepted`, ma **nessun chiamante**: tutte le fatture restano `NotTransmitted` e rettificabili. Servono: provider/canale di invio, endpoint o servizio di transizione, ricezione notifiche (ricevuta di consegna, scarto, mancata consegna), **persistenza del file XML effettivamente inviato**, e blocco definitivo della rettifica dopo `Pending`/`Transmitted`. |
-| **P1** | **Automatismi fiscali anagrafica estera nel form ordini** | Oggi `ordini-nuovo`, `banco-cassa` e `order-detail` offrono tutta la lista di Nature **a scelta manuale**; l'incoerenza con il paese del cliente (N3.2 intra-UE / N3.1 extra-UE) emerge solo alla generazione dell'XML. Proporre/imporre la Natura in base al paese del cliente senza mai inventarla per documenti storici. |
-| **P1** | **XML per note di credito** | `GetInvoiceXmlAsync` gestisce solo fatture TD01; le note di credito hanno il PDF ma non l'XML (TD04). Servono righe e classificazioni esplicite (niente aliquota media su note multi-aliquota). |
-| **P1** | **Stabilizzare i test** | Correggere le 3 spec Angular obsolete; rendere robusti i test Testcontainers (timeout di connessione/`EnsureCreated`, durata della suite 43 min); rieseguire la suite completa. |
-| **P2** | **Estendere il modulo acquisti (già presente)** | Integrare un motore OCR/IA reale (oggi `parse` riceve un payload già strutturato); gestire le fatture passive; eseguire il test di round-trip S3 in CI (oggi saltato senza variabili d'ambiente). Estendere `SupplierPurchaseOrderPostgreSqlTests` (formato, prefisso, progressione, unicità sotto concorrenza). |
-| **P2** | **Hardening operativo** | Rendere `Program.cs` minimale (HttpClient, Swagger, CORS e migrazione all'avvio sono ancora inline); sostituire il CORS `AllowAll`; valutare un indice univoco su `invoices.order_id` (oggi solo lock + controllo applicativo); verificare la numerazione ordini `count + 1` in presenza di eliminazioni di bozze; ridurre il bundle iniziale Angular. |
-| **P3** | **Punti aperti dalle decisioni sui prezzi** | Sconto sul totale in fattura, accesso del magazziniere al documento di spedizione, ruolo `Accounting`, prezzi errati già fatturati (`docs/PRICE_CALCULATOR_DECISIONS.md`); rimozione del ruolo `Cashier` in Entra prima del rilascio. |
-| **P3** | **Regimi speciali** | Bollo, ritenute, casse previdenziali, split payment, esigibilità IVA: non implementati per scelta di perimetro. Un esportatore XML definitivo dovrà validare anche i controlli SDI aggiornati (i test aritmetici da soli non certificano la conformità). |
+| P0 | Provider SDI reale e acquisizione esiti | Il workflow, la validazione XML, lo storage e il provider simulato sono presenti; gli ambienti non-Development usano il provider non configurato. Non è integrato un canale reale né la ricezione di accettazioni/scarti. |
+| P1 | Hardening API | La policy CORS `AllowAll` e parte della configurazione DI/HTTP restano nel bootstrap API; definire origini per ambiente e continuare a spostare configurazione in extension methods. |
+| P1 | Verifica full-suite continuativa | I test mirati recenti sono verdi; la suite completa va rieseguita nell'ambiente CI/Docker per misurarne lo stato aggregato aggiornato. |
+| P1 | Abbinamento passivo a ordini/DDT | Le fatture passive sono registrabili, ma non hanno ancora riconciliazione automatica a ordini fornitore o DDT ricevuti. |
+| P1 | Report gestionale | Aggiungere report/export operativo di vendite, IVA per aliquota/Natura e costi passivi; non è un registro IVA ufficiale né una liquidazione. |
+| P2 | OCR documenti fornitori | Il DDT fornitore accetta payload OCR/IA già strutturati; non contiene un motore OCR né invia file a provider IA esterni. |
+| P2 | Test storage S3 in CI | Il test di round-trip richiede endpoint e credenziali temporanei dedicati. |
+| P2 | Cespiti e paghe | Le righe `AssetCandidate` sono solo segnalazioni. Registro cespiti/ammortamenti e gestione paghe restano fuori; i riepiloghi possono essere passati ai professionisti. |
+| P3 | Regimi fiscali speciali | Bollo, ritenute, casse previdenziali, split payment ed esigibilità IVA non fanno parte del perimetro corrente. |
 
 ---
 
-## 6. Avvertenze e guida alla ripresa
+## 6. Invarianti operative
 
-- **Working tree sporco**: la rettifica pre-SDI, l'`XML builder`, l'audit, `SdiStatus` e le migrazioni 13–14 esistono solo localmente. Verificare `git status` prima di creare nuove migrazioni.
-- **Regole non negoziabili** per qualunque modifica contabile: usare solo `ItalianAccountingCalculator`; `decimal` + `AwayFromZero`; IVA per gruppo `(aliquota, Natura)`; importi 2 decimali, prezzi unitari 8; valutare l'intero documento prima di mutare righe/totali; nessuna Natura di default su documenti storici.
-- **Invarianti da proteggere con test** quando si tocca il codice: formato e sequenza `OF-…` degli ordini fornitore; riconciliazione ristretta alle coppie `(WarehouseId, VariantId)`; propagazione della cancellazione e fallback di geocoding solo per guasti attesi (`AddressAndVatProviderTests`); un solo percorso canonico di validazione per request.
-- **UI**: tabelle sempre paginate (`<app-pagination>`), azioni con `TableActionButtonComponent`, pulsanti Nuovo con `AddActionButtonComponent`, eliminazioni sempre con conferma, ritorni con `BackButtonComponent` (`<button>`, mai link).
-- **Strumenti**: migrazioni con `dotnet ef migrations add` / `dotnet ef database update`; generatore di volume solo su database `*_loadtest` e da aggiornare (codice, test, `README.txt`) a ogni modifica di entità o flussi documentali.
-- **Comandi di verifica**: backend `dotnet test src\Mauw.Erp.UnitTests\Mauw.Erp.UnitTests.csproj` (richiede Docker); frontend da `src\Mauw.Erp.Web`: `npx ng test --watch=false --browsers=ChromeHeadless` e `npx ng build`.
+- Contabilità: usare `ItalianAccountingCalculator`, `decimal` e
+  `MidpointRounding.AwayFromZero`; IVA per gruppo `(aliquota, Natura)`;
+  importi a due decimali, prezzi unitari fino a otto; validare il documento
+  prima di mutare righe e totali. Non inventare Nature per documenti storici.
+- Ordini fornitore: mantenere `OF-{yyyyMMdd}-{sequenza:D6}` e
+  `supplier_purchase_order_number_seq`.
+- Riconciliazione: restringere le query alle coppie effettive
+  `(WarehouseId, VariantId)`.
+- Pagamenti: normalizzare le date a UTC prima della persistenza PostgreSQL.
+- Ciclo passivo: conservare gli importi IVA e i riferimenti come riportati nei
+  documenti ricevuti; la registrazione passiva non muove lo stock né calcola
+  ammortamenti. Gli importi non sostituiscono i registri ufficiali del
+  commercialista.
+- UI: tabelle paginate, componenti condivisi per paginazione/azioni/aggiunta,
+  conferma esplicita per eliminazioni e pulsante condiviso per tornare indietro.
+- Migrazioni: usare `dotnet ef migrations add` e `dotnet ef database update`.
+- DataGenerator: mantenerlo opzionale e isolato su database `*_loadtest`;
+  aggiornare implementazione, test e README quando cambiano flussi documentali.

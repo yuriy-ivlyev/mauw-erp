@@ -71,6 +71,7 @@ public sealed class AuthorizationMatrixHost : IAsyncLifetime
         services.AddCompanyBranding();
         services.AddImageStorage(builder.Configuration);
         services.AddSupplierDeliveryNotes();
+        services.AddPayableDocuments();
         services.AddApplicationServices();
         services.AddMemoryCache();
         services.AddHttpContextAccessor();
@@ -109,6 +110,7 @@ public sealed class AuthorizationMatrixHost : IAsyncLifetime
         _app.MapPriceFormulaEndpoints();
         _app.MapSupplierDeliveryNoteEndpoints();
         _app.MapSupplierPurchaseOrderEndpoints();
+        _app.MapPayableDocumentEndpoints();
         // Endpoint without any authorization metadata: it must fall under the fallback policy.
         _app.MapGet("/api/test/unmarked", () => Results.Ok());
         await _app.StartAsync();
@@ -142,6 +144,7 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
     private static readonly string[] AdminWarehouse = [Admin, Warehouse];
     private static readonly string[] AdminSales = [Admin, Sales];
     private static readonly string[] Billing = [Admin, Accounting, Sales];
+    private static readonly string[] AdminAccounting = [Admin, Accounting];
     private static readonly string[] AdminWarehouseSales = [Admin, Warehouse, Sales];
 
     public static TheoryData<string, string, string> Matrix()
@@ -314,6 +317,27 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
         Add("GET", $"/api/supplier-purchase-orders/{Id}", AdminWarehouse);
         Add("POST", "/api/supplier-purchase-orders", AdminWarehouse);
         Add("POST", $"/api/supplier-purchase-orders/{Id}/confirm", AdminWarehouse);
+
+        // Supplier payables and personal reimbursement submissions
+        Add("GET", "/api/v1/payables", AdminAccounting);
+        Add("GET", $"/api/v1/payables/{Id}", AdminAccounting);
+        Add("GET", $"/api/v1/payables/{Id}/attachment", AdminAccounting);
+        Add("POST", "/api/v1/payables", AdminAccounting);
+        Add("PUT", $"/api/v1/payables/{Id}", AdminAccounting);
+        Add("POST", $"/api/v1/payables/{Id}/attachment", AdminAccounting);
+        Add("POST", $"/api/v1/payables/{Id}/submit", AdminAccounting);
+        Add("POST", $"/api/v1/payables/{Id}/approve", AdminAccounting);
+        Add("POST", $"/api/v1/payables/{Id}/reject", AdminAccounting);
+        Add("POST", $"/api/v1/payables/{Id}/cancel", AdminAccounting);
+        Add("POST", $"/api/v1/payables/{Id}/payments", AdminAccounting);
+        Add("GET", "/api/v1/payables/my-reimbursements", All);
+        Add("POST", "/api/v1/payables/my-reimbursements", All);
+        Add("GET", $"/api/v1/payables/my-reimbursements/{Id}", All);
+        Add("PUT", $"/api/v1/payables/my-reimbursements/{Id}", All);
+        Add("POST", $"/api/v1/payables/my-reimbursements/{Id}/attachment", All);
+        Add("GET", $"/api/v1/payables/my-reimbursements/{Id}/attachment", All);
+        Add("POST", $"/api/v1/payables/my-reimbursements/{Id}/submit", All);
+        Add("POST", $"/api/v1/payables/my-reimbursements/{Id}/cancel", All);
 
         var data = new TheoryData<string, string, string>();
         foreach (var (method, path, roles) in rows)
@@ -497,8 +521,18 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
     private async Task<HttpStatusCode> SendAsync(string? role, string method, string path)
     {
         using var client = host.CreateClient(role);
+        var isAttachmentUpload = method == "POST"
+            && path.EndsWith("/attachment", StringComparison.Ordinal);
+        if (isAttachmentUpload)
+            path = $"{path}?version={Id}";
         using var request = new HttpRequestMessage(new HttpMethod(method), path);
-        if (method is "POST" or "PUT" or "PATCH")
+        if (isAttachmentUpload)
+        {
+            var multipart = new MultipartFormDataContent();
+            multipart.Add(new ByteArrayContent([]), "file", "test.pdf");
+            request.Content = multipart;
+        }
+        else if (method is "POST" or "PUT" or "PATCH")
             request.Content = new StringContent("{}", new MediaTypeHeaderValue("application/json"));
         using var response = await client.SendAsync(request);
         return response.StatusCode;

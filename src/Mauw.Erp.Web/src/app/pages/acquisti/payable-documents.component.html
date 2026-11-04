@@ -1,0 +1,378 @@
+<main class="mx-auto max-w-screen-2xl space-y-5 p-4 text-slate-800 sm:p-6">
+  <app-back-button (activated)="goBack()"></app-back-button>
+
+  <div *ngIf="errorMessage" role="alert" class="rounded-lg border border-red-300 bg-red-50 p-3 text-red-800">
+    {{ errorMessage }}
+  </div>
+  <div *ngIf="successMessage" role="status" aria-live="polite"
+    class="rounded-lg border border-green-300 bg-green-50 p-3 text-green-800">
+    {{ successMessage }}
+  </div>
+
+  <header class="flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <p class="text-sm text-slate-500">Acquisti</p>
+      <h1 class="text-2xl font-bold">
+        {{ editorMode ? (selected?.documentCode || kindLabel(kind)) : reimbursementsOnly ? 'Rimborsi spese' : 'Fatture passive e spese' }}
+      </h1>
+      <p class="mt-1 text-sm text-slate-600">
+        {{ editorMode
+          ? 'Documento operativo per approvazione e pagamento; non sostituisce la contabilità del commercialista.'
+          : 'Documenti operativi per approvazione e pagamento; non sostituiscono la contabilità del commercialista.' }}
+      </p>
+    </div>
+    <div *ngIf="!editorMode" class="flex gap-2">
+      <app-add-action-button *ngIf="canManageAll && !reimbursementsOnly"
+        label="Nuova fattura passiva" (activated)="startNew('SupplierInvoice')">
+      </app-add-action-button>
+      <app-add-action-button *ngIf="reimbursementsOnly"
+        label="Nuova richiesta rimborso" (activated)="startNew('ExpenseReimbursement')">
+      </app-add-action-button>
+    </div>
+  </header>
+
+  <section *ngIf="!editorMode && !reimbursementsOnly" class="rounded-xl border border-slate-200 bg-white p-4"
+    aria-label="Filtri documenti passivi">
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <label *ngIf="!reimbursementsOnly" class="grid gap-1 text-sm font-medium">
+        Cerca
+        <input [(ngModel)]="search" (keyup.enter)="applyFilters()" class="rounded border border-slate-300 p-2"
+          placeholder="Codice, numero fattura, fornitore o beneficiario" />
+      </label>
+      <label *ngIf="!reimbursementsOnly" class="grid gap-1 text-sm font-medium">
+        Tipo
+        <select [(ngModel)]="filterKind" class="rounded border border-slate-300 p-2">
+          <option value="">Tutti</option>
+          <option value="SupplierInvoice">Fattura fornitore</option>
+          <option value="ExpenseReimbursement">Rimborso</option>
+        </select>
+      </label>
+      <label class="grid gap-1 text-sm font-medium">
+        Stato
+        <select [(ngModel)]="filterStatus" class="rounded border border-slate-300 p-2">
+          <option value="">Tutti</option>
+          <option value="Draft">Bozza</option>
+          <option value="PendingApproval">In approvazione</option>
+          <option value="Approved">Approvato</option>
+          <option value="Rejected">Respinto</option>
+          <option value="Cancelled">Annullato</option>
+        </select>
+      </label>
+      <label class="grid gap-1 text-sm font-medium">
+        Dal
+        <input type="date" [(ngModel)]="dateFrom" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">
+        Al
+        <input type="date" [(ngModel)]="dateTo" class="rounded border border-slate-300 p-2" />
+      </label>
+    </div>
+    <div class="mt-3 flex justify-end">
+      <button type="button" (click)="applyFilters()"
+        class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">
+        Applica filtri
+      </button>
+    </div>
+  </section>
+
+  <section *ngIf="!editorMode" class="overflow-hidden rounded-xl border border-slate-200 bg-white"
+    aria-label="Elenco documenti passivi">
+    <div *ngIf="loading" role="status" class="p-6 text-center text-slate-500">Caricamento…</div>
+    <div *ngIf="!loading" class="overflow-x-auto">
+      <table class="w-full min-w-[950px] text-sm">
+        <thead class="border-b bg-slate-50 text-left text-slate-600">
+          <tr>
+            <th class="px-3 py-3">Documento</th>
+            <th class="px-3 py-3">Fornitore / beneficiario</th>
+            <th class="px-3 py-3">Data</th>
+            <th class="px-3 py-3">Scadenza</th>
+            <th class="px-3 py-3">Stato</th>
+            <th class="px-3 py-3">Pagamento</th>
+            <th class="px-3 py-3 text-right">Totale</th>
+            <th class="px-3 py-3 text-right">Residuo</th>
+            <th class="px-3 py-3 text-center">Apri</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <tr *ngFor="let document of documents">
+            <td class="px-3 py-3">
+              <span class="block font-semibold">{{ document.documentCode }}</span>
+              <span class="text-xs text-slate-500">{{ document.sourceDocumentNumber || kindLabel(document.kind) }}</span>
+            </td>
+            <td class="px-3 py-3">{{ document.supplierName || document.beneficiaryName || '—' }}</td>
+            <td class="whitespace-nowrap px-3 py-3">{{ document.documentDate | date:'dd/MM/yyyy' }}</td>
+            <td class="whitespace-nowrap px-3 py-3">{{ document.dueDate | date:'dd/MM/yyyy' }}</td>
+            <td class="px-3 py-3">
+              <span class="rounded-full px-2.5 py-1 text-xs font-semibold" [ngClass]="statusClass(document.status)">
+                {{ statusLabel(document.status) }}
+              </span>
+            </td>
+            <td class="px-3 py-3">{{ paymentStatusLabel(document.paymentStatus) }}</td>
+            <td class="whitespace-nowrap px-3 py-3 text-right">
+              {{ document.grossTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}
+            </td>
+            <td class="whitespace-nowrap px-3 py-3 text-right font-semibold">
+              {{ document.balanceDue | currency:'EUR':'symbol':'1.2-2':'it-IT' }}
+            </td>
+            <td class="px-3 py-3 text-center">
+              <button type="button" [attr.aria-label]="'Apri ' + document.documentCode"
+                class="font-semibold text-blue-700 underline hover:text-blue-900"
+                (click)="openDocument(document)">Apri</button>
+            </td>
+          </tr>
+          <tr *ngIf="!loading && documents.length === 0">
+            <td colspan="9" class="p-8 text-center text-slate-500">Nessun documento trovato.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <app-pagination *ngIf="!loading" [page]="currentPage" [pageSize]="pageSize"
+      [totalCount]="totalCount" (pageChange)="changePage($event)"
+      (pageSizeChange)="changePageSize($event)">
+    </app-pagination>
+  </section>
+
+  <section *ngIf="editorMode && editing" class="space-y-4 rounded-xl border border-blue-200 bg-white p-5"
+    aria-label="Bozza documento passivo">
+    <header>
+      <h2 class="text-lg font-bold">{{ selected ? 'Modifica bozza' : kindLabel(kind) }}</h2>
+      <p class="text-sm text-slate-600">
+        Inserire gli importi e la classificazione riportati sul giustificativo. Il gestionale non calcola ammortamenti.
+      </p>
+    </header>
+
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <label *ngIf="kind === 'SupplierInvoice'" class="grid gap-1 text-sm font-medium">
+        Fornitore
+        <select [(ngModel)]="supplierId" class="rounded border border-slate-300 p-2">
+          <option value="">Seleziona fornitore</option>
+          <option *ngFor="let supplier of suppliers" [value]="supplier.id">{{ supplier.businessName }}</option>
+        </select>
+      </label>
+      <label *ngIf="kind === 'SupplierInvoice'" class="grid gap-1 text-sm font-medium">
+        Numero documento fornitore
+        <input [(ngModel)]="sourceDocumentNumber" maxlength="100" class="rounded border border-slate-300 p-2" />
+      </label>
+      <p *ngIf="kind === 'ExpenseReimbursement'" class="self-end rounded bg-blue-50 p-2 text-sm text-blue-800">
+        Il rimborso viene intestato all'utente autenticato.
+      </p>
+      <label class="grid gap-1 text-sm font-medium">
+        Data documento
+        <input type="date" [(ngModel)]="documentDate" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">
+        Scadenza pagamento
+        <input type="date" [(ngModel)]="dueDate" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium sm:col-span-2">
+        Note
+        <input [(ngModel)]="notes" maxlength="2000" class="rounded border border-slate-300 p-2" />
+      </label>
+    </div>
+
+    <div class="space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold">Righe del documento</h3>
+        <app-add-action-button label="Aggiungi riga al documento" (activated)="addLine()"></app-add-action-button>
+      </div>
+      <article *ngFor="let line of draftLines; let index = index" class="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-4">
+        <label class="grid gap-1 text-sm font-medium sm:col-span-2">
+          Descrizione
+          <input [(ngModel)]="line.description" maxlength="500" class="rounded border border-slate-300 p-2" />
+        </label>
+        <label class="grid gap-1 text-sm font-medium">
+          Categoria
+          <select [(ngModel)]="line.category" class="rounded border border-slate-300 p-2">
+            <option *ngFor="let category of categories" [ngValue]="category.value">{{ category.label }}</option>
+          </select>
+        </label>
+        <label class="grid gap-1 text-sm font-medium">
+          Centro di costo
+          <input [(ngModel)]="line.costCenter" maxlength="100" class="rounded border border-slate-300 p-2" />
+        </label>
+        <label class="grid gap-1 text-sm font-medium">
+          Progetto / lavoro
+          <input [(ngModel)]="line.project" maxlength="100" class="rounded border border-slate-300 p-2" />
+        </label>
+        <label class="grid gap-1 text-sm font-medium">
+          Imponibile dalla fattura
+          <input type="number" min="0" step="0.01" [(ngModel)]="line.taxableAmount" class="rounded border border-slate-300 p-2" />
+        </label>
+        <label class="grid gap-1 text-sm font-medium">
+          Aliquota IVA
+          <input type="number" min="0" max="100" step="0.01" [(ngModel)]="line.vatRate"
+            class="rounded border border-slate-300 p-2" placeholder="Lascia vuoto se non indicata" />
+        </label>
+        <label *ngIf="line.vatRate === 0" class="grid gap-1 text-sm font-medium">
+          Natura IVA
+          <select [(ngModel)]="line.natureCode" class="rounded border border-slate-300 p-2">
+            <option [ngValue]="null">Seleziona</option>
+            <option *ngFor="let code of natureCodes" [value]="code">{{ code }}</option>
+          </select>
+        </label>
+        <label class="grid gap-1 text-sm font-medium">
+          IVA dalla fattura
+          <input type="number" min="0" step="0.01" [(ngModel)]="line.vatAmount" class="rounded border border-slate-300 p-2" />
+        </label>
+        <label class="grid gap-1 text-sm font-medium">
+          Totale riga dalla fattura
+          <input type="number" min="0.01" step="0.01" [(ngModel)]="line.grossAmount" class="rounded border border-slate-300 p-2" />
+        </label>
+        <p *ngIf="line.category === 'AssetCandidate'" class="sm:col-span-2 lg:col-span-4 rounded bg-amber-50 p-2 text-sm text-amber-900">
+          Possibile cespite: la classificazione e l'eventuale ammortamento vanno verificati dal commercialista.
+        </p>
+      </article>
+    </div>
+
+    <div class="grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-3">
+      <label class="grid gap-1 text-sm font-medium">
+        Allegato PDF / PNG / JPEG (max 20 MB)
+        <input type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+          (change)="onFileSelected($event)" class="rounded border border-slate-300 bg-white p-2" />
+      </label>
+      <p class="self-end text-sm text-slate-600">
+        {{ selected?.attachmentFileName || selectedFile?.name || 'Nessun allegato caricato' }}
+      </p>
+      <button *ngIf="selected && selected.status === 'Draft'" type="button"
+        [disabled]="uploading || !selectedFile" (click)="uploadAttachment()"
+        class="self-end rounded-lg border border-blue-300 bg-blue-50 px-4 py-2 font-semibold text-blue-800 disabled:opacity-50">
+        {{ uploading ? 'Caricamento…' : 'Carica allegato' }}
+      </button>
+    </div>
+
+    <div class="flex flex-wrap justify-end gap-3">
+      <button type="button" (click)="editing = false"
+        class="rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700">Chiudi</button>
+      <button type="button" [disabled]="saving" (click)="saveDraft()"
+        class="rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white disabled:opacity-50">
+        {{ saving ? 'Salvataggio…' : 'Salva bozza' }}
+      </button>
+      <button *ngIf="selected?.status === 'Draft'" type="button"
+        [disabled]="submitting || selected?.hasAttachment !== true" (click)="submitForApproval()"
+        class="rounded-lg bg-green-700 px-4 py-2 font-semibold text-white disabled:opacity-50">
+        {{ submitting ? 'Invio…' : 'Invia in approvazione' }}
+      </button>
+    </div>
+  </section>
+
+  <section *ngIf="editorMode && selected as document" class="space-y-4 rounded-xl border border-slate-200 bg-white p-5"
+    aria-label="Dettaglio documento passivo">
+    <header class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <p class="text-sm text-slate-500">{{ kindLabel(document.kind) }} · {{ document.documentCode }}</p>
+        <h2 class="text-xl font-bold">{{ document.supplierName || document.beneficiaryName }}</h2>
+        <p class="text-sm text-slate-600">
+          {{ document.sourceDocumentNumber || 'Rimborso' }} · documento {{ document.documentDate | date:'dd/MM/yyyy' }}
+          · scadenza {{ document.dueDate | date:'dd/MM/yyyy' }}
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button *ngIf="document.hasAttachment" type="button" (click)="downloadAttachment(document)"
+          class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800">
+          Scarica allegato
+        </button>
+        <button *ngIf="document.status === 'Draft' || document.status === 'Rejected'" type="button" (click)="editing = true"
+          class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700">
+          Modifica bozza
+        </button>
+      </div>
+    </header>
+    <p *ngIf="document.rejectionReason" role="status"
+      class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+      Motivo del rifiuto: {{ document.rejectionReason }}
+    </p>
+
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <p class="rounded bg-slate-50 p-3"><span class="block text-xs text-slate-500">Stato</span><strong>{{ statusLabel(document.status) }}</strong></p>
+      <p class="rounded bg-slate-50 p-3"><span class="block text-xs text-slate-500">Imponibile</span><strong>{{ document.taxableTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</strong></p>
+      <p class="rounded bg-slate-50 p-3"><span class="block text-xs text-slate-500">IVA riportata</span><strong>{{ document.vatTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</strong></p>
+      <p class="rounded bg-blue-50 p-3"><span class="block text-xs text-blue-700">Totale / residuo</span><strong>{{ document.grossTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }} / {{ document.balanceDue | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</strong></p>
+    </div>
+
+    <div class="grid gap-3 md:grid-cols-2">
+      <article *ngFor="let line of document.lines" class="rounded-lg border border-slate-200 p-3">
+        <div class="flex justify-between gap-3">
+          <strong>{{ line.description }}</strong>
+          <span class="text-sm">{{ line.grossAmount | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</span>
+        </div>
+        <p class="mt-1 text-sm text-slate-600">
+          {{ categoryLabel(line.category) }} · imponibile {{ line.taxableAmount | currency:'EUR':'symbol':'1.2-2':'it-IT' }}
+          · IVA {{ line.vatAmount | currency:'EUR':'symbol':'1.2-2':'it-IT' }}
+          <span *ngIf="line.vatRate !== null">({{ line.vatRate }}%<span *ngIf="line.natureCode"> · {{ line.natureCode }}</span>)</span>
+        </p>
+        <p *ngIf="line.costCenter || line.project" class="text-xs text-slate-500">
+          {{ line.costCenter }}<span *ngIf="line.costCenter && line.project"> · </span>{{ line.project }}
+        </p>
+        <p *ngIf="line.category === 'AssetCandidate'" class="mt-1 text-xs font-semibold text-amber-800">Possibile cespite da verificare</p>
+      </article>
+    </div>
+
+    <section *ngIf="document.payments.length" aria-label="Pagamenti registrati">
+      <h3 class="mb-2 font-bold">Pagamenti registrati</h3>
+      <ul class="divide-y divide-slate-100 rounded-lg border border-slate-200">
+        <li *ngFor="let payment of document.payments" class="flex flex-wrap justify-between gap-2 p-3 text-sm">
+          <span>{{ payment.paymentDateUtc | date:'dd/MM/yyyy' }} · {{ payment.paymentMethod }}
+            <span *ngIf="payment.transactionDetails">· {{ payment.transactionDetails }}</span></span>
+          <strong>{{ payment.amount | currency:'EUR':'symbol':'1.2-2':'it-IT' }}</strong>
+        </li>
+      </ul>
+    </section>
+
+    <section *ngIf="canManageAll && document.status === 'PendingApproval'"
+      class="grid gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 sm:grid-cols-[1fr_auto_auto]">
+      <input [(ngModel)]="rejectionReason" maxlength="500" placeholder="Motivo del rifiuto"
+        class="rounded border border-slate-300 p-2" />
+      <button type="button" [disabled]="approving" (click)="reject()"
+        class="rounded-lg bg-red-700 px-4 py-2 font-semibold text-white">Respingi</button>
+      <button type="button" [disabled]="approving" (click)="approve()"
+        class="rounded-lg bg-green-700 px-4 py-2 font-semibold text-white">
+        {{ approving ? 'Attendi…' : 'Approva' }}
+      </button>
+    </section>
+
+    <section *ngIf="canManageAll && document.status === 'Approved' && document.balanceDue > 0"
+      class="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-5">
+      <h3 class="sm:col-span-2 lg:col-span-5 font-bold">Registra pagamento</h3>
+      <label class="grid gap-1 text-sm font-medium">Importo
+        <input type="number" min="0.01" step="0.01" [max]="document.balanceDue"
+          [(ngModel)]="paymentAmount" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Data
+        <input type="date" [(ngModel)]="paymentDate" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Metodo
+        <select [(ngModel)]="paymentMethod" class="rounded border border-slate-300 p-2">
+          <option *ngFor="let method of paymentMethods" [value]="method">{{ method }}</option>
+        </select>
+      </label>
+      <label class="grid gap-1 text-sm font-medium lg:col-span-2">Riferimento
+        <input [(ngModel)]="transactionDetails" maxlength="500" class="rounded border border-slate-300 p-2" />
+      </label>
+      <div class="flex justify-end sm:col-span-2 lg:col-span-5">
+        <button type="button" [disabled]="recordingPayment" (click)="recordPayment()"
+          class="rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white disabled:opacity-50">
+          {{ recordingPayment ? 'Registrazione…' : 'Registra pagamento' }}
+        </button>
+      </div>
+    </section>
+
+    <footer *ngIf="document.status === 'Draft' || document.status === 'PendingApproval' || document.status === 'Rejected'"
+      class="flex justify-end">
+      <button type="button" (click)="cancelDraft()"
+        class="rounded-lg border border-red-300 bg-red-50 px-4 py-2 font-semibold text-red-800">
+        Annulla documento
+      </button>
+    </footer>
+  </section>
+</main>
+
+<app-confirm-delete-modal
+  [isOpen]="cancelConfirmationOpen"
+  title="Annullare il documento?"
+  message="Il documento non potrà più essere approvato o pagato. L'allegato sarà mantenuto nello storico."
+  confirmLabel="Conferma annullamento"
+  [showDeleteIcon]="false"
+  actionVariant="danger"
+  (confirmed)="confirmCancelDraft()"
+  (cancelled)="closeCancelConfirmation()">
+</app-confirm-delete-modal>

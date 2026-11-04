@@ -37,7 +37,7 @@ interface VariantSearchDto {
 }
 
 const REASON_LABELS: Record<number, string> = {
-  1: 'Carico Fornitore', 2: 'Vendita Cassa', 3: 'Spedizione Ordine',
+  1: 'Carico Fornitore', 2: 'Vendita showroom / cassa', 3: 'Spedizione Ordine',
   4: 'Trasferimento', 5: 'Reso Cliente', 6: 'Reso Fornitore', 7: 'Rettifica Inventario'
 };
 

@@ -21,6 +21,9 @@ public static class AppPolicies
     /// <summary>Invoices and credit notes: Admin, Accounting, Sales.</summary>
     public const string Billing = nameof(Billing);
 
+    /// <summary>Supplier payables, approval and payments: Admin and Accounting.</summary>
+    public const string AccountsPayable = nameof(AccountsPayable);
+
     /// <summary>DDT created or downloaded from the cassa and the order list: Admin, Warehouse, Sales.</summary>
     public const string DdtDocuments = nameof(DdtDocuments);
 

@@ -62,6 +62,9 @@ public static class OrderPermittedActionsPolicy
 
             case OrderStatus.Confirmed:
                 Add("StartPicking", "Prendi in Carico Magazzino", "start-picking", "primary");
+                if (order.FulfillmentType == OrderFulfillmentType.StandardShipping)
+                    Add("CompleteShowroomPickup", "Ritiro in showroom", "complete-showroom-pickup",
+                        "primary", true, "ShowroomPickupConfirmation");
                 Add("PutOnHold", "Metti in Sospeso", "hold", "warning", true, "CancelReason");
                 Add("Cancel", "Annulla Ordine", "cancel", "danger", true, "CancelReason");
                 break;

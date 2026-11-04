@@ -14,7 +14,8 @@ public enum OrderWorkflowAction
     PutOnHold,
     Resume,
     Complete,
-    CancelRemainingLines
+    CancelRemainingLines,
+    CompleteShowroomPickup
 }
 
 public sealed record UpdateOrderWorkflowCommand(
@@ -58,6 +59,19 @@ public sealed class UpdateOrderWorkflowCommandHandler(IUnitOfWork unitOfWork)
                     break;
                 case OrderWorkflowAction.Complete:
                     order.Complete();
+                    break;
+                case OrderWorkflowAction.CompleteShowroomPickup:
+                    if (!order.FulfillmentWarehouseId.HasValue)
+                        throw new InvalidOperationException("The order has no fulfillment warehouse.");
+                    var warehouse = await unitOfWork.Warehouses.GetByIdAsync(order.FulfillmentWarehouseId.Value);
+                    if (warehouse is null || !warehouse.IsActive || !warehouse.IsSellable)
+                        throw new InvalidOperationException(
+                            "Il magazzino dell'ordine non esiste, non è attivo o non è abilitato alla vendita.");
+                    var pickupError = await OrderInventoryOperations.RecordShowroomPickupMovementsAsync(
+                        unitOfWork, order, warehouse);
+                    if (pickupError is not null)
+                        throw new InvalidOperationException(pickupError);
+                    order.CompleteShowroomPickup();
                     break;
                 case OrderWorkflowAction.CancelRemainingLines:
                     if (!order.FulfillmentWarehouseId.HasValue)

@@ -10,12 +10,13 @@ import { PriceListService, priceError } from '../../../services/price-list.servi
 import { CountryDto, VatValidationResult } from '../../../models/country.model';
 import { VatLookupComponent } from '../../../components/vat-lookup/vat-lookup.component';
 import { AddressAutocompleteComponent, ParsedAddress } from '../../../components/address-autocomplete/address-autocomplete.component';
+import { CustomerStatementComponent } from '../../../components/customer-statement/customer-statement.component';
 import { ConfirmDeleteModalComponent } from '../../../shared/confirm-delete-modal/confirm-delete-modal.component';
 import { PaginationComponent } from '../../../shared/pagination/pagination.component';
 import { TableActionButtonComponent } from '../../../shared/table-action-button/table-action-button.component';
 import { AddActionButtonComponent } from '../../../shared/add-action-button/add-action-button.component';
 
-type Tab = 'fiscal' | 'addresses' | 'persons' | 'customer' | 'supplier' | 'agent';
+type Tab = 'fiscal' | 'addresses' | 'persons' | 'customer' | 'supplier' | 'agent' | 'statement';
 
 interface AgentOption {
   id: string;
@@ -27,7 +28,8 @@ interface AgentOption {
   standalone: true,
   imports: [
     CommonModule, ReactiveFormsModule, FormsModule, VatLookupComponent, AddressAutocompleteComponent,
-    ConfirmDeleteModalComponent, PaginationComponent, TableActionButtonComponent, AddActionButtonComponent
+    ConfirmDeleteModalComponent, PaginationComponent, TableActionButtonComponent, AddActionButtonComponent,
+    CustomerStatementComponent
   ],
   templateUrl: './anagrafica-modifica.component.html'
 })

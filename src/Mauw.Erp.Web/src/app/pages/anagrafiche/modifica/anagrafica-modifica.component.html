@@ -5,7 +5,7 @@
     <h1 class="text-3xl font-bold">{{ editId ? 'Modifica Anagrafica' : 'Nuova Anagrafica' }}</h1>
     <div class="flex gap-2">
       <button (click)="cancel()" class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded">Annulla</button>
-      <button (click)="save()" [disabled]="saving"
+      <button *ngIf="activeTab !== 'statement'" (click)="save()" [disabled]="saving"
         class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded font-medium">
         {{ saving ? 'Salvataggio…' : 'Salva' }}
       </button>
@@ -23,19 +23,22 @@
 
     <!-- TAB BAR -->
     <div class="flex border-b mb-6 overflow-x-auto">
-      <button *ngFor="let tab of [
+      <ng-container *ngFor="let tab of [
         { key: 'fiscal',    label: 'Dati Fiscali' },
         { key: 'addresses', label: 'Indirizzi' },
         { key: 'persons',   label: 'Referenti' },
         { key: 'customer',  label: '🧑‍💼 Cliente',  toggle: true, active: hasCustomer,  prop: 'hasCustomer' },
         { key: 'supplier',  label: '🏭 Fornitore', toggle: true, active: hasSupplier, prop: 'hasSupplier' },
-        { key: 'agent',     label: '🤝 Agente',    toggle: true, active: hasAgent,    prop: 'hasAgent'    }
-      ]"
-        (click)="setTab(tab.key)"
-        [class]="'px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition ' +
-          (activeTab === tab.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700')">
-        {{ tab.label }}
-      </button>
+        { key: 'agent',     label: '🤝 Agente',    toggle: true, active: hasAgent,    prop: 'hasAgent'    },
+        { key: 'statement', label: 'Estratto Conto / Partitario' }
+      ]">
+        <button *ngIf="tab.key !== 'statement' || (editId && hasCustomer)"
+          (click)="setTab(tab.key)"
+          [class]="'px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition ' +
+            (activeTab === tab.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700')">
+          {{ tab.label }}
+        </button>
+      </ng-container>
     </div>
 
     <!-- ── TAB: Dati Fiscali ─────────────────────────────────────────────── -->
@@ -508,12 +511,17 @@
       </section>
     </div>
 
+    <section *ngIf="activeTab === 'statement' && editId && hasCustomer"
+      aria-label="Estratto Conto / Partitario del cliente">
+      <app-customer-statement [customerId]="editId"></app-customer-statement>
+    </section>
+
   </div><!-- end form -->
 
   <!-- Bottom save bar -->
   <div *ngIf="!loading" class="mt-8 flex justify-end gap-3">
     <button (click)="cancel()" class="bg-gray-400 hover:bg-gray-500 text-white px-6 py-2 rounded">Annulla</button>
-    <button (click)="save()" [disabled]="saving"
+    <button *ngIf="activeTab !== 'statement'" (click)="save()" [disabled]="saving"
       class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-2 rounded font-medium">
       {{ saving ? 'Salvataggio…' : (editId ? 'Aggiorna' : 'Crea Anagrafica') }}
     </button>

@@ -41,8 +41,13 @@ public sealed class OrderPermittedActionsPolicyTests
 
         var confirmed = NewOrder();
         confirmed.Confirm();
-        Assert.Equal(["StartPicking", "PutOnHold", "Cancel"],
+        Assert.Equal(["StartPicking", "CompleteShowroomPickup", "PutOnHold", "Cancel"],
             OrderPermittedActionsPolicy.GetFor(confirmed).Select(action => action.Action));
+        var pickupAction = OrderPermittedActionsPolicy.GetFor(confirmed)[1];
+        Assert.Equal("Ritiro in showroom", pickupAction.Label);
+        Assert.Equal($"/api/v1/orders/{confirmed.Id}/complete-showroom-pickup", pickupAction.Endpoint);
+        Assert.True(pickupAction.RequiresDialog);
+        Assert.Equal("ShowroomPickupConfirmation", pickupAction.DialogType);
 
         confirmed.StartPicking(Guid.NewGuid());
         Assert.Equal(["Ship", "PutOnHold", "Cancel"],
@@ -51,6 +56,11 @@ public sealed class OrderPermittedActionsPolicyTests
         confirmed.CompletePacking(1, 2m);
         Assert.Equal(["Ship", "PutOnHold", "Cancel"],
             OrderPermittedActionsPolicy.GetFor(confirmed).Select(action => action.Action));
+
+        var showroomOrder = NewOrder();
+        showroomOrder.Confirm();
+        showroomOrder.CompleteShowroomPickup();
+        Assert.Empty(OrderPermittedActionsPolicy.GetFor(showroomOrder));
     }
 
     [Fact]

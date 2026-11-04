@@ -48,10 +48,12 @@ export class MenuService {
       label: 'Acquisti',
       icon: ICONS.cart,
       isCollapsed: true,
-      roles: ['Admin', 'Warehouse'],
+      roles: ['Admin', 'Sales', 'Warehouse', 'Accounting'],
       children: [
         { label: 'Ordini Fornitore', route: '/acquisti/ordini-fornitore', icon: ICONS.orders, roles: ['Admin', 'Warehouse'] },
-        { label: 'Carico Merce', route: '/acquisti/ddt-fornitore', icon: ICONS.ddt, roles: ['Admin', 'Warehouse'] }
+        { label: 'Carico Merce', route: '/acquisti/ddt-fornitore', icon: ICONS.ddt, roles: ['Admin', 'Warehouse'] },
+        { label: 'Fatture passive', route: '/acquisti/passivi', icon: ICONS.invoice, roles: ['Admin', 'Accounting'] },
+        { label: 'Rimborsi', route: '/acquisti/rimborsi', icon: ICONS.creditNote, roles: ['Admin', 'Sales', 'Warehouse', 'Accounting'] }
       ]
     },
     {

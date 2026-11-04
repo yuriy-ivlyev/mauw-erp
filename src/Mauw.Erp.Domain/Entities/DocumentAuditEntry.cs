@@ -5,6 +5,7 @@ public static class AuditDocumentTypes
     public const string Order = nameof(Order);
     public const string Invoice = nameof(Invoice);
     public const string CreditNote = nameof(CreditNote);
+    public const string PayableDocument = nameof(PayableDocument);
 }
 
 public static class AuditActions
@@ -15,6 +16,14 @@ public static class AuditActions
     public const string InvoiceTransmittedToSdi = nameof(InvoiceTransmittedToSdi);
     public const string CreditNoteIssued = nameof(CreditNoteIssued);
     public const string CreditNoteTransmittedToSdi = nameof(CreditNoteTransmittedToSdi);
+    public const string PayableDocumentSubmitted = nameof(PayableDocumentSubmitted);
+    public const string PayableDocumentCreated = nameof(PayableDocumentCreated);
+    public const string PayableDocumentUpdated = nameof(PayableDocumentUpdated);
+    public const string PayableDocumentAttachmentUploaded = nameof(PayableDocumentAttachmentUploaded);
+    public const string PayableDocumentApproved = nameof(PayableDocumentApproved);
+    public const string PayableDocumentRejected = nameof(PayableDocumentRejected);
+    public const string PayableDocumentCancelled = nameof(PayableDocumentCancelled);
+    public const string PayableDocumentPaymentRecorded = nameof(PayableDocumentPaymentRecorded);
 }
 
 /// <summary>

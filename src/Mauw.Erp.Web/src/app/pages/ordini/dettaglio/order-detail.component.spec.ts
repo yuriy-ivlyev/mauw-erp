@@ -296,6 +296,7 @@ describe('OrderDetailComponent', () => {
     component.order = {
     ...order,
     status: 'Completed',
+    fulfillmentType: 'ShowroomPickup',
     canEditInvoice: true,
     linkedDocuments: null
     };
@@ -340,6 +341,34 @@ describe('OrderDetailComponent', () => {
       { reason: 'Verifica disponibilità' }
     );
     expect(component.dialogAction).toBeNull();
+  });
+
+  it('confirms showroom pickup before completing without a warehouse dialog or DDT', () => {
+    const pickupAction: OrderPermittedAction = {
+      action: 'CompleteShowroomPickup',
+      label: 'Ritiro in showroom',
+      endpoint: '/api/v1/orders/order-1/complete-showroom-pickup',
+      method: 'POST',
+      style: 'primary',
+      requiresDialog: true,
+      dialogType: 'ShowroomPickupConfirmation'
+    };
+    order.permittedActions = [pickupAction];
+    const fixture = TestBed.createComponent(OrderDetailComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+
+    component.openAction(pickupAction);
+    expect(component.dialogAction).toBe(pickupAction);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent)
+      .toContain('Non verranno avviati prelievo, imballaggio o DDT.');
+
+    component.submitDialog();
+
+    expect(service.postAction).toHaveBeenCalledWith(pickupAction, undefined);
+    expect(component.dialogAction).toBeNull();
+    expect(component.successMessage).toContain('senza emettere un DDT');
   });
 
   it('posts non-dialog actions directly and refreshes the local order', () => {

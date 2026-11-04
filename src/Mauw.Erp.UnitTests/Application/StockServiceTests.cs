@@ -235,7 +235,7 @@ public class StockServiceTests
 
     [Theory]
     [InlineData(StockMovementReason.SupplierReceipt, "Carico Fornitore")]
-    [InlineData(StockMovementReason.ShowroomSale, "Vendita Cassa")]
+    [InlineData(StockMovementReason.ShowroomSale, "Vendita showroom / cassa")]
     [InlineData(StockMovementReason.OrderShipment, "Spedizione Ordine")]
     [InlineData(StockMovementReason.InternalTransfer, "Trasferimento")]
     [InlineData(StockMovementReason.CustomerReturn, "Reso Cliente")]

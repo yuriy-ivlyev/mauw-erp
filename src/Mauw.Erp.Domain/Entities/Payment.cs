@@ -28,12 +28,20 @@ public class Payment : Entity<Guid>
     {
         InvoiceId = invoiceId;
         Amount = amount;
-        PaymentDate = paymentDate ?? DateTime.UtcNow;
+        PaymentDate = ToUtc(paymentDate ?? DateTime.UtcNow);
         PaymentMethod = paymentMethod;
         TransactionDetails = transactionDetails;
         SourceCreditNoteId = sourceCreditNoteId;
         SourceCreditNote = sourceCreditNote;
     }
+
+    private static DateTime ToUtc(DateTime dateTime) =>
+        dateTime.Kind switch
+        {
+            DateTimeKind.Utc => dateTime,
+            DateTimeKind.Local => dateTime.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(dateTime, DateTimeKind.Utc)
+        };
 
     private Payment() { } // For EF Core
 }

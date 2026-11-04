@@ -136,6 +136,11 @@ public static class OrderEndpoints
             .WithName("CompleteOrder")
             .WithSummary("Complete a shipped order");
 
+        group.MapPost("/{id}/complete-showroom-pickup", CompleteShowroomPickup)
+            .RequireAuthorization(AppPolicies.SalesOperations)
+            .WithName("CompleteShowroomPickup")
+            .WithSummary("Complete a confirmed order for showroom pickup without a DDT");
+
         group.MapPost("/{id}/cancel-remaining", CancelRemainingLines)
             .RequireAuthorization(AppPolicies.SalesOperations)
             .WithName("CancelRemainingOrderLines")
@@ -463,6 +468,10 @@ public static class OrderEndpoints
 
     private static async Task<IResult> CompleteOrder(Guid id, ISender sender) =>
         await UpdateWorkflow(id, new UpdateOrderWorkflowCommand(id, OrderWorkflowAction.Complete), sender);
+
+    private static async Task<IResult> CompleteShowroomPickup(Guid id, ISender sender) =>
+        await UpdateWorkflow(id, new UpdateOrderWorkflowCommand(
+            id, OrderWorkflowAction.CompleteShowroomPickup), sender);
 
     private static async Task<IResult> CancelRemainingLines(
         Guid id,

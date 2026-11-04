@@ -126,7 +126,7 @@ public class StockMovement : Entity<Guid>
         };
     }
 
-    public static StockMovement FromCassaItem(Order order, OrderItem item, Guid warehouseId)
+    public static StockMovement FromShowroomSale(Order order, OrderItem item, Guid warehouseId)
     {
         var isCustomerReturn = item.PricingSnapshot?.IsCustomerReturn == true || item.Quantity < 0;
         var quantity = checked((int)Math.Abs((long)item.Quantity));

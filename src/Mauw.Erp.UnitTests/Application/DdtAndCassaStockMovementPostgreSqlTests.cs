@@ -220,6 +220,74 @@ public sealed class DdtAndCassaStockMovementPostgreSqlTests(PostgreSqlContainerF
     }
 
     [Fact]
+    public async Task ShowroomPickupCompletesConfirmedOrderUpdatesStockAndAllowsInvoicePayment()
+    {
+        var database = postgres.CreateDatabase();
+        var seed = await SeedAsync(database);
+        Guid orderId;
+        await using (var setup = database.CreateDbContext())
+        {
+            var order = new Order(seed.ContactId, $"PICKUP-{Guid.NewGuid():N}");
+            order.Items.Add(new OrderItem(order.Id, seed.VariantId, 2, 10m, 22m)
+            {
+                LineNetTotal = 20m
+            });
+            setup.Add(order);
+            await setup.SaveChangesAsync();
+            orderId = order.Id;
+        }
+
+        await using var db = database.CreateDbContext();
+        Assert.True((await OrderService(db).ConfirmOrderAsync(orderId)).Success);
+        var stock = await db.StockItems.SingleAsync();
+        Assert.Equal(2m, stock.QuantityReserved);
+
+        var handler = new UpdateOrderWorkflowCommandHandler(
+            new UnitOfWork(db, new MemoryCache(new MemoryCacheOptions())));
+        var completed = await handler.Handle(
+            new UpdateOrderWorkflowCommand(orderId, OrderWorkflowAction.CompleteShowroomPickup),
+            CancellationToken.None);
+
+        Assert.True(completed.Success, completed.Error);
+        Assert.Equal(OrderStatusEnum.Completed, completed.Data!.Status);
+        Assert.Equal("ShowroomPickup", completed.Data.FulfillmentType);
+        Assert.Equal(2, completed.Data.Items.Single().ShippedQuantity);
+        Assert.Equal(0, completed.Data.Items.Single().RemainingQuantity);
+        stock = await db.StockItems.SingleAsync();
+        Assert.Equal(3m, stock.QuantityOnHand);
+        Assert.Equal(0m, stock.QuantityReserved);
+        Assert.Empty(await db.DdtDocuments.Where(item => item.OrderId == orderId).ToListAsync());
+        Assert.Empty(await db.Shipments.Where(item => item.OrderId == orderId).ToListAsync());
+        var movement = await db.StockMovements.SingleAsync();
+        Assert.Equal(StockMovementReason.ShowroomSale, movement.Reason);
+        Assert.Equal(-2m, movement.QuantityDelta);
+        Assert.Equal(orderId, movement.ReferenceId);
+
+        var invoiceService = new InvoiceService(
+            new UnitOfWork(db, new MemoryCache(new MemoryCacheOptions())),
+            new ItalianAccountingCalculator(),
+            Mock.Of<ICompanySettingsService>(),
+            Mock.Of<IInvoicePdfGenerator>(),
+            Mock.Of<ISdiDocumentStorage>());
+        var invoice = await invoiceService.GenerateFromOrderAsync(orderId);
+        Assert.True(invoice.Success, invoice.Error);
+        var createdInvoice = invoice.Data!;
+        var payment = await invoiceService.RecordPaymentAsync(createdInvoice.Id, new()
+        {
+            Amount = createdInvoice.GrossTotal,
+            PaymentDate = new DateTime(2026, 11, 3),
+            PaymentMethod = "Carta"
+        });
+
+        Assert.True(payment.Success, payment.Error);
+        Assert.Equal("Paid", payment.Data!.Status);
+        Assert.Equal(createdInvoice.GrossTotal, payment.Data.PaidAmount);
+        var savedPayment = await db.Payments.SingleAsync();
+        Assert.Equal(DateTimeKind.Utc, savedPayment.PaymentDate.Kind);
+        Assert.Equal(new DateTime(2026, 11, 3, 0, 0, 0, DateTimeKind.Utc), savedPayment.PaymentDate);
+    }
+
+    [Fact]
     public async Task StandardShippingReturnsDdtPdfAndCommitsDdtAndStockTogether()
     {
         var database = postgres.CreateDatabase();

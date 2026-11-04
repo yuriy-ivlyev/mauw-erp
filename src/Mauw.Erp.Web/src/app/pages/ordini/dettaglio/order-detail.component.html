@@ -18,8 +18,8 @@
         <p class="mb-1 text-xs font-bold uppercase tracking-wider text-slate-500">Ordine vendita</p>
         <h1 class="m-0 text-3xl font-bold">{{ currentOrder.orderNumber }}</h1>
         <div class="mt-3 flex flex-wrap items-center gap-4 text-sm text-slate-500">
-          <span [class]="currentOrder.fulfillmentType === 'CashDesk' ? 'type-badge type-cash' : 'type-badge type-shipping'">
-            {{ currentOrder.fulfillmentType === 'CashDesk' ? 'Cassa' : 'Spedizione' }}
+          <span [class]="currentOrder.fulfillmentType === 'CashDesk' ? 'type-badge type-cash' : currentOrder.fulfillmentType === 'ShowroomPickup' ? 'type-badge type-showroom' : 'type-badge type-shipping'">
+            {{ currentOrder.fulfillmentType === 'CashDesk' ? 'Cassa' : currentOrder.fulfillmentType === 'ShowroomPickup' ? 'Ritiro in showroom' : 'Spedizione' }}
           </span>
           <span [class]="'status-badge ' + statusClass(currentOrder.status)">
             {{ currentOrder.statusDescription }}
@@ -439,6 +439,10 @@
             <input class="w-full rounded border border-slate-300 p-2" name="transactionDetails" [(ngModel)]="transactionDetails" maxlength="500" />
           </label>
         </ng-container>
+
+        <p *ngIf="action.dialogType === 'ShowroomPickupConfirmation'" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+          L’ordine sarà completato e la giacenza del magazzino assegnato verrà aggiornata. Non verranno avviati prelievo, imballaggio o DDT.
+        </p>
 
         <footer class="mt-4 flex justify-end gap-3">
           <app-back-button label="Indietro" [disabled]="submitting" (activated)="closeDialog()"></app-back-button>

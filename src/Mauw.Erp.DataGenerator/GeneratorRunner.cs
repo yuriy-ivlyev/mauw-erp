@@ -68,6 +68,8 @@ public sealed class GeneratorRunner(ILogger<GeneratorRunner> logger)
                 await db.Invoices.AnyAsync(token) ||
                 await db.CreditNotes.AnyAsync(token) ||
                 await db.Payments.AnyAsync(token) ||
+                await db.PayableDocuments.AnyAsync(token) ||
+                await db.PayableDocumentPayments.AnyAsync(token) ||
                 await db.DdtDocuments.AnyAsync(token) ||
                 await db.Shipments.AnyAsync(token))
             {

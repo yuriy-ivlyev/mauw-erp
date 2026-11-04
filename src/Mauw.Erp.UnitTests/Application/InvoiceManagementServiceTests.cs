@@ -67,6 +67,8 @@ public class InvoiceManagementServiceTests
         Assert.Equal(25.50m, payment.Amount);
         Assert.Equal("Bonifico bancario", payment.PaymentMethod);
         Assert.Equal("CRO 123456", payment.TransactionDetails);
+        Assert.Equal(DateTimeKind.Utc, payment.PaymentDate.Kind);
+        Assert.Equal(new DateTime(2026, 10, 29, 0, 0, 0, DateTimeKind.Utc), payment.PaymentDate);
         repository.Verify(value => value.UpdateAsync(invoice), Times.Once);
         unitOfWork.Verify(value => value.SaveChangesAsync(), Times.Once);
     }

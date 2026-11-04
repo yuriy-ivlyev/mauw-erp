@@ -30,6 +30,7 @@ public static class AuthorizationExtensions
             .AddPolicy(AppPolicies.WarehouseOperations, policy => policy.RequireRole(AppRoles.Admin, AppRoles.Warehouse))
             .AddPolicy(AppPolicies.SalesOperations, policy => policy.RequireRole(AppRoles.Admin, AppRoles.Sales))
             .AddPolicy(AppPolicies.Billing, policy => policy.RequireRole(AppRoles.Admin, AppRoles.Accounting, AppRoles.Sales))
+            .AddPolicy(AppPolicies.AccountsPayable, policy => policy.RequireRole(AppRoles.Admin, AppRoles.Accounting))
             .AddPolicy(AppPolicies.DdtDocuments, policy => policy.RequireRole(AppRoles.Admin, AppRoles.Warehouse, AppRoles.Sales))
             .AddPolicy(AppPolicies.StockMovementWrite, policy => policy.RequireRole(AppRoles.Admin, AppRoles.Warehouse, AppRoles.Sales))
             .AddPolicy(AppPolicies.InventoryStockRead, policy => policy

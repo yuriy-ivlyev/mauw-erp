@@ -82,6 +82,35 @@ public sealed class OrderLifecycleTests
     }
 
     [Fact]
+    public void ConfirmedOrderCanCompleteAsShowroomPickupWithoutWarehouseStages()
+    {
+        var order = NewOrder(OrderFulfillmentType.StandardShipping);
+        order.SetFulfillmentWarehouse(Guid.NewGuid());
+        order.Confirm();
+
+        order.CompleteShowroomPickup();
+
+        Assert.Equal(OrderStatus.Completed, order.Status);
+        Assert.Equal(OrderFulfillmentType.ShowroomPickup, order.FulfillmentType);
+        Assert.Equal(order.Items.Single().Quantity, order.Items.Single().QuantityShipped);
+        Assert.Throws<InvalidOperationException>(() => order.StartPicking(Guid.NewGuid()));
+        Assert.Throws<InvalidOperationException>(order.Complete);
+    }
+
+    [Fact]
+    public void ShowroomPickupRequiresAConfirmedOrderWithAssignedWarehouse()
+    {
+        var draft = NewOrder(OrderFulfillmentType.StandardShipping);
+        Assert.Throws<InvalidOperationException>(draft.CompleteShowroomPickup);
+        Assert.Equal(OrderStatus.Draft, draft.Status);
+
+        var unassigned = NewOrder(OrderFulfillmentType.StandardShipping);
+        unassigned.Confirm();
+        Assert.Throws<InvalidOperationException>(unassigned.CompleteShowroomPickup);
+        Assert.Equal(OrderStatus.Confirmed, unassigned.Status);
+    }
+
+    [Fact]
     public void CancellationIsLimitedToUnshippedStates()
     {
         var order = NewOrder(OrderFulfillmentType.StandardShipping);

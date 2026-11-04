@@ -112,7 +112,8 @@ public class SimulationTests(PostgreSqlContainerFixture postgres)
             item.MovementDateUtc.Year < options.EndDate.Year).Sum(item => item.Quantity));
 
         var orders = await db.Orders.AsNoTracking().Include(item => item.Items).ToDictionaryAsync(item => item.Id);
-        var ddts = await db.DdtDocuments.AsNoTracking().Include(item => item.Items).ToDictionaryAsync(item => item.OrderId!.Value);
+        var ddts = await db.DdtDocuments.AsNoTracking().Include(item => item.Items)
+            .ToDictionaryAsync(item => item.OrderId!.Value);
         var shipments = await db.Shipments.AsNoTracking().Include(item => item.Lines)
             .ToDictionaryAsync(item => item.OrderId);
         var invoices = await db.Invoices.AsNoTracking()
@@ -123,13 +124,18 @@ public class SimulationTests(PostgreSqlContainerFixture postgres)
         var customerContactIds = customers.Select(item => item.ContactId).ToHashSet();
         Assert.NotEmpty(orders);
         Assert.All(orders.Values, order => Assert.Equal(OrderStatus.Completed, order.Status));
+        Assert.Contains(orders.Values, order => order.FulfillmentType == OrderFulfillmentType.ShowroomPickup);
+        Assert.Contains(orders.Values, order => order.FulfillmentType == OrderFulfillmentType.StandardShipping);
         Assert.All(orders.Values, order => Assert.Contains(order.ContactId, customerContactIds));
         Assert.All(orders.Values, order => Assert.Equal(0.00m, order.ShippingCost));
         Assert.All(orders.Values, order => Assert.Equal(order.Items.Sum(item => item.Quantity), order.Items.Sum(item => item.QuantityShipped)));
         Assert.Contains(orders.Values, order => !string.IsNullOrWhiteSpace(order.InternalNotes));
         Assert.All(orders.Values, order => Assert.True(order.InternalNotes is null || order.InternalNotes.Length <= 2000));
         Assert.All(ddts.Values, ddt => Assert.Contains(ddt.ContactId, customerContactIds));
-        Assert.Equal(orders.Count, shipments.Count);
+        var shippedOrderCount = orders.Values.Count(order =>
+            order.FulfillmentType == OrderFulfillmentType.StandardShipping);
+        Assert.Equal(shippedOrderCount, ddts.Count);
+        Assert.Equal(shippedOrderCount, shipments.Count);
         Assert.All(invoices, invoice => Assert.Contains(invoice.ContactId, customerContactIds));
         Assert.All(invoices, invoice => Assert.Equal(InvoiceStatuses.Confirmed, invoice.Status));
         Assert.All(invoices, invoice => Assert.Equal(SdiStatus.NotTransmitted, invoice.SdiStatus));
@@ -154,27 +160,39 @@ public class SimulationTests(PostgreSqlContainerFixture postgres)
         {
             Assert.Empty(invoice.Payments);
             var order = orders[invoice.OrderId!.Value];
-            var ddt = ddts[order.Id];
-            var shipment = shipments[order.Id];
-            Assert.True(order.OrderDate <= ddt.DdtDate && ddt.DdtDate <= invoice.InvoiceDate);
             Assert.Equal(order.ContactId, invoice.ContactId);
-            Assert.Equal(order.ContactId, ddt.ContactId);
-            Assert.Equal(shipment.DdtNumber, ddt.DdtNumber);
-            Assert.StartsWith("SIM-SPED-", shipment.ShipmentNumber);
-            Assert.Equal(order.Id, shipment.OrderId);
-            Assert.Equal(order.Items.Sum(item => item.Quantity),
-                shipment.Lines.Sum(item => item.QuantityShipped));
+            if (order.FulfillmentType == OrderFulfillmentType.ShowroomPickup)
+            {
+                Assert.False(ddts.ContainsKey(order.Id));
+                Assert.False(shipments.ContainsKey(order.Id));
+            }
+            else
+            {
+                var ddt = ddts[order.Id];
+                var shipment = shipments[order.Id];
+                Assert.True(order.OrderDate <= ddt.DdtDate && ddt.DdtDate <= invoice.InvoiceDate);
+                Assert.Equal(order.ContactId, ddt.ContactId);
+                Assert.Equal(shipment.DdtNumber, ddt.DdtNumber);
+                Assert.StartsWith("SIM-SPED-", shipment.ShipmentNumber);
+                Assert.Equal(order.Id, shipment.OrderId);
+                Assert.Equal(order.Items.Sum(item => item.Quantity),
+                    shipment.Lines.Sum(item => item.QuantityShipped));
+            }
             var calculated = calculator.CalculateAndApply(invoice.Items);
             Assert.True(calculated.Success, calculated.Error);
             Assert.Equal(calculated.Data!.TotalGross, invoice.GrossTotal);
             Assert.Equal(order.GrossTotal, invoice.GrossTotal);
-            Assert.Equal(ddt.GrossTotal, invoice.GrossTotal);
             var expected = invoice.Items.OrderBy(item => item.VariantId)
                 .Select(item => (item.VariantId, item.Quantity, item.UnitNetPrice, item.DiscountPercent, item.VatRate, item.NatureCode, item.LineNetTotal));
             Assert.Equal(expected, order.Items.OrderBy(item => item.VariantId)
                 .Select(item => (item.VariantId, Quantity: (decimal)item.Quantity, item.UnitNetPrice, item.DiscountPercent, item.VatRate, item.NatureCode, item.LineNetTotal)));
-            Assert.Equal(expected, ddt.Items.OrderBy(item => item.VariantId)
-                .Select(item => (item.VariantId, Quantity: (decimal)item.Quantity, item.UnitNetPrice, item.DiscountPercent, item.VatRate, item.NatureCode, item.LineNetTotal)));
+            if (order.FulfillmentType == OrderFulfillmentType.StandardShipping)
+            {
+                var ddt = ddts[order.Id];
+                Assert.Equal(ddt.GrossTotal, invoice.GrossTotal);
+                Assert.Equal(expected, ddt.Items.OrderBy(item => item.VariantId)
+                    .Select(item => (item.VariantId, Quantity: (decimal)item.Quantity, item.UnitNetPrice, item.DiscountPercent, item.VatRate, item.NatureCode, item.LineNetTotal)));
+            }
             Assert.All(invoice.Items, item =>
             {
                 Assert.Equal(decimal.Truncate(item.Quantity), item.Quantity);
@@ -292,6 +310,24 @@ public class SimulationTests(PostgreSqlContainerFixture postgres)
         Assert.False(result.Success);
         Assert.Empty(db.ChangeTracker.Entries());
         Assert.False(await db.Contacts.AnyAsync());
+    }
+
+    [Fact]
+    public async Task ExistingPayableDocumentsPreventGeneration()
+    {
+        await using var db = Context();
+        db.PayableDocuments.Add(new Mauw.Erp.Domain.Entities.PayableDocument(
+            PayableDocumentKind.ExpenseReimbursement, "user-1"));
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var result = await Generator(db).GenerateAsync(FixtureOptions(), CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Contains("empty business database", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(db.ChangeTracker.Entries());
+        Assert.Single(await db.PayableDocuments.ToListAsync());
+        Assert.False(await db.Products.AnyAsync());
     }
 
     [Theory]

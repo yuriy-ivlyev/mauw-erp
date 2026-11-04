@@ -54,9 +54,50 @@ internal static class OrderInventoryOperations
     {
         foreach (var item in order.Items)
         {
-            var movement = StockMovement.FromCassaItem(order, item, warehouse.Id);
+            var movement = StockMovement.FromShowroomSale(order, item, warehouse.Id);
             await unitOfWork.Stock.RecordMovementAsync(movement, movement.QuantityDelta!.Value);
         }
+    }
+
+    public static async Task<string?> RecordShowroomPickupMovementsAsync(
+        IUnitOfWork unitOfWork,
+        Order order,
+        Warehouse warehouse)
+    {
+        if (order.Status != Domain.Enums.OrderStatus.Confirmed)
+            return "Solo un ordine confermato può essere completato con ritiro in showroom.";
+        if (order.FulfillmentType != Domain.Enums.OrderFulfillmentType.StandardShipping)
+            return "Solo un ordine standard può essere completato con ritiro in showroom.";
+        if (order.FulfillmentWarehouseId != warehouse.Id)
+            return "Il magazzino di evasione dell'ordine non corrisponde.";
+        if (order.Items.Count == 0 || order.Items.Any(item => item.Quantity is 0 or int.MinValue))
+            return "L'ordine contiene quantità non valide.";
+
+        var saleRequirements = GetSaleQuantities(order).ToList();
+        foreach (var requirement in saleRequirements.OrderBy(requirement => requirement.VariantId))
+        {
+            var stock = await unitOfWork.Stock.GetStockItemAsync(warehouse.Id, requirement.VariantId);
+            if (stock is null || stock.QuantityOnHand < requirement.Quantity)
+                return $"Giacenza fisica insufficiente per la variante {requirement.VariantId}.";
+            if (stock.QuantityReserved < requirement.Quantity)
+                return $"La riserva non è disponibile per la variante {requirement.VariantId}.";
+        }
+
+        foreach (var item in order.Items.Where(item => item.AffectsStock))
+        {
+            var movement = StockMovement.FromShowroomSale(order, item, warehouse.Id);
+            if (movement.QuantityDelta < 0)
+            {
+                var stock = await unitOfWork.Stock.GetStockItemAsync(warehouse.Id, item.VariantId)
+                    ?? throw new InvalidOperationException(
+                        $"La giacenza della variante {item.VariantId} è scomparsa durante il ritiro.");
+                stock.ReleaseReservation(-movement.QuantityDelta.Value);
+            }
+
+            await unitOfWork.Stock.RecordMovementAsync(movement, movement.QuantityDelta!.Value);
+        }
+
+        return null;
     }
 
     public static async Task<string?> ReserveOrderAsync(

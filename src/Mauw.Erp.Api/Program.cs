@@ -48,6 +48,7 @@ builder.Services.AddInventoryStockReporting();
 builder.Services.AddCompanyBranding();
 builder.Services.AddImageStorage(builder.Configuration);
 builder.Services.AddSupplierDeliveryNotes();
+builder.Services.AddPayableDocuments();
 
 // Register application services with tracing decorators
 builder.Services.AddApplicationServices();
@@ -159,6 +160,7 @@ app.MapCassaSessionEndpoints();
 app.MapPriceListEndpoints();
 app.MapPriceFormulaEndpoints();
 app.MapSupplierDeliveryNoteEndpoints();
+app.MapPayableDocumentEndpoints();
 app.MapSupplierPurchaseOrderEndpoints();
 
 // Migrate database on startup and initialize seed data

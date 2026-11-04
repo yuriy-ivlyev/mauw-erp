@@ -179,7 +179,7 @@ public class StockService(
     public static string? GetReasonLabel(StockMovementReason? reason) => reason switch
     {
         StockMovementReason.SupplierReceipt     => "Carico Fornitore",
-        StockMovementReason.ShowroomSale        => "Vendita Cassa",
+        StockMovementReason.ShowroomSale        => "Vendita showroom / cassa",
         StockMovementReason.OrderShipment       => "Spedizione Ordine",
         StockMovementReason.InternalTransfer    => "Trasferimento",
         StockMovementReason.CustomerReturn      => "Reso Cliente",

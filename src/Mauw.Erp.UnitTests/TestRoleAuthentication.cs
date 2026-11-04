@@ -36,7 +36,12 @@ internal static class TestRoleAuthentication
         {
             if (!Request.Headers.TryGetValue(RoleHeader, out var role))
                 return Task.FromResult(AuthenticateResult.NoResult());
-            var identity = new ClaimsIdentity([new Claim(ClaimTypes.Role, role.ToString())], Scheme.Name);
+            var identity = new ClaimsIdentity(
+                [
+                    new Claim(ClaimTypes.Role, role.ToString()),
+                    new Claim("oid", "test-user")
+                ],
+                Scheme.Name);
             return Task.FromResult(AuthenticateResult.Success(new(new ClaimsPrincipal(identity), Scheme.Name)));
         }
     }

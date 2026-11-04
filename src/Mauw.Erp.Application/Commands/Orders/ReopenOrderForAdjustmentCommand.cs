@@ -94,7 +94,9 @@ public sealed class ReopenOrderForAdjustmentCommandHandler(
     // (closed with "stralcio residuo") would make the stock delta ambiguous, so such orders are not reopened.
     private async Task<string?> EnsureFullyShippedAsync(Order order)
     {
-        if (order.FulfillmentType != Domain.Enums.OrderFulfillmentType.StandardShipping)
+        if (order.FulfillmentType is not (
+            Domain.Enums.OrderFulfillmentType.StandardShipping or
+            Domain.Enums.OrderFulfillmentType.ShowroomPickup))
             return null;
 
         var ddts = await unitOfWork.DdtDocuments.GetByOrderIdWithItemsAsync(order.Id);

@@ -56,7 +56,8 @@ const REOPEN_ACTION = 'ReopenForAdjustment';
 const SYNC_ACTION = 'SyncAndFinalizeInvoice';
 const ACTION_SUCCESS_MESSAGES: Record<string, string> = {
   [REOPEN_ACTION]: 'Ordine riaperto per modifica righe pre-SDI.',
-  [SYNC_ACTION]: 'Fattura aggiornata e rigenerata con successo'
+  [SYNC_ACTION]: 'Fattura aggiornata e rigenerata con successo',
+  CompleteShowroomPickup: 'Ritiro showroom registrato: giacenze aggiornate senza emettere un DDT.'
 };
 
 @Component({
@@ -655,6 +656,9 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
           transactionDetails: this.transactionDetails.trim() || null
         };
         break;
+      case 'ShowroomPickupConfirmation':
+        payload = undefined;
+        break;
       default:
         this.errorMessage = 'Tipo di dialogo non supportato.';
         return;
@@ -773,7 +777,8 @@ export class OrderDetailComponent implements OnInit, OnDestroy {
     const titles: Record<string, string> = {
       CancelReason: 'Motivo dell’operazione',
       ShipmentDetails: 'Dettagli della spedizione',
-      PaymentDetails: 'Dettagli del pagamento'
+      PaymentDetails: 'Dettagli del pagamento',
+      ShowroomPickupConfirmation: 'Conferma ritiro in showroom'
     };
     return titles[action.dialogType ?? ''] ?? action.label;
   }
