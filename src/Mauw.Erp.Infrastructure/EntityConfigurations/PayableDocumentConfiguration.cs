@@ -37,6 +37,10 @@ public sealed class PayableDocumentConfiguration : IEntityTypeConfiguration<Paya
             .WithMany()
             .HasForeignKey(document => document.SupplierId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(document => document.Employee)
+            .WithMany()
+            .HasForeignKey(document => document.EmployeeId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(document => document.Lines)
             .WithOne(line => line.PayableDocument)
             .HasForeignKey(line => line.PayableDocumentId)
@@ -55,6 +59,13 @@ public sealed class PayableDocumentConfiguration : IEntityTypeConfiguration<Paya
             })
             .IsUnique()
             .HasFilter("supplier_id IS NOT NULL AND source_document_number IS NOT NULL");
+        builder.HasIndex(document => new
+            {
+                document.EmployeeId,
+                document.SourceDocumentNumber
+            })
+            .IsUnique()
+            .HasFilter("kind = 2 AND employee_id IS NOT NULL AND source_document_number IS NOT NULL");
         builder.HasIndex(document => new { document.Status, document.DueDate });
         builder.HasIndex(document => new { document.Kind, document.DocumentDate });
         builder.HasIndex(document => document.CreatedByUserId);

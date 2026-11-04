@@ -111,6 +111,7 @@ public sealed class AuthorizationMatrixHost : IAsyncLifetime
         _app.MapSupplierDeliveryNoteEndpoints();
         _app.MapSupplierPurchaseOrderEndpoints();
         _app.MapPayableDocumentEndpoints();
+        _app.MapEmployeeEndpoints();
         // Endpoint without any authorization metadata: it must fall under the fallback policy.
         _app.MapGet("/api/test/unmarked", () => Results.Ok());
         await _app.StartAsync();
@@ -330,14 +331,23 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
         Add("POST", $"/api/v1/payables/{Id}/reject", AdminAccounting);
         Add("POST", $"/api/v1/payables/{Id}/cancel", AdminAccounting);
         Add("POST", $"/api/v1/payables/{Id}/payments", AdminAccounting);
-        Add("GET", "/api/v1/payables/my-reimbursements", All);
-        Add("POST", "/api/v1/payables/my-reimbursements", All);
-        Add("GET", $"/api/v1/payables/my-reimbursements/{Id}", All);
-        Add("PUT", $"/api/v1/payables/my-reimbursements/{Id}", All);
-        Add("POST", $"/api/v1/payables/my-reimbursements/{Id}/attachment", All);
-        Add("GET", $"/api/v1/payables/my-reimbursements/{Id}/attachment", All);
-        Add("POST", $"/api/v1/payables/my-reimbursements/{Id}/submit", All);
-        Add("POST", $"/api/v1/payables/my-reimbursements/{Id}/cancel", All);
+        Add("GET", "/api/v1/payables/reimbursements", AdminOnly);
+        Add("POST", "/api/v1/payables/reimbursements", AdminOnly);
+        Add("GET", $"/api/v1/payables/reimbursements/{Id}", AdminOnly);
+        Add("PUT", $"/api/v1/payables/reimbursements/{Id}", AdminOnly);
+        Add("POST", $"/api/v1/payables/reimbursements/{Id}/attachment", AdminOnly);
+        Add("GET", $"/api/v1/payables/reimbursements/{Id}/attachment", AdminOnly);
+        Add("POST", $"/api/v1/payables/reimbursements/{Id}/submit", AdminOnly);
+        Add("POST", $"/api/v1/payables/reimbursements/{Id}/cancel", AdminOnly);
+
+        // Employee records and payroll costs/payslips are restricted to administrators.
+        Add("GET", "/api/v1/employees", AdminOnly);
+        Add("POST", "/api/v1/employees", AdminOnly);
+        Add("GET", $"/api/v1/employees/{Id}", AdminOnly);
+        Add("PUT", $"/api/v1/employees/{Id}", AdminOnly);
+        Add("POST", $"/api/v1/employees/{Id}/deactivate", AdminOnly);
+        Add("GET", $"/api/v1/employees/{Id}/payroll-costs", AdminOnly);
+        Add("POST", $"/api/v1/employees/{Id}/payroll-costs", AdminOnly);
 
         var data = new TheoryData<string, string, string>();
         foreach (var (method, path, roles) in rows)
@@ -523,13 +533,20 @@ public class EndpointAuthorizationMatrixTests(AuthorizationMatrixHost host) : IC
         using var client = host.CreateClient(role);
         var isAttachmentUpload = method == "POST"
             && path.EndsWith("/attachment", StringComparison.Ordinal);
+        var isPayrollCostCreate = method == "POST"
+            && path.EndsWith("/payroll-costs", StringComparison.Ordinal);
         if (isAttachmentUpload)
             path = $"{path}?version={Id}";
         using var request = new HttpRequestMessage(new HttpMethod(method), path);
-        if (isAttachmentUpload)
+        if (isAttachmentUpload || isPayrollCostCreate)
         {
             var multipart = new MultipartFormDataContent();
-            multipart.Add(new ByteArrayContent([]), "file", "test.pdf");
+            if (isPayrollCostCreate)
+            {
+                multipart.Add(new StringContent("2026-11-01"), "period");
+                multipart.Add(new StringContent("100.00"), "monthlyCompanyCost");
+            }
+            multipart.Add(new ByteArrayContent("%PDF-1.4"u8.ToArray()), "file", "test.pdf");
             request.Content = multipart;
         }
         else if (method is "POST" or "PUT" or "PATCH")

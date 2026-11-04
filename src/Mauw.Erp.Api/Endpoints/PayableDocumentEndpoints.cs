@@ -39,24 +39,24 @@ public static class PayableDocumentEndpoints
         management.MapPost("/{id:guid}/payments", RecordPayment)
             .WithSummary("Registra un pagamento parziale o totale");
 
-        var ownReimbursements = app.MapGroup("/api/v1/payables/my-reimbursements")
+        var reimbursements = app.MapGroup("/api/v1/payables/reimbursements")
             .WithTags("Payables")
-            .RequireAuthorization(AppPolicies.AnyRole);
-        ownReimbursements.MapGet("/", ListMyReimbursements)
-            .WithSummary("Elenca i rimborsi dell'utente autenticato");
-        ownReimbursements.MapPost("/", CreateReimbursement)
-            .WithSummary("Registra una richiesta di rimborso in bozza");
-        ownReimbursements.MapGet("/{id:guid}", GetOwnReimbursement)
-            .WithSummary("Legge un rimborso dell'utente autenticato");
-        ownReimbursements.MapPut("/{id:guid}", UpdateOwnReimbursement)
+            .RequireAuthorization(AppPolicies.AdminOnly);
+        reimbursements.MapGet("/", ListReimbursements)
+            .WithSummary("Elenca i rimborsi dei dipendenti");
+        reimbursements.MapPost("/", CreateReimbursement)
+            .WithSummary("Registra un rimborso per un dipendente");
+        reimbursements.MapGet("/{id:guid}", GetManaged)
+            .WithSummary("Legge un rimborso");
+        reimbursements.MapPut("/{id:guid}", UpdateManaged)
             .WithSummary("Aggiorna una bozza di rimborso");
-        ownReimbursements.MapPost("/{id:guid}/attachment", UploadOwnReimbursement).DisableAntiforgery()
+        reimbursements.MapPost("/{id:guid}/attachment", UploadManaged).DisableAntiforgery()
             .WithSummary("Carica il giustificativo di un rimborso");
-        ownReimbursements.MapGet("/{id:guid}/attachment", DownloadOwnReimbursement)
+        reimbursements.MapGet("/{id:guid}/attachment", DownloadManaged)
             .WithSummary("Scarica il giustificativo del rimborso");
-        ownReimbursements.MapPost("/{id:guid}/submit", SubmitOwnReimbursement)
+        reimbursements.MapPost("/{id:guid}/submit", SubmitManaged)
             .WithSummary("Invia un rimborso in approvazione");
-        ownReimbursements.MapPost("/{id:guid}/cancel", CancelOwnReimbursement)
+        reimbursements.MapPost("/{id:guid}/cancel", CancelManaged)
             .WithSummary("Annulla una bozza di rimborso");
     }
 
@@ -86,18 +86,12 @@ public static class PayableDocumentEndpoints
             page, pageSize, search, kind, status, dateFrom, dateTo, cancellationToken));
     }
 
-    private static async Task<IResult> ListMyReimbursements(
-        ICurrentUserService currentUser,
+    private static async Task<IResult> ListReimbursements(
         IPayableDocumentService service,
         int page = 1,
         int pageSize = 20,
-        CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(currentUser.UserId))
-            return TypedResults.Unauthorized();
-        return TypedResults.Ok(await service.ListMyReimbursementsAsync(
-            currentUser.UserId, page, pageSize, cancellationToken));
-    }
+        CancellationToken cancellationToken = default) =>
+        TypedResults.Ok(await service.ListReimbursementsAsync(page, pageSize, cancellationToken));
 
     private static async Task<IResult> CreateSupplierInvoice(
         CreatePayableDocumentRequest request,
@@ -125,13 +119,6 @@ public static class PayableDocumentEndpoints
         CancellationToken cancellationToken) =>
         await Get(id, requestingUserId: null, canManageAll: true, service, cancellationToken);
 
-    private static async Task<IResult> GetOwnReimbursement(
-        Guid id,
-        ICurrentUserService currentUser,
-        IPayableDocumentService service,
-        CancellationToken cancellationToken) =>
-        await Get(id, currentUser.UserId, canManageAll: false, service, cancellationToken);
-
     private static async Task<IResult> Get(
         Guid id,
         string? requestingUserId,
@@ -152,15 +139,6 @@ public static class PayableDocumentEndpoints
         ToResult(await service.UpdateDraftAsync(
             id, request, currentUser.UserId, canManageAll: true, cancellationToken));
 
-    private static async Task<IResult> UpdateOwnReimbursement(
-        Guid id,
-        CreatePayableDocumentRequest request,
-        ICurrentUserService currentUser,
-        IPayableDocumentService service,
-        CancellationToken cancellationToken) =>
-        ToResult(await service.UpdateDraftAsync(
-            id, request, currentUser.UserId, canManageAll: false, cancellationToken));
-
     private static async Task<IResult> UploadManaged(
         Guid id,
         Guid version,
@@ -169,15 +147,6 @@ public static class PayableDocumentEndpoints
         IPayableDocumentService service,
         CancellationToken cancellationToken) =>
         await Upload(id, version, file, currentUser.UserId, canManageAll: true, service, cancellationToken);
-
-    private static async Task<IResult> UploadOwnReimbursement(
-        Guid id,
-        Guid version,
-        IFormFile file,
-        ICurrentUserService currentUser,
-        IPayableDocumentService service,
-        CancellationToken cancellationToken) =>
-        await Upload(id, version, file, currentUser.UserId, canManageAll: false, service, cancellationToken);
 
     private static async Task<IResult> Upload(
         Guid id,
@@ -203,13 +172,6 @@ public static class PayableDocumentEndpoints
         CancellationToken cancellationToken) =>
         await Download(id, requestingUserId: null, canManageAll: true, service, cancellationToken);
 
-    private static async Task<IResult> DownloadOwnReimbursement(
-        Guid id,
-        ICurrentUserService currentUser,
-        IPayableDocumentService service,
-        CancellationToken cancellationToken) =>
-        await Download(id, currentUser.UserId, canManageAll: false, service, cancellationToken);
-
     private static async Task<IResult> Download(
         Guid id,
         string? requestingUserId,
@@ -232,15 +194,6 @@ public static class PayableDocumentEndpoints
         CancellationToken cancellationToken) =>
         ToResult(await service.SubmitAsync(
             id, request.Version, currentUser.UserId, canManageAll: true, cancellationToken));
-
-    private static async Task<IResult> SubmitOwnReimbursement(
-        Guid id,
-        PayableDocumentActionRequest request,
-        ICurrentUserService currentUser,
-        IPayableDocumentService service,
-        CancellationToken cancellationToken) =>
-        ToResult(await service.SubmitAsync(
-            id, request.Version, currentUser.UserId, canManageAll: false, cancellationToken));
 
     private static async Task<IResult> Approve(
         Guid id,
@@ -267,15 +220,6 @@ public static class PayableDocumentEndpoints
         CancellationToken cancellationToken) =>
         ToResult(await service.CancelAsync(
             id, request.Version, currentUser.UserId, canManageAll: true, cancellationToken));
-
-    private static async Task<IResult> CancelOwnReimbursement(
-        Guid id,
-        PayableDocumentActionRequest request,
-        ICurrentUserService currentUser,
-        IPayableDocumentService service,
-        CancellationToken cancellationToken) =>
-        ToResult(await service.CancelAsync(
-            id, request.Version, currentUser.UserId, canManageAll: false, cancellationToken));
 
     private static async Task<IResult> RecordPayment(
         Guid id,

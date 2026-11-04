@@ -1,8 +1,8 @@
 import { PagedResult } from './pagination.model';
 
-export type PayableDocumentKind = 'SupplierInvoice' | 'ExpenseReimbursement';
+export type PayableDocumentKind = 'SupplierInvoice' | 'ExpenseReimbursement' | 'EmployeePayroll';
 export type PayableDocumentStatus = 'Draft' | 'PendingApproval' | 'Approved' | 'Rejected' | 'Cancelled';
-export type PayablePaymentStatus = 'Unpaid' | 'PartiallyPaid' | 'Paid';
+export type PayablePaymentStatus = 'NotPayable' | 'Unpaid' | 'PartiallyPaid' | 'Paid';
 export type PayableExpenseCategory =
   | 'Merchandise'
   | 'Utilities'
@@ -11,7 +11,8 @@ export type PayableExpenseCategory =
   | 'Travel'
   | 'ProfessionalFees'
   | 'AssetCandidate'
-  | 'Other';
+  | 'Other'
+  | 'Payroll';
 
 export interface PayableDocumentLine {
   id: string;
@@ -39,6 +40,8 @@ export interface PayableDocumentListItem {
   id: string;
   documentCode: string;
   kind: PayableDocumentKind;
+  employeeId: string | null;
+  employeeNumber: string | null;
   supplierName: string | null;
   sourceDocumentNumber: string | null;
   documentDate: string;
@@ -51,13 +54,13 @@ export interface PayableDocumentListItem {
   grossTotal: number;
   paidAmount: number;
   balanceDue: number;
+  attachmentFileName: string | null;
   hasAttachment: boolean;
 }
 
 export interface PayableDocument extends PayableDocumentListItem {
   supplierId: string | null;
   notes: string | null;
-  attachmentFileName: string | null;
   attachmentContentType: string | null;
   attachmentLength: number | null;
   createdByUserId: string | null;
@@ -92,6 +95,7 @@ export interface CreatePayableDocumentRequest {
   notes: string | null;
   lines: PayableDocumentLineRequest[];
   version?: string;
+  employeeId?: string | null;
 }
 
 export interface PayableDocumentPaymentRequest {

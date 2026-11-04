@@ -20,7 +20,13 @@ public sealed record CreatePayableDocumentRequest(
     string? BeneficiaryName,
     string? Notes,
     IReadOnlyList<PayableDocumentLineRequest>? Lines,
-    Guid? Version = null);
+    Guid? Version = null,
+    Guid? EmployeeId = null);
+
+public sealed record CreateEmployeePayrollCostRequest(
+    DateOnly Period,
+    decimal MonthlyCompanyCost,
+    string? Notes);
 
 public sealed record PayableDocumentPaymentRequest(
     Guid Version,

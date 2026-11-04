@@ -1,0 +1,223 @@
+<main class="mx-auto max-w-screen-2xl space-y-5 p-4 text-slate-800 sm:p-6">
+  <app-back-button></app-back-button>
+
+  <div *ngIf="errorMessage" role="alert" class="rounded-lg border border-red-300 bg-red-50 p-3 text-red-800">
+    {{ errorMessage }}
+  </div>
+  <div *ngIf="successMessage" role="status" aria-live="polite"
+    class="rounded-lg border border-green-300 bg-green-50 p-3 text-green-800">
+    {{ successMessage }}
+  </div>
+
+  <header class="flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <p class="text-sm text-slate-500">Amministrazione · accesso riservato Admin</p>
+      <h1 class="text-2xl font-bold">Dipendenti e costi mensili</h1>
+      <p class="mt-1 text-sm text-slate-600">
+        Anagrafica, inquadramento, costo aziendale mensile e cedolini. Non calcola paghe né adempimenti fiscali.
+      </p>
+    </div>
+    <app-add-action-button label="Nuovo dipendente" (activated)="createEmployee()"></app-add-action-button>
+  </header>
+
+  <section class="rounded-xl border border-slate-200 bg-white p-4" aria-label="Ricerca dipendenti">
+    <div class="flex flex-wrap items-end gap-3">
+      <label class="grid min-w-64 flex-1 gap-1 text-sm font-medium">
+        Cerca per matricola o nominativo
+        <input [(ngModel)]="search" (keyup.enter)="applySearch()"
+          class="rounded border border-slate-300 p-2" />
+      </label>
+      <button type="button" (click)="applySearch()"
+        class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">
+        Cerca
+      </button>
+    </div>
+  </section>
+
+  <section class="overflow-hidden rounded-xl border border-slate-200 bg-white" aria-label="Elenco dipendenti">
+    <div *ngIf="loading" role="status" class="p-6 text-center text-slate-500">Caricamento…</div>
+    <div *ngIf="!loading" class="overflow-x-auto">
+      <table class="w-full min-w-[900px] text-sm">
+        <thead class="border-b bg-slate-50 text-left text-slate-600">
+          <tr>
+            <th class="px-3 py-3">Matricola</th>
+            <th class="px-3 py-3">Dipendente</th>
+            <th class="px-3 py-3">Inquadramento</th>
+            <th class="px-3 py-3 text-right">RAL</th>
+            <th class="px-3 py-3 text-right">Costo annuo</th>
+            <th class="px-3 py-3">Stato</th>
+            <th class="px-3 py-3 text-center">Azioni</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <tr *ngFor="let employee of employees">
+            <td class="px-3 py-3 font-semibold">{{ employee.employeeNumber }}</td>
+            <td class="px-3 py-3">{{ employee.firstName }} {{ employee.lastName }}</td>
+            <td class="px-3 py-3">
+              {{ employee.qualification || '—' }}
+              <span *ngIf="employee.contractLevel"> · {{ employee.contractLevel }}</span>
+              <span *ngIf="employee.contractType"> · {{ employee.contractType }}</span>
+            </td>
+            <td class="whitespace-nowrap px-3 py-3 text-right">
+              {{ employee.annualGrossSalary === null ? '—' : (employee.annualGrossSalary | currency:'EUR':'symbol':'1.2-2':'it-IT') }}
+            </td>
+            <td class="whitespace-nowrap px-3 py-3 text-right">
+              {{ employee.annualCompanyCost === null ? '—' : (employee.annualCompanyCost | currency:'EUR':'symbol':'1.2-2':'it-IT') }}
+            </td>
+            <td class="px-3 py-3">
+              <span class="rounded-full px-2.5 py-1 text-xs font-semibold"
+                [ngClass]="employee.isActive ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'">
+                {{ employee.isActive ? 'Attivo' : 'Cessato' }}
+              </span>
+            </td>
+            <td class="px-3 py-3">
+              <div class="flex items-center justify-center gap-2">
+                <app-table-action-button action="edit"
+                  [label]="'Modifica ' + employee.employeeNumber"
+                  (activated)="editEmployee(employee)"></app-table-action-button>
+                <button type="button" (click)="openPayroll(employee)"
+                  class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100">
+                  Costi e cedolini
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="employees.length === 0">
+            <td colspan="7" class="p-8 text-center text-slate-500">Nessun dipendente trovato.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <app-pagination [page]="currentPage" [pageSize]="pageSize" [totalCount]="totalCount"
+      (pageChange)="changePage($event)" (pageSizeChange)="changePageSize($event)">
+    </app-pagination>
+  </section>
+
+  <section *ngIf="editorOpen" class="space-y-4 rounded-xl border border-blue-200 bg-white p-5"
+    aria-label="Anagrafica dipendente">
+    <header>
+      <h2 class="text-lg font-bold">{{ selectedEmployee ? 'Modifica dipendente' : 'Nuovo dipendente' }}</h2>
+      <p class="text-sm text-slate-600">RAL e costo annuo sono dati informativi; non vengono usati per calcolare le paghe.</p>
+    </header>
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <label class="grid gap-1 text-sm font-medium">Matricola
+        <input [(ngModel)]="employeeNumber" maxlength="50" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Nome
+        <input [(ngModel)]="firstName" maxlength="100" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Cognome
+        <input [(ngModel)]="lastName" maxlength="100" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Inquadramento
+        <input [(ngModel)]="qualification" maxlength="150" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Livello
+        <input [(ngModel)]="contractLevel" maxlength="100" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Contratto / CCNL
+        <input [(ngModel)]="contractType" maxlength="100" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">RAL annua
+        <input type="number" min="0" step="0.01" [(ngModel)]="annualGrossSalary"
+          class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Costo annuo aziendale
+        <input type="number" min="0" step="0.01" [(ngModel)]="annualCompanyCost"
+          class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Data assunzione
+        <input type="date" [(ngModel)]="hireDate" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Data cessazione
+        <input type="date" [(ngModel)]="endDate" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="flex items-center gap-2 self-end rounded border border-slate-200 p-2 text-sm font-medium">
+        <input type="checkbox" [(ngModel)]="isActive" />
+        Dipendente attivo
+      </label>
+      <label class="grid gap-1 text-sm font-medium sm:col-span-2 lg:col-span-4">Note
+        <textarea [(ngModel)]="notes" maxlength="1000" rows="2"
+          class="rounded border border-slate-300 p-2"></textarea>
+      </label>
+    </div>
+    <div class="flex justify-end gap-3">
+      <button type="button" (click)="closeEditor()"
+        class="rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700">Chiudi</button>
+      <button type="button" [disabled]="saving" (click)="saveEmployee()"
+        class="rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white disabled:opacity-50">
+        {{ saving ? 'Salvataggio…' : 'Salva dipendente' }}
+      </button>
+    </div>
+  </section>
+
+  <section *ngIf="selectedEmployee && !editorOpen" class="space-y-4 rounded-xl border border-slate-200 bg-white p-5"
+    aria-label="Costi mensili e cedolini">
+    <header>
+      <h2 class="text-lg font-bold">Costi e cedolini · {{ selectedEmployee.employeeNumber }} ·
+        {{ selectedEmployee.firstName }} {{ selectedEmployee.lastName }}</h2>
+      <p class="text-sm text-slate-600">Ogni costo viene registrato come spesa passiva mensile con il cedolino allegato.</p>
+    </header>
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <label class="grid gap-1 text-sm font-medium">Mese
+        <input type="month" [(ngModel)]="payrollPeriod" class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Costo aziendale del mese
+        <input type="number" min="0.01" step="0.01" [(ngModel)]="monthlyCompanyCost"
+          class="rounded border border-slate-300 p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Cedolino PDF / PNG / JPEG (max 20 MB)
+        <input type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+          (change)="onPayslipSelected($event)" class="rounded border border-slate-300 bg-white p-2" />
+      </label>
+      <label class="grid gap-1 text-sm font-medium">Note
+        <input [(ngModel)]="payrollNotes" maxlength="2000" class="rounded border border-slate-300 p-2" />
+      </label>
+    </div>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <p class="text-sm text-slate-500">{{ payslip?.name || 'Nessun cedolino selezionato' }}</p>
+      <button type="button" [disabled]="payrollSaving" (click)="savePayrollCost()"
+        class="rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white disabled:opacity-50">
+        {{ payrollSaving ? 'Registrazione…' : 'Registra costo e cedolino' }}
+      </button>
+    </div>
+
+    <div *ngIf="payrollLoading" role="status" class="p-4 text-center text-slate-500">Caricamento costi mensili…</div>
+    <div *ngIf="!payrollLoading" class="overflow-x-auto rounded-lg border border-slate-200">
+      <table class="w-full min-w-[700px] text-sm">
+        <thead class="border-b bg-slate-50 text-left text-slate-600">
+          <tr>
+            <th class="px-3 py-3">Mese</th>
+            <th class="px-3 py-3">Documento</th>
+            <th class="px-3 py-3">Stato</th>
+            <th class="px-3 py-3 text-right">Costo</th>
+            <th class="px-3 py-3 text-center">Cedolino</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <tr *ngFor="let cost of payrollCosts">
+            <td class="px-3 py-3">{{ cost.sourceDocumentNumber }}</td>
+            <td class="px-3 py-3">{{ cost.documentCode }}</td>
+            <td class="px-3 py-3">{{ cost.status === 'Approved' ? 'Registrato' : cost.status }}</td>
+            <td class="whitespace-nowrap px-3 py-3 text-right">
+              {{ cost.grossTotal | currency:'EUR':'symbol':'1.2-2':'it-IT' }}
+            </td>
+            <td class="px-3 py-3 text-center">
+              <button *ngIf="cost.hasAttachment" type="button" (click)="downloadPayslip(cost)"
+                class="font-semibold text-blue-700 underline hover:text-blue-900">
+                Scarica
+              </button>
+              <span *ngIf="!cost.hasAttachment" class="text-slate-500">—</span>
+            </td>
+          </tr>
+          <tr *ngIf="payrollCosts.length === 0">
+            <td colspan="5" class="p-6 text-center text-slate-500">Nessun costo mensile registrato.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <app-pagination [page]="payrollPage" [pageSize]="payrollPageSize" [totalCount]="payrollTotalCount"
+      (pageChange)="changePayrollPage($event)" (pageSizeChange)="changePayrollPageSize($event)">
+    </app-pagination>
+  </section>
+</main>

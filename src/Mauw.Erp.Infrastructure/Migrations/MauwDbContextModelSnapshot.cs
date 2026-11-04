@@ -1434,6 +1434,101 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.ToTable("document_audit_entries", (string)null);
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.Employee", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal?>("AnnualCompanyCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("annual_company_cost");
+
+                    b.Property<decimal?>("AnnualGrossSalary")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("annual_gross_salary");
+
+                    b.Property<string>("ContractLevel")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("contract_level");
+
+                    b.Property<string>("ContractType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("contract_type");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("EmployeeNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("employee_number");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date")
+                        .HasColumnName("end_date");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("first_name");
+
+                    b.Property<DateOnly?>("HireDate")
+                        .HasColumnType("date")
+                        .HasColumnName("hire_date");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("last_name");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("Qualification")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("qualification");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_employees");
+
+                    b.HasIndex("EmployeeNumber")
+                        .IsUnique();
+
+                    b.HasIndex("IsActive", "EmployeeNumber");
+
+                    b.ToTable("employees");
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.Invoice", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2087,6 +2182,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
                         .HasColumnType("date")
                         .HasColumnName("due_date");
 
+                    b.Property<Guid?>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
                     b.Property<decimal>("GrossTotal")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -2156,6 +2255,10 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
                     b.HasIndex("DocumentCode")
                         .IsUnique();
+
+                    b.HasIndex("EmployeeId", "SourceDocumentNumber")
+                        .IsUnique()
+                        .HasFilter("kind = 2 AND employee_id IS NOT NULL AND source_document_number IS NOT NULL");
 
                     b.HasIndex("Kind", "DocumentDate");
 
@@ -4102,11 +4205,19 @@ namespace Mauw.Erp.Infrastructure.Migrations
 
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.PayableDocument", b =>
                 {
+                    b.HasOne("Mauw.Erp.Domain.Entities.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("f_k_payable_documents_employees_employee_id");
+
                     b.HasOne("Mauw.Erp.Domain.Entities.Contact", "Supplier")
                         .WithMany()
                         .HasForeignKey("SupplierId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("f_k_payable_documents_contacts_supplier_id");
+
+                    b.Navigation("Employee");
 
                     b.Navigation("Supplier");
                 });

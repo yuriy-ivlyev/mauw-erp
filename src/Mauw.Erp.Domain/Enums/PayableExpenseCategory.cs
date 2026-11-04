@@ -9,5 +9,6 @@ public enum PayableExpenseCategory
     Travel = 4,
     ProfessionalFees = 5,
     AssetCandidate = 6,
-    Other = 7
+    Other = 7,
+    Payroll = 8
 }

@@ -4,10 +4,13 @@ namespace Mauw.Erp.Domain.Entities;
 
 public sealed class PayableDocument : Entity<Guid>
 {
+    private const decimal MaximumMoneyAmount = 9_999_999_999_999_999.99m;
     public PayableDocumentKind Kind { get; private set; }
     public string DocumentCode { get; private set; } = string.Empty;
     public Guid? SupplierId { get; private set; }
     public Contact? Supplier { get; private set; }
+    public Guid? EmployeeId { get; private set; }
+    public Employee? Employee { get; private set; }
     public string? SourceDocumentNumber { get; private set; }
     public DateOnly DocumentDate { get; private set; }
     public DateOnly DueDate { get; private set; }
@@ -24,9 +27,11 @@ public sealed class PayableDocument : Entity<Guid>
     public decimal GrossTotal { get; private set; } = 0.00m;
     public decimal PaidAmount { get; private set; } = 0.00m;
     public decimal BalanceDue => Status == PayableDocumentStatus.Approved
+        && Kind != PayableDocumentKind.EmployeePayroll
         ? GrossTotal - PaidAmount
         : 0.00m;
     public PayablePaymentStatus PaymentStatus => Status != PayableDocumentStatus.Approved
+        || Kind == PayableDocumentKind.EmployeePayroll
         ? PayablePaymentStatus.NotPayable
         : PaidAmount == 0m
             ? PayablePaymentStatus.Unpaid
@@ -58,7 +63,8 @@ public sealed class PayableDocument : Entity<Guid>
         DateOnly dueDate,
         string? beneficiaryName,
         string? notes,
-        IReadOnlyList<PayableDocumentLine>? lines)
+        IReadOnlyList<PayableDocumentLine>? lines,
+        Guid? employeeId = null)
     {
         if (Status is not (PayableDocumentStatus.Draft or PayableDocumentStatus.Rejected))
             return PayableDocumentOperationResult.Fail("Solo una bozza o un documento respinto può essere modificato.");
@@ -79,18 +85,49 @@ public sealed class PayableDocument : Entity<Guid>
                 return PayableDocumentOperationResult.Fail("Il numero della fattura fornitore è obbligatorio (massimo 100 caratteri).");
             if (!string.IsNullOrWhiteSpace(beneficiaryName))
                 return PayableDocumentOperationResult.Fail("Il beneficiario è previsto solo per un rimborso.");
+            if (employeeId.HasValue)
+                return PayableDocumentOperationResult.Fail("Una fattura fornitore non può essere associata a un dipendente.");
         }
         else if (Kind == PayableDocumentKind.ExpenseReimbursement)
         {
             if (supplierId.HasValue)
                 return PayableDocumentOperationResult.Fail("Un rimborso non può avere un fornitore.");
+            if (!employeeId.HasValue || employeeId == Guid.Empty)
+                return PayableDocumentOperationResult.Fail("Selezionare il dipendente beneficiario del rimborso.");
             if (string.IsNullOrWhiteSpace(beneficiaryName) || beneficiaryName.Length > 200)
                 return PayableDocumentOperationResult.Fail("Indicare un beneficiario (massimo 200 caratteri).");
+        }
+        else if (Kind == PayableDocumentKind.EmployeePayroll)
+        {
+            if (supplierId.HasValue)
+                return PayableDocumentOperationResult.Fail("Un costo dipendente non può avere un fornitore.");
+            if (!employeeId.HasValue || employeeId == Guid.Empty)
+                return PayableDocumentOperationResult.Fail("Selezionare il dipendente.");
+            if (!DateOnly.TryParseExact(
+                    sourceDocumentNumber,
+                    "yyyy-MM",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None,
+                    out var period)
+                || period.Day != 1 || documentDate != period
+                || dueDate != period.AddMonths(1).AddDays(-1))
+                return PayableDocumentOperationResult.Fail("Il periodo del costo dipendente deve essere un mese valido.");
+            if (string.IsNullOrWhiteSpace(beneficiaryName) || beneficiaryName.Length > 200)
+                return PayableDocumentOperationResult.Fail("Indicare il dipendente.");
+            if (lines.Count != 1 || lines[0].Category != PayableExpenseCategory.Payroll
+                || lines[0].VatRate.HasValue || lines[0].NatureCode is not null
+                || lines[0].VatAmount != 0m)
+                return PayableDocumentOperationResult.Fail("Il costo mensile deve avere una sola riga senza IVA, di categoria paghe.");
         }
         else
         {
             return PayableDocumentOperationResult.Fail("Tipo documento non supportato.");
         }
+
+        if (Kind != PayableDocumentKind.EmployeePayroll
+            && lines.Any(line => line.Category == PayableExpenseCategory.Payroll))
+            return PayableDocumentOperationResult.Fail(
+                "La categoria paghe è riservata ai costi mensili dei dipendenti.");
 
         foreach (var line in lines)
         {
@@ -99,19 +136,28 @@ public sealed class PayableDocument : Entity<Guid>
                 return validation;
         }
 
+        var taxableTotal = Money(lines.Sum(line => line.TaxableAmount));
+        var vatTotal = Money(lines.Sum(line => line.VatAmount));
+        var grossTotal = Money(lines.Sum(line => line.GrossAmount));
+        if (taxableTotal > MaximumMoneyAmount || vatTotal > MaximumMoneyAmount
+            || grossTotal > MaximumMoneyAmount)
+            return PayableDocumentOperationResult.Fail(
+                "I totali del documento superano il limite gestibile.");
+
         Lines.Clear();
         foreach (var line in lines)
             Lines.Add(line);
 
         SupplierId = supplierId;
+        EmployeeId = employeeId;
         SourceDocumentNumber = Normalize(sourceDocumentNumber);
         DocumentDate = documentDate;
         DueDate = dueDate;
         BeneficiaryName = Normalize(beneficiaryName);
         Notes = Normalize(notes);
-        TaxableTotal = Money(Lines.Sum(line => line.TaxableAmount));
-        VatTotal = Money(Lines.Sum(line => line.VatAmount));
-        GrossTotal = Money(Lines.Sum(line => line.GrossAmount));
+        TaxableTotal = taxableTotal;
+        VatTotal = vatTotal;
+        GrossTotal = grossTotal;
         if (Status == PayableDocumentStatus.Rejected)
         {
             Status = PayableDocumentStatus.Draft;
@@ -213,6 +259,8 @@ public sealed class PayableDocument : Entity<Guid>
         string? transactionDetails,
         string? createdByUserId)
     {
+        if (Kind == PayableDocumentKind.EmployeePayroll)
+            return PayableDocumentOperationResult.Fail("Il costo mensile del dipendente non gestisce pagamenti in ERP.");
         if (Status != PayableDocumentStatus.Approved)
             return PayableDocumentOperationResult.Fail("I pagamenti sono ammessi solo per documenti approvati.");
         if (amount <= 0m || decimal.Round(amount, 2, MidpointRounding.AwayFromZero) != amount)
@@ -245,6 +293,8 @@ public sealed class PayableDocument : Entity<Guid>
         if (!HasMoneyScale(line.TaxableAmount) || !HasMoneyScale(line.VatAmount)
             || !HasMoneyScale(line.GrossAmount)
             || line.TaxableAmount < 0m || line.VatAmount < 0m || line.GrossAmount <= 0m
+            || line.TaxableAmount > MaximumMoneyAmount || line.VatAmount > MaximumMoneyAmount
+            || line.GrossAmount > MaximumMoneyAmount
             || line.GrossAmount != line.TaxableAmount + line.VatAmount)
             return PayableDocumentOperationResult.Fail("Gli importi devono essere positivi, a due decimali e coerenti tra imponibile, IVA e totale.");
         if (!line.VatRate.HasValue)

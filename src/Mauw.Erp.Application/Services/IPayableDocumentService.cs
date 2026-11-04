@@ -15,8 +15,13 @@ public interface IPayableDocumentService
         DateOnly? dateTo,
         CancellationToken cancellationToken);
 
-    Task<PagedResult<PayableDocumentListItemDto>> ListMyReimbursementsAsync(
-        string userId,
+    Task<PagedResult<PayableDocumentListItemDto>> ListReimbursementsAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken);
+
+    Task<PagedResult<PayableDocumentListItemDto>> ListEmployeePayrollCostsAsync(
+        Guid employeeId,
         int page,
         int pageSize,
         CancellationToken cancellationToken);
@@ -34,7 +39,17 @@ public interface IPayableDocumentService
 
     Task<OperationResult<PayableDocumentDto>> CreateReimbursementAsync(
         CreatePayableDocumentRequest request,
-        string? beneficiaryUserId,
+        string? createdByUserId,
+        CancellationToken cancellationToken);
+
+    Task<OperationResult<PayableDocumentDto>> CreateEmployeePayrollCostAsync(
+        Guid employeeId,
+        CreateEmployeePayrollCostRequest request,
+        Stream attachment,
+        string fileName,
+        string contentType,
+        long length,
+        string? createdByUserId,
         CancellationToken cancellationToken);
 
     Task<OperationResult<PayableDocumentDto>> UpdateDraftAsync(

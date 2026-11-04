@@ -14,8 +14,10 @@ import {
   PayableExpenseCategory
 } from '../../models/payable-document.model';
 import { ContactSummary } from '../../models/contact.model';
+import { Employee } from '../../models/employee.model';
 import { AuthService } from '../../services/auth.service';
 import { ContactService } from '../../services/contact.service';
+import { EmployeeService } from '../../services/employee.service';
 import { PayableDocumentService } from '../../services/payable-document.service';
 import { AddActionButtonComponent } from '../../shared/add-action-button/add-action-button.component';
 import { BackButtonComponent } from '../../shared/back-button/back-button.component';
@@ -58,6 +60,7 @@ export class PayableDocumentsComponent implements OnInit, OnDestroy {
 
   documents: PayableDocumentListItem[] = [];
   suppliers: ContactSummary[] = [];
+  employees: Employee[] = [];
   selected: PayableDocument | null = null;
   loading = false;
   saving = false;
@@ -81,10 +84,10 @@ export class PayableDocumentsComponent implements OnInit, OnDestroy {
   editing = false;
   kind: PayableDocumentKind = 'SupplierInvoice';
   supplierId = '';
+  employeeId = '';
   sourceDocumentNumber = '';
   documentDate = '';
   dueDate = '';
-  beneficiaryName = '';
   notes = '';
   draftLines: PayableDocumentLineRequest[] = [this.newLine()];
   selectedFile: File | null = null;
@@ -103,6 +106,7 @@ export class PayableDocumentsComponent implements OnInit, OnDestroy {
     private readonly router: Router,
     private readonly documentsApi: PayableDocumentService,
     private readonly contactsApi: ContactService,
+    private readonly employeesApi: EmployeeService,
     private readonly auth: AuthService
   ) {}
 
@@ -120,6 +124,9 @@ export class PayableDocumentsComponent implements OnInit, OnDestroy {
 
     if (this.canManageAll && !this.reimbursementsOnly) {
       this.loadSuppliers();
+    }
+    if (this.reimbursementsOnly && this.auth.hasRole('Admin')) {
+      this.loadEmployees();
     }
     if (this.editorMode) {
       const documentId = this.route.snapshot.paramMap.get('id');
@@ -166,7 +173,7 @@ export class PayableDocumentsComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.errorMessage = '';
     const request = this.reimbursementsOnly
-      ? this.documentsApi.listMyReimbursements(this.currentPage, pageSize)
+      ? this.documentsApi.listReimbursements(this.currentPage, pageSize)
       : this.documentsApi.list(this.currentPage, pageSize, {
         search: this.search.trim() || undefined,
         kind: this.filterKind || undefined,
@@ -194,6 +201,15 @@ export class PayableDocumentsComponent implements OnInit, OnDestroy {
       });
   }
 
+  loadEmployees(): void {
+    this.employeesApi.list(1, 100, '', true)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: result => { this.employees = result.items; },
+        error: error => { this.errorMessage = this.describeError(error, 'Impossibile caricare i dipendenti.'); }
+      });
+  }
+
   startNew(kind: PayableDocumentKind): void {
     const route = kind === 'ExpenseReimbursement' ? '/acquisti/rimborsi' : '/acquisti/passivi';
     void this.router.navigate([route, 'nuovo'], {
@@ -205,10 +221,10 @@ export class PayableDocumentsComponent implements OnInit, OnDestroy {
     this.selected = null;
     this.kind = kind;
     this.supplierId = '';
+    this.employeeId = '';
     this.sourceDocumentNumber = '';
     this.documentDate = toLocalDateInput(new Date());
     this.dueDate = this.documentDate;
-    this.beneficiaryName = '';
     this.notes = '';
     this.draftLines = [this.newLine()];
     this.selectedFile = null;
@@ -227,7 +243,7 @@ export class PayableDocumentsComponent implements OnInit, OnDestroy {
   private loadDocument(id: string): void {
     this.errorMessage = '';
     const request = this.reimbursementsOnly
-      ? this.documentsApi.getMyReimbursement(id)
+      ? this.documentsApi.getReimbursement(id)
       : this.documentsApi.get(id);
     request.pipe(takeUntil(this.destroy$)).subscribe({
       next: document => {
@@ -442,7 +458,9 @@ export class PayableDocumentsComponent implements OnInit, OnDestroy {
   }
 
   kindLabel(kind: string): string {
-    return kind === 'ExpenseReimbursement' ? 'Rimborso spese' : 'Fattura fornitore';
+    if (kind === 'ExpenseReimbursement') return 'Rimborso spese';
+    if (kind === 'EmployeePayroll') return 'Costo mensile dipendente';
+    return 'Fattura fornitore';
   }
 
   statusLabel(status: string): string {
@@ -502,6 +520,10 @@ export class PayableDocumentsComponent implements OnInit, OnDestroy {
       this.errorMessage = 'Selezionare il fornitore e inserire il numero fattura.';
       return false;
     }
+    if (this.kind === 'ExpenseReimbursement' && !this.employeeId) {
+      this.errorMessage = 'Selezionare il dipendente beneficiario del rimborso.';
+      return false;
+    }
     if (this.draftLines.length === 0 || this.draftLines.some(line =>
       !line.description.trim() || line.taxableAmount < 0 || line.vatAmount < 0
       || line.grossAmount <= 0 || this.kind === 'SupplierInvoice' && line.vatRate === null
@@ -519,9 +541,7 @@ export class PayableDocumentsComponent implements OnInit, OnDestroy {
       sourceDocumentNumber: this.sourceDocumentNumber.trim() || null,
       documentDate: this.documentDate,
       dueDate: this.dueDate,
-      beneficiaryName: this.kind === 'ExpenseReimbursement'
-        ? this.beneficiaryName.trim() || null
-        : null,
+      beneficiaryName: null,
       notes: this.notes.trim() || null,
       lines: this.draftLines.map(line => ({
         ...line,
@@ -530,17 +550,18 @@ export class PayableDocumentsComponent implements OnInit, OnDestroy {
         project: line.project?.trim() || null,
         natureCode: line.natureCode?.trim() || null
       })),
-      version: this.selected?.version
+      version: this.selected?.version,
+      employeeId: this.kind === 'ExpenseReimbursement' ? this.employeeId : null
     };
   }
 
   private copyToDraft(document: PayableDocument): void {
     this.kind = document.kind;
     this.supplierId = document.supplierId ?? '';
+    this.employeeId = document.employeeId ?? '';
     this.sourceDocumentNumber = document.sourceDocumentNumber ?? '';
     this.documentDate = document.documentDate;
     this.dueDate = document.dueDate;
-    this.beneficiaryName = document.beneficiaryName ?? '';
     this.notes = document.notes ?? '';
     this.draftLines = document.lines.map(line => ({
       description: line.description,

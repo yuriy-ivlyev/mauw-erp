@@ -80,6 +80,7 @@ public sealed class PayableDocumentTests
     public void ReimbursementNeedsABeneficiaryAndNeverRequiresASupplier()
     {
         var document = new PayableDocument(PayableDocumentKind.ExpenseReimbursement, "user-1");
+        var employeeId = Guid.NewGuid();
 
         var missingBeneficiary = document.UpdateDraft(
             null,
@@ -90,7 +91,8 @@ public sealed class PayableDocumentTests
             null,
             [new PayableDocumentLine(
                 document.Id, "Trasferta", PayableExpenseCategory.Travel,
-                100m, null, null, 0m, 100m, "Commerciale", "Visita clienti")]);
+                100m, null, null, 0m, 100m, "Commerciale", "Visita clienti")],
+            employeeId);
         Assert.False(missingBeneficiary.Success);
 
         var valid = document.UpdateDraft(
@@ -102,10 +104,12 @@ public sealed class PayableDocumentTests
             null,
             [new PayableDocumentLine(
                 document.Id, "Trasferta", PayableExpenseCategory.Travel,
-                100m, null, null, 0m, 100m, "Commerciale", "Visita clienti")]);
+                100m, null, null, 0m, 100m, "Commerciale", "Visita clienti")],
+            employeeId);
 
         Assert.True(valid.Success, valid.Error);
         Assert.Null(document.SupplierId);
+        Assert.Equal(employeeId, document.EmployeeId);
         Assert.Equal("Mario Rossi", document.BeneficiaryName);
     }
 
@@ -141,6 +145,41 @@ public sealed class PayableDocumentTests
         Assert.Equal(PayableDocumentStatus.Draft, document.Status);
         Assert.Null(document.RejectionReason);
         Assert.True(document.SubmitForApproval(DateTime.UtcNow).Success);
+    }
+
+    [Fact]
+    public void AggregateTotalsAreValidatedBeforeReplacingExistingLines()
+    {
+        var document = NewSupplierInvoice();
+        var supplierId = Guid.NewGuid();
+        Assert.True(document.UpdateDraft(
+            supplierId,
+            "F-2026-004",
+            new DateOnly(2026, 11, 4),
+            new DateOnly(2026, 12, 4),
+            null,
+            null,
+            [Line(document.Id)]).Success);
+        var originalLine = Assert.Single(document.Lines);
+        var maximumAmount = 9_999_999_999_999_999.99m;
+
+        var result = document.UpdateDraft(
+            supplierId,
+            "F-2026-004",
+            new DateOnly(2026, 11, 4),
+            new DateOnly(2026, 12, 4),
+            null,
+            null,
+            [
+                new(document.Id, "Costo uno", PayableExpenseCategory.Other,
+                    maximumAmount, null, null, 0m, maximumAmount, null, null),
+                new(document.Id, "Costo due", PayableExpenseCategory.Other,
+                    maximumAmount, null, null, 0m, maximumAmount, null, null)
+            ]);
+
+        Assert.False(result.Success);
+        Assert.Equal(100m, document.TaxableTotal);
+        Assert.Same(originalLine, Assert.Single(document.Lines));
     }
 
     private static PayableDocument NewSupplierInvoice() =>

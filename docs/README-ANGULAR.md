@@ -142,18 +142,26 @@ pagamenti parziali fino al saldo; ogni passaggio è auditato. La registrazione
 del documento passivo non genera movimenti di magazzino: l'entrata merce resta
 nel flusso DDT fornitore.
 
-La rotta `/acquisti/rimborsi` è disponibile agli utenti autenticati e mostra
-solo i rimborsi presentati dall'utente corrente. **Nuovo rimborso** e il
-dettaglio aprono schermate separate (`/acquisti/rimborsi/nuovo` e
-`/acquisti/rimborsi/:id`), preservando la lista personale. Il beneficiario è
-ricavato dall'identità autenticata; il giustificativo è obbligatorio per
-l'approvazione. Il back office approva e registra il rimborso come documento
-passivo.
+La rotta `/acquisti/rimborsi` è riservata ad `Admin`; l'amministratore sceglie
+il dipendente beneficiario. **Nuovo rimborso** e il dettaglio aprono schermate
+separate (`/acquisti/rimborsi/nuovo` e `/acquisti/rimborsi/:id`), preservando
+la lista. Il giustificativo è obbligatorio per inviare la richiesta in
+approvazione; i rimborsi sono documenti passivi associati al dipendente, non
+all'utente ERP che li registra.
+
+La rotta Admin-only `/amministrazione/dipendenti` gestisce matricola,
+nominativo, inquadramento, livello/contratto, RAL e costo annuo aziendale.
+Nella scheda del dipendente si registra per ogni mese il costo aziendale
+effettivo e si allega il cedolino (PDF/PNG/JPEG, massimo 20 MB). Il costo
+diventa un documento passivo approvato di categoria paghe, con IVA zero e
+senza gestione di pagamenti ERP; il cedolino e i dati dipendente non sono
+esposti alle API o alle schermate `Accounting`.
 
 Queste funzioni sono per controllo operativo e passaggio dati al commercialista:
-non implementano contabilità generale, registri o liquidazioni IVA, registro
-cespiti/ammortamenti o paghe. Le fatture passive non sono ancora abbinate
-automaticamente a ordini o DDT fornitore.
+non implementano contabilità generale, registri o liquidazioni IVA, calcolo
+delle paghe, adempimenti contributivi, registro cespiti o ammortamenti. Le
+fatture passive non sono ancora abbinate automaticamente a ordini o DDT
+fornitore.
 
 ## Acquisti / Carico Merce (DDT fornitore)
 

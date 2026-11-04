@@ -330,6 +330,36 @@ public class SimulationTests(PostgreSqlContainerFixture postgres)
         Assert.False(await db.Products.AnyAsync());
     }
 
+    [Fact]
+    public async Task ExistingEmployeeRecordsPreventGeneration()
+    {
+        await using var db = Context();
+        var employee = new Mauw.Erp.Domain.Entities.Employee();
+        Assert.True(employee.Update(
+            "MAT-TEST",
+            "Test",
+            "Dipendente",
+            null,
+            null,
+            null,
+            null,
+            30_000m,
+            null,
+            null,
+            true,
+            null).Success);
+        db.Employees.Add(employee);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var result = await Generator(db).GenerateAsync(FixtureOptions(), CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Contains("empty business database", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(await db.Employees.ToListAsync());
+        Assert.False(await db.Products.AnyAsync());
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

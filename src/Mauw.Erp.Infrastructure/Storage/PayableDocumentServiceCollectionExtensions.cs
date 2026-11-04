@@ -9,6 +9,7 @@ public static class PayableDocumentServiceCollectionExtensions
     public static IServiceCollection AddPayableDocuments(this IServiceCollection services)
     {
         services.AddScoped<IPayableDocumentService, PayableDocumentService>();
+        services.AddScoped<IEmployeeService, EmployeeService>();
         return services;
     }
 }

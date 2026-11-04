@@ -29,19 +29,19 @@ export class PayableDocumentService {
     return this.http.get<PayableDocumentPage>(this.base, { params });
   }
 
-  listMyReimbursements(page: number, pageSize: number): Observable<PayableDocumentPage> {
+  listReimbursements(page: number, pageSize: number): Observable<PayableDocumentPage> {
     const params = new HttpParams()
       .set('page', String(page))
       .set('pageSize', String(pageSize));
-    return this.http.get<PayableDocumentPage>(`${this.base}/my-reimbursements`, { params });
+    return this.http.get<PayableDocumentPage>(`${this.base}/reimbursements`, { params });
   }
 
   get(id: string): Observable<PayableDocument> {
     return this.http.get<PayableDocument>(`${this.base}/${id}`);
   }
 
-  getMyReimbursement(id: string): Observable<PayableDocument> {
-    return this.http.get<PayableDocument>(`${this.base}/my-reimbursements/${id}`);
+  getReimbursement(id: string): Observable<PayableDocument> {
+    return this.http.get<PayableDocument>(`${this.base}/reimbursements/${id}`);
   }
 
   createSupplierInvoice(request: CreatePayableDocumentRequest): Observable<PayableDocument> {
@@ -49,12 +49,12 @@ export class PayableDocumentService {
   }
 
   createReimbursement(request: CreatePayableDocumentRequest): Observable<PayableDocument> {
-    return this.http.post<PayableDocument>(`${this.base}/my-reimbursements`, request);
+    return this.http.post<PayableDocument>(`${this.base}/reimbursements`, request);
   }
 
   update(id: string, request: CreatePayableDocumentRequest, mine = false): Observable<PayableDocument> {
     return this.http.put<PayableDocument>(
-      `${mine ? `${this.base}/my-reimbursements` : this.base}/${id}`,
+      `${mine ? `${this.base}/reimbursements` : this.base}/${id}`,
       request
     );
   }
@@ -63,17 +63,17 @@ export class PayableDocumentService {
     const form = new FormData();
     form.append('file', file, file.name);
     const params = new HttpParams().set('version', version);
-    const path = `${mine ? `${this.base}/my-reimbursements` : this.base}/${id}/attachment`;
+    const path = `${mine ? `${this.base}/reimbursements` : this.base}/${id}/attachment`;
     return this.http.post<PayableDocument>(path, form, { params });
   }
 
   downloadAttachment(id: string, mine = false): Observable<Blob> {
-    const path = `${mine ? `${this.base}/my-reimbursements` : this.base}/${id}/attachment`;
+    const path = `${mine ? `${this.base}/reimbursements` : this.base}/${id}/attachment`;
     return this.http.get(path, { responseType: 'blob' });
   }
 
   submit(id: string, version: string, mine = false): Observable<PayableDocument> {
-    const path = `${mine ? `${this.base}/my-reimbursements` : this.base}/${id}/submit`;
+    const path = `${mine ? `${this.base}/reimbursements` : this.base}/${id}/submit`;
     return this.http.post<PayableDocument>(path, { version });
   }
 
@@ -86,7 +86,7 @@ export class PayableDocumentService {
   }
 
   cancel(id: string, version: string, mine = false): Observable<PayableDocument> {
-    const path = `${mine ? `${this.base}/my-reimbursements` : this.base}/${id}/cancel`;
+    const path = `${mine ? `${this.base}/reimbursements` : this.base}/${id}/cancel`;
     return this.http.post<PayableDocument>(path, { version });
   }
 

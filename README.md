@@ -11,6 +11,8 @@ web Angular e database PostgreSQL.
 - Fatture, registrazione pagamenti, partitario cliente e note di credito.
 - Ciclo passivo operativo per fatture fornitori, spese e rimborsi con allegati,
   approvazione e pagamenti parziali.
+- Anagrafica dipendenti Admin-only con matricola, inquadramento, dati annui e
+  registrazione dei costi aziendali mensili con cedolino allegato.
 - Calcolo fiscale centralizzato e generazione PDF/XML FatturaPA.
 - Ritiro in showroom: completa un ordine confermato senza prelievo, imballaggio
   o DDT e registra comunque lo scarico della giacenza.
@@ -62,6 +64,7 @@ facoltativo: usare esclusivamente un database dedicato `*_loadtest`, come
 descritto nel suo README.
 
 Il ciclo passivo è operativo, ma non costituisce contabilità generale né
-liquidazione IVA. Ammortamenti e paghe restano fuori dal gestionale: i
-documenti e le spese sono preparati per il controllo interno e il passaggio al
-commercialista.
+liquidazione IVA. Rimborsi, anagrafica dipendenti, costi mensili e cedolini sono
+riservati all'Admin; il gestionale non calcola paghe, ammortamenti o
+adempimenti fiscali. I documenti e le spese servono al controllo interno e al
+passaggio dei dati al commercialista.

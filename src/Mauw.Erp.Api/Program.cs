@@ -161,6 +161,7 @@ app.MapPriceListEndpoints();
 app.MapPriceFormulaEndpoints();
 app.MapSupplierDeliveryNoteEndpoints();
 app.MapPayableDocumentEndpoints();
+app.MapEmployeeEndpoints();
 app.MapSupplierPurchaseOrderEndpoints();
 
 // Migrate database on startup and initialize seed data

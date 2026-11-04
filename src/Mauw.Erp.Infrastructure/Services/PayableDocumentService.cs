@@ -28,6 +28,7 @@ public sealed class PayableDocumentService(
 
     private IQueryable<PayableDocument> Documents => db.PayableDocuments
         .Include(document => document.Supplier)
+        .Include(document => document.Employee)
         .Include(document => document.Lines)
         .Include(document => document.Payments);
 
@@ -44,6 +45,10 @@ public sealed class PayableDocumentService(
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
         var query = db.PayableDocuments.AsQueryable();
+        if (!currentUser.HasRole("Admin"))
+            query = query.Where(document =>
+                document.Kind != PayableDocumentKind.ExpenseReimbursement
+                && document.Kind != PayableDocumentKind.EmployeePayroll);
         if (Enum.TryParse<PayableDocumentKind>(kind, true, out var documentKind)
             && Enum.IsDefined(documentKind))
             query = query.Where(document => document.Kind == documentKind);
@@ -73,25 +78,24 @@ public sealed class PayableDocumentService(
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Include(document => document.Supplier)
+            .Include(document => document.Employee)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
         return new(documents.Select(MapListItem).ToList(), page, pageSize, total);
     }
 
-    public async Task<PagedResult<PayableDocumentListItemDto>> ListMyReimbursementsAsync(
-        string userId,
+    public async Task<PagedResult<PayableDocumentListItemDto>> ListReimbursementsAsync(
         int page,
         int pageSize,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(userId))
+        if (!currentUser.HasRole("Admin"))
             return new([], 1, 20, 0);
 
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
         var query = db.PayableDocuments
-            .Where(document => document.Kind == PayableDocumentKind.ExpenseReimbursement
-                && document.CreatedByUserId == userId);
+            .Where(document => document.Kind == PayableDocumentKind.ExpenseReimbursement);
         var total = await query.CountAsync(cancellationToken);
         var documents = await query
             .OrderByDescending(document => document.DocumentDate)
@@ -100,6 +104,34 @@ public sealed class PayableDocumentService(
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Include(document => document.Supplier)
+            .Include(document => document.Employee)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+        return new(documents.Select(MapListItem).ToList(), page, pageSize, total);
+    }
+
+    public async Task<PagedResult<PayableDocumentListItemDto>> ListEmployeePayrollCostsAsync(
+        Guid employeeId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        if (!currentUser.HasRole("Admin"))
+            return new([], 1, 20, 0);
+
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        var query = db.PayableDocuments.Where(document =>
+            document.Kind == PayableDocumentKind.EmployeePayroll
+            && document.EmployeeId == employeeId);
+        var total = await query.CountAsync(cancellationToken);
+        var documents = await query
+            .OrderByDescending(document => document.DocumentDate)
+            .ThenByDescending(document => document.CreatedAt)
+            .ThenBy(document => document.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Include(document => document.Employee)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
         return new(documents.Select(MapListItem).ToList(), page, pageSize, total);
@@ -124,27 +156,158 @@ public sealed class PayableDocumentService(
         CancellationToken cancellationToken) =>
         CreateAsync(request, PayableDocumentKind.SupplierInvoice, createdByUserId, cancellationToken);
 
-    public Task<OperationResult<PayableDocumentDto>> CreateReimbursementAsync(
+    public async Task<OperationResult<PayableDocumentDto>> CreateReimbursementAsync(
         CreatePayableDocumentRequest request,
-        string? beneficiaryUserId,
+        string? createdByUserId,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(beneficiaryUserId))
-            return Task.FromResult(OperationResult<PayableDocumentDto>.Fail(
-                "Utente autenticato non identificato."));
+        if (!currentUser.HasRole("Admin"))
+            return OperationResult<PayableDocumentDto>.Fail("Solo un amministratore può registrare un rimborso.");
+        if (string.IsNullOrWhiteSpace(createdByUserId))
+            return OperationResult<PayableDocumentDto>.Fail("Utente amministratore non identificato.");
         if (request.SupplierId.HasValue)
-            return Task.FromResult(OperationResult<PayableDocumentDto>.Fail(
-                "Un rimborso non può avere un fornitore."));
-        var beneficiaryName = currentUser.FullName ?? currentUser.Email;
-        if (string.IsNullOrWhiteSpace(beneficiaryName))
-            return Task.FromResult(OperationResult<PayableDocumentDto>.Fail(
-                "Il profilo autenticato non contiene un nominativo per il rimborso."));
+            return OperationResult<PayableDocumentDto>.Fail("Un rimborso non può avere un fornitore.");
+        var employee = request.EmployeeId.HasValue
+            ? await db.Employees.SingleOrDefaultAsync(
+                item => item.Id == request.EmployeeId.Value, cancellationToken)
+            : null;
+        if (employee is null || !employee.IsActive)
+            return OperationResult<PayableDocumentDto>.Fail("Selezionare un dipendente attivo.");
 
-        return CreateAsync(request with
+        return await CreateAsync(request with
         {
             Kind = PayableDocumentKind.ExpenseReimbursement.ToString(),
-            BeneficiaryName = beneficiaryName
-        }, PayableDocumentKind.ExpenseReimbursement, beneficiaryUserId, cancellationToken);
+            BeneficiaryName = $"{employee.FirstName} {employee.LastName}"
+        }, PayableDocumentKind.ExpenseReimbursement, createdByUserId, cancellationToken);
+    }
+
+    public async Task<OperationResult<PayableDocumentDto>> CreateEmployeePayrollCostAsync(
+        Guid employeeId,
+        CreateEmployeePayrollCostRequest request,
+        Stream attachment,
+        string fileName,
+        string contentType,
+        long length,
+        string? createdByUserId,
+        CancellationToken cancellationToken)
+    {
+        if (!currentUser.HasRole("Admin"))
+            return OperationResult<PayableDocumentDto>.Fail("Solo un amministratore può registrare costi del personale.");
+        if (string.IsNullOrWhiteSpace(createdByUserId))
+            return OperationResult<PayableDocumentDto>.Fail("Utente amministratore non identificato.");
+        if (request.Period == default || request.Period.Day != 1
+            || request.MonthlyCompanyCost <= 0m
+            || decimal.Round(request.MonthlyCompanyCost, 2, MidpointRounding.AwayFromZero)
+                != request.MonthlyCompanyCost)
+            return OperationResult<PayableDocumentDto>.Fail(
+                "Indicare il primo giorno del mese e un costo aziendale positivo a due decimali.");
+        var attachmentBuffer = await ReadAndValidateAttachmentAsync(
+            attachment, fileName, contentType, length, cancellationToken);
+        if (!attachmentBuffer.Success)
+            return OperationResult<PayableDocumentDto>.Fail(attachmentBuffer.Error!);
+        using var buffer = attachmentBuffer.Data!;
+
+        var employee = await db.Employees.SingleOrDefaultAsync(
+            item => item.Id == employeeId, cancellationToken);
+        if (employee is null)
+            return OperationResult<PayableDocumentDto>.Fail("Dipendente non trovato.");
+        var periodEnd = request.Period.AddMonths(1).AddDays(-1);
+        if (employee.HireDate > periodEnd || employee.EndDate < request.Period)
+            return OperationResult<PayableDocumentDto>.Fail(
+                "Il periodo del costo non ricade nel periodo di impiego del dipendente.");
+
+        var document = new PayableDocument(PayableDocumentKind.EmployeePayroll, createdByUserId);
+        var line = new PayableDocumentLine(
+            document.Id,
+            $"Costo aziendale mensile - {employee.EmployeeNumber} {request.Period:MM/yyyy}",
+            PayableExpenseCategory.Payroll,
+            request.MonthlyCompanyCost,
+            null,
+            null,
+            0.00m,
+            request.MonthlyCompanyCost,
+            null,
+            null);
+        var updated = document.UpdateDraft(
+            null,
+            request.Period.ToString("yyyy-MM"),
+            request.Period,
+            periodEnd,
+            $"{employee.FirstName} {employee.LastName}",
+            request.Notes,
+            [line],
+            employeeId);
+        if (!updated.Success)
+            return OperationResult<PayableDocumentDto>.Fail(updated.Error!);
+
+        buffer.Position = 0;
+        var storageKey = await storage.UploadAsync(document.Id, buffer, contentType, cancellationToken);
+        var attached = document.SetAttachment(
+            storageKey, Path.GetFileName(fileName), contentType, buffer.Length);
+        if (!attached.Success)
+        {
+            await storage.DeleteAsync(storageKey, CancellationToken.None);
+            return OperationResult<PayableDocumentDto>.Fail(attached.Error!);
+        }
+        var submitted = document.SubmitForApproval(DateTime.UtcNow);
+        if (!submitted.Success)
+        {
+            await storage.DeleteAsync(storageKey, CancellationToken.None);
+            return OperationResult<PayableDocumentDto>.Fail(submitted.Error!);
+        }
+        var approved = document.Approve(createdByUserId, DateTime.UtcNow);
+        if (!approved.Success)
+        {
+            await storage.DeleteAsync(storageKey, CancellationToken.None);
+            return OperationResult<PayableDocumentDto>.Fail(approved.Error!);
+        }
+
+        db.PayableDocuments.Add(document);
+        db.DocumentAuditEntries.Add(new DocumentAuditEntry(
+            AuditDocumentTypes.PayableDocument,
+            document.Id,
+            AuditActions.EmployeePayrollCostCreated,
+            "Costo aziendale mensile e cedolino registrati.",
+            createdByUserId,
+            currentUser.FullName ?? currentUser.Email ?? createdByUserId));
+        db.DocumentAuditEntries.Add(new DocumentAuditEntry(
+            AuditDocumentTypes.PayableDocument,
+            document.Id,
+            AuditActions.PayableDocumentApproved,
+            "Costo mensile verificato e registrato come spesa passiva.",
+            createdByUserId,
+            currentUser.FullName ?? currentUser.Email ?? createdByUserId,
+            occurredAtUtc: DateTime.UtcNow));
+        PayableDocumentOperationResult saved;
+        try
+        {
+            saved = await SaveAsync(cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            try
+            {
+                await storage.DeleteAsync(storageKey, CancellationToken.None);
+            }
+            catch (Exception cleanupException)
+            {
+                throw new AggregateException(
+                    "Salvataggio costo dipendente fallito e pulizia S3 non riuscita.",
+                    exception,
+                    cleanupException);
+            }
+            throw;
+        }
+
+        if (!saved.Success)
+        {
+            await storage.DeleteAsync(storageKey, CancellationToken.None);
+            return OperationResult<PayableDocumentDto>.Fail(saved.Error!);
+        }
+        var created = await GetAsync(document.Id, createdByUserId, canManageAll: true, cancellationToken);
+        return created is null
+            ? OperationResult<PayableDocumentDto>.Fail("Costo dipendente non trovato dopo il salvataggio.")
+            : OperationResult<PayableDocumentDto>.Ok(created);
     }
 
     public async Task<OperationResult<PayableDocumentDto>> UpdateDraftAsync(
@@ -167,12 +330,16 @@ public sealed class PayableDocumentService(
         var supplierError = await ValidateSupplierAsync(document.Kind, request.SupplierId, cancellationToken);
         if (supplierError is not null)
             return OperationResult<PayableDocumentDto>.Fail(supplierError);
+        var employeeValidation = await ValidateEmployeeAsync(
+            document.Kind, request.EmployeeId, request.DocumentDate, request.DueDate, cancellationToken);
+        if (employeeValidation.Error is not null)
+            return OperationResult<PayableDocumentDto>.Fail(employeeValidation.Error);
 
         var lines = BuildLines(document.Id, document.Kind, request.Lines);
         if (!lines.Success)
             return OperationResult<PayableDocumentDto>.Fail(lines.Error!);
-        var beneficiaryName = document.Kind == PayableDocumentKind.ExpenseReimbursement && !canManageAll
-            ? document.BeneficiaryName
+        var beneficiaryName = employeeValidation.Employee is { } employee
+            ? $"{employee.FirstName} {employee.LastName}"
             : request.BeneficiaryName;
         var updated = document.UpdateDraft(
             request.SupplierId,
@@ -181,7 +348,8 @@ public sealed class PayableDocumentService(
             request.DueDate,
             beneficiaryName,
             request.Notes,
-            lines.Data!);
+            lines.Data!,
+            request.EmployeeId);
         if (!updated.Success)
             return OperationResult<PayableDocumentDto>.Fail(updated.Error!);
 
@@ -209,26 +377,11 @@ public sealed class PayableDocumentService(
         bool canManageAll,
         CancellationToken cancellationToken)
     {
-        if (length <= 0 || length > MaximumFileSize)
-            return OperationResult<PayableDocumentDto>.Fail("Allegare un file non vuoto di massimo 20 MB.");
-        if (!AllowedContentType(contentType))
-            return OperationResult<PayableDocumentDto>.Fail("Sono ammessi solo file PDF, PNG e JPEG.");
-        var extension = Path.GetExtension(fileName).ToLowerInvariant();
-        if ((contentType, extension) is not (("application/pdf", ".pdf")
-            or ("image/png", ".png") or ("image/jpeg", ".jpg") or ("image/jpeg", ".jpeg")))
-            return OperationResult<PayableDocumentDto>.Fail("Estensione e formato dell'allegato non corrispondono.");
-
-        using var buffer = new MemoryStream();
-        var chunk = new byte[81920];
-        int read;
-        while ((read = await stream.ReadAsync(chunk, cancellationToken)) > 0)
-        {
-            if (buffer.Length + read > MaximumFileSize)
-                return OperationResult<PayableDocumentDto>.Fail("Il documento supera 20 MB.");
-            await buffer.WriteAsync(chunk.AsMemory(0, read), cancellationToken);
-        }
-        if (!ValidSignature(buffer.GetBuffer().AsSpan(0, (int)buffer.Length), contentType))
-            return OperationResult<PayableDocumentDto>.Fail("Il contenuto del file non corrisponde al formato dichiarato.");
+        var attachmentBuffer = await ReadAndValidateAttachmentAsync(
+            stream, fileName, contentType, length, cancellationToken);
+        if (!attachmentBuffer.Success)
+            return OperationResult<PayableDocumentDto>.Fail(attachmentBuffer.Error!);
+        using var buffer = attachmentBuffer.Data!;
 
         var document = await Documents.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
         if (document is null)
@@ -367,6 +520,8 @@ public sealed class PayableDocumentService(
         var document = await Documents.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
         if (document is null)
             return OperationResult<PayableDocumentDto>.Fail(Missing);
+        if (!CanAccess(document, recordedByUserId, canManageAll: true))
+            return OperationResult<PayableDocumentDto>.Fail("Non si dispone dei permessi per modificare questo documento.");
         if (document.Version != request.Version)
             return OperationResult<PayableDocumentDto>.Fail(ConcurrencyConflict);
 
@@ -404,6 +559,10 @@ public sealed class PayableDocumentService(
         var supplierError = await ValidateSupplierAsync(kind, request.SupplierId, cancellationToken);
         if (supplierError is not null)
             return OperationResult<PayableDocumentDto>.Fail(supplierError);
+        var employeeValidation = await ValidateEmployeeAsync(
+            kind, request.EmployeeId, request.DocumentDate, request.DueDate, cancellationToken);
+        if (employeeValidation.Error is not null)
+            return OperationResult<PayableDocumentDto>.Fail(employeeValidation.Error);
 
         var document = new PayableDocument(kind, userId);
         var lines = BuildLines(document.Id, kind, request.Lines);
@@ -414,9 +573,12 @@ public sealed class PayableDocumentService(
             request.SourceDocumentNumber,
             request.DocumentDate,
             request.DueDate,
-            request.BeneficiaryName,
+            employeeValidation.Employee is { } employee
+                ? $"{employee.FirstName} {employee.LastName}"
+                : request.BeneficiaryName,
             request.Notes,
-            lines.Data!);
+            lines.Data!,
+            request.EmployeeId);
         if (!updated.Success)
             return OperationResult<PayableDocumentDto>.Fail(updated.Error!);
 
@@ -497,6 +659,16 @@ public sealed class PayableDocumentService(
             db.ChangeTracker.Clear();
             return PayableDocumentOperationResult.Fail("La fattura con questo numero è già registrata per il fornitore.");
         }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException postgres
+            && postgres.SqlState == PostgresErrorCodes.UniqueViolation
+            && postgres.ConstraintName?.Contains(
+                "employee_id_source_document_number",
+                StringComparison.OrdinalIgnoreCase) == true)
+        {
+            db.ChangeTracker.Clear();
+            return PayableDocumentOperationResult.Fail(
+                "Il costo del dipendente per questo mese è già registrato.");
+        }
     }
 
     private async Task<string?> ValidateSupplierAsync(
@@ -504,9 +676,9 @@ public sealed class PayableDocumentService(
         Guid? supplierId,
         CancellationToken cancellationToken)
     {
-        if (kind == PayableDocumentKind.ExpenseReimbursement)
+        if (kind != PayableDocumentKind.SupplierInvoice)
             return supplierId.HasValue
-                ? "Un rimborso non può avere un fornitore."
+                ? "Questo documento non può avere un fornitore."
                 : null;
         if (!supplierId.HasValue || supplierId == Guid.Empty)
             return "Selezionare il fornitore.";
@@ -516,6 +688,34 @@ public sealed class PayableDocumentService(
             && contact.Status == ContactStatus.Active && contact.SupplierProfile != null,
             cancellationToken);
         return exists ? null : "Fornitore non valido o non attivo.";
+    }
+
+    private async Task<(Employee? Employee, string? Error)> ValidateEmployeeAsync(
+        PayableDocumentKind kind,
+        Guid? employeeId,
+        DateOnly documentDate,
+        DateOnly dueDate,
+        CancellationToken cancellationToken)
+    {
+        if (kind == PayableDocumentKind.SupplierInvoice)
+            return employeeId.HasValue
+                ? (null, "Una fattura fornitore non può essere associata a un dipendente.")
+                : (null, null);
+        if (kind is not (PayableDocumentKind.ExpenseReimbursement or PayableDocumentKind.EmployeePayroll))
+            return (null, "Tipo documento non supportato.");
+        if (!employeeId.HasValue || employeeId == Guid.Empty)
+            return (null, kind == PayableDocumentKind.ExpenseReimbursement
+                ? "Selezionare il dipendente beneficiario del rimborso."
+                : "Selezionare il dipendente.");
+
+        var employee = await db.Employees.SingleOrDefaultAsync(
+            item => item.Id == employeeId.Value, cancellationToken);
+        if (employee is null)
+            return (null, "Dipendente non trovato.");
+        if (kind == PayableDocumentKind.EmployeePayroll
+            && (employee.HireDate > dueDate || employee.EndDate < documentDate))
+            return (null, "Il periodo del costo non ricade nel periodo di impiego del dipendente.");
+        return (employee, null);
     }
 
     private OperationResult<List<PayableDocumentLine>> BuildLines(
@@ -532,6 +732,17 @@ public sealed class PayableDocumentService(
             if (!Enum.TryParse<PayableExpenseCategory>(request.Category, true, out var category)
                 || !Enum.IsDefined(category))
                 return OperationResult<List<PayableDocumentLine>>.Fail("Categoria di spesa non valida.");
+            if (category == PayableExpenseCategory.Payroll
+                && kind != PayableDocumentKind.EmployeePayroll)
+                return OperationResult<List<PayableDocumentLine>>.Fail(
+                    "La categoria paghe è riservata ai costi mensili dei dipendenti.");
+            if (kind == PayableDocumentKind.EmployeePayroll
+                && (requests.Count != 1 || category != PayableExpenseCategory.Payroll
+                    || request.VatRate.HasValue || request.NatureCode is not null
+                    || request.VatAmount != 0m
+                    || request.TaxableAmount != request.GrossAmount))
+                return OperationResult<List<PayableDocumentLine>>.Fail(
+                    "Il costo mensile deve avere una sola riga senza IVA, di categoria paghe.");
             if (kind == PayableDocumentKind.SupplierInvoice && !request.VatRate.HasValue)
                 return OperationResult<List<PayableDocumentLine>>.Fail(
                     "Indicare aliquota e Natura IVA dalla fattura del fornitore.");
@@ -563,20 +774,72 @@ public sealed class PayableDocumentService(
         return OperationResult<List<PayableDocumentLine>>.Ok(lines);
     }
 
-    private static bool CanAccess(PayableDocument document, string? userId, bool canManageAll) =>
-        canManageAll || document.Kind == PayableDocumentKind.ExpenseReimbursement
-            && !string.IsNullOrWhiteSpace(userId)
-            && document.CreatedByUserId == userId;
+    private bool CanAccess(PayableDocument document, string? userId, bool canManageAll)
+    {
+        if (!canManageAll)
+            return false;
+        if (document.Kind is PayableDocumentKind.ExpenseReimbursement or PayableDocumentKind.EmployeePayroll)
+            return currentUser.HasRole("Admin");
+        return true;
+    }
 
     private static bool KindMatches(PayableDocumentKind expected, string? requested) =>
         Enum.TryParse<PayableDocumentKind>(requested, true, out var parsed)
         && Enum.IsDefined(parsed)
         && parsed == expected;
 
+    private static async Task<OperationResult<MemoryStream>> ReadAndValidateAttachmentAsync(
+        Stream stream,
+        string fileName,
+        string contentType,
+        long length,
+        CancellationToken cancellationToken)
+    {
+        if (length <= 0 || length > MaximumFileSize)
+            return OperationResult<MemoryStream>.Fail("Allegare un file non vuoto di massimo 20 MB.");
+        if (!AllowedContentType(contentType))
+            return OperationResult<MemoryStream>.Fail("Sono ammessi solo file PDF, PNG e JPEG.");
+        var extension = Path.GetExtension(fileName).ToLowerInvariant();
+        if ((contentType, extension) is not (("application/pdf", ".pdf")
+            or ("image/png", ".png") or ("image/jpeg", ".jpg") or ("image/jpeg", ".jpeg")))
+            return OperationResult<MemoryStream>.Fail("Estensione e formato dell'allegato non corrispondono.");
+
+        var buffer = new MemoryStream();
+        try
+        {
+            var chunk = new byte[81920];
+            int read;
+            while ((read = await stream.ReadAsync(chunk, cancellationToken)) > 0)
+            {
+                if (buffer.Length + read > MaximumFileSize)
+                {
+                    buffer.Dispose();
+                    return OperationResult<MemoryStream>.Fail("Il documento supera 20 MB.");
+                }
+                await buffer.WriteAsync(chunk.AsMemory(0, read), cancellationToken);
+            }
+            if (!ValidSignature(buffer.GetBuffer().AsSpan(0, (int)buffer.Length), contentType))
+            {
+                buffer.Dispose();
+                return OperationResult<MemoryStream>.Fail(
+                    "Il contenuto del file non corrisponde al formato dichiarato.");
+            }
+            buffer.Position = 0;
+            return OperationResult<MemoryStream>.Ok(buffer);
+        }
+        catch
+        {
+            buffer.Dispose();
+            throw;
+        }
+    }
+
     private static PayableDocumentListItemDto MapListItem(PayableDocument document) => new(
         document.Id,
         document.DocumentCode,
         document.Kind.ToString(),
+        document.EmployeeId,
+        document.Employee?.EmployeeNumber,
         document.Supplier?.BusinessName,
         document.SourceDocumentNumber,
         document.DocumentDate,
@@ -589,6 +852,7 @@ public sealed class PayableDocumentService(
         document.GrossTotal,
         document.PaidAmount,
         document.BalanceDue,
+        document.AttachmentFileName,
         !string.IsNullOrWhiteSpace(document.AttachmentKey));
 
     private static PayableDocumentDto Map(PayableDocument document) => new(
@@ -597,6 +861,8 @@ public sealed class PayableDocumentService(
         document.Kind.ToString(),
         document.SupplierId,
         document.Supplier?.BusinessName,
+        document.EmployeeId,
+        document.Employee?.EmployeeNumber,
         document.SourceDocumentNumber,
         document.DocumentDate,
         document.DueDate,

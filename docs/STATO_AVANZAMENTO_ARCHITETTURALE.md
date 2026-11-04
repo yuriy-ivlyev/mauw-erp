@@ -12,8 +12,9 @@ particolare branch o stato Git.
 - Fatture, pagamenti, partitario cliente, note di credito, PDF e generazione
   XML FatturaPA/TD04 sono integrati nei flussi applicativi.
 - Il ciclo passivo operativo registra fatture fornitori, spese e rimborsi con
-  allegati, categorie, approvazione e pagamenti parziali. Non è contabilità
-  generale né liquidazione IVA.
+  allegati, categorie, approvazione e pagamenti parziali. L'anagrafica
+  dipendenti, i rimborsi e i costi mensili con cedolino sono riservati ad
+  `Admin`; non è contabilità generale né liquidazione IVA.
 - Il workflow SDI valida e archivia l'XML e usa `ISdiTransmissionProvider`.
   Development usa un provider simulato; negli altri ambienti il provider
   predefinito è non configurato. Non è quindi disponibile un collegamento SDI
@@ -197,7 +198,8 @@ modifica anagrafica. Dashboard analitiche disponibili a `Admin`.
 
 ### 2.8 Ciclo passivo operativo
 
-- `PayableDocument` distingue fattura fornitore e rimborso; le righe conservano
+- `PayableDocument` distingue fattura fornitore, rimborso e costo mensile
+  dipendente (`EmployeePayroll`); le righe conservano
   gli importi e la classificazione IVA riportati nel documento sorgente, oltre a
   categoria, centro di costo/progetto e segnalazione `AssetCandidate`.
 - Gli allegati PDF/PNG/JPEG sono archiviati su S3. Bozza, invio in approvazione,
@@ -207,15 +209,24 @@ modifica anagrafica. Dashboard analitiche disponibili a `Admin`.
   creazione/dettaglio; ricerca, filtri e pagina vengono preservati al ritorno
   dalla schermata documento.
 - Le fatture passive richiedono un fornitore attivo e il numero documento;
-  l'indice impedisce duplicati per fornitore, numero e data. I rimborsi sono
-  associati all'utente autenticato e visibili al richiedente e ai ruoli
-  `Admin`/`Accounting`.
+  l'indice impedisce duplicati per fornitore, numero e data. L'Admin registra
+  i rimborsi scegliendo il dipendente, senza legarli all'account ERP del
+  richiedente.
+- `Employee` conserva matricola univoca, nominativo, inquadramento, livello,
+  contratto/CCNL, RAL e costo annuo informativi, date di impiego, stato e note.
+  Per ogni mese l'Admin inserisce il costo aziendale effettivo e allega il
+  cedolino in un'unica operazione; il costo diventa un documento `EmployeePayroll`
+  approvato, IVA zero e non pagabile in ERP. La coppia dipendente/mese è univoca.
+- Dati dipendenti, rimborsi, costi mensili e cedolini sono filtrati nelle API
+  e disponibili solo a `Admin`; `Accounting` continua a vedere le fatture
+  passive ordinarie.
 - La registrazione non produce movimenti di magazzino: i DDT fornitore restano
   la fonte dell'entrata merce. Gli importi sono acquisiti dalla fattura, non
   ricalcolati. `AssetCandidate` è solo una segnalazione per il commercialista:
   non esistono registro cespiti o ammortamenti automatici.
 - Perimetro non incluso: contabilità generale, registri/liquidazioni IVA,
-  fatture passive abbinate automaticamente a ordini/DDT e paghe.
+  fatture passive abbinate automaticamente a ordini/DDT, calcolo paghe o
+  adempimenti contributivi.
 
 ### 2.9 Mappa API principale
 
@@ -226,9 +237,10 @@ emissione, dettaglio, XML e trasmissione; il PDF è servito dall'endpoint
 `invoices/{id}/pdf`), `fiscal-documents` (invio batch), `ddts`,
 `inventory`, `products`, `contacts` (incl. `/{id}/statement`), `warehouses`,
 `price-lists`, `settings`, `supplier-delivery-notes`, `payables` e
-`payables/my-reimbursements`, `geo`, `lookups` e `dashboard`. Le fatture passive
-sono riservate ad `Admin`/`Accounting`; i rimborsi personali sono accessibili
-ai quattro ruoli applicativi. Il ciclo passivo non genera movimenti stock.
+`payables/reimbursements`, `employees` (incl. costi mensili/cedolini), `geo`,
+`lookups` e `dashboard`. Fatture passive ordinarie sono riservate ad
+`Admin`/`Accounting`; rimborsi, personale e cedolini sono esclusivi di `Admin`.
+Il ciclo passivo non genera movimenti stock.
 Eccezioni al prefisso `v1`: gli ordini fornitore sono solo su
 `/api/supplier-purchase-orders`; i DDT fornitore e le giacenze sono esposti sia
 su `/api/...` sia su `/api/v1/...`.
@@ -248,10 +260,11 @@ PostgreSQL 16; schema gestito da EF Core e da migrazioni versionate in
 | Magazzino | `warehouses`, `stock_items` (token `xmin`), `stock_movements` |
 | Ordini e spedizioni | `orders`, `order_items`, `shipments`, `shipment_lines`, `ddt_documents`, `ddt_items` |
 | Fatturazione e audit | `invoices`, `invoice_items`, `payments`, `credit_notes`, `document_audit_entries` |
-| Ciclo passivo | `payable_documents`, `payable_document_lines`, `payable_document_payments` |
+| Personale | `employees` |
+| Ciclo passivo | `payable_documents`, `payable_document_lines`, `payable_document_payments` (`EmployeePayroll` incluso) |
 | Acquisti | `supplier_purchase_orders`, `supplier_purchase_order_lines`, `supplier_delivery_notes`, `supplier_delivery_note_lines`, `supplier_article_mappings`, `supplier_return_drafts`, `supplier_return_draft_lines` |
 
-### Migrazioni (20, inclusa la baseline)
+### Migrazioni (21, inclusa la baseline)
 
 | # | Migrazione | Contenuto |
 |---|---|---|
@@ -275,6 +288,7 @@ PostgreSQL 16; schema gestito da EF Core e da migrazioni versionate in
 | 18 | `20261101175138_AddCreditNoteAllocation` | `credit_notes.allocated_amount`, `payments.source_credit_note_id` nullable con FK `RESTRICT` |
 | 19 | `20261104131620_AddPayableDocuments` | Documenti passivi, righe, pagamenti, allegati, stati e audit |
 | 20 | `20261104133730_PayableDocumentInvoiceNumberScopedByDate` | Unicità numero fattura fornitore per fornitore e data documento |
+| 21 | `20261104175345_AddEmployeeRegistryAndPayrollCosts` | Tabella `employees`, relazione del dipendente sui documenti passivi e unicità del costo mensile per dipendente |
 
 Note operative: i database locali creati prima del baseline vanno ricreati o
 riallineati nella `__EFMigrationsHistory`. Le migrazioni si creano/applicano
@@ -304,10 +318,11 @@ sono riportati come stato permanente.
 
 Verifiche mirate del 2026-11-04 (non equivalenti a una suite completa):
 
-- 403 test .NET superati, inclusi test di dominio e PostgreSQL del ciclo
-  passivo, matrice autorizzazioni e presidio DataGenerator.
-- 7 test Angular superati per la pagina passiva e la navigazione filtrata per
-  ruolo.
+- 432 test .NET mirati superati per dipendenti, costi mensili/cedolini,
+  rimborsi, ciclo passivo, matrice autorizzazioni e DataGenerator; i 13 test
+  finali di dominio e persistenza dipendenti/passivi sono stati rieseguiti e
+  superati dopo gli ultimi controlli di precisione e metadata.
+- 4 test Angular mirati superati per schermate e flussi acquisti/personale.
 - `dotnet build` e `npm run build` completati; la build Angular segnala il
   bundle iniziale oltre il budget configurato.
 - `dotnet ef migrations has-pending-model-changes` conferma che il modello è
@@ -327,10 +342,10 @@ movimenti/resi di magazzino, acquisti, autorizzazioni e sicurezza dei costi.
 | P1 | Hardening API | La policy CORS `AllowAll` e parte della configurazione DI/HTTP restano nel bootstrap API; definire origini per ambiente e continuare a spostare configurazione in extension methods. |
 | P1 | Verifica full-suite continuativa | I test mirati recenti sono verdi; la suite completa va rieseguita nell'ambiente CI/Docker per misurarne lo stato aggregato aggiornato. |
 | P1 | Abbinamento passivo a ordini/DDT | Le fatture passive sono registrabili, ma non hanno ancora riconciliazione automatica a ordini fornitore o DDT ricevuti. |
-| P1 | Report gestionale | Aggiungere report/export operativo di vendite, IVA per aliquota/Natura e costi passivi; non è un registro IVA ufficiale né una liquidazione. |
+| P1 | Report gestionale | Aggiungere report/export operativo di vendite, IVA per aliquota/Natura e costi passivi, inclusi i costi mensili del personale; non è un registro IVA ufficiale né una liquidazione. |
 | P2 | OCR documenti fornitori | Il DDT fornitore accetta payload OCR/IA già strutturati; non contiene un motore OCR né invia file a provider IA esterni. |
 | P2 | Test storage S3 in CI | Il test di round-trip richiede endpoint e credenziali temporanei dedicati. |
-| P2 | Cespiti e paghe | Le righe `AssetCandidate` sono solo segnalazioni. Registro cespiti/ammortamenti e gestione paghe restano fuori; i riepiloghi possono essere passati ai professionisti. |
+| P2 | Cespiti e paghe | Costi aziendali mensili e cedolini sono archiviati, ma non vengono calcolati paghe/contributi. `AssetCandidate` resta una segnalazione; registro cespiti e ammortamenti restano fuori. |
 | P3 | Regimi fiscali speciali | Bollo, ritenute, casse previdenziali, split payment ed esigibilità IVA non fanno parte del perimetro corrente. |
 
 ---
@@ -347,7 +362,8 @@ movimenti/resi di magazzino, acquisti, autorizzazioni e sicurezza dei costi.
   `(WarehouseId, VariantId)`.
 - Pagamenti: normalizzare le date a UTC prima della persistenza PostgreSQL.
 - Ciclo passivo: conservare gli importi IVA e i riferimenti come riportati nei
-  documenti ricevuti; la registrazione passiva non muove lo stock né calcola
+  documenti ricevuti; personale, rimborsi, costo mensile e cedolino sono
+  Admin-only. La registrazione passiva non muove lo stock né calcola paghe o
   ammortamenti. Gli importi non sostituiscono i registri ufficiali del
   commercialista.
 - UI: tabelle paginate, componenti condivisi per paginazione/azioni/aggiunta,

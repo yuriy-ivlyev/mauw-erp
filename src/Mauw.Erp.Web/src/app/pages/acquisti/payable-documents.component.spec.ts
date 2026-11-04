@@ -4,6 +4,7 @@ import { of } from 'rxjs';
 import { ContactService } from '../../services/contact.service';
 import { AuthService } from '../../services/auth.service';
 import { PayableDocumentService } from '../../services/payable-document.service';
+import { EmployeeService } from '../../services/employee.service';
 import { PayableDocumentsComponent } from './payable-documents.component';
 import { PayableDocument } from '../../models/payable-document.model';
 
@@ -11,22 +12,24 @@ describe('PayableDocumentsComponent', () => {
   let fixture: ComponentFixture<PayableDocumentsComponent>;
   let payableApi: jasmine.SpyObj<PayableDocumentService>;
   let contactsApi: jasmine.SpyObj<ContactService>;
+  let employeesApi: jasmine.SpyObj<EmployeeService>;
   let auth: jasmine.SpyObj<AuthService>;
 
   beforeEach(async () => {
     payableApi = jasmine.createSpyObj<PayableDocumentService>('PayableDocumentService', [
-      'list', 'listMyReimbursements', 'get', 'getMyReimbursement',
+      'list', 'listReimbursements', 'get', 'getReimbursement',
       'createSupplierInvoice', 'createReimbursement', 'update', 'uploadAttachment',
       'downloadAttachment', 'submit', 'approve', 'reject', 'cancel', 'recordPayment'
     ]);
     contactsApi = jasmine.createSpyObj<ContactService>('ContactService', ['getList']);
+    employeesApi = jasmine.createSpyObj<EmployeeService>('EmployeeService', ['list']);
     auth = jasmine.createSpyObj<AuthService>('AuthService', ['hasRole']);
     auth.hasRole.and.callFake(role => role === 'Admin');
     payableApi.list.and.returnValue(of({
       items: [], pageNumber: 1, pageSize: 20, totalCount: 0, totalPages: 0
     }));
-    payableApi.listMyReimbursements.and.returnValue(of({
-      items: [], pageNumber: 1, pageSize: 20, totalCount: 0, totalPages: 0
+    employeesApi.list.and.returnValue(of({
+      items: [], pageNumber: 1, pageSize: 100, totalCount: 0, totalPages: 0
     }));
     contactsApi.getList.and.returnValue(of({
       items: [], pageNumber: 1, pageSize: 100, totalCount: 0, totalPages: 0
@@ -49,6 +52,7 @@ describe('PayableDocumentsComponent', () => {
         },
         { provide: PayableDocumentService, useValue: payableApi },
         { provide: ContactService, useValue: contactsApi },
+        { provide: EmployeeService, useValue: employeesApi },
         { provide: AuthService, useValue: auth }
       ]
     }).compileComponents();
@@ -89,6 +93,8 @@ describe('PayableDocumentsComponent', () => {
       kind: 'SupplierInvoice',
       supplierId: 'supplier-1',
       supplierName: 'Fornitore',
+      employeeId: null,
+      employeeNumber: null,
       sourceDocumentNumber: 'FT-1',
       documentDate: '2026-11-04',
       dueDate: '2026-12-04',

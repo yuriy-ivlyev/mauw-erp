@@ -130,12 +130,22 @@ public sealed class PayableDocumentPostgreSqlTests(PostgreSqlContainerFixture po
     }
 
     [Fact]
-    public async Task ReimbursementIsPrivateToItsSubmitterAndHasNoSupplier()
+    public async Task ReimbursementIsOwnedByEmployeeAndAdminOnly()
     {
         var database = postgres.CreateDatabase();
+        Guid employeeId;
+        await using (var seed = database.CreateDbContext())
+        {
+            var employee = NewEmployee();
+            seed.Employees.Add(employee);
+            await seed.SaveChangesAsync();
+            employeeId = employee.Id;
+        }
+
         await using var db = database.CreateDbContext();
         var currentUser = new Mock<ICurrentUserService>();
-        currentUser.Setup(user => user.FullName).Returns("Richiedente autenticato");
+        currentUser.Setup(user => user.FullName).Returns("Amministratore");
+        currentUser.Setup(user => user.HasRole("Admin")).Returns(true);
         var service = Service(db, new MemoryPayableDocumentStorage(), currentUser.Object);
         var request = new CreatePayableDocumentRequest(
             PayableDocumentKind.ExpenseReimbursement.ToString(),
@@ -143,7 +153,7 @@ public sealed class PayableDocumentPostgreSqlTests(PostgreSqlContainerFixture po
             "RIMB-001",
             new DateOnly(2026, 11, 4),
             new DateOnly(2026, 11, 10),
-            "Altro beneficiario",
+            "Nome ignorato dal backend",
             "Spese trasferta",
             [
                 new(
@@ -156,16 +166,112 @@ public sealed class PayableDocumentPostgreSqlTests(PostgreSqlContainerFixture po
                     80m,
                     "Vendite",
                     "Visite clienti")
-            ]);
+            ],
+            EmployeeId: employeeId);
 
-        var result = await service.CreateReimbursementAsync(request, "user-1", CancellationToken.None);
+        var result = await service.CreateReimbursementAsync(request, "admin-user", CancellationToken.None);
 
         Assert.True(result.Success, result.Error);
         Assert.Null(result.Data!.SupplierId);
-        Assert.Equal("Richiedente autenticato", result.Data.BeneficiaryName);
-        Assert.Null(await service.GetAsync(result.Data.Id, "user-2", canManageAll: false, CancellationToken.None));
-        Assert.NotNull(await service.GetAsync(result.Data.Id, "user-1", canManageAll: false, CancellationToken.None));
+        Assert.Equal(employeeId, result.Data.EmployeeId);
+        Assert.Equal("Mario Rossi", result.Data.BeneficiaryName);
+        var accountant = new Mock<ICurrentUserService>();
+        accountant.Setup(user => user.HasRole("Admin")).Returns(false);
+        var accountingService = Service(db, new MemoryPayableDocumentStorage(), accountant.Object);
+        Assert.Null(await accountingService.GetAsync(
+            result.Data.Id, "accounting-user", canManageAll: true, CancellationToken.None));
         Assert.NotNull(await service.GetAsync(result.Data.Id, null, canManageAll: true, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task EmployeePayrollCostIsMonthlyNonPayableAndVisibleOnlyToAdmin()
+    {
+        var database = postgres.CreateDatabase();
+        Guid employeeId;
+        await using (var seed = database.CreateDbContext())
+        {
+            var employee = NewEmployee();
+            seed.Employees.Add(employee);
+            await seed.SaveChangesAsync();
+            employeeId = employee.Id;
+        }
+
+        await using var db = database.CreateDbContext();
+        var admin = new Mock<ICurrentUserService>();
+        admin.Setup(user => user.FullName).Returns("Amministratore");
+        admin.Setup(user => user.HasRole("Admin")).Returns(true);
+        var adminService = Service(db, new MemoryPayableDocumentStorage(), admin.Object);
+        var pdf = Encoding.ASCII.GetBytes("%PDF-1.4\npayroll");
+        var created = await adminService.CreateEmployeePayrollCostAsync(
+            employeeId,
+            new(new DateOnly(2026, 11, 1), 3_250.75m, "Costo complessivo mensile"),
+            new MemoryStream(pdf),
+            "cedolino.pdf",
+            "application/pdf",
+            pdf.Length,
+            "admin-user",
+            CancellationToken.None);
+
+        Assert.True(created.Success, created.Error);
+        Assert.Equal(PayableDocumentKind.EmployeePayroll.ToString(), created.Data!.Kind);
+        Assert.Equal("2026-11", created.Data.SourceDocumentNumber);
+        Assert.Equal(3_250.75m, created.Data.GrossTotal);
+        Assert.Equal(PayablePaymentStatus.NotPayable.ToString(), created.Data.PaymentStatus);
+        Assert.Equal(0m, created.Data.BalanceDue);
+        Assert.Equal("Mario Rossi", created.Data.BeneficiaryName);
+        Assert.Equal(PayableDocumentStatus.Approved.ToString(), created.Data.Status);
+        Assert.Equal("cedolino.pdf", created.Data.AttachmentFileName);
+        var duplicate = await adminService.CreateEmployeePayrollCostAsync(
+            employeeId,
+            new(new DateOnly(2026, 11, 1), 3_250.75m, null),
+            new MemoryStream(pdf),
+            "cedolino.pdf",
+            "application/pdf",
+            pdf.Length,
+            "admin-user",
+            CancellationToken.None);
+        Assert.False(duplicate.Success);
+        Assert.Contains("già registrato", duplicate.Error, StringComparison.OrdinalIgnoreCase);
+
+        var payment = await adminService.RecordPaymentAsync(
+            created.Data.Id,
+            new(created.Data.Version, 100m, DateTime.UtcNow, "Bonifico bancario", null),
+            "admin-user",
+            CancellationToken.None);
+        Assert.False(payment.Success);
+        Assert.Contains("non gestisce pagamenti", payment.Error, StringComparison.OrdinalIgnoreCase);
+
+        var accounting = new Mock<ICurrentUserService>();
+        accounting.Setup(user => user.HasRole("Admin")).Returns(false);
+        var accountingService = Service(db, new MemoryPayableDocumentStorage(), accounting.Object);
+        Assert.Null(await accountingService.GetAsync(
+            created.Data.Id, "accounting-user", canManageAll: true, CancellationToken.None));
+        Assert.Empty((await accountingService.ListAsync(
+            1, 100, null, null, null, null, null, CancellationToken.None)).Items);
+        Assert.Null(await accountingService.DownloadAttachmentAsync(
+            created.Data.Id, "accounting-user", canManageAll: true, CancellationToken.None));
+        Assert.Single((await adminService.ListEmployeePayrollCostsAsync(
+            employeeId, 1, 100, CancellationToken.None)).Items);
+    }
+
+    private static Employee NewEmployee()
+    {
+        var employee = new Employee();
+        var result = employee.Update(
+            "MAT-001",
+            "Mario",
+            "Rossi",
+            "Impiegato",
+            "4",
+            "Commercio",
+            null,
+            45_000m,
+            new DateOnly(2024, 1, 1),
+            null,
+            true,
+            null);
+        Assert.True(result.Success, result.Error);
+        return employee;
     }
 
     private static PayableDocumentService Service(

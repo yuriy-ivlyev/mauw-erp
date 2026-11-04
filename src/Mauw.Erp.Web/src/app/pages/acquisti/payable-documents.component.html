@@ -153,9 +153,15 @@
         Numero documento fornitore
         <input [(ngModel)]="sourceDocumentNumber" maxlength="100" class="rounded border border-slate-300 p-2" />
       </label>
-      <p *ngIf="kind === 'ExpenseReimbursement'" class="self-end rounded bg-blue-50 p-2 text-sm text-blue-800">
-        Il rimborso viene intestato all'utente autenticato.
-      </p>
+      <label *ngIf="kind === 'ExpenseReimbursement'" class="grid gap-1 text-sm font-medium">
+        Dipendente beneficiario
+        <select [(ngModel)]="employeeId" class="rounded border border-slate-300 p-2">
+          <option value="">Seleziona dipendente</option>
+          <option *ngFor="let employee of employees" [value]="employee.id">
+            {{ employee.employeeNumber }} · {{ employee.firstName }} {{ employee.lastName }}
+          </option>
+        </select>
+      </label>
       <label class="grid gap-1 text-sm font-medium">
         Data documento
         <input type="date" [(ngModel)]="documentDate" class="rounded border border-slate-300 p-2" />

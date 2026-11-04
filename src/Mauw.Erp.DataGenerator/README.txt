@@ -65,7 +65,10 @@ AddCreditNoteSdiStorageMetadata (aggiunge il nome file, la chiave S3 e
 l'identificativo/data di trasmissione nullable delle note senza modificare lo
 stato dei documenti storici) e AddCreditNoteAllocation (aggiunge il credito
 allocato, inizializzato a zero per le note storiche, e il riferimento alla nota
-sui pagamenti con eliminazione restrittiva):
+sui pagamenti con eliminazione restrittiva), AddPayableDocuments e
+PayableDocumentInvoiceNumberScopedByDate (ciclo passivo operativo e unicità
+numero fattura per fornitore/data) e AddEmployeeRegistryAndPayrollCosts
+(anagrafica dipendenti, collegamento dei rimborsi e costi mensili con cedolino):
 il ciclo reset -> database update -> seed e
 percorribile su un database vuoto. Un database creato con le vecchie migrazioni
 va ricreato oppure la sua tabella __EFMigrationsHistory va allineata (riga con
@@ -80,10 +83,11 @@ update -> seed, non migrare in-place il vecchio dataset.
 Il generatore non emette note di credito né pagamenti: le fatture sintetiche
 restano NotTransmitted e non costituiscono documenti accettati dallo SDI. I
 test verificano che il seed non crei note, compensazioni o pagamenti fittizi.
-Il generatore non simula fatture passive, pagamenti a fornitori o rimborsi:
-questa suite misura vendite, stock e documenti attivi, non il ciclo passivo.
-Anche i database con documenti passivi già presenti vengono rifiutati come non
-vuoti; il seed non li sovrascrive né li integra.
+Il generatore non simula fatture passive, pagamenti a fornitori, rimborsi,
+dipendenti, costi mensili o cedolini: questa suite misura vendite, stock e
+documenti attivi, non il ciclo passivo o i dati del personale. Database con
+dipendenti o documenti passivi già presenti vengono rifiutati come non vuoti;
+il seed non li sovrascrive né li integra.
 
 Non conservare password nel repository o nella cronologia della shell.
 Impostare MAUW_LOADTEST_CONNECTION nel proprio secret manager/ambiente:

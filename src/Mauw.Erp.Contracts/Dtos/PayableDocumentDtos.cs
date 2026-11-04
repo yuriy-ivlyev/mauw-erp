@@ -24,6 +24,8 @@ public sealed record PayableDocumentListItemDto(
     Guid Id,
     string DocumentCode,
     string Kind,
+    Guid? EmployeeId,
+    string? EmployeeNumber,
     string? SupplierName,
     string? SourceDocumentNumber,
     DateOnly DocumentDate,
@@ -36,6 +38,7 @@ public sealed record PayableDocumentListItemDto(
     decimal GrossTotal,
     decimal PaidAmount,
     decimal BalanceDue,
+    string? AttachmentFileName,
     bool HasAttachment);
 
 public sealed record PayableDocumentDto(
@@ -44,6 +47,8 @@ public sealed record PayableDocumentDto(
     string Kind,
     Guid? SupplierId,
     string? SupplierName,
+    Guid? EmployeeId,
+    string? EmployeeNumber,
     string? SourceDocumentNumber,
     DateOnly DocumentDate,
     DateOnly DueDate,
