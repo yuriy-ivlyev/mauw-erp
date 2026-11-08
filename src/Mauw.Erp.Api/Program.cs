@@ -11,6 +11,7 @@ using Mauw.Erp.Infrastructure.Branding;
 using Mauw.Erp.Infrastructure.Storage;
 using Mauw.Erp.Domain.Repositories;
 using Mauw.Erp.Infrastructure.Repositories;
+using Mauw.Erp.Infrastructure.Ocr;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,6 +50,7 @@ builder.Services.AddCompanyBranding();
 builder.Services.AddImageStorage(builder.Configuration);
 builder.Services.AddSupplierDeliveryNotes();
 builder.Services.AddPayableDocuments();
+builder.Services.AddSupplierDocumentOcr(builder.Configuration);
 
 // Register application services with tracing decorators
 builder.Services.AddApplicationServices();
@@ -163,6 +165,8 @@ app.MapSupplierDeliveryNoteEndpoints();
 app.MapPayableDocumentEndpoints();
 app.MapEmployeeEndpoints();
 app.MapSupplierPurchaseOrderEndpoints();
+app.MapSupplierDocumentOcrEndpoints();
+app.MapSupplierDocumentOcrSettingsEndpoints();
 
 // Migrate database on startup and initialize seed data
 using (var scope = app.Services.CreateScope())

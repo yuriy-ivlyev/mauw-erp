@@ -149,7 +149,9 @@ la lista. Il giustificativo è obbligatorio per inviare la richiesta in
 approvazione; i rimborsi sono documenti passivi associati al dipendente, non
 all'utente ERP che li registra.
 
-La rotta Admin-only `/amministrazione/dipendenti` gestisce matricola,
+La sezione laterale Admin-only **Gestione aziendale**, separata da Acquisti e
+Sistema, contiene **Azienda** (`/impostazioni/azienda`) e **Personale**
+(`/amministrazione/dipendenti`). La scheda personale gestisce matricola,
 nominativo, inquadramento, livello/contratto, indirizzo principale, email,
 telefono/cellulare, RAL e costo annuo aziendale.
 Nella scheda del dipendente si registra per ogni mese il costo aziendale

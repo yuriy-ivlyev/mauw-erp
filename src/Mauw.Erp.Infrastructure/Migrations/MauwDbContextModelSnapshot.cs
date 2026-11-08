@@ -3669,6 +3669,546 @@ namespace Mauw.Erp.Infrastructure.Migrations
                     b.ToTable("supplier_delivery_note_lines", (string)null);
                 });
 
+            modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierDocumentOcrHeaderAlias", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Alias")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("alias");
+
+                    b.Property<string>("Column")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("column");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("NormalizedAlias")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("normalized_alias");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("p_k_supplier_document_ocr_header_aliases");
+
+                    b.HasIndex("NormalizedAlias")
+                        .IsUnique();
+
+                    b.HasIndex("Column", "Position");
+
+                    b.ToTable("supplier_document_ocr_header_aliases", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000001"),
+                            Alias = "codicearticolo",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "codicearticolo",
+                            Position = 0,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000002"),
+                            Alias = "codart",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "codart",
+                            Position = 1,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000003"),
+                            Alias = "codicefornitore",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "codicefornitore",
+                            Position = 2,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000004"),
+                            Alias = "codiceprodotto",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "codiceprodotto",
+                            Position = 3,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000005"),
+                            Alias = "codice",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "codice",
+                            Position = 4,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000006"),
+                            Alias = "suppliercode",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "suppliercode",
+                            Position = 5,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000007"),
+                            Alias = "supplieritemcode",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "supplieritemcode",
+                            Position = 6,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000008"),
+                            Alias = "itemcode",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "itemcode",
+                            Position = 7,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000009"),
+                            Alias = "itemnumber",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "itemnumber",
+                            Position = 8,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000010"),
+                            Alias = "itemno",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "itemno",
+                            Position = 9,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000011"),
+                            Alias = "productcode",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "productcode",
+                            Position = 10,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000012"),
+                            Alias = "productnumber",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "productnumber",
+                            Position = 11,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000013"),
+                            Alias = "articlecode",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "articlecode",
+                            Position = 12,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000014"),
+                            Alias = "articleno",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "articleno",
+                            Position = 13,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000015"),
+                            Alias = "numeroarticolo",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "numeroarticolo",
+                            Position = 14,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000016"),
+                            Alias = "nrarticolo",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "nrarticolo",
+                            Position = 15,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000017"),
+                            Alias = "nart",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "nart",
+                            Position = 16,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000018"),
+                            Alias = "code",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "code",
+                            Position = 17,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000019"),
+                            Alias = "sku",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "sku",
+                            Position = 18,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000020"),
+                            Alias = "reference",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "reference",
+                            Position = 19,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000021"),
+                            Alias = "ref",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "ref",
+                            Position = 20,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000022"),
+                            Alias = "partnumber",
+                            Column = "SupplierCode",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "partnumber",
+                            Position = 21,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000023"),
+                            Alias = "descrizione",
+                            Column = "Description",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "descrizione",
+                            Position = 0,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000024"),
+                            Alias = "description",
+                            Column = "Description",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "description",
+                            Position = 1,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000025"),
+                            Alias = "itemdescription",
+                            Column = "Description",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "itemdescription",
+                            Position = 2,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000026"),
+                            Alias = "productdescription",
+                            Column = "Description",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "productdescription",
+                            Position = 3,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000027"),
+                            Alias = "descrizionearticolo",
+                            Column = "Description",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "descrizionearticolo",
+                            Position = 4,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000028"),
+                            Alias = "descrarticolo",
+                            Column = "Description",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "descrarticolo",
+                            Position = 5,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000029"),
+                            Alias = "descrizionemerce",
+                            Column = "Description",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "descrizionemerce",
+                            Position = 6,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000030"),
+                            Alias = "denominazione",
+                            Column = "Description",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "denominazione",
+                            Position = 7,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000031"),
+                            Alias = "nomearticolo",
+                            Column = "Description",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "nomearticolo",
+                            Position = 8,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000032"),
+                            Alias = "dettaglio",
+                            Column = "Description",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "dettaglio",
+                            Position = 9,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000033"),
+                            Alias = "articolo",
+                            Column = "Description",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "articolo",
+                            Position = 10,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000034"),
+                            Alias = "productname",
+                            Column = "Description",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "productname",
+                            Position = 11,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000035"),
+                            Alias = "itemname",
+                            Column = "Description",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "itemname",
+                            Position = 12,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000036"),
+                            Alias = "quantita",
+                            Column = "Quantity",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "quantita",
+                            Position = 0,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000037"),
+                            Alias = "qta",
+                            Column = "Quantity",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "qta",
+                            Position = 1,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000038"),
+                            Alias = "qtaord",
+                            Column = "Quantity",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "qtaord",
+                            Position = 2,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000039"),
+                            Alias = "quantitaordinata",
+                            Column = "Quantity",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "quantitaordinata",
+                            Position = 3,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000040"),
+                            Alias = "qty",
+                            Column = "Quantity",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "qty",
+                            Position = 4,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000041"),
+                            Alias = "qtyordered",
+                            Column = "Quantity",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "qtyordered",
+                            Position = 5,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000042"),
+                            Alias = "quantity",
+                            Column = "Quantity",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "quantity",
+                            Position = 6,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000043"),
+                            Alias = "quantities",
+                            Column = "Quantity",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "quantities",
+                            Position = 7,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000044"),
+                            Alias = "quantityordered",
+                            Column = "Quantity",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "quantityordered",
+                            Position = 8,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000045"),
+                            Alias = "npezzi",
+                            Column = "Quantity",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "npezzi",
+                            Position = 9,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000046"),
+                            Alias = "pezzi",
+                            Column = "Quantity",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "pezzi",
+                            Position = 10,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000047"),
+                            Alias = "pieces",
+                            Column = "Quantity",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "pieces",
+                            Position = 11,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000048"),
+                            Alias = "pcs",
+                            Column = "Quantity",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "pcs",
+                            Position = 12,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("d5510000-0000-0000-0000-000000000049"),
+                            Alias = "pz",
+                            Column = "Quantity",
+                            CreatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            NormalizedAlias = "pz",
+                            Position = 13,
+                            UpdatedAt = new DateTime(2026, 11, 8, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
+                });
+
             modelBuilder.Entity("Mauw.Erp.Domain.Entities.SupplierProfile", b =>
                 {
                     b.Property<Guid>("ContactId")

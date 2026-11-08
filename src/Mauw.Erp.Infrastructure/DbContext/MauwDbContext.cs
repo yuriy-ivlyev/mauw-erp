@@ -51,6 +51,7 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
     public DbSet<SupplierDeliveryNote> SupplierDeliveryNotes { get; set; }
     public DbSet<SupplierDeliveryNoteLine> SupplierDeliveryNoteLines { get; set; }
     public DbSet<SupplierArticleMapping> SupplierArticleMappings { get; set; }
+    public DbSet<SupplierDocumentOcrHeaderAlias> SupplierDocumentOcrHeaderAliases { get; set; }
     public DbSet<SupplierPurchaseOrder> SupplierPurchaseOrders { get; set; }
     public DbSet<SupplierPurchaseOrderLine> SupplierPurchaseOrderLines { get; set; }
     public DbSet<SupplierReturnDraft> SupplierReturnDrafts { get; set; }
@@ -135,6 +136,7 @@ public class MauwDbContext(DbContextOptions<MauwDbContext> options) : Microsoft.
         modelBuilder.ApplyConfiguration(new SupplierDeliveryNoteConfiguration());
         modelBuilder.ApplyConfiguration(new SupplierDeliveryNoteLineConfiguration());
         modelBuilder.ApplyConfiguration(new SupplierArticleMappingConfiguration());
+        modelBuilder.ApplyConfiguration(new SupplierDocumentOcrHeaderAliasConfiguration());
         modelBuilder.ApplyConfiguration(new SupplierPurchaseOrderConfiguration());
         modelBuilder.ApplyConfiguration(new SupplierPurchaseOrderLineConfiguration());
         modelBuilder.ApplyConfiguration(new SupplierReturnDraftConfiguration());

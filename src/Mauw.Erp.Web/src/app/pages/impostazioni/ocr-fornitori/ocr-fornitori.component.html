@@ -1,0 +1,60 @@
+<div class="mx-auto max-w-5xl space-y-6 p-6">
+  <header class="flex items-center gap-4">
+    <app-back-button label="Torna al sistema" (activated)="goBack()" [disabled]="busy"></app-back-button>
+    <div>
+      <p class="text-sm text-gray-500">Sistema / Impostazioni</p>
+      <h1 class="text-2xl font-semibold dark:text-white">Intestazioni OCR fornitori</h1>
+    </div>
+  </header>
+
+  <p *ngIf="error" role="alert" class="rounded-lg bg-red-50 p-4 text-red-700">{{ error }}</p>
+  <p *ngIf="success" role="status" class="rounded-lg bg-green-50 p-4 text-green-700">{{ success }}</p>
+
+  <div *ngIf="loading" class="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500 dark:bg-gray-900">
+    Caricamento alias…
+  </div>
+
+  <ng-container *ngIf="!loading">
+    <p class="text-sm text-gray-600 dark:text-gray-300">
+      Gli alias sono globali e si applicano ai documenti di tutti i fornitori. Il testo viene confrontato senza
+      differenze di maiuscole, accenti, spazi e punteggiatura.
+    </p>
+
+    <section *ngFor="let column of columns" class="space-y-4 rounded-xl border border-gray-200 bg-white p-5 dark:bg-gray-900">
+      <div>
+        <h2 class="text-lg font-semibold dark:text-white">{{ column.label }}</h2>
+        <p class="text-sm text-gray-500">{{ column.description }}</p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <input [name]="'new-alias-' + column.field" [(ngModel)]="newAliases[column.field]"
+          [disabled]="busy" maxlength="100" [placeholder]="'Nuovo alias per ' + column.label"
+          [attr.aria-label]="'Nuovo alias per ' + column.label" class="max-w-md" />
+        <app-add-action-button [label]="'Aggiungi alias ' + column.label"
+          (activated)="add(column.field)" [disabled]="busy || !newAliases[column.field].trim()">
+        </app-add-action-button>
+      </div>
+
+      <ul class="divide-y divide-gray-100 dark:divide-gray-800">
+        <li *ngFor="let alias of aliasesFor(column.field)" class="flex items-center justify-between gap-3 py-2">
+          <span class="break-all">{{ alias.alias }}</span>
+          <app-table-action-button action="delete" [label]="'Rimuovi alias ' + alias.alias"
+            [disabled]="busy" (activated)="requestDelete(alias)">
+          </app-table-action-button>
+        </li>
+        <li *ngIf="aliasesFor(column.field).length === 0" class="py-3 text-sm text-gray-500">
+          Nessun alias configurato per questo campo.
+        </li>
+      </ul>
+    </section>
+  </ng-container>
+
+  <app-confirm-delete-modal
+    [isOpen]="deleteConfirmationOpen"
+    title="Rimuovere l’alias OCR?"
+    [message]="pendingDelete ? 'Rimuovere l’alias ' + pendingDelete.alias + '?' : ''"
+    confirmLabel="Rimuovi alias"
+    (confirmed)="confirmDelete()"
+    (cancelled)="cancelDelete()">
+  </app-confirm-delete-modal>
+</div>

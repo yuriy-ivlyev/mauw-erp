@@ -3,9 +3,10 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
+import { of } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { finalize } from 'rxjs/operators';
+import { finalize, switchMap } from 'rxjs/operators';
 import { SupplierDeliveryNoteService } from '../../services/supplier-delivery-note.service';
 import { SupplierPurchaseOrderService } from '../../services/supplier-purchase-order.service';
 import { ContactService } from '../../services/contact.service';
@@ -20,7 +21,7 @@ import { AddActionButtonComponent } from '../../shared/add-action-button/add-act
 import { ContactSummary } from '../../models/contact.model';
 import { WarehouseSummary } from '../../models/warehouse.model';
 import { VariantSearchDto } from '../../models/product.model';
-import { SupplierDeliveryNote, SupplierDeliveryNoteLine, SaveSupplierDeliveryNoteLines } from '../../models/supplier-delivery-note.model';
+import { ParsedDocumentLine, SupplierDeliveryNote, SupplierDeliveryNoteLine, SaveSupplierDeliveryNoteLines } from '../../models/supplier-delivery-note.model';
 import { SupplierPurchaseOrder } from '../../models/supplier-purchase-order.model';
 
 @Component({
@@ -66,11 +67,13 @@ export class CaricoMerceWizardComponent implements OnInit, OnDestroy {
   variants: VariantSearchDto[] = [];
   matchingLine: SupplierDeliveryNoteLine | null = null;
   deleteConfirmationOpen = false;
+  ocrReplacementConfirmationOpen = false;
   private lineToRemove: number | null = null;
-  ocrJson = '';
+  pendingOcrLines: SupplierDeliveryNoteLine[] | null = null;
   documentPreview: SafeResourceUrl | null = null;
   previewLoading = false;
   private documentPreviewObjectUrl: string | null = null;
+  private documentPreviewBlob: Blob | null = null;
   readonly labels: Record<string, string> = {
     Draft: 'Bozza', Parsing: 'In elaborazione', Parsed: 'Elaborata', Confirmed: 'Confermata', Cancelled: 'Annullata',
     Matched: 'Associata', NewArticleNeeded: 'Da associare', Error: 'Errore'
@@ -95,6 +98,7 @@ export class CaricoMerceWizardComponent implements OnInit, OnDestroy {
         if (this.documentPreviewObjectUrl) URL.revokeObjectURL(this.documentPreviewObjectUrl);
         this.documentPreviewObjectUrl = null;
         this.documentPreview = null;
+        this.documentPreviewBlob = null;
         this.selected = null;
         this.activeStep = 1;
         this.dirty = false;
@@ -141,6 +145,11 @@ export class CaricoMerceWizardComponent implements OnInit, OnDestroy {
   }
 
   private loadNote(id: string): void {
+    this.cancelOcrReplacement();
+    if (this.documentPreviewObjectUrl) URL.revokeObjectURL(this.documentPreviewObjectUrl);
+    this.documentPreviewObjectUrl = null;
+    this.documentPreview = null;
+    this.documentPreviewBlob = null;
     this.busy = true;
     this.service.get(id).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.busy = false)).subscribe({
       next: note => {
@@ -357,6 +366,10 @@ export class CaricoMerceWizardComponent implements OnInit, OnDestroy {
     if (request.lines.some(l => !Number.isInteger(l.quantity) || l.quantity <= 0)) {
       this.error = 'Le quantita devono essere intere e positive.'; return;
     }
+    if (request.lines.some(l => typeof l.unitPrice === 'string' && !l.unitPrice.trim())) {
+      this.error = 'Completare il costo unitario di ogni riga: Textract non estrae i prezzi.';
+      return;
+    }
     this.busy = true;
     this.service.save(this.selected.id, request, parsed)
       .pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.busy = false)).subscribe({
@@ -369,19 +382,80 @@ export class CaricoMerceWizardComponent implements OnInit, OnDestroy {
       });
   }
 
-  importOcr(): void {
-    if (!this.selected) return;
-    let value: unknown;
-    try { value = JSON.parse(this.ocrJson); }
-    catch { this.error = 'JSON OCR non valido.'; return; }
-    if (!this.isOcrPayload(value)) { this.error = 'Il payload deve contenere lines con codice, descrizione, quantita intera e prezzo.'; return; }
-    this.selected.documentNumber = value.documentNumber ?? this.selected.documentNumber;
-    this.selected.lines = value.lines.map(l => ({
-      ...l, id: '', articleVariantId: null, articleDescription: null,
-      supplierPurchaseOrderLineId: null, lineStatus: 'NewArticleNeeded', stockMovementId: null
-    }));
+  extractOcr(): void {
+    if (!this.selected || !this.editable || this.busy) return;
+    const note = this.selected;
+    const document$ = this.documentPreviewBlob
+      ? of(this.documentPreviewBlob)
+      : this.service.download(note.id);
+
+    this.error = '';
+    this.success = '';
+    this.busy = true;
+    document$.pipe(
+      switchMap(blob => {
+        const fileName = note.filePath.split(/[\\/]/).pop() || `supplier-document-${note.id}`;
+        const file = new File([blob], fileName, { type: blob.type || 'application/octet-stream' });
+        return this.service.parseDocument(file);
+      }),
+      takeUntilDestroyed(this.destroyRef),
+      finalize(() => this.busy = false)
+    ).subscribe({
+      next: result => {
+        if (this.selected !== note) return;
+        if (!Array.isArray(result.lines) || result.lines.length === 0) {
+          this.error = 'Textract non ha trovato righe articolo nel documento.';
+          return;
+        }
+
+        this.pendingOcrLines = result.lines.map(line => this.toOcrLine(line));
+        if (note.lines.length > 0) {
+          this.ocrReplacementConfirmationOpen = true;
+          this.success = `Estratte ${result.lines.length} righe. Conferma la sostituzione delle righe esistenti.`;
+          return;
+        }
+
+        this.applyOcrLines();
+      },
+      error: error => {
+        if (this.selected === note) this.showError(error);
+      }
+    });
+  }
+
+  confirmOcrReplacement(): void {
+    this.applyOcrLines();
+  }
+
+  cancelOcrReplacement(): void {
+    this.ocrReplacementConfirmationOpen = false;
+    this.pendingOcrLines = null;
+  }
+
+  private toOcrLine(line: ParsedDocumentLine): SupplierDeliveryNoteLine {
+    return {
+      id: '',
+      supplierItemCode: line.supplierCode,
+      articleVariantId: null,
+      articleDescription: null,
+      supplierPurchaseOrderLineId: null,
+      description: line.description,
+      quantity: line.quantity,
+      unitPrice: '',
+      lineStatus: 'NewArticleNeeded',
+      stockMovementId: null
+    };
+  }
+
+  private applyOcrLines(): void {
+    if (!this.selected || !this.pendingOcrLines) return;
+    const lineCount = this.pendingOcrLines.length;
+    this.selected.lines = this.pendingOcrLines;
+    this.pendingOcrLines = null;
+    this.ocrReplacementConfirmationOpen = false;
     this.dirty = true;
-    this.save(true);
+    this.linePage = 1;
+    this.success = `Importate ${lineCount} righe. Verificare i dati, associare gli articoli e inserire i costi unitari.`;
   }
 
   action(action: 'confirm' | 'cancel'): void {
@@ -419,6 +493,7 @@ export class CaricoMerceWizardComponent implements OnInit, OnDestroy {
     this.service.download(id).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.previewLoading = false))
       .subscribe({
         next: blob => {
+          this.documentPreviewBlob = blob;
           if (this.documentPreviewObjectUrl) URL.revokeObjectURL(this.documentPreviewObjectUrl);
           this.documentPreviewObjectUrl = URL.createObjectURL(blob);
           this.documentPreview = this.sanitizer.bypassSecurityTrustResourceUrl(this.documentPreviewObjectUrl);
@@ -429,7 +504,7 @@ export class CaricoMerceWizardComponent implements OnInit, OnDestroy {
 
   private accept(note: SupplierDeliveryNote): void {
     this.selected = note; this.dirty = false; this.error = ''; this.success = '';
-    this.matchingLine = null; this.variants = []; this.ocrJson = '';
+    this.matchingLine = null; this.variants = [];
     this.linePage = 1;
     this.summaryPage = 1;
   }
@@ -441,18 +516,5 @@ export class CaricoMerceWizardComponent implements OnInit, OnDestroy {
     } else {
       this.error = 'Operazione non riuscita. Verificare connessione e autorizzazioni, poi riprovare.';
     }
-  }
-
-  private isOcrPayload(value: unknown): value is {
-    documentNumber?: string;
-    lines: { supplierItemCode: string; description: string; quantity: number; unitPrice: number | string }[];
-  } {
-    if (typeof value !== 'object' || value === null || !('lines' in value) || !Array.isArray(value.lines)) return false;
-    if ('documentNumber' in value && typeof value.documentNumber !== 'string') return false;
-    return value.lines.every((l: unknown) => typeof l === 'object' && l !== null
-      && 'supplierItemCode' in l && typeof l.supplierItemCode === 'string'
-      && 'description' in l && typeof l.description === 'string'
-      && 'quantity' in l && typeof l.quantity === 'number' && Number.isInteger(l.quantity)
-      && 'unitPrice' in l && (typeof l.unitPrice === 'number' || typeof l.unitPrice === 'string'));
   }
 }

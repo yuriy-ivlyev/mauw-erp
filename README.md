@@ -13,6 +13,7 @@ web Angular e database PostgreSQL.
   approvazione e pagamenti parziali.
 - Anagrafica dipendenti Admin-only con indirizzo/recapiti, documenti personali,
   attestati, cartellini giornalieri e costi mensili con cedolino.
+- Impostazioni aziendali per dati e loghi usati nell'applicazione e nei PDF.
 - Calcolo fiscale centralizzato e generazione PDF/XML FatturaPA.
 - Ritiro in showroom: completa un ordine confermato senza prelievo, imballaggio
   o DDT e registra comunque lo scarico della giacenza.
@@ -29,6 +30,7 @@ Application, Infrastructure e API. Il frontend è in `src/Mauw.Erp.Web`; i test
 xUnit e il generatore opzionale di dati di volume sono in progetti distinti.
 
 - [Stato architetturale e funzionale](docs/STATO_AVANZAMENTO_ARCHITETTURALE.md)
+- [Sintesi esecutiva](docs/EXECUTIVE_SUMMARY.md)
 - [Documentazione Angular e flussi web](docs/README-ANGULAR.md)
 - [Decisioni sul calcolo prezzi](docs/PRICE_CALCULATOR_DECISIONS.md)
 - [Generatore dati di volume](src/Mauw.Erp.DataGenerator/README.txt)

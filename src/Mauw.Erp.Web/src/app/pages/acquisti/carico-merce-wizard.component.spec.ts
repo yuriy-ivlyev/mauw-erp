@@ -27,7 +27,7 @@ describe('CaricoMerceWizardComponent', () => {
   });
 
   beforeEach(async () => {
-    service = jasmine.createSpyObj<SupplierDeliveryNoteService>('SupplierDeliveryNoteService', ['list', 'get', 'findArticle', 'upload', 'save', 'action', 'download']);
+    service = jasmine.createSpyObj<SupplierDeliveryNoteService>('SupplierDeliveryNoteService', ['list', 'get', 'findArticle', 'upload', 'save', 'action', 'download', 'parseDocument']);
     service.list.and.returnValue(of({ items: [], pageNumber: 1, pageSize: 20, totalCount: 0, totalPages: 0 }));
     service.save.and.returnValue(of(draft()));
     await TestBed.configureTestingModule({
@@ -65,6 +65,13 @@ describe('CaricoMerceWizardComponent', () => {
     component.save();
     expect(service.save).not.toHaveBeenCalled();
     expect(component.error).toContain('intere');
+  });
+
+  it('requires OCR unit prices to be entered before saving', () => {
+    component.selected!.lines[0].unitPrice = '';
+    component.save();
+    expect(service.save).not.toHaveBeenCalled();
+    expect(component.error).toContain('Textract non estrae i prezzi');
   });
 
   it('preserves all unit price digits and accepts the Italian decimal separator', () => {
@@ -183,21 +190,45 @@ describe('CaricoMerceWizardComponent', () => {
     expect(line.lineStatus).toBe('Matched');
   });
 
-  it('imports structured OCR data without monetary arithmetic and requests matching', () => {
-    component.ocrJson = '{"documentNumber":"OCR-1","lines":[{"supplierItemCode":"NEW","description":"Maglia","quantity":2,"unitPrice":"1.12345678"}]}';
-    component.importOcr();
-    expect(service.save).toHaveBeenCalledWith('note', jasmine.objectContaining({
-      documentNumber: 'OCR-1',
-      lines: [jasmine.objectContaining({ articleVariantId: null, quantity: 2, unitPrice: '1.12345678' })]
-    }), true);
+  it('sends the stored document to OCR and asks before replacing current lines', () => {
+    service.download.and.returnValue(of(new Blob(['document'], { type: 'application/pdf' })));
+    service.parseDocument.and.returnValue(of({
+      lines: [{ supplierCode: 'NEW', description: 'Maglia', quantity: 2 }]
+    }));
+
+    component.extractOcr();
+
+    const uploadedFile = service.parseDocument.calls.mostRecent().args[0];
+    expect(uploadedFile.name).toBe('doc.pdf');
+    expect(uploadedFile.type).toBe('application/pdf');
+    expect(component.ocrReplacementConfirmationOpen).toBeTrue();
+    expect(component.selected!.lines[0].supplierItemCode).toBe('SUP-M');
+    expect(service.save).not.toHaveBeenCalled();
+
+    component.confirmOcrReplacement();
+
+    expect(component.selected!.lines).toEqual([jasmine.objectContaining({
+      supplierItemCode: 'NEW',
+      description: 'Maglia',
+      quantity: 2,
+      unitPrice: '',
+      articleVariantId: null
+    })]);
+    expect(component.dirty).toBeTrue();
+    expect(component.ocrReplacementConfirmationOpen).toBeFalse();
   });
 
-  it('does not replace editable lines when OCR input is malformed or fractional', () => {
-    const lines = component.selected!.lines;
-    component.ocrJson = '{"lines":[{"supplierItemCode":"NEW","description":"Maglia","quantity":1.5,"unitPrice":"10.00"}]}';
-    component.importOcr();
-    expect(service.save).not.toHaveBeenCalled();
-    expect(component.selected!.lines).toBe(lines);
-    expect(component.error).toBeTruthy();
+  it('keeps current lines when the user cancels OCR replacement', () => {
+    service.download.and.returnValue(of(new Blob(['document'], { type: 'application/pdf' })));
+    service.parseDocument.and.returnValue(of({
+      lines: [{ supplierCode: 'NEW', description: 'Maglia', quantity: 2 }]
+    }));
+    const originalLines = component.selected!.lines;
+
+    component.extractOcr();
+    component.cancelOcrReplacement();
+
+    expect(component.selected!.lines).toBe(originalLines);
+    expect(component.dirty).toBeFalse();
   });
 });

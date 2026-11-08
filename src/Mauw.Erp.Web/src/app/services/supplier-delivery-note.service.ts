@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 import { PagedResult } from '../models/pagination.model';
-import { SaveSupplierDeliveryNoteLines, SupplierArticleMatch, SupplierDeliveryNote, SupplierDeliveryNoteListItem } from '../models/supplier-delivery-note.model';
+import { ParsedDocumentResponse, SaveSupplierDeliveryNoteLines, SupplierArticleMatch, SupplierDeliveryNote, SupplierDeliveryNoteListItem } from '../models/supplier-delivery-note.model';
 
 export interface SupplierDeliveryNoteFilters {
   search?: string;
@@ -50,5 +50,11 @@ export class SupplierDeliveryNoteService {
 
   download(id: string) {
     return this.http.get(`${this.base}/${id}/file`, { responseType: 'blob' });
+  }
+
+  parseDocument(file: File) {
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    return this.http.post<ParsedDocumentResponse>(`${environment.apiUrl}/v1/supplier-documents/parse`, formData);
   }
 }

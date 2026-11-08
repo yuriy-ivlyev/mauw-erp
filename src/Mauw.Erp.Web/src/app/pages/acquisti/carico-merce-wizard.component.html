@@ -172,11 +172,14 @@
         <span *ngIf="dirty" class="text-sm text-amber-700">Modifiche non salvate</span>
       </div>
       <details *ngIf="editable" class="border-t border-gray-100 px-5 py-4 dark:border-gray-800">
-        <summary class="cursor-pointer font-medium">Importa dati estratti da OCR / IA</summary>
-        <p class="my-2 text-sm text-gray-500">Incolla il payload strutturato. Sostituisce tutte le righe; il documento non viene inviato automaticamente a servizi esterni.</p>
-        <textarea rows="5" [(ngModel)]="ocrJson" [disabled]="busy"
-          placeholder='{"documentNumber":"DDT-123","lines":[{"supplierItemCode":"MAGLIA-BLU-M","description":"Maglia blu M","quantity":5,"unitPrice":"12.34567890"}]}'></textarea>
-        <button class="action mt-2" type="button" (click)="importOcr()" [disabled]="busy || !ocrJson.trim()">Importa righe</button>
+        <summary class="cursor-pointer font-medium">Estrai righe con OCR (Amazon Textract)</summary>
+        <p class="my-2 text-sm text-gray-500">
+          L’azione invia il documento originale ad Amazon Textract per estrarre codice, descrizione e quantità.
+          Il costo unitario non viene estratto e dovrà essere inserito manualmente.
+        </p>
+        <button class="action primary mt-2" type="button" (click)="extractOcr()" [disabled]="busy">
+          {{ busy ? 'Estrazione OCR...' : 'Estrai righe dal documento' }}
+        </button>
       </details>
     </div>
 
@@ -268,5 +271,15 @@
     message="La riga verrà rimossa dalla bozza al prossimo salvataggio. Continuare?"
     (confirmed)="confirmRemoveLine()"
     (cancelled)="cancelRemoveLine()">
+  </app-confirm-delete-modal>
+  <app-confirm-delete-modal
+    [isOpen]="ocrReplacementConfirmationOpen"
+    title="Sostituire le righe con l’estrazione OCR?"
+    message="Le righe correnti e le eventuali modifiche non salvate alle righe verranno sostituite. Il documento originale non cambia."
+    confirmLabel="Sostituisci righe"
+    [showDeleteIcon]="false"
+    actionVariant="primary"
+    (confirmed)="confirmOcrReplacement()"
+    (cancelled)="cancelOcrReplacement()">
   </app-confirm-delete-modal>
 </div>

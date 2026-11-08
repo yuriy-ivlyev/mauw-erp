@@ -1,6 +1,6 @@
 # Mauw ERP — Stato architetturale e funzionale
 
-ERP B2B Pronto Moda Wholesale «mauw». Rilevazione aggiornata al **2026-11-04**,
+ERP B2B Pronto Moda Wholesale «mauw». Rilevazione aggiornata al **2026-11-05**,
 basata sull'implementazione presente e sui test mirati recenti; non descrive un
 particolare branch o stato Git.
 
@@ -181,7 +181,10 @@ l'XML archiviato.
 Contatti con profili cliente/fornitore/agente (provvigioni), indirizzi, persone,
 blocco cliente, assegnazione cliente–agente, paesi, validazione P.IVA via VIES,
 autocomplete indirizzi (Google Places → fallback Photon) e impostazioni azienda
-(sedi, loghi e dati fattura). Il partitario cliente è aggregato dall'API e
+(sedi, loghi e dati fattura). La navigazione laterale riserva la sezione
+**Gestione aziendale** (`/impostazioni/azienda` e
+`/amministrazione/dipendenti`) al ruolo `Admin`, separandola da Acquisti e
+Sistema. Il partitario cliente è aggregato dall'API e
 visualizzato tramite `CustomerStatementComponent`, condiviso tra dettaglio e
 modifica anagrafica. Dashboard analitiche disponibili a `Admin`.
 

@@ -2,6 +2,7 @@
 <#
 .SYNOPSIS
     Builda solo i servizi modificati (api / web / proxy) e avvia docker compose.
+    Se sono configurate credenziali AWS locali, le monta come Compose secrets.
 
 .PARAMETER Target
     auto  (default) rileva le modifiche rispetto all'ultima build riuscita
@@ -34,6 +35,43 @@ function Invoke-Docker {
 if ($Target -eq 'down') {
     Invoke-Docker compose down --remove-orphans
     return
+}
+
+$composeFiles = @('-f', 'docker-compose.yml')
+$secretStorePath = Join-Path $env:APPDATA 'Microsoft\UserSecrets\mauw-erp-api-secrets\secrets.json'
+if (Test-Path -LiteralPath $secretStorePath) {
+    $settings = Get-Content -LiteralPath $secretStorePath -Raw | ConvertFrom-Json
+    $regionProperty = $settings.PSObject.Properties['AWS:Region']
+    if ($null -ne $regionProperty -and
+        -not [string]::IsNullOrWhiteSpace([string]$regionProperty.Value)) {
+        $env:AWS_REGION = [string]$regionProperty.Value
+    }
+
+    $textractRegionProperty = $settings.PSObject.Properties['AWS:TextractRegion']
+    if ($null -ne $textractRegionProperty -and
+        -not [string]::IsNullOrWhiteSpace([string]$textractRegionProperty.Value)) {
+        $env:AWS_TEXTRACT_REGION = [string]$textractRegionProperty.Value
+    } elseif ([string]::IsNullOrWhiteSpace($env:AWS_TEXTRACT_REGION)) {
+        $env:AWS_TEXTRACT_REGION = 'eu-central-1'
+    }
+
+    $accessKeyProperty = $settings.PSObject.Properties['AWS:AccessKeyId']
+    $secretKeyProperty = $settings.PSObject.Properties['AWS:SecretAccessKey']
+    $hasAccessKey = $null -ne $accessKeyProperty -and
+        -not [string]::IsNullOrWhiteSpace([string]$accessKeyProperty.Value)
+    $hasSecretKey = $null -ne $secretKeyProperty -and
+        -not [string]::IsNullOrWhiteSpace([string]$secretKeyProperty.Value)
+
+    if ($hasAccessKey -xor $hasSecretKey) {
+        throw 'AWS:AccessKeyId e AWS:SecretAccessKey devono essere configurati insieme.'
+    }
+
+    if ($hasAccessKey) {
+        & (Join-Path $PSScriptRoot 'export-aws-textract-secrets.ps1')
+        $composeFiles += @('-f', 'docker-compose.aws-secrets.yml')
+    }
+
+    Remove-Variable settings, regionProperty, textractRegionProperty, accessKeyProperty, secretKeyProperty -ErrorAction SilentlyContinue
 }
 
 # Hash del contenuto sorgente che finisce nell'immagine di ciascun servizio
@@ -84,9 +122,10 @@ $toBuild = @($toBuild)
 
 if ($toBuild.Count -gt 0) {
     Write-Host "==> Build: $($toBuild -join ', ')" -ForegroundColor Cyan
-    $buildArgs = @('compose', 'build')
+    $buildArgs = @('compose') + $composeFiles + @('build')
     if ($NoCache) { $buildArgs += '--no-cache' }
-    Invoke-Docker @buildArgs @toBuild
+    $buildArgs += $toBuild
+    Invoke-Docker @buildArgs
     foreach ($svc in $toBuild) { $previous[$svc] = $hashes[$svc] }
     New-Item -ItemType Directory -Force (Split-Path $stateFile) | Out-Null
     $previous | ConvertTo-Json | Set-Content $stateFile -Encoding UTF8
@@ -95,7 +134,8 @@ if ($toBuild.Count -gt 0) {
 }
 
 Write-Host '==> docker compose up' -ForegroundColor Cyan
-Invoke-Docker compose up -d --remove-orphans
+$upArgs = @('compose') + $composeFiles + @('up', '-d', '--remove-orphans')
+Invoke-Docker @upArgs
 
 $port = if ($env:HTTPS_PORT) { $env:HTTPS_PORT } else { '5019' }
 Write-Host "==> Pronto: https://localhost:$port" -ForegroundColor Green

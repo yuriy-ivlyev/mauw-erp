@@ -90,6 +90,9 @@ services:
       S3Storage__AccessKey: "${MINIO_ROOT_USER}"
       S3Storage__SecretKey: "${MINIO_ROOT_PASSWORD}"
       S3Storage__BucketName: "${S3_BUCKET:-mauw-erp-images}"
+      # Region is not secret; mount AWS credentials with docker-compose.aws-secrets.yml.
+      AWS_REGION: "${AWS_REGION:-}"
+      AWS_TEXTRACT_REGION: "${AWS_TEXTRACT_REGION:-eu-central-1}"
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: "http://+:8080"
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"

@@ -33,30 +33,34 @@ describe('SidebarComponent', () => {
     expect(hasLink('Prodotti')).toBeTrue();
     section('Sistema').click();
     fixture.detectChanges();
+    expect(hasLink('Azienda')).toBeFalse();
+    expect(hasLink('Formula prezzi')).toBeTrue();
+    section('Gestione aziendale').click();
+    fixture.detectChanges();
+    expect(hasLink('Personale')).toBeTrue();
     expect(hasLink('Azienda')).toBeTrue();
     expect(hasLink('Prodotti')).toBeTrue();
     section('Catalogo').click();
     fixture.detectChanges();
     expect(hasLink('Prodotti')).toBeFalse();
     expect(hasLink('Azienda')).toBeTrue();
+    expect(hasLink('Personale')).toBeTrue();
   });
 
-  it('shows Sales only the reimbursement entry under Purchases', async () => {
+  it('hides admin-only purchases and personnel from Sales', async () => {
     const fixture = await createSidebar(['Sales']);
     const catalog = fixture.componentInstance.menuItems.find(item => item.label === 'Catalogo')!;
     fixture.componentInstance.toggleSubmenu(catalog);
-    const purchases = fixture.componentInstance.menuItems.find(item => item.label === 'Acquisti')!;
-    fixture.componentInstance.toggleSubmenu(purchases);
     fixture.detectChanges();
     const text = (fixture.nativeElement as HTMLElement).textContent!;
     expect(text).toContain('Listini');
     expect(text).not.toContain('Prodotti');
     expect(text).not.toContain('Sistema');
+    expect(text).not.toContain('Gestione aziendale');
+    expect(text).not.toContain('Acquisti');
     const links = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('nav a'))
       .map(link => link.textContent?.trim());
-    expect(text).toContain('Acquisti');
-    expect(links).toContain('Rimborsi');
-    for (const label of ['Fatture passive', 'Ordini Fornitore', 'Carico Merce']) {
+    for (const label of ['Rimborsi', 'Fatture passive', 'Ordini Fornitore', 'Carico Merce', 'Personale']) {
       expect(links).not.toContain(label);
     }
   });

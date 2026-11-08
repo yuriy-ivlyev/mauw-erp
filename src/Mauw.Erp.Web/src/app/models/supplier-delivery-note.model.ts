@@ -49,3 +49,13 @@ export interface SaveSupplierDeliveryNoteLines {
   documentDate: string;
   lines: Pick<SupplierDeliveryNoteLine, 'supplierItemCode' | 'articleVariantId' | 'supplierPurchaseOrderLineId' | 'description' | 'quantity' | 'unitPrice'>[];
 }
+
+export interface ParsedDocumentLine {
+  supplierCode: string;
+  description: string;
+  quantity: number;
+}
+
+export interface ParsedDocumentResponse {
+  lines: ParsedDocumentLine[];
+}

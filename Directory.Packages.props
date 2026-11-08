@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="AWSSDK.S3" Version="4.0.104.5" />
+    <PackageVersion Include="AWSSDK.Textract" Version="4.0.100.24" />
     <PackageVersion Include="Bogus" Version="35.6.5" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="MediatR" Version="14.2.0" />

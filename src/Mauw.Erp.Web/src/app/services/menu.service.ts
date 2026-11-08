@@ -53,8 +53,17 @@ export class MenuService {
         { label: 'Ordini Fornitore', route: '/acquisti/ordini-fornitore', icon: ICONS.orders, roles: ['Admin', 'Warehouse'] },
         { label: 'Carico Merce', route: '/acquisti/ddt-fornitore', icon: ICONS.ddt, roles: ['Admin', 'Warehouse'] },
         { label: 'Fatture passive', route: '/acquisti/passivi', icon: ICONS.invoice, roles: ['Admin', 'Accounting'] },
-        { label: 'Rimborsi', route: '/acquisti/rimborsi', icon: ICONS.creditNote, roles: ['Admin'] },
-        { label: 'Personale', route: '/amministrazione/dipendenti', icon: ICONS.company, roles: ['Admin'] }
+        { label: 'Rimborsi', route: '/acquisti/rimborsi', icon: ICONS.creditNote, roles: ['Admin'] }
+      ]
+    },
+    {
+      label: 'Gestione aziendale',
+      icon: ICONS.company,
+      isCollapsed: true,
+      roles: ['Admin'],
+      children: [
+        { label: 'Personale', route: '/amministrazione/dipendenti', icon: ICONS.contacts },
+        { label: 'Azienda', route: '/impostazioni/azienda', icon: ICONS.company }
       ]
     },
     {
@@ -108,8 +117,8 @@ export class MenuService {
         { label: 'Anagrafiche', route: '/dashboard/anagrafiche', icon: ICONS.contacts, roles: ['Admin'] },
         { label: 'Magazzino', route: '/dashboard/magazzino', icon: ICONS.movements, roles: ['Admin'] },
         { label: 'Impostazioni', icon: '', isSeparator: true },
-        { label: 'Azienda', route: '/impostazioni/azienda', icon: ICONS.company, roles: ['Admin'] },
-        { label: 'Formula prezzi', route: '/impostazioni/formula-prezzi', icon: ICONS.priceList, roles: ['Admin'] }
+        { label: 'Formula prezzi', route: '/impostazioni/formula-prezzi', icon: ICONS.priceList, roles: ['Admin'] },
+        { label: 'Intestazioni OCR fornitori', route: '/impostazioni/ocr-fornitori', icon: ICONS.settings, roles: ['Admin'] }
       ]
     }
   ];
